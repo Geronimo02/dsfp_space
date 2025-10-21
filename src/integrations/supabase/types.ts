@@ -384,6 +384,54 @@ export type Database = {
           },
         ]
       }
+      service_parts: {
+        Row: {
+          created_at: string
+          id: string
+          part_name: string
+          product_id: string | null
+          quantity: number
+          service_id: string
+          subtotal: number
+          unit_cost: number
+        }
+        Insert: {
+          created_at?: string
+          id?: string
+          part_name: string
+          product_id?: string | null
+          quantity?: number
+          service_id: string
+          subtotal: number
+          unit_cost: number
+        }
+        Update: {
+          created_at?: string
+          id?: string
+          part_name?: string
+          product_id?: string | null
+          quantity?: number
+          service_id?: string
+          subtotal?: number
+          unit_cost?: number
+        }
+        Relationships: [
+          {
+            foreignKeyName: "service_parts_product_id_fkey"
+            columns: ["product_id"]
+            isOneToOne: false
+            referencedRelation: "products"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "service_parts_service_id_fkey"
+            columns: ["service_id"]
+            isOneToOne: false
+            referencedRelation: "technical_services"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       supplier_payments: {
         Row: {
           amount: number
@@ -486,6 +534,86 @@ export type Database = {
         }
         Relationships: []
       }
+      technical_services: {
+        Row: {
+          brand: string | null
+          completed_date: string | null
+          created_at: string
+          customer_id: string | null
+          delivered_date: string | null
+          device_type: string
+          diagnosis: string | null
+          estimated_completion_date: string | null
+          id: string
+          labor_cost: number | null
+          model: string | null
+          notes: string | null
+          parts_cost: number | null
+          received_date: string
+          reported_issue: string
+          serial_number: string | null
+          service_number: string
+          status: Database["public"]["Enums"]["service_status"]
+          total_cost: number
+          updated_at: string
+          user_id: string
+        }
+        Insert: {
+          brand?: string | null
+          completed_date?: string | null
+          created_at?: string
+          customer_id?: string | null
+          delivered_date?: string | null
+          device_type: string
+          diagnosis?: string | null
+          estimated_completion_date?: string | null
+          id?: string
+          labor_cost?: number | null
+          model?: string | null
+          notes?: string | null
+          parts_cost?: number | null
+          received_date?: string
+          reported_issue: string
+          serial_number?: string | null
+          service_number: string
+          status?: Database["public"]["Enums"]["service_status"]
+          total_cost?: number
+          updated_at?: string
+          user_id: string
+        }
+        Update: {
+          brand?: string | null
+          completed_date?: string | null
+          created_at?: string
+          customer_id?: string | null
+          delivered_date?: string | null
+          device_type?: string
+          diagnosis?: string | null
+          estimated_completion_date?: string | null
+          id?: string
+          labor_cost?: number | null
+          model?: string | null
+          notes?: string | null
+          parts_cost?: number | null
+          received_date?: string
+          reported_issue?: string
+          serial_number?: string | null
+          service_number?: string
+          status?: Database["public"]["Enums"]["service_status"]
+          total_cost?: number
+          updated_at?: string
+          user_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "technical_services_customer_id_fkey"
+            columns: ["customer_id"]
+            isOneToOne: false
+            referencedRelation: "customers"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       user_roles: {
         Row: {
           id: string
@@ -509,6 +637,10 @@ export type Database = {
       [_ in never]: never
     }
     Functions: {
+      generate_service_number: {
+        Args: Record<PropertyKey, never>
+        Returns: string
+      }
       has_role: {
         Args: {
           _role: Database["public"]["Enums"]["app_role"]
@@ -519,6 +651,12 @@ export type Database = {
     }
     Enums: {
       app_role: "admin" | "manager" | "employee"
+      service_status:
+        | "received"
+        | "in_diagnosis"
+        | "in_repair"
+        | "ready"
+        | "delivered"
     }
     CompositeTypes: {
       [_ in never]: never
@@ -647,6 +785,13 @@ export const Constants = {
   public: {
     Enums: {
       app_role: ["admin", "manager", "employee"],
+      service_status: [
+        "received",
+        "in_diagnosis",
+        "in_repair",
+        "ready",
+        "delivered",
+      ],
     },
   },
 } as const
