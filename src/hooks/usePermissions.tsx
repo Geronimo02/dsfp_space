@@ -14,7 +14,10 @@ export type Module =
   | "cash_register" 
   | "technical_services"
   | "quotations"
-  | "delivery_notes";
+  | "delivery_notes"
+  | "promotions"
+  | "returns"
+  | "credit_notes";
 
 interface RolePermission {
   role: string;

@@ -18,7 +18,9 @@ import {
   Activity,
   FileSignature,
   PackageCheck,
-  CreditCard
+  CreditCard,
+  RotateCcw,
+  Tag
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { supabase } from "@/integrations/supabase/client";
@@ -40,6 +42,7 @@ const navigationSections = [
       { name: "Ventas", href: "/sales", icon: Receipt },
       { name: "Presupuestos", href: "/quotations", icon: FileSignature },
       { name: "Remitos", href: "/delivery-notes", icon: PackageCheck },
+      { name: "Devoluciones", href: "/returns", icon: RotateCcw },
       { name: "Clientes", href: "/customers", icon: Users },
       { name: "Cuentas Corrientes", href: "/customer-account", icon: CreditCard },
     ]
@@ -56,6 +59,7 @@ const navigationSections = [
     title: "Gestión",
     items: [
       { name: "Servicios Técnicos", href: "/technical-services", icon: Wrench },
+      { name: "Promociones", href: "/promotions", icon: Tag },
       { name: "Gestión de Caja", href: "/cash-register", icon: Wallet },
       { name: "Usuarios", href: "/employees", icon: UserCog },
     ]
