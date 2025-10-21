@@ -28,7 +28,7 @@ const navigation = [
   { name: "Clientes", href: "/customers", icon: Users },
   { name: "Ventas", href: "/sales", icon: Receipt },
   { name: "Servicios Técnicos", href: "/technical-services", icon: Wrench },
-  { name: "Empleados", href: "/employees", icon: UserCog },
+  { name: "Usuarios", href: "/employees", icon: UserCog },
   { name: "Gestión de Caja", href: "/cash-register", icon: Wallet },
   { name: "Compras", href: "/purchases", icon: ShoppingBag },
   { name: "Reportes", href: "/reports", icon: BarChart3 },

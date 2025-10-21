@@ -63,7 +63,15 @@ export default function Employees() {
     try {
       setLoading(true);
 
-      // Get all users from auth.users via profiles
+      // Get current user
+      const { data: { user: currentUser } } = await supabase.auth.getUser();
+      
+      if (!currentUser) {
+        toast.error("No estás autenticado");
+        return;
+      }
+
+      // Get all profiles
       const { data: profiles, error: profilesError } = await supabase
         .from("profiles")
         .select("id, full_name");
@@ -77,22 +85,14 @@ export default function Employees() {
 
       if (rolesError) throw rolesError;
 
-      // Get emails from auth admin API
-      const { data, error: usersError } = await supabase.auth.admin.listUsers();
-
-      if (usersError) throw usersError;
-
-      const users = data?.users || [];
-
-      // Combine data
+      // Combine data (no podemos obtener emails sin service role key)
       const employeesData: Employee[] = profiles?.map((profile) => {
-        const user = users.find((u) => u.id === profile.id);
         const roles = (userRoles?.filter((r) => r.user_id === profile.id).map((r) => r.role as AppRole) || []) as AppRole[];
 
         return {
           id: profile.id,
           full_name: profile.full_name,
-          email: user?.email || "Sin email",
+          email: profile.id === currentUser.id ? currentUser.email || "Sin email" : "***@***.***",
           roles,
         };
       }) || [];
@@ -167,9 +167,9 @@ export default function Employees() {
       <div className="space-y-6">
         <div className="flex justify-between items-center">
           <div>
-            <h1 className="text-3xl font-bold text-foreground">Empleados</h1>
+            <h1 className="text-3xl font-bold text-foreground">Gestión de Usuarios</h1>
             <p className="text-muted-foreground mt-1">
-              Gestiona usuarios y permisos del sistema
+              Administra roles y permisos del sistema
             </p>
           </div>
         </div>
@@ -235,7 +235,7 @@ export default function Employees() {
               <TableHeader>
                 <TableRow>
                   <TableHead>Nombre</TableHead>
-                  <TableHead>Email</TableHead>
+                  <TableHead>ID de Usuario</TableHead>
                   <TableHead>Roles</TableHead>
                   <TableHead className="text-right">Acciones</TableHead>
                 </TableRow>
@@ -259,7 +259,7 @@ export default function Employees() {
                       <TableCell className="font-medium">
                         {employee.full_name || "Sin nombre"}
                       </TableCell>
-                      <TableCell>{employee.email}</TableCell>
+                      <TableCell className="font-mono text-xs">{employee.id.substring(0, 8)}...</TableCell>
                       <TableCell>
                         <div className="flex gap-1 flex-wrap">
                           {employee.roles.length === 0 ? (
@@ -306,7 +306,10 @@ export default function Employees() {
             <div>
               <Label className="text-sm font-medium">Usuario</Label>
               <p className="text-sm text-muted-foreground mt-1">
-                {selectedEmployee?.full_name || "Sin nombre"} ({selectedEmployee?.email})
+                {selectedEmployee?.full_name || "Sin nombre"}
+              </p>
+              <p className="text-xs text-muted-foreground font-mono">
+                ID: {selectedEmployee?.id}
               </p>
             </div>
 
