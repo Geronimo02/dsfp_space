@@ -10,6 +10,56 @@ interface ReceiptItem {
 }
 
 interface ReceiptData {
+  saleNumber?: string;
+  sale_number?: string;
+  items: ReceiptItem[];
+  sale_items?: ReceiptItem[];
+  subtotal: number;
+  discount: number;
+  discount_rate?: number;
+  tax: number;
+  tax_rate?: number;
+  cardSurcharge?: number;
+  total: number;
+  paymentMethod?: string;
+  payment_method?: string;
+  installments?: number;
+  installmentAmount?: number;
+  installment_amount?: number;
+  companyName?: string;
+  companyAddress?: string;
+  companyPhone?: string;
+  companyTaxId?: string;
+  footer?: string;
+  customer?: any;
+}
+
+export const ReceiptPDF = (data: ReceiptData) => {
+  const items = data.items || data.sale_items || [];
+  const saleNumber = data.saleNumber || data.sale_number || "";
+  const paymentMethod = data.paymentMethod || data.payment_method || "cash";
+  const installmentAmount = data.installmentAmount || data.installment_amount || 0;
+
+  generateReceiptPDF({
+    saleNumber,
+    items,
+    subtotal: data.subtotal,
+    discount: data.discount,
+    tax: data.tax,
+    cardSurcharge: data.cardSurcharge,
+    total: data.total,
+    paymentMethod,
+    installments: data.installments,
+    installmentAmount,
+    companyName: data.companyName || "Mi Negocio",
+    companyAddress: data.companyAddress,
+    companyPhone: data.companyPhone,
+    companyTaxId: data.companyTaxId,
+    footer: data.footer,
+  });
+};
+
+export const generateReceiptPDF = (data: {
   saleNumber: string;
   items: ReceiptItem[];
   subtotal: number;
@@ -25,9 +75,7 @@ interface ReceiptData {
   companyPhone?: string;
   companyTaxId?: string;
   footer?: string;
-}
-
-export const generateReceiptPDF = (data: ReceiptData) => {
+}) => {
   const doc = new jsPDF({
     unit: "mm",
     format: [80, 200], // Formato ticket térmico

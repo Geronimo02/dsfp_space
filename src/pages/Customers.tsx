@@ -8,7 +8,8 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from 
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
-import { Plus, Edit, Search, Receipt, Eye } from "lucide-react";
+import { Plus, Edit, Search, Receipt, Eye, Printer } from "lucide-react";
+import { ReceiptPDF } from "@/components/pos/ReceiptPDF";
 import { toast } from "sonner";
 import { Badge } from "@/components/ui/badge";
 import { format } from "date-fns";
@@ -51,7 +52,10 @@ export default function Customers() {
       
       const { data, error } = await supabase
         .from("sales")
-        .select("*")
+        .select(`
+          *,
+          sale_items(*)
+        `)
         .eq("customer_id", selectedCustomer.id)
         .order("created_at", { ascending: false });
       
@@ -140,6 +144,15 @@ export default function Customers() {
   };
 
   const totalSpent = customerSales?.reduce((sum, sale) => sum + Number(sale.total), 0) || 0;
+
+  const handlePrintReceipt = (sale: any) => {
+    const saleData = {
+      ...sale,
+      items: sale.sale_items || [],
+      customer: selectedCustomer,
+    };
+    ReceiptPDF(saleData);
+  };
 
   return (
     <Layout>
@@ -300,6 +313,7 @@ export default function Customers() {
                       <TableHead>Método</TableHead>
                       <TableHead>Total</TableHead>
                       <TableHead>Estado</TableHead>
+                      <TableHead className="text-right">Acción</TableHead>
                     </TableRow>
                   </TableHeader>
                   <TableBody>
@@ -320,6 +334,15 @@ export default function Customers() {
                         </TableCell>
                         <TableCell>
                           <Badge className="bg-success">Completada</Badge>
+                        </TableCell>
+                        <TableCell className="text-right">
+                          <Button 
+                            size="icon" 
+                            variant="outline"
+                            onClick={() => handlePrintReceipt(sale)}
+                          >
+                            <Printer className="h-4 w-4" />
+                          </Button>
                         </TableCell>
                       </TableRow>
                     ))}
