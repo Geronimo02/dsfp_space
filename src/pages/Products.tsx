@@ -11,6 +11,30 @@ import { supabase } from "@/integrations/supabase/client";
 import { Plus, Edit, Trash2, Search } from "lucide-react";
 import { toast } from "sonner";
 import { Badge } from "@/components/ui/badge";
+import { z } from "zod";
+
+const productSchema = z.object({
+  name: z.string().trim().min(1, "El nombre es requerido").max(200, "El nombre debe tener máximo 200 caracteres"),
+  price: z.number({ invalid_type_error: "El precio debe ser un número" })
+    .positive("El precio debe ser mayor a 0")
+    .max(999999.99, "El precio debe ser menor a 1,000,000"),
+  cost: z.number({ invalid_type_error: "El costo debe ser un número" })
+    .nonnegative("El costo no puede ser negativo")
+    .max(999999.99, "El costo debe ser menor a 1,000,000")
+    .optional(),
+  stock: z.number({ invalid_type_error: "El stock debe ser un número" })
+    .int("El stock debe ser un número entero")
+    .nonnegative("El stock no puede ser negativo")
+    .max(1000000, "El stock debe ser menor a 1,000,000"),
+  min_stock: z.number({ invalid_type_error: "El stock mínimo debe ser un número" })
+    .int("El stock mínimo debe ser un número entero")
+    .nonnegative("El stock mínimo no puede ser negativo")
+    .max(1000000, "El stock mínimo debe ser menor a 1,000,000")
+    .optional(),
+  category: z.string().max(100, "La categoría debe tener máximo 100 caracteres").optional(),
+  barcode: z.string().max(50, "El código de barras debe tener máximo 50 caracteres").optional(),
+  sku: z.string().max(50, "El SKU debe tener máximo 50 caracteres").optional(),
+});
 
 export default function Products() {
   const [searchQuery, setSearchQuery] = useState("");
@@ -106,21 +130,43 @@ export default function Products() {
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
     
-    const productData = {
-      name: formData.name,
-      barcode: formData.barcode || null,
-      sku: formData.sku || null,
-      price: parseFloat(formData.price),
-      cost: formData.cost ? parseFloat(formData.cost) : 0,
-      stock: parseInt(formData.stock),
-      min_stock: formData.min_stock ? parseInt(formData.min_stock) : 0,
-      category: formData.category || null,
-    };
+    try {
+      // Parse and validate input data
+      const validatedData = productSchema.parse({
+        name: formData.name,
+        price: parseFloat(formData.price),
+        cost: formData.cost ? parseFloat(formData.cost) : undefined,
+        stock: parseInt(formData.stock),
+        min_stock: formData.min_stock ? parseInt(formData.min_stock) : undefined,
+        category: formData.category || undefined,
+        barcode: formData.barcode || undefined,
+        sku: formData.sku || undefined,
+      });
 
-    if (editingProduct) {
-      updateProductMutation.mutate({ id: editingProduct.id, data: productData });
-    } else {
-      createProductMutation.mutate(productData);
+      // Prepare data for database
+      const productData = {
+        name: validatedData.name,
+        barcode: validatedData.barcode || null,
+        sku: validatedData.sku || null,
+        price: validatedData.price,
+        cost: validatedData.cost ?? 0,
+        stock: validatedData.stock,
+        min_stock: validatedData.min_stock ?? 0,
+        category: validatedData.category || null,
+      };
+
+      if (editingProduct) {
+        updateProductMutation.mutate({ id: editingProduct.id, data: productData });
+      } else {
+        createProductMutation.mutate(productData);
+      }
+    } catch (error) {
+      if (error instanceof z.ZodError) {
+        const firstError = error.errors[0];
+        toast.error(firstError.message);
+      } else {
+        toast.error("Error al validar el producto");
+      }
     }
   };
 

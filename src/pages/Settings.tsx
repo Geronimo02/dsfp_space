@@ -9,6 +9,22 @@ import { Textarea } from "@/components/ui/textarea";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
 import { toast } from "sonner";
+import { z } from "zod";
+
+const settingsSchema = z.object({
+  company_name: z.string().trim().min(1, "El nombre de la empresa es requerido").max(200, "El nombre debe tener máximo 200 caracteres"),
+  email: z.string().trim().max(255, "El email debe tener máximo 255 caracteres")
+    .refine((val) => val === "" || z.string().email().safeParse(val).success, "Email inválido")
+    .optional(),
+  phone: z.string().max(20, "El teléfono debe tener máximo 20 caracteres").optional(),
+  tax_id: z.string().max(50, "El Tax ID debe tener máximo 50 caracteres").optional(),
+  address: z.string().max(500, "La dirección debe tener máximo 500 caracteres").optional(),
+  default_tax_rate: z.number({ invalid_type_error: "El impuesto debe ser un número" })
+    .min(0, "El impuesto no puede ser negativo")
+    .max(100, "El impuesto no puede ser mayor a 100%"),
+  currency: z.string().length(3, "El código de moneda debe tener 3 caracteres (ISO 4217)"),
+  receipt_footer: z.string().max(500, "El pie de ticket debe tener máximo 500 caracteres").optional(),
+});
 
 export default function Settings() {
   const queryClient = useQueryClient();
@@ -80,7 +96,29 @@ export default function Settings() {
 
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
-    updateSettingsMutation.mutate(formData);
+    
+    try {
+      // Parse and validate input data
+      const validatedData = settingsSchema.parse({
+        company_name: formData.company_name,
+        email: formData.email || undefined,
+        phone: formData.phone || undefined,
+        tax_id: formData.tax_id || undefined,
+        address: formData.address || undefined,
+        default_tax_rate: parseFloat(formData.default_tax_rate) || 0,
+        currency: formData.currency,
+        receipt_footer: formData.receipt_footer || undefined,
+      });
+
+      updateSettingsMutation.mutate(validatedData);
+    } catch (error) {
+      if (error instanceof z.ZodError) {
+        const firstError = error.errors[0];
+        toast.error(firstError.message);
+      } else {
+        toast.error("Error al validar la configuración");
+      }
+    }
   };
 
   if (isLoading) {
