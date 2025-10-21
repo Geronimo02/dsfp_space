@@ -14,6 +14,7 @@ import Suppliers from "./pages/Suppliers";
 import Customers from "./pages/Customers";
 import Sales from "./pages/Sales";
 import TechnicalServices from "./pages/TechnicalServices";
+import Employees from "./pages/Employees";
 import Settings from "./pages/Settings";
 import NotFound from "./pages/NotFound";
 
@@ -68,6 +69,7 @@ const App = () => (
           <Route path="/customers" element={<ProtectedRoute><Customers /></ProtectedRoute>} />
           <Route path="/sales" element={<ProtectedRoute><Sales /></ProtectedRoute>} />
           <Route path="/technical-services" element={<ProtectedRoute><TechnicalServices /></ProtectedRoute>} />
+          <Route path="/employees" element={<ProtectedRoute><Employees /></ProtectedRoute>} />
           <Route path="/settings" element={<ProtectedRoute><Settings /></ProtectedRoute>} />
           {/* ADD ALL CUSTOM ROUTES ABOVE THE CATCH-ALL "*" ROUTE */}
           <Route path="*" element={<NotFound />} />
