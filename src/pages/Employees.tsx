@@ -10,7 +10,20 @@ import {
   DialogHeader,
   DialogTitle,
   DialogTrigger,
+  DialogDescription,
+  DialogFooter,
 } from "@/components/ui/dialog";
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+  AlertDialogTrigger,
+} from "@/components/ui/alert-dialog";
 import {
   Table,
   TableBody,
@@ -28,7 +41,7 @@ import {
 } from "@/components/ui/select";
 import { supabase } from "@/integrations/supabase/client";
 import { toast } from "sonner";
-import { UserPlus, Search, Users, Shield, UserCheck } from "lucide-react";
+import { UserPlus, Search, Users, Shield, UserCheck, Database, Trash2 } from "lucide-react";
 import { Label } from "@/components/ui/label";
 import { Checkbox } from "@/components/ui/checkbox";
 
@@ -46,8 +59,14 @@ export default function Employees() {
   const [loading, setLoading] = useState(true);
   const [searchTerm, setSearchTerm] = useState("");
   const [dialogOpen, setDialogOpen] = useState(false);
+  const [inviteDialogOpen, setInviteDialogOpen] = useState(false);
   const [selectedEmployee, setSelectedEmployee] = useState<Employee | null>(null);
   const [selectedRoles, setSelectedRoles] = useState<AppRole[]>([]);
+  const [inviteEmail, setInviteEmail] = useState("");
+  const [inviteName, setInviteName] = useState("");
+  const [inviteLoading, setInviteLoading] = useState(false);
+  const [isAdmin, setIsAdmin] = useState(false);
+  const [resetLoading, setResetLoading] = useState(false);
 
   const availableRoles: { value: AppRole; label: string; color: string }[] = [
     { value: "admin", label: "Administrador", color: "bg-red-500" },
@@ -57,7 +76,24 @@ export default function Employees() {
 
   useEffect(() => {
     fetchEmployees();
+    checkAdminStatus();
   }, []);
+
+  const checkAdminStatus = async () => {
+    try {
+      const { data: { user } } = await supabase.auth.getUser();
+      if (!user) return;
+
+      const { data: roles } = await supabase
+        .from("user_roles")
+        .select("role")
+        .eq("user_id", user.id);
+
+      setIsAdmin(roles?.some((r) => r.role === "admin") || false);
+    } catch (error: any) {
+      console.error("Error checking admin status:", error);
+    }
+  };
 
   const fetchEmployees = async () => {
     try {
@@ -153,6 +189,89 @@ export default function Employees() {
     setDialogOpen(true);
   };
 
+  const handleInviteEmployee = async () => {
+    if (!inviteEmail) {
+      toast.error("El email es requerido");
+      return;
+    }
+
+    try {
+      setInviteLoading(true);
+      const { data: { session } } = await supabase.auth.getSession();
+      
+      if (!session) {
+        toast.error("No estás autenticado");
+        return;
+      }
+
+      const response = await fetch(
+        `https://pjcfncnydhxrlnaowbae.supabase.co/functions/v1/invite-employee`,
+        {
+          method: "POST",
+          headers: {
+            "Authorization": `Bearer ${session.access_token}`,
+            "Content-Type": "application/json",
+          },
+          body: JSON.stringify({
+            email: inviteEmail,
+            full_name: inviteName,
+          }),
+        }
+      );
+
+      const result = await response.json();
+
+      if (!response.ok) {
+        throw new Error(result.error || "Error al invitar empleado");
+      }
+
+      toast.success("Invitación enviada exitosamente");
+      setInviteDialogOpen(false);
+      setInviteEmail("");
+      setInviteName("");
+      fetchEmployees();
+    } catch (error: any) {
+      toast.error("Error al invitar empleado: " + error.message);
+    } finally {
+      setInviteLoading(false);
+    }
+  };
+
+  const handleResetDatabase = async () => {
+    try {
+      setResetLoading(true);
+      const { data: { session } } = await supabase.auth.getSession();
+      
+      if (!session) {
+        toast.error("No estás autenticado");
+        return;
+      }
+
+      const response = await fetch(
+        `https://pjcfncnydhxrlnaowbae.supabase.co/functions/v1/reset-database`,
+        {
+          method: "POST",
+          headers: {
+            "Authorization": `Bearer ${session.access_token}`,
+            "Content-Type": "application/json",
+          },
+        }
+      );
+
+      const result = await response.json();
+
+      if (!response.ok) {
+        throw new Error(result.error || "Error al resetear la base de datos");
+      }
+
+      toast.success("Base de datos reseteada exitosamente");
+    } catch (error: any) {
+      toast.error("Error al resetear la base de datos: " + error.message);
+    } finally {
+      setResetLoading(false);
+    }
+  };
+
   const filteredEmployees = employees.filter((employee) =>
     employee.full_name?.toLowerCase().includes(searchTerm.toLowerCase()) ||
     employee.email.toLowerCase().includes(searchTerm.toLowerCase())
@@ -171,6 +290,85 @@ export default function Employees() {
             <p className="text-muted-foreground mt-1">
               Administra roles y permisos del sistema
             </p>
+          </div>
+          <div className="flex gap-2">
+            {isAdmin && (
+              <>
+                <Dialog open={inviteDialogOpen} onOpenChange={setInviteDialogOpen}>
+                  <DialogTrigger asChild>
+                    <Button>
+                      <UserPlus className="h-4 w-4 mr-2" />
+                      Agregar Empleado
+                    </Button>
+                  </DialogTrigger>
+                  <DialogContent>
+                    <DialogHeader>
+                      <DialogTitle>Invitar Nuevo Empleado</DialogTitle>
+                      <DialogDescription>
+                        Envía una invitación por correo electrónico. El nuevo usuario recibirá un rol de "Empleado" por defecto.
+                      </DialogDescription>
+                    </DialogHeader>
+                    <div className="space-y-4">
+                      <div>
+                        <Label htmlFor="name">Nombre completo (opcional)</Label>
+                        <Input
+                          id="name"
+                          placeholder="Juan Pérez"
+                          value={inviteName}
+                          onChange={(e) => setInviteName(e.target.value)}
+                        />
+                      </div>
+                      <div>
+                        <Label htmlFor="email">Email *</Label>
+                        <Input
+                          id="email"
+                          type="email"
+                          placeholder="empleado@ejemplo.com"
+                          value={inviteEmail}
+                          onChange={(e) => setInviteEmail(e.target.value)}
+                        />
+                      </div>
+                    </div>
+                    <DialogFooter>
+                      <Button variant="outline" onClick={() => setInviteDialogOpen(false)}>
+                        Cancelar
+                      </Button>
+                      <Button onClick={handleInviteEmployee} disabled={inviteLoading}>
+                        {inviteLoading ? "Enviando..." : "Enviar Invitación"}
+                      </Button>
+                    </DialogFooter>
+                  </DialogContent>
+                </Dialog>
+
+                <AlertDialog>
+                  <AlertDialogTrigger asChild>
+                    <Button variant="destructive">
+                      <Database className="h-4 w-4 mr-2" />
+                      Reset DB
+                    </Button>
+                  </AlertDialogTrigger>
+                  <AlertDialogContent>
+                    <AlertDialogHeader>
+                      <AlertDialogTitle>¿Estás absolutamente seguro?</AlertDialogTitle>
+                      <AlertDialogDescription>
+                        Esta acción eliminará todos los datos de ventas, compras, productos, clientes, proveedores y servicios técnicos.
+                        Los usuarios y roles permanecerán intactos. Esta acción NO se puede deshacer.
+                      </AlertDialogDescription>
+                    </AlertDialogHeader>
+                    <AlertDialogFooter>
+                      <AlertDialogCancel>Cancelar</AlertDialogCancel>
+                      <AlertDialogAction
+                        onClick={handleResetDatabase}
+                        disabled={resetLoading}
+                        className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
+                      >
+                        {resetLoading ? "Reseteando..." : "Sí, resetear la base de datos"}
+                      </AlertDialogAction>
+                    </AlertDialogFooter>
+                  </AlertDialogContent>
+                </AlertDialog>
+              </>
+            )}
           </div>
         </div>
 
