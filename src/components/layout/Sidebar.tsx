@@ -51,6 +51,7 @@ const navigationSections = [
     title: "Inventario & Compras",
     items: [
       { name: "Productos", href: "/products", icon: Package },
+      { name: "Alertas de Inventario", href: "/inventory-alerts", icon: Activity },
       { name: "Compras", href: "/purchases", icon: ShoppingBag },
       { name: "Proveedores", href: "/suppliers", icon: Truck },
     ]

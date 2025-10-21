@@ -26,6 +26,7 @@ import DeliveryNotes from "./pages/DeliveryNotes";
 import CustomerAccount from "./pages/CustomerAccount";
 import Promotions from "./pages/Promotions";
 import Returns from "./pages/Returns";
+import InventoryAlerts from "./pages/InventoryAlerts";
 import NotFound from "./pages/NotFound";
 
 const queryClient = new QueryClient();
@@ -90,6 +91,7 @@ const App = () => (
           <Route path="/reports" element={<ProtectedRoute><Reports /></ProtectedRoute>} />
           <Route path="/audit-logs" element={<ProtectedRoute><AuditLogs /></ProtectedRoute>} />
           <Route path="/access-logs" element={<ProtectedRoute><AccessLogs /></ProtectedRoute>} />
+          <Route path="/inventory-alerts" element={<ProtectedRoute><InventoryAlerts /></ProtectedRoute>} />
           <Route path="/settings" element={<ProtectedRoute><Settings /></ProtectedRoute>} />
           {/* ADD ALL CUSTOM ROUTES ABOVE THE CATCH-ALL "*" ROUTE */}
           <Route path="*" element={<NotFound />} />

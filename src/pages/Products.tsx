@@ -38,6 +38,9 @@ const productSchema = z.object({
   category: z.string().max(100, "La categoría debe tener máximo 100 caracteres").optional(),
   barcode: z.string().max(50, "El código de barras debe tener máximo 50 caracteres").optional(),
   sku: z.string().max(50, "El SKU debe tener máximo 50 caracteres").optional(),
+  location: z.string().max(100, "La ubicación debe tener máximo 100 caracteres").optional(),
+  batch_number: z.string().max(50, "El número de lote debe tener máximo 50 caracteres").optional(),
+  expiration_date: z.string().optional(),
 });
 
 export default function Products() {
@@ -53,6 +56,9 @@ export default function Products() {
     stock: "",
     min_stock: "",
     category: "",
+    location: "",
+    batch_number: "",
+    expiration_date: "",
   });
   const [selectedProducts, setSelectedProducts] = useState<Set<string>>(new Set());
   const [isImportDialogOpen, setIsImportDialogOpen] = useState(false);
@@ -142,7 +148,11 @@ export default function Products() {
       stock: "",
       min_stock: "",
       category: "",
+      location: "",
+      batch_number: "",
+      expiration_date: "",
     });
+    setEditingProduct(null);
   };
 
   const handleSubmit = (e: React.FormEvent) => {
@@ -159,6 +169,9 @@ export default function Products() {
         category: formData.category || undefined,
         barcode: formData.barcode || undefined,
         sku: formData.sku || undefined,
+        location: formData.location || undefined,
+        batch_number: formData.batch_number || undefined,
+        expiration_date: formData.expiration_date || undefined,
       });
 
       // Prepare data for database
@@ -171,6 +184,10 @@ export default function Products() {
         stock: validatedData.stock,
         min_stock: validatedData.min_stock ?? 0,
         category: validatedData.category || null,
+        location: validatedData.location || null,
+        batch_number: validatedData.batch_number || null,
+        expiration_date: validatedData.expiration_date || null,
+        last_restock_date: editingProduct ? undefined : new Date().toISOString(),
       };
 
       if (editingProduct) {
@@ -199,6 +216,9 @@ export default function Products() {
       stock: product.stock.toString(),
       min_stock: product.min_stock?.toString() || "",
       category: product.category || "",
+      location: product.location || "",
+      batch_number: product.batch_number || "",
+      expiration_date: product.expiration_date || "",
     });
     setIsDialogOpen(true);
   };
@@ -526,6 +546,33 @@ export default function Products() {
                       type="number"
                       value={formData.min_stock}
                       onChange={(e) => setFormData({ ...formData, min_stock: e.target.value })}
+                    />
+                  </div>
+                  <div className="space-y-2">
+                    <Label htmlFor="location">Ubicación/Almacén</Label>
+                    <Input
+                      id="location"
+                      value={formData.location}
+                      onChange={(e) => setFormData({ ...formData, location: e.target.value })}
+                      placeholder="Ej: Estante A-3"
+                    />
+                  </div>
+                  <div className="space-y-2">
+                    <Label htmlFor="batch_number">Número de Lote</Label>
+                    <Input
+                      id="batch_number"
+                      value={formData.batch_number}
+                      onChange={(e) => setFormData({ ...formData, batch_number: e.target.value })}
+                      placeholder="Ej: LOTE-2025-001"
+                    />
+                  </div>
+                  <div className="space-y-2">
+                    <Label htmlFor="expiration_date">Fecha de Vencimiento</Label>
+                    <Input
+                      id="expiration_date"
+                      type="date"
+                      value={formData.expiration_date}
+                      onChange={(e) => setFormData({ ...formData, expiration_date: e.target.value })}
                     />
                   </div>
                 </div>

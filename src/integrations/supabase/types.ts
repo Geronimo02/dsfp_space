@@ -513,19 +513,57 @@ export type Database = {
           },
         ]
       }
+      notifications: {
+        Row: {
+          created_at: string
+          data: Json | null
+          id: string
+          message: string
+          read: boolean | null
+          title: string
+          type: string
+          user_id: string | null
+        }
+        Insert: {
+          created_at?: string
+          data?: Json | null
+          id?: string
+          message: string
+          read?: boolean | null
+          title: string
+          type: string
+          user_id?: string | null
+        }
+        Update: {
+          created_at?: string
+          data?: Json | null
+          id?: string
+          message?: string
+          read?: boolean | null
+          title?: string
+          type?: string
+          user_id?: string | null
+        }
+        Relationships: []
+      }
       products: {
         Row: {
           active: boolean | null
           barcode: string | null
+          batch_number: string | null
           category: string | null
           cost: number | null
           created_at: string
           description: string | null
+          expiration_date: string | null
           id: string
           image_url: string | null
+          last_restock_date: string | null
+          location: string | null
           min_stock: number | null
           name: string
           price: number
+          reorder_point: number | null
           sku: string | null
           stock: number
           updated_at: string
@@ -533,15 +571,20 @@ export type Database = {
         Insert: {
           active?: boolean | null
           barcode?: string | null
+          batch_number?: string | null
           category?: string | null
           cost?: number | null
           created_at?: string
           description?: string | null
+          expiration_date?: string | null
           id?: string
           image_url?: string | null
+          last_restock_date?: string | null
+          location?: string | null
           min_stock?: number | null
           name: string
           price?: number
+          reorder_point?: number | null
           sku?: string | null
           stock?: number
           updated_at?: string
@@ -549,15 +592,20 @@ export type Database = {
         Update: {
           active?: boolean | null
           barcode?: string | null
+          batch_number?: string | null
           category?: string | null
           cost?: number | null
           created_at?: string
           description?: string | null
+          expiration_date?: string | null
           id?: string
           image_url?: string | null
+          last_restock_date?: string | null
+          location?: string | null
           min_stock?: number | null
           name?: string
           price?: number
+          reorder_point?: number | null
           sku?: string | null
           stock?: number
           updated_at?: string
@@ -1427,6 +1475,14 @@ export type Database = {
       }
     }
     Functions: {
+      check_expiring_products: {
+        Args: Record<PropertyKey, never>
+        Returns: undefined
+      }
+      check_low_stock_alerts: {
+        Args: Record<PropertyKey, never>
+        Returns: undefined
+      }
       generate_credit_note_number: {
         Args: Record<PropertyKey, never>
         Returns: string
