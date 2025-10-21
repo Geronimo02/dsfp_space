@@ -412,17 +412,21 @@ export default function POS() {
                     <div className="space-y-2">
                       <Label>Cliente (Opcional)</Label>
                       <Select 
-                        value={selectedCustomer?.id || ""} 
+                        value={selectedCustomer?.id || "none"} 
                         onValueChange={(val) => {
-                          const customer = customers?.find(c => c.id === val);
-                          setSelectedCustomer(customer || null);
+                          if (val === "none") {
+                            setSelectedCustomer(null);
+                          } else {
+                            const customer = customers?.find(c => c.id === val);
+                            setSelectedCustomer(customer || null);
+                          }
                         }}
                       >
                         <SelectTrigger>
                           <SelectValue placeholder="Seleccionar cliente..." />
                         </SelectTrigger>
                         <SelectContent>
-                          <SelectItem value="">Sin cliente</SelectItem>
+                          <SelectItem value="none">Sin cliente</SelectItem>
                           {customers?.map((customer) => (
                             <SelectItem key={customer.id} value={customer.id}>
                               {customer.name}
