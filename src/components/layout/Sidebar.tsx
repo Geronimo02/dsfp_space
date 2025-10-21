@@ -8,7 +8,8 @@ import {
   Receipt, 
   Settings,
   LogOut,
-  Wrench
+  Wrench,
+  Truck
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { supabase } from "@/integrations/supabase/client";
@@ -19,6 +20,7 @@ const navigation = [
   { name: "Dashboard", href: "/", icon: LayoutDashboard },
   { name: "Punto de Venta", href: "/pos", icon: ShoppingCart },
   { name: "Productos", href: "/products", icon: Package },
+  { name: "Proveedores", href: "/suppliers", icon: Truck },
   { name: "Clientes", href: "/customers", icon: Users },
   { name: "Ventas", href: "/sales", icon: Receipt },
   { name: "Servicios Técnicos", href: "/technical-services", icon: Wrench },

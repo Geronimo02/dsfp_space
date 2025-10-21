@@ -10,6 +10,7 @@ import Dashboard from "./pages/Dashboard";
 import Auth from "./pages/Auth";
 import POS from "./pages/POS";
 import Products from "./pages/Products";
+import Suppliers from "./pages/Suppliers";
 import Customers from "./pages/Customers";
 import Sales from "./pages/Sales";
 import TechnicalServices from "./pages/TechnicalServices";
@@ -63,6 +64,7 @@ const App = () => (
           <Route path="/" element={<ProtectedRoute><Dashboard /></ProtectedRoute>} />
           <Route path="/pos" element={<ProtectedRoute><POS /></ProtectedRoute>} />
           <Route path="/products" element={<ProtectedRoute><Products /></ProtectedRoute>} />
+          <Route path="/suppliers" element={<ProtectedRoute><Suppliers /></ProtectedRoute>} />
           <Route path="/customers" element={<ProtectedRoute><Customers /></ProtectedRoute>} />
           <Route path="/sales" element={<ProtectedRoute><Sales /></ProtectedRoute>} />
           <Route path="/technical-services" element={<ProtectedRoute><TechnicalServices /></ProtectedRoute>} />
