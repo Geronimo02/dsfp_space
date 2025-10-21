@@ -172,34 +172,79 @@ export type Database = {
         }
         Relationships: []
       }
+      customer_payments: {
+        Row: {
+          amount: number
+          created_at: string
+          customer_id: string
+          id: string
+          notes: string | null
+          payment_date: string
+          payment_method: string
+          sale_id: string | null
+          user_id: string
+        }
+        Insert: {
+          amount: number
+          created_at?: string
+          customer_id: string
+          id?: string
+          notes?: string | null
+          payment_date?: string
+          payment_method: string
+          sale_id?: string | null
+          user_id: string
+        }
+        Update: {
+          amount?: number
+          created_at?: string
+          customer_id?: string
+          id?: string
+          notes?: string | null
+          payment_date?: string
+          payment_method?: string
+          sale_id?: string | null
+          user_id?: string
+        }
+        Relationships: []
+      }
       customers: {
         Row: {
           address: string | null
           created_at: string
+          credit_limit: number | null
+          current_balance: number | null
           document: string | null
           email: string | null
           id: string
           name: string
+          payment_terms: string | null
           phone: string | null
           updated_at: string
         }
         Insert: {
           address?: string | null
           created_at?: string
+          credit_limit?: number | null
+          current_balance?: number | null
           document?: string | null
           email?: string | null
           id?: string
           name: string
+          payment_terms?: string | null
           phone?: string | null
           updated_at?: string
         }
         Update: {
           address?: string | null
           created_at?: string
+          credit_limit?: number | null
+          current_balance?: number | null
           document?: string | null
           email?: string | null
           id?: string
           name?: string
+          payment_terms?: string | null
           phone?: string | null
           updated_at?: string
         }

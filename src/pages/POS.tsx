@@ -8,10 +8,12 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { Separator } from "@/components/ui/separator";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
-import { Search, ShoppingCart, Trash2, Plus, Minus, Receipt, DollarSign } from "lucide-react";
+import { Search, ShoppingCart, Trash2, Plus, Minus, Receipt, DollarSign, CreditCard, AlertCircle } from "lucide-react";
 import { toast } from "sonner";
 import { BarcodeScanner } from "@/components/pos/BarcodeScanner";
 import { generateReceiptPDF } from "@/components/pos/ReceiptPDF";
+import { Badge } from "@/components/ui/badge";
+import { Alert, AlertDescription } from "@/components/ui/alert";
 
 interface CartItem {
   product_id: string;
@@ -27,6 +29,7 @@ export default function POS() {
   const [paymentMethod, setPaymentMethod] = useState("cash");
   const [discountRate, setDiscountRate] = useState(0);
   const [installments, setInstallments] = useState(1);
+  const [selectedCustomer, setSelectedCustomer] = useState<any>(null);
   const queryClient = useQueryClient();
 
   const { data: products } = useQuery({
@@ -51,6 +54,19 @@ export default function POS() {
         .from("company_settings")
         .select("*")
         .single();
+      
+      if (error) throw error;
+      return data;
+    },
+  });
+
+  const { data: customers } = useQuery({
+    queryKey: ["customers"],
+    queryFn: async () => {
+      const { data, error } = await supabase
+        .from("customers")
+        .select("*")
+        .order("name", { ascending: true });
       
       if (error) throw error;
       return data;
@@ -115,6 +131,8 @@ export default function POS() {
     setCart([]);
     setDiscountRate(0);
     setInstallments(1);
+    setSelectedCustomer(null);
+    setPaymentMethod("cash");
     toast.info("Carrito vaciado");
   };
 
@@ -132,6 +150,17 @@ export default function POS() {
       const { data: { user } } = await supabase.auth.getUser();
       if (!user) throw new Error("Usuario no autenticado");
 
+      // Validate credit limit if payment is on credit
+      if (paymentMethod === "credit") {
+        if (!selectedCustomer) {
+          throw new Error("Debe seleccionar un cliente para ventas a crédito");
+        }
+        const availableCredit = Number(selectedCustomer.credit_limit) - Number(selectedCustomer.current_balance);
+        if (total > availableCredit) {
+          throw new Error(`Crédito insuficiente. Disponible: $${availableCredit.toFixed(2)}`);
+        }
+      }
+
       const saleNumber = `S-${Date.now()}`;
       
       const { data: sale, error: saleError } = await supabase
@@ -139,6 +168,7 @@ export default function POS() {
         .insert({
           sale_number: saleNumber,
           user_id: user.id,
+          customer_id: selectedCustomer?.id || null,
           subtotal: subtotal,
           discount: discountAmount,
           discount_rate: discountRate,
@@ -376,6 +406,41 @@ export default function POS() {
                     </div>
 
                     <div className="space-y-2">
+                      <Label>Cliente (Opcional)</Label>
+                      <Select 
+                        value={selectedCustomer?.id || ""} 
+                        onValueChange={(val) => {
+                          const customer = customers?.find(c => c.id === val);
+                          setSelectedCustomer(customer || null);
+                        }}
+                      >
+                        <SelectTrigger>
+                          <SelectValue placeholder="Seleccionar cliente..." />
+                        </SelectTrigger>
+                        <SelectContent>
+                          <SelectItem value="">Sin cliente</SelectItem>
+                          {customers?.map((customer) => (
+                            <SelectItem key={customer.id} value={customer.id}>
+                              {customer.name}
+                              {Number(customer.current_balance) > 0 && 
+                                ` (Debe: $${Number(customer.current_balance).toFixed(2)})`
+                              }
+                            </SelectItem>
+                          ))}
+                        </SelectContent>
+                      </Select>
+                    </div>
+
+                    {selectedCustomer && Number(selectedCustomer.current_balance) > 0 && (
+                      <Alert>
+                        <AlertCircle className="h-4 w-4" />
+                        <AlertDescription className="text-xs">
+                          Saldo pendiente: ${Number(selectedCustomer.current_balance).toFixed(2)}
+                        </AlertDescription>
+                      </Alert>
+                    )}
+
+                    <div className="space-y-2">
                       <Label>Método de Pago</Label>
                       <Select value={paymentMethod} onValueChange={setPaymentMethod}>
                         <SelectTrigger>
@@ -385,9 +450,41 @@ export default function POS() {
                           <SelectItem value="cash">Efectivo</SelectItem>
                           <SelectItem value="card">Tarjeta</SelectItem>
                           <SelectItem value="transfer">Transferencia</SelectItem>
+                          {selectedCustomer && (
+                            <SelectItem value="credit">
+                              <div className="flex items-center gap-2">
+                                <CreditCard className="h-4 w-4" />
+                                Cuenta Corriente
+                              </div>
+                            </SelectItem>
+                          )}
                         </SelectContent>
                       </Select>
                     </div>
+
+                    {paymentMethod === "credit" && selectedCustomer && (
+                      <Alert>
+                        <DollarSign className="h-4 w-4" />
+                        <AlertDescription className="text-xs space-y-1">
+                          <div className="flex justify-between">
+                            <span>Límite de crédito:</span>
+                            <span className="font-medium">${Number(selectedCustomer.credit_limit).toFixed(2)}</span>
+                          </div>
+                          <div className="flex justify-between">
+                            <span>Saldo actual:</span>
+                            <span className="font-medium text-destructive">
+                              ${Number(selectedCustomer.current_balance).toFixed(2)}
+                            </span>
+                          </div>
+                          <div className="flex justify-between pt-1 border-t">
+                            <span>Disponible:</span>
+                            <span className="font-bold">
+                              ${(Number(selectedCustomer.credit_limit) - Number(selectedCustomer.current_balance)).toFixed(2)}
+                            </span>
+                          </div>
+                        </AlertDescription>
+                      </Alert>
+                    )}
 
                     {paymentMethod === "card" && (
                       <div className="space-y-2">
