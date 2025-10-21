@@ -7,7 +7,8 @@ import {
   Users, 
   Receipt, 
   Settings,
-  LogOut
+  LogOut,
+  Wrench
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { supabase } from "@/integrations/supabase/client";
@@ -20,6 +21,7 @@ const navigation = [
   { name: "Productos", href: "/products", icon: Package },
   { name: "Clientes", href: "/customers", icon: Users },
   { name: "Ventas", href: "/sales", icon: Receipt },
+  { name: "Servicios Técnicos", href: "/technical-services", icon: Wrench },
   { name: "Configuración", href: "/settings", icon: Settings },
 ];
 
