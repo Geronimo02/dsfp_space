@@ -106,45 +106,69 @@ export type Database = {
       company_settings: {
         Row: {
           address: string | null
+          backup_enabled: boolean | null
+          card_surcharge_rate: number | null
           company_name: string
           created_at: string
           currency: string | null
           default_tax_rate: number | null
           email: string | null
           id: string
+          last_backup_date: string | null
           logo_url: string | null
+          low_stock_alert: boolean | null
           phone: string | null
           receipt_footer: string | null
+          receipt_format: string | null
+          receipt_printer_name: string | null
           tax_id: string | null
           updated_at: string
+          whatsapp_enabled: boolean | null
+          whatsapp_number: string | null
         }
         Insert: {
           address?: string | null
+          backup_enabled?: boolean | null
+          card_surcharge_rate?: number | null
           company_name: string
           created_at?: string
           currency?: string | null
           default_tax_rate?: number | null
           email?: string | null
           id?: string
+          last_backup_date?: string | null
           logo_url?: string | null
+          low_stock_alert?: boolean | null
           phone?: string | null
           receipt_footer?: string | null
+          receipt_format?: string | null
+          receipt_printer_name?: string | null
           tax_id?: string | null
           updated_at?: string
+          whatsapp_enabled?: boolean | null
+          whatsapp_number?: string | null
         }
         Update: {
           address?: string | null
+          backup_enabled?: boolean | null
+          card_surcharge_rate?: number | null
           company_name?: string
           created_at?: string
           currency?: string | null
           default_tax_rate?: number | null
           email?: string | null
           id?: string
+          last_backup_date?: string | null
           logo_url?: string | null
+          low_stock_alert?: boolean | null
           phone?: string | null
           receipt_footer?: string | null
+          receipt_format?: string | null
+          receipt_printer_name?: string | null
           tax_id?: string | null
           updated_at?: string
+          whatsapp_enabled?: boolean | null
+          whatsapp_number?: string | null
         }
         Relationships: []
       }

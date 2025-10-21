@@ -2,7 +2,9 @@ import { useState } from "react";
 import { Layout } from "@/components/layout/Layout";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
-import { Building2, DollarSign, Receipt, MessageSquare, Database, AlertTriangle } from "lucide-react";
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
+import { Switch } from "@/components/ui/switch";
+import { Building2, DollarSign, Receipt, MessageSquare, Database, AlertTriangle, Package } from "lucide-react";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Button } from "@/components/ui/button";
@@ -23,8 +25,16 @@ const settingsSchema = z.object({
   default_tax_rate: z.number({ invalid_type_error: "El impuesto debe ser un número" })
     .min(0, "El impuesto no puede ser negativo")
     .max(100, "El impuesto no puede ser mayor a 100%"),
+  card_surcharge_rate: z.number({ invalid_type_error: "El recargo debe ser un número" })
+    .min(0, "El recargo no puede ser negativo")
+    .max(100, "El recargo no puede ser mayor a 100%"),
   currency: z.string().length(3, "El código de moneda debe tener 3 caracteres (ISO 4217)"),
   receipt_footer: z.string().max(500, "El pie de ticket debe tener máximo 500 caracteres").optional(),
+  receipt_format: z.string().optional(),
+  receipt_printer_name: z.string().max(100, "El nombre de impresora debe tener máximo 100 caracteres").optional(),
+  whatsapp_number: z.string().max(20, "El número debe tener máximo 20 caracteres").optional(),
+  whatsapp_enabled: z.boolean(),
+  low_stock_alert: z.boolean(),
 });
 
 export default function Settings() {
@@ -36,8 +46,14 @@ export default function Settings() {
     phone: "",
     email: "",
     default_tax_rate: "",
+    card_surcharge_rate: "",
     currency: "",
     receipt_footer: "",
+    receipt_format: "thermal",
+    receipt_printer_name: "",
+    whatsapp_number: "",
+    whatsapp_enabled: false,
+    low_stock_alert: true,
   });
 
   const { data: settings, isLoading } = useQuery({
@@ -58,8 +74,14 @@ export default function Settings() {
         phone: data.phone || "",
         email: data.email || "",
         default_tax_rate: data.default_tax_rate?.toString() || "",
+        card_surcharge_rate: data.card_surcharge_rate?.toString() || "",
         currency: data.currency || "USD",
         receipt_footer: data.receipt_footer || "",
+        receipt_format: data.receipt_format || "thermal",
+        receipt_printer_name: data.receipt_printer_name || "",
+        whatsapp_number: data.whatsapp_number || "",
+        whatsapp_enabled: data.whatsapp_enabled || false,
+        low_stock_alert: data.low_stock_alert !== false,
       });
       
       return data;
@@ -79,8 +101,14 @@ export default function Settings() {
           phone: data.phone || null,
           email: data.email || null,
           default_tax_rate: parseFloat(data.default_tax_rate) || 0,
+          card_surcharge_rate: parseFloat(data.card_surcharge_rate) || 0,
           currency: data.currency,
           receipt_footer: data.receipt_footer || null,
+          receipt_format: data.receipt_format || "thermal",
+          receipt_printer_name: data.receipt_printer_name || null,
+          whatsapp_number: data.whatsapp_number || null,
+          whatsapp_enabled: data.whatsapp_enabled,
+          low_stock_alert: data.low_stock_alert,
         })
         .eq("id", settings.id);
       
@@ -107,8 +135,14 @@ export default function Settings() {
         tax_id: formData.tax_id || undefined,
         address: formData.address || undefined,
         default_tax_rate: parseFloat(formData.default_tax_rate) || 0,
+        card_surcharge_rate: parseFloat(formData.card_surcharge_rate) || 0,
         currency: formData.currency,
         receipt_footer: formData.receipt_footer || undefined,
+        receipt_format: formData.receipt_format || "thermal",
+        receipt_printer_name: formData.receipt_printer_name || undefined,
+        whatsapp_number: formData.whatsapp_number || undefined,
+        whatsapp_enabled: formData.whatsapp_enabled,
+        low_stock_alert: formData.low_stock_alert,
       });
 
       updateSettingsMutation.mutate(validatedData);
@@ -141,11 +175,12 @@ export default function Settings() {
         </div>
 
         <Tabs defaultValue="company" className="space-y-6">
-          <TabsList className="grid w-full grid-cols-5">
+          <TabsList className="grid w-full grid-cols-6">
             <TabsTrigger value="company">Empresa</TabsTrigger>
             <TabsTrigger value="financial">Finanzas</TabsTrigger>
             <TabsTrigger value="receipts">Tickets</TabsTrigger>
-            <TabsTrigger value="integrations">Integraciones</TabsTrigger>
+            <TabsTrigger value="inventory">Inventario</TabsTrigger>
+            <TabsTrigger value="integrations">WhatsApp</TabsTrigger>
             <TabsTrigger value="system">Sistema</TabsTrigger>
           </TabsList>
 
@@ -246,16 +281,37 @@ export default function Settings() {
                         value={formData.default_tax_rate}
                         onChange={(e) => setFormData({ ...formData, default_tax_rate: e.target.value })}
                       />
+                      <p className="text-xs text-muted-foreground">
+                        IVA o impuesto aplicado automáticamente a productos
+                      </p>
                     </div>
 
                     <div className="space-y-2">
+                      <Label htmlFor="card_surcharge_rate">Recargo Tarjeta de Crédito (%)</Label>
+                      <Input
+                        id="card_surcharge_rate"
+                        type="number"
+                        step="0.01"
+                        value={formData.card_surcharge_rate}
+                        onChange={(e) => setFormData({ ...formData, card_surcharge_rate: e.target.value })}
+                      />
+                      <p className="text-xs text-muted-foreground">
+                        Se aplicará automáticamente al pagar con tarjeta
+                      </p>
+                    </div>
+
+                    <div className="space-y-2 md:col-span-2">
                       <Label htmlFor="currency">Moneda (Código ISO)</Label>
                       <Input
                         id="currency"
                         value={formData.currency}
-                        onChange={(e) => setFormData({ ...formData, currency: e.target.value })}
-                        placeholder="USD, EUR, PEN, etc."
+                        onChange={(e) => setFormData({ ...formData, currency: e.target.value.toUpperCase() })}
+                        placeholder="USD, EUR, PEN, ARS, etc."
+                        maxLength={3}
                       />
+                      <p className="text-xs text-muted-foreground">
+                        Código de 3 letras según ISO 4217 (ej: USD, EUR, ARS, PEN)
+                      </p>
                     </div>
                   </div>
 
@@ -283,6 +339,37 @@ export default function Settings() {
               </CardHeader>
               <CardContent>
                 <form onSubmit={handleSubmit} className="space-y-4">
+                  <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                    <div className="space-y-2">
+                      <Label htmlFor="receipt_format">Formato de Ticket</Label>
+                      <Select 
+                        value={formData.receipt_format} 
+                        onValueChange={(value) => setFormData({ ...formData, receipt_format: value })}
+                      >
+                        <SelectTrigger id="receipt_format">
+                          <SelectValue />
+                        </SelectTrigger>
+                        <SelectContent>
+                          <SelectItem value="thermal">Térmico (58mm/80mm)</SelectItem>
+                          <SelectItem value="a4">A4 (Hoja completa)</SelectItem>
+                        </SelectContent>
+                      </Select>
+                    </div>
+
+                    <div className="space-y-2">
+                      <Label htmlFor="receipt_printer_name">Nombre de Impresora</Label>
+                      <Input
+                        id="receipt_printer_name"
+                        value={formData.receipt_printer_name}
+                        onChange={(e) => setFormData({ ...formData, receipt_printer_name: e.target.value })}
+                        placeholder="Ej: EPSON TM-T20"
+                      />
+                      <p className="text-xs text-muted-foreground">
+                        Nombre exacto de la impresora configurada en el sistema
+                      </p>
+                    </div>
+                  </div>
+
                   <div className="space-y-2">
                     <Label htmlFor="receipt_footer">Mensaje en el Ticket</Label>
                     <Textarea
@@ -307,56 +394,165 @@ export default function Settings() {
             </Card>
           </TabsContent>
 
-          {/* Integraciones */}
+          {/* Inventario */}
+          <TabsContent value="inventory" className="space-y-6">
+            <Card className="shadow-soft">
+              <CardHeader>
+                <CardTitle className="flex items-center gap-2">
+                  <Package className="h-5 w-5 text-primary" />
+                  Configuración de Inventario
+                </CardTitle>
+                <CardDescription>
+                  Alertas y notificaciones de stock
+                </CardDescription>
+              </CardHeader>
+              <CardContent>
+                <form onSubmit={handleSubmit} className="space-y-4">
+                  <div className="flex items-center justify-between rounded-lg border p-4">
+                    <div className="space-y-0.5">
+                      <Label htmlFor="low_stock_alert" className="text-base font-medium">
+                        Alertas de Stock Bajo
+                      </Label>
+                      <p className="text-sm text-muted-foreground">
+                        Recibe notificaciones cuando los productos alcancen su stock mínimo
+                      </p>
+                    </div>
+                    <Switch
+                      id="low_stock_alert"
+                      checked={formData.low_stock_alert}
+                      onCheckedChange={(checked) => setFormData({ ...formData, low_stock_alert: checked })}
+                    />
+                  </div>
+
+                  <div className="rounded-lg border p-4 space-y-2 bg-muted/50">
+                    <h4 className="font-semibold text-sm">Cómo funcionan las alertas</h4>
+                    <ul className="text-sm text-muted-foreground space-y-1 list-disc list-inside">
+                      <li>Las alertas se activan cuando el stock actual &lt; stock mínimo</li>
+                      <li>Puedes configurar el stock mínimo de cada producto individualmente</li>
+                      <li>Los productos con stock bajo aparecerán destacados en los reportes</li>
+                    </ul>
+                  </div>
+
+                  <div className="flex justify-end pt-4">
+                    <Button type="submit" disabled={updateSettingsMutation.isPending}>
+                      {updateSettingsMutation.isPending ? "Guardando..." : "Guardar Cambios"}
+                    </Button>
+                  </div>
+                </form>
+              </CardContent>
+            </Card>
+          </TabsContent>
+
+          {/* WhatsApp */}
           <TabsContent value="integrations" className="space-y-6">
             <Card className="shadow-soft">
               <CardHeader>
                 <CardTitle className="flex items-center gap-2">
                   <MessageSquare className="h-5 w-5 text-primary" />
-                  Integraciones Externas
+                  Integración WhatsApp Business
                 </CardTitle>
                 <CardDescription>
-                  Conecta servicios externos como WhatsApp, Email, etc.
+                  Envía tickets y notificaciones por WhatsApp
                 </CardDescription>
               </CardHeader>
               <CardContent>
-                <div className="space-y-4">
-                  <div className="border rounded-lg p-4 space-y-2">
-                    <h4 className="font-semibold">WhatsApp Business</h4>
-                    <p className="text-sm text-muted-foreground">
-                      Próximamente: Envía notificaciones y tickets por WhatsApp
-                    </p>
-                    <Button variant="outline" disabled>
-                      Configurar WhatsApp
-                    </Button>
+                <form onSubmit={handleSubmit} className="space-y-4">
+                  <div className="flex items-center justify-between rounded-lg border p-4">
+                    <div className="space-y-0.5">
+                      <Label htmlFor="whatsapp_enabled" className="text-base font-medium">
+                        Activar WhatsApp
+                      </Label>
+                      <p className="text-sm text-muted-foreground">
+                        Habilita el envío de mensajes por WhatsApp
+                      </p>
+                    </div>
+                    <Switch
+                      id="whatsapp_enabled"
+                      checked={formData.whatsapp_enabled}
+                      onCheckedChange={(checked) => setFormData({ ...formData, whatsapp_enabled: checked })}
+                    />
                   </div>
 
-                  <div className="border rounded-lg p-4 space-y-2">
-                    <h4 className="font-semibold">Correo Electrónico</h4>
-                    <p className="text-sm text-muted-foreground">
-                      Próximamente: Envía facturas y reportes por email
+                  <div className="space-y-2">
+                    <Label htmlFor="whatsapp_number">Número de WhatsApp Business</Label>
+                    <Input
+                      id="whatsapp_number"
+                      value={formData.whatsapp_number}
+                      onChange={(e) => setFormData({ ...formData, whatsapp_number: e.target.value })}
+                      placeholder="+1234567890"
+                    />
+                    <p className="text-xs text-muted-foreground">
+                      Incluye el código de país (ej: +54 para Argentina, +51 para Perú)
                     </p>
-                    <Button variant="outline" disabled>
-                      Configurar Email
-                    </Button>
                   </div>
 
-                  <div className="border rounded-lg p-4 space-y-2">
-                    <h4 className="font-semibold">Backup Automático</h4>
-                    <p className="text-sm text-muted-foreground">
-                      Próximamente: Respalda tu base de datos automáticamente
-                    </p>
-                    <Button variant="outline" disabled>
-                      Configurar Backup
+                  <div className="rounded-lg border p-4 space-y-2 bg-muted/50">
+                    <h4 className="font-semibold text-sm">Próximamente</h4>
+                    <ul className="text-sm text-muted-foreground space-y-1 list-disc list-inside">
+                      <li>Envío automático de tickets de venta</li>
+                      <li>Notificaciones de servicios técnicos</li>
+                      <li>Recordatorios de pagos pendientes</li>
+                      <li>Confirmaciones de compra</li>
+                    </ul>
+                  </div>
+
+                  <div className="flex justify-end pt-4">
+                    <Button type="submit" disabled={updateSettingsMutation.isPending}>
+                      {updateSettingsMutation.isPending ? "Guardando..." : "Guardar Cambios"}
                     </Button>
                   </div>
-                </div>
+                </form>
               </CardContent>
             </Card>
           </TabsContent>
 
           {/* Sistema */}
           <TabsContent value="system" className="space-y-6">
+            <Card className="shadow-soft">
+              <CardHeader>
+                <CardTitle className="flex items-center gap-2">
+                  <Database className="h-5 w-5 text-primary" />
+                  Información y Backup
+                </CardTitle>
+                <CardDescription>
+                  Estado del sistema y respaldos de base de datos
+                </CardDescription>
+              </CardHeader>
+              <CardContent>
+                <div className="space-y-4">
+                  <div className="border rounded-lg p-4 space-y-2">
+                    <h4 className="font-semibold flex items-center gap-2">
+                      <Database className="h-4 w-4" />
+                      Estado de Backup
+                    </h4>
+                    <div className="text-sm space-y-1">
+                      <p className="text-muted-foreground">
+                        {settings?.last_backup_date 
+                          ? `Último backup: ${new Date(settings.last_backup_date).toLocaleString('es')}`
+                          : "Sin backup realizado"}
+                      </p>
+                      <p className="text-muted-foreground">
+                        Estado: {settings?.backup_enabled ? "✓ Activado" : "✗ Desactivado"}
+                      </p>
+                    </div>
+                    <Button variant="outline" disabled>
+                      <Database className="mr-2 h-4 w-4" />
+                      Crear Backup Manual (Próximamente)
+                    </Button>
+                  </div>
+
+                  <div className="border rounded-lg p-4 space-y-2">
+                    <h4 className="font-semibold">Información del Sistema</h4>
+                    <div className="text-sm space-y-1">
+                      <p className="text-muted-foreground">Versión: 1.0.0</p>
+                      <p className="text-muted-foreground">Base de datos: Supabase (PostgreSQL)</p>
+                      <p className="text-muted-foreground">Framework: React + Vite</p>
+                    </div>
+                  </div>
+                </div>
+              </CardContent>
+            </Card>
+
             <Card className="shadow-soft border-destructive/50">
               <CardHeader>
                 <CardTitle className="flex items-center gap-2 text-destructive">
@@ -368,35 +564,24 @@ export default function Settings() {
                 </CardDescription>
               </CardHeader>
               <CardContent>
-                <div className="space-y-4">
-                  <div className="border border-destructive rounded-lg p-4 space-y-2 bg-destructive/5">
-                    <h4 className="font-semibold flex items-center gap-2">
-                      <Database className="h-4 w-4" />
-                      Reset de Base de Datos
-                    </h4>
-                    <p className="text-sm text-muted-foreground">
-                      Elimina TODOS los datos del sistema (ventas, productos, clientes, etc.)
-                    </p>
-                    <p className="text-sm font-semibold text-destructive">
-                      ⚠️ ADVERTENCIA: Esta acción es IRREVERSIBLE
-                    </p>
-                    <Button variant="destructive" disabled>
-                      <AlertTriangle className="mr-2 h-4 w-4" />
-                      Reset Completo (Deshabilitado)
-                    </Button>
-                    <p className="text-xs text-muted-foreground">
-                      Por seguridad, esta función requiere acceso directo a la base de datos en Supabase
-                    </p>
-                  </div>
-
-                  <div className="border rounded-lg p-4 space-y-2">
-                    <h4 className="font-semibold">Información del Sistema</h4>
-                    <div className="text-sm space-y-1">
-                      <p className="text-muted-foreground">Versión: 1.0.0</p>
-                      <p className="text-muted-foreground">Base de datos: Supabase (PostgreSQL)</p>
-                      <p className="text-muted-foreground">Framework: React + Vite</p>
-                    </div>
-                  </div>
+                <div className="border border-destructive rounded-lg p-4 space-y-2 bg-destructive/5">
+                  <h4 className="font-semibold flex items-center gap-2">
+                    <Database className="h-4 w-4" />
+                    Reset de Base de Datos
+                  </h4>
+                  <p className="text-sm text-muted-foreground">
+                    Elimina TODOS los datos del sistema (ventas, productos, clientes, etc.)
+                  </p>
+                  <p className="text-sm font-semibold text-destructive">
+                    ⚠️ ADVERTENCIA: Esta acción es IRREVERSIBLE
+                  </p>
+                  <Button variant="destructive" disabled>
+                    <AlertTriangle className="mr-2 h-4 w-4" />
+                    Reset Completo (Deshabilitado)
+                  </Button>
+                  <p className="text-xs text-muted-foreground">
+                    Por seguridad, esta función requiere acceso directo a la base de datos en Supabase
+                  </p>
                 </div>
               </CardContent>
             </Card>
