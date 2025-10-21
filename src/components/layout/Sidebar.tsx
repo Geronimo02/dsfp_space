@@ -12,7 +12,8 @@ import {
   Truck,
   UserCog,
   Wallet,
-  ShoppingBag
+  ShoppingBag,
+  BarChart3
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { supabase } from "@/integrations/supabase/client";
@@ -30,6 +31,7 @@ const navigation = [
   { name: "Empleados", href: "/employees", icon: UserCog },
   { name: "Gestión de Caja", href: "/cash-register", icon: Wallet },
   { name: "Compras", href: "/purchases", icon: ShoppingBag },
+  { name: "Reportes", href: "/reports", icon: BarChart3 },
   { name: "Configuración", href: "/settings", icon: Settings },
 ];
 
