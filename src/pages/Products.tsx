@@ -4,14 +4,17 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
 import { Label } from "@/components/ui/label";
-import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog";
+import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger, DialogDescription } from "@/components/ui/dialog";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
-import { Plus, Edit, Trash2, Search } from "lucide-react";
+import { Plus, Edit, Trash2, Search, Upload, Download, X } from "lucide-react";
 import { toast } from "sonner";
 import { Badge } from "@/components/ui/badge";
 import { z } from "zod";
+import Papa from "papaparse";
+import { Checkbox } from "@/components/ui/checkbox";
+import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle, AlertDialogTrigger } from "@/components/ui/alert-dialog";
 
 const productSchema = z.object({
   name: z.string().trim().min(1, "El nombre es requerido").max(200, "El nombre debe tener máximo 200 caracteres"),
@@ -50,6 +53,17 @@ export default function Products() {
     min_stock: "",
     category: "",
   });
+  const [selectedProducts, setSelectedProducts] = useState<Set<string>>(new Set());
+  const [isImportDialogOpen, setIsImportDialogOpen] = useState(false);
+  const [importFile, setImportFile] = useState<File | null>(null);
+  const [isMassEditDialogOpen, setIsMassEditDialogOpen] = useState(false);
+  const [massEditData, setMassEditData] = useState({
+    price: "",
+    cost: "",
+    stock: "",
+    category: "",
+  });
+  const [isDeleteDialogOpen, setIsDeleteDialogOpen] = useState(false);
   const queryClient = useQueryClient();
 
   const { data: products, isLoading } = useQuery({
@@ -185,6 +199,175 @@ export default function Products() {
     setIsDialogOpen(true);
   };
 
+  const handleSelectAll = (checked: boolean) => {
+    if (checked && products) {
+      setSelectedProducts(new Set(products.map(p => p.id)));
+    } else {
+      setSelectedProducts(new Set());
+    }
+  };
+
+  const handleSelectProduct = (productId: string, checked: boolean) => {
+    const newSelected = new Set(selectedProducts);
+    if (checked) {
+      newSelected.add(productId);
+    } else {
+      newSelected.delete(productId);
+    }
+    setSelectedProducts(newSelected);
+  };
+
+  const handleExportCSV = () => {
+    if (!products || products.length === 0) {
+      toast.error("No hay productos para exportar");
+      return;
+    }
+
+    const csvData = products.map(p => ({
+      nombre: p.name,
+      categoria: p.category || "",
+      codigo_barras: p.barcode || "",
+      sku: p.sku || "",
+      precio: p.price,
+      costo: p.cost || "",
+      stock: p.stock,
+      stock_minimo: p.min_stock || "",
+    }));
+
+    const csv = Papa.unparse(csvData);
+    const blob = new Blob([csv], { type: "text/csv;charset=utf-8;" });
+    const link = document.createElement("a");
+    link.href = URL.createObjectURL(blob);
+    link.download = `productos_${new Date().toISOString().split('T')[0]}.csv`;
+    link.click();
+    toast.success("Productos exportados exitosamente");
+  };
+
+  const handleImportCSV = () => {
+    if (!importFile) {
+      toast.error("Selecciona un archivo CSV");
+      return;
+    }
+
+    Papa.parse(importFile, {
+      header: true,
+      skipEmptyLines: true,
+      complete: async (results) => {
+        const data = results.data as any[];
+        let successCount = 0;
+        let errorCount = 0;
+
+        for (const row of data) {
+          try {
+            const validatedData = productSchema.parse({
+              name: row.nombre?.trim() || row.name?.trim(),
+              price: parseFloat(row.precio || row.price),
+              cost: row.costo || row.cost ? parseFloat(row.costo || row.cost) : undefined,
+              stock: parseInt(row.stock),
+              min_stock: row.stock_minimo || row.min_stock ? parseInt(row.stock_minimo || row.min_stock) : undefined,
+              category: row.categoria?.trim() || row.category?.trim() || undefined,
+              barcode: row.codigo_barras?.trim() || row.barcode?.trim() || undefined,
+              sku: row.sku?.trim() || undefined,
+            });
+
+            const productData = {
+              name: validatedData.name,
+              barcode: validatedData.barcode || null,
+              sku: validatedData.sku || null,
+              price: validatedData.price,
+              cost: validatedData.cost ?? 0,
+              stock: validatedData.stock,
+              min_stock: validatedData.min_stock ?? 0,
+              category: validatedData.category || null,
+            };
+
+            const { error } = await supabase.from("products").insert(productData);
+            if (error) throw error;
+            successCount++;
+          } catch (error) {
+            errorCount++;
+            console.error("Error importing row:", row, error);
+          }
+        }
+
+        queryClient.invalidateQueries({ queryKey: ["products"] });
+        setIsImportDialogOpen(false);
+        setImportFile(null);
+        
+        if (successCount > 0) {
+          toast.success(`${successCount} productos importados exitosamente`);
+        }
+        if (errorCount > 0) {
+          toast.error(`${errorCount} productos no pudieron ser importados`);
+        }
+      },
+      error: (error) => {
+        toast.error("Error al leer el archivo CSV");
+        console.error(error);
+      },
+    });
+  };
+
+  const handleMassEdit = async () => {
+    if (selectedProducts.size === 0) {
+      toast.error("Selecciona al menos un producto");
+      return;
+    }
+
+    const updates: any = {};
+    if (massEditData.price) updates.price = parseFloat(massEditData.price);
+    if (massEditData.cost) updates.cost = parseFloat(massEditData.cost);
+    if (massEditData.stock) updates.stock = parseInt(massEditData.stock);
+    if (massEditData.category) updates.category = massEditData.category;
+
+    if (Object.keys(updates).length === 0) {
+      toast.error("Ingresa al menos un campo para actualizar");
+      return;
+    }
+
+    try {
+      const productIds = Array.from(selectedProducts);
+      const { error } = await supabase
+        .from("products")
+        .update(updates)
+        .in("id", productIds);
+
+      if (error) throw error;
+
+      toast.success(`${productIds.length} productos actualizados exitosamente`);
+      queryClient.invalidateQueries({ queryKey: ["products"] });
+      setIsMassEditDialogOpen(false);
+      setMassEditData({ price: "", cost: "", stock: "", category: "" });
+      setSelectedProducts(new Set());
+    } catch (error: any) {
+      toast.error(error.message || "Error al actualizar productos");
+    }
+  };
+
+  const handleMassDelete = async () => {
+    if (selectedProducts.size === 0) {
+      toast.error("Selecciona al menos un producto");
+      return;
+    }
+
+    try {
+      const productIds = Array.from(selectedProducts);
+      const { error } = await supabase
+        .from("products")
+        .delete()
+        .in("id", productIds);
+
+      if (error) throw error;
+
+      toast.success(`${productIds.length} productos eliminados exitosamente`);
+      queryClient.invalidateQueries({ queryKey: ["products"] });
+      setIsDeleteDialogOpen(false);
+      setSelectedProducts(new Set());
+    } catch (error: any) {
+      toast.error(error.message || "Error al eliminar productos");
+    }
+  };
+
   return (
     <Layout>
       <div className="space-y-6">
@@ -193,13 +376,53 @@ export default function Products() {
             <h1 className="text-3xl font-bold text-foreground">Productos</h1>
             <p className="text-muted-foreground">Gestiona tu inventario</p>
           </div>
-          <Dialog open={isDialogOpen} onOpenChange={setIsDialogOpen}>
-            <DialogTrigger asChild>
-              <Button onClick={() => { setEditingProduct(null); resetForm(); }}>
-                <Plus className="mr-2 h-4 w-4" />
-                Nuevo Producto
-              </Button>
-            </DialogTrigger>
+          <div className="flex gap-2">
+            <Button variant="outline" onClick={handleExportCSV}>
+              <Download className="mr-2 h-4 w-4" />
+              Exportar CSV
+            </Button>
+            <Dialog open={isImportDialogOpen} onOpenChange={setIsImportDialogOpen}>
+              <DialogTrigger asChild>
+                <Button variant="outline">
+                  <Upload className="mr-2 h-4 w-4" />
+                  Importar CSV
+                </Button>
+              </DialogTrigger>
+              <DialogContent>
+                <DialogHeader>
+                  <DialogTitle>Importar Productos desde CSV</DialogTitle>
+                  <DialogDescription>
+                    El archivo debe contener las columnas: nombre, categoria, codigo_barras, sku, precio, costo, stock, stock_minimo
+                  </DialogDescription>
+                </DialogHeader>
+                <div className="space-y-4">
+                  <div className="space-y-2">
+                    <Label htmlFor="csv-file">Archivo CSV</Label>
+                    <Input
+                      id="csv-file"
+                      type="file"
+                      accept=".csv"
+                      onChange={(e) => setImportFile(e.target.files?.[0] || null)}
+                    />
+                  </div>
+                  <div className="flex justify-end gap-2">
+                    <Button variant="outline" onClick={() => setIsImportDialogOpen(false)}>
+                      Cancelar
+                    </Button>
+                    <Button onClick={handleImportCSV} disabled={!importFile}>
+                      Importar
+                    </Button>
+                  </div>
+                </div>
+              </DialogContent>
+            </Dialog>
+            <Dialog open={isDialogOpen} onOpenChange={setIsDialogOpen}>
+              <DialogTrigger asChild>
+                <Button onClick={() => { setEditingProduct(null); resetForm(); }}>
+                  <Plus className="mr-2 h-4 w-4" />
+                  Nuevo Producto
+                </Button>
+              </DialogTrigger>
             <DialogContent className="max-w-2xl">
               <DialogHeader>
                 <DialogTitle>{editingProduct ? "Editar Producto" : "Nuevo Producto"}</DialogTitle>
@@ -291,7 +514,121 @@ export default function Products() {
               </form>
             </DialogContent>
           </Dialog>
+          </div>
         </div>
+
+        {selectedProducts.size > 0 && (
+          <Card className="shadow-soft bg-muted/50">
+            <CardContent className="pt-4">
+              <div className="flex items-center justify-between">
+                <div className="flex items-center gap-4">
+                  <span className="text-sm font-medium">
+                    {selectedProducts.size} producto{selectedProducts.size > 1 ? 's' : ''} seleccionado{selectedProducts.size > 1 ? 's' : ''}
+                  </span>
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    onClick={() => setSelectedProducts(new Set())}
+                  >
+                    <X className="mr-2 h-4 w-4" />
+                    Limpiar selección
+                  </Button>
+                </div>
+                <div className="flex gap-2">
+                  <Dialog open={isMassEditDialogOpen} onOpenChange={setIsMassEditDialogOpen}>
+                    <DialogTrigger asChild>
+                      <Button variant="outline" size="sm">
+                        <Edit className="mr-2 h-4 w-4" />
+                        Editar seleccionados
+                      </Button>
+                    </DialogTrigger>
+                    <DialogContent>
+                      <DialogHeader>
+                        <DialogTitle>Edición Masiva</DialogTitle>
+                        <DialogDescription>
+                          Los campos que completes se aplicarán a los {selectedProducts.size} productos seleccionados
+                        </DialogDescription>
+                      </DialogHeader>
+                      <div className="space-y-4">
+                        <div className="space-y-2">
+                          <Label htmlFor="mass-price">Precio</Label>
+                          <Input
+                            id="mass-price"
+                            type="number"
+                            step="0.01"
+                            placeholder="Dejar vacío para no modificar"
+                            value={massEditData.price}
+                            onChange={(e) => setMassEditData({ ...massEditData, price: e.target.value })}
+                          />
+                        </div>
+                        <div className="space-y-2">
+                          <Label htmlFor="mass-cost">Costo</Label>
+                          <Input
+                            id="mass-cost"
+                            type="number"
+                            step="0.01"
+                            placeholder="Dejar vacío para no modificar"
+                            value={massEditData.cost}
+                            onChange={(e) => setMassEditData({ ...massEditData, cost: e.target.value })}
+                          />
+                        </div>
+                        <div className="space-y-2">
+                          <Label htmlFor="mass-stock">Stock</Label>
+                          <Input
+                            id="mass-stock"
+                            type="number"
+                            placeholder="Dejar vacío para no modificar"
+                            value={massEditData.stock}
+                            onChange={(e) => setMassEditData({ ...massEditData, stock: e.target.value })}
+                          />
+                        </div>
+                        <div className="space-y-2">
+                          <Label htmlFor="mass-category">Categoría</Label>
+                          <Input
+                            id="mass-category"
+                            placeholder="Dejar vacío para no modificar"
+                            value={massEditData.category}
+                            onChange={(e) => setMassEditData({ ...massEditData, category: e.target.value })}
+                          />
+                        </div>
+                        <div className="flex justify-end gap-2">
+                          <Button variant="outline" onClick={() => setIsMassEditDialogOpen(false)}>
+                            Cancelar
+                          </Button>
+                          <Button onClick={handleMassEdit}>
+                            Actualizar {selectedProducts.size} productos
+                          </Button>
+                        </div>
+                      </div>
+                    </DialogContent>
+                  </Dialog>
+                  <AlertDialog open={isDeleteDialogOpen} onOpenChange={setIsDeleteDialogOpen}>
+                    <AlertDialogTrigger asChild>
+                      <Button variant="outline" size="sm" className="text-destructive">
+                        <Trash2 className="mr-2 h-4 w-4" />
+                        Eliminar seleccionados
+                      </Button>
+                    </AlertDialogTrigger>
+                    <AlertDialogContent>
+                      <AlertDialogHeader>
+                        <AlertDialogTitle>¿Estás seguro?</AlertDialogTitle>
+                        <AlertDialogDescription>
+                          Esta acción eliminará {selectedProducts.size} producto{selectedProducts.size > 1 ? 's' : ''} y no se puede deshacer.
+                        </AlertDialogDescription>
+                      </AlertDialogHeader>
+                      <AlertDialogFooter>
+                        <AlertDialogCancel>Cancelar</AlertDialogCancel>
+                        <AlertDialogAction onClick={handleMassDelete} className="bg-destructive text-destructive-foreground hover:bg-destructive/90">
+                          Eliminar
+                        </AlertDialogAction>
+                      </AlertDialogFooter>
+                    </AlertDialogContent>
+                  </AlertDialog>
+                </div>
+              </div>
+            </CardContent>
+          </Card>
+        )}
 
         <Card className="shadow-soft">
           <CardHeader>
@@ -309,6 +646,12 @@ export default function Products() {
             <Table>
               <TableHeader>
                 <TableRow>
+                  <TableHead className="w-12">
+                    <Checkbox
+                      checked={products && products.length > 0 && selectedProducts.size === products.length}
+                      onCheckedChange={handleSelectAll}
+                    />
+                  </TableHead>
                   <TableHead>Nombre</TableHead>
                   <TableHead>Categoría</TableHead>
                   <TableHead>Precio</TableHead>
@@ -320,6 +663,12 @@ export default function Products() {
               <TableBody>
                 {products?.map((product) => (
                   <TableRow key={product.id}>
+                    <TableCell>
+                      <Checkbox
+                        checked={selectedProducts.has(product.id)}
+                        onCheckedChange={(checked) => handleSelectProduct(product.id, checked as boolean)}
+                      />
+                    </TableCell>
                     <TableCell className="font-medium">{product.name}</TableCell>
                     <TableCell>{product.category || "-"}</TableCell>
                     <TableCell>${Number(product.price).toFixed(2)}</TableCell>
