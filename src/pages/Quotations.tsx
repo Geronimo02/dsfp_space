@@ -32,7 +32,8 @@ import {
 import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
 import { toast } from "sonner";
-import { Plus, Search, FileText, Trash2, Eye, CheckCircle, XCircle, Send, Download } from "lucide-react";
+import { Plus, Search, FileText, Trash2, Eye, CheckCircle, XCircle, Send, Download, ShoppingCart } from "lucide-react";
+import { generateQuotationPDF } from "@/components/pdf/QuotationPDF";
 import { format } from "date-fns";
 import { es } from "date-fns/locale";
 import { usePermissions } from "@/hooks/usePermissions";
@@ -94,6 +95,18 @@ export default function Quotations() {
         .select("id, name, price")
         .eq("active", true)
         .order("name");
+      if (error) throw error;
+      return data;
+    },
+  });
+
+  const { data: companySettings } = useQuery({
+    queryKey: ["company-settings"],
+    queryFn: async () => {
+      const { data, error } = await supabase
+        .from("company_settings")
+        .select("*")
+        .single();
       if (error) throw error;
       return data;
     },
@@ -191,6 +204,119 @@ export default function Quotations() {
     },
   });
 
+  const convertToSaleMutation = useMutation({
+    mutationFn: async (quotationId: string) => {
+      // Obtener presupuesto con items
+      const { data: quotation, error: quotationError } = await supabase
+        .from("quotations")
+        .select("*")
+        .eq("id", quotationId)
+        .single();
+      
+      if (quotationError) throw quotationError;
+
+      const { data: quotationItems, error: itemsError } = await supabase
+        .from("quotation_items")
+        .select("*")
+        .eq("quotation_id", quotationId);
+      
+      if (itemsError) throw itemsError;
+
+      const { data: { user } } = await supabase.auth.getUser();
+      if (!user) throw new Error("Usuario no autenticado");
+
+      // Generar número de venta
+      const { data: salesData } = await supabase
+        .from("sales")
+        .select("sale_number")
+        .order("created_at", { ascending: false })
+        .limit(1);
+
+      const lastNumber = salesData?.[0]?.sale_number || "VENTA-00000000-0000";
+      const parts = lastNumber.split("-");
+      const counter = parseInt(parts[2]) + 1;
+      const saleNumber = `VENTA-${new Date().toISOString().split("T")[0].replace(/-/g, "")}-${counter.toString().padStart(4, "0")}`;
+
+      // Crear venta
+      const { data: sale, error: saleError } = await supabase
+        .from("sales")
+        .insert({
+          sale_number: saleNumber,
+          customer_id: quotation.customer_id,
+          user_id: user.id,
+          subtotal: quotation.subtotal,
+          discount: quotation.discount,
+          discount_rate: quotation.discount_rate,
+          tax: quotation.tax,
+          tax_rate: quotation.tax_rate,
+          total: quotation.total,
+          payment_method: "credit",
+          installments: 1,
+          notes: `Convertido desde presupuesto ${quotation.quotation_number}`,
+          status: "completed",
+        })
+        .select()
+        .single();
+
+      if (saleError) throw saleError;
+
+      // Crear items de venta
+      const saleItems = quotationItems.map(item => ({
+        sale_id: sale.id,
+        product_id: item.product_id,
+        product_name: item.product_name,
+        quantity: item.quantity,
+        unit_price: item.unit_price,
+        subtotal: item.subtotal,
+      }));
+
+      const { error: saleItemsError } = await supabase
+        .from("sale_items")
+        .insert(saleItems);
+
+      if (saleItemsError) throw saleItemsError;
+
+      // Actualizar stock de productos
+      for (const item of quotationItems) {
+        if (item.product_id) {
+          const { data: product } = await supabase
+            .from("products")
+            .select("stock")
+            .eq("id", item.product_id)
+            .single();
+          
+          if (product) {
+            await supabase
+              .from("products")
+              .update({ stock: product.stock - item.quantity })
+              .eq("id", item.product_id);
+          }
+        }
+      }
+
+      // Marcar presupuesto como convertido
+      const { error: updateError } = await supabase
+        .from("quotations")
+        .update({ 
+          status: "converted",
+          converted_to_sale_id: sale.id 
+        })
+        .eq("id", quotationId);
+
+      if (updateError) throw updateError;
+
+      return sale;
+    },
+    onSuccess: () => {
+      toast.success("Presupuesto convertido a venta exitosamente");
+      queryClient.invalidateQueries({ queryKey: ["quotations"] });
+      queryClient.invalidateQueries({ queryKey: ["sales"] });
+    },
+    onError: (error: Error) => {
+      toast.error("Error al convertir: " + error.message);
+    },
+  });
+
   const addItem = (productId: string) => {
     const product = products?.find(p => p.id === productId);
     if (!product) return;
@@ -204,6 +330,38 @@ export default function Quotations() {
     };
 
     setItems([...items, newItem]);
+  };
+
+  const handleDownloadPDF = async (quotationId: string) => {
+    try {
+      // Obtener presupuesto con items
+      const { data: quotation, error: quotationError } = await supabase
+        .from("quotations")
+        .select("*")
+        .eq("id", quotationId)
+        .single();
+      
+      if (quotationError) throw quotationError;
+
+      const { data: items, error: itemsError } = await supabase
+        .from("quotation_items")
+        .select("*")
+        .eq("quotation_id", quotationId);
+      
+      if (itemsError) throw itemsError;
+
+      await generateQuotationPDF(
+        {
+          ...quotation,
+          items: items || [],
+        },
+        companySettings
+      );
+
+      toast.success("PDF generado exitosamente");
+    } catch (error: any) {
+      toast.error("Error al generar PDF: " + error.message);
+    }
   };
 
   const updateItemQuantity = (index: number, quantity: number) => {
@@ -450,6 +608,14 @@ export default function Quotations() {
                       </TableCell>
                       <TableCell>
                         <div className="flex gap-2">
+                          <Button
+                            size="sm"
+                            variant="outline"
+                            onClick={() => handleDownloadPDF(quotation.id)}
+                            title="Descargar PDF"
+                          >
+                            <Download className="h-4 w-4" />
+                          </Button>
                           {canEdit && quotation.status === "draft" && (
                             <>
                               <Button
@@ -459,6 +625,7 @@ export default function Quotations() {
                                   id: quotation.id, 
                                   status: "sent" 
                                 })}
+                                title="Marcar como enviado"
                               >
                                 <Send className="h-4 w-4" />
                               </Button>
@@ -469,10 +636,22 @@ export default function Quotations() {
                                   id: quotation.id, 
                                   status: "accepted" 
                                 })}
+                                title="Marcar como aceptado"
                               >
                                 <CheckCircle className="h-4 w-4" />
                               </Button>
                             </>
+                          )}
+                          {canEdit && quotation.status === "accepted" && (
+                            <Button
+                              size="sm"
+                              variant="default"
+                              onClick={() => convertToSaleMutation.mutate(quotation.id)}
+                              title="Convertir a venta"
+                            >
+                              <ShoppingCart className="h-4 w-4 mr-1" />
+                              Convertir
+                            </Button>
                           )}
                         </div>
                       </TableCell>

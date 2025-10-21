@@ -8,7 +8,8 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { toast } from "sonner";
-import { Search, Truck, Package, CheckCircle } from "lucide-react";
+import { Search, Truck, Package, CheckCircle, Download } from "lucide-react";
+import { generateDeliveryNotePDF } from "@/components/pdf/DeliveryNotePDF";
 import { format } from "date-fns";
 import { es } from "date-fns/locale";
 import { usePermissions } from "@/hooks/usePermissions";
@@ -31,6 +32,18 @@ export default function DeliveryNotes() {
       }
 
       const { data, error } = await query;
+      if (error) throw error;
+      return data;
+    },
+  });
+
+  const { data: companySettings } = useQuery({
+    queryKey: ["company-settings"],
+    queryFn: async () => {
+      const { data, error } = await supabase
+        .from("company_settings")
+        .select("*")
+        .single();
       if (error) throw error;
       return data;
     },
@@ -75,6 +88,37 @@ export default function DeliveryNotes() {
         {config.label}
       </Badge>
     );
+  };
+
+  const handleDownloadPDF = async (deliveryNoteId: string) => {
+    try {
+      const { data: deliveryNote, error: noteError } = await supabase
+        .from("delivery_notes")
+        .select("*")
+        .eq("id", deliveryNoteId)
+        .single();
+      
+      if (noteError) throw noteError;
+
+      const { data: items, error: itemsError } = await supabase
+        .from("delivery_note_items")
+        .select("*")
+        .eq("delivery_note_id", deliveryNoteId);
+      
+      if (itemsError) throw itemsError;
+
+      await generateDeliveryNotePDF(
+        {
+          ...deliveryNote,
+          items: items || [],
+        },
+        companySettings
+      );
+
+      toast.success("PDF generado exitosamente");
+    } catch (error: any) {
+      toast.error("Error al generar PDF: " + error.message);
+    }
   };
 
   const canEdit = hasPermission("delivery_notes", "edit");
@@ -189,34 +233,46 @@ export default function DeliveryNotes() {
                           : "-"}
                       </TableCell>
                       <TableCell>
-                        {canEdit && (
-                          <div className="flex gap-2">
-                            {note.status === "pending" && (
-                              <Button
-                                size="sm"
-                                variant="outline"
-                                onClick={() => updateStatusMutation.mutate({ 
-                                  id: note.id, 
-                                  status: "in_transit" 
-                                })}
-                              >
-                                <Truck className="h-4 w-4" />
-                              </Button>
-                            )}
-                            {note.status === "in_transit" && (
-                              <Button
-                                size="sm"
-                                variant="outline"
-                                onClick={() => updateStatusMutation.mutate({ 
-                                  id: note.id, 
-                                  status: "delivered" 
-                                })}
-                              >
-                                <CheckCircle className="h-4 w-4" />
-                              </Button>
-                            )}
-                          </div>
-                        )}
+                        <div className="flex gap-2">
+                          <Button
+                            size="sm"
+                            variant="outline"
+                            onClick={() => handleDownloadPDF(note.id)}
+                            title="Descargar PDF"
+                          >
+                            <Download className="h-4 w-4" />
+                          </Button>
+                          {canEdit && (
+                            <>
+                              {note.status === "pending" && (
+                                <Button
+                                  size="sm"
+                                  variant="outline"
+                                  onClick={() => updateStatusMutation.mutate({ 
+                                    id: note.id, 
+                                    status: "in_transit" 
+                                  })}
+                                  title="Marcar en tránsito"
+                                >
+                                  <Truck className="h-4 w-4" />
+                                </Button>
+                              )}
+                              {note.status === "in_transit" && (
+                                <Button
+                                  size="sm"
+                                  variant="outline"
+                                  onClick={() => updateStatusMutation.mutate({ 
+                                    id: note.id, 
+                                    status: "delivered" 
+                                  })}
+                                  title="Marcar como entregado"
+                                >
+                                  <CheckCircle className="h-4 w-4" />
+                                </Button>
+                              )}
+                            </>
+                          )}
+                        </div>
                       </TableCell>
                     </TableRow>
                   ))

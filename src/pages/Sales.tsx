@@ -6,18 +6,76 @@ import { Button } from "@/components/ui/button";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { useQuery } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
-import { Search, Receipt, Eye, Printer } from "lucide-react";
+import { Search, Receipt, Eye, Printer, Truck } from "lucide-react";
 import { Badge } from "@/components/ui/badge";
 import { format } from "date-fns";
 import { es } from "date-fns/locale";
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { Separator } from "@/components/ui/separator";
 import { ReceiptPDF } from "@/components/pos/ReceiptPDF";
+import { useMutation, useQueryClient } from "@tanstack/react-query";
+import { toast } from "sonner";
 
 export default function Sales() {
   const [searchQuery, setSearchQuery] = useState("");
   const [selectedSale, setSelectedSale] = useState<any>(null);
   const [isDetailOpen, setIsDetailOpen] = useState(false);
+  const queryClient = useQueryClient();
+
+  const createDeliveryNoteMutation = useMutation({
+    mutationFn: async (saleId: string) => {
+      const { data: sale, error: saleError } = await supabase
+        .from("sales")
+        .select("*, sale_items(*), customer:customers(name)")
+        .eq("id", saleId)
+        .single();
+      
+      if (saleError) throw saleError;
+
+      const { data: { user } } = await supabase.auth.getUser();
+      if (!user) throw new Error("No autenticado");
+
+      const { data: numberData } = await supabase.rpc("generate_delivery_number");
+
+      const customerName = sale.customer?.name || "Cliente";
+
+      const { data: deliveryNote, error: noteError } = await supabase
+        .from("delivery_notes")
+        .insert({
+          delivery_number: numberData,
+          sale_id: saleId,
+          customer_id: sale.customer_id,
+          customer_name: customerName,
+          user_id: user.id,
+          subtotal: sale.subtotal,
+          total: sale.total,
+          status: "pending",
+        })
+        .select()
+        .single();
+
+      if (noteError) throw noteError;
+
+      const items = sale.sale_items.map((item: any) => ({
+        delivery_note_id: deliveryNote.id,
+        product_id: item.product_id,
+        product_name: item.product_name,
+        quantity: item.quantity,
+        unit_price: item.unit_price,
+        subtotal: item.subtotal,
+      }));
+
+      await supabase.from("delivery_note_items").insert(items);
+      return deliveryNote;
+    },
+    onSuccess: () => {
+      toast.success("Remito generado exitosamente");
+      queryClient.invalidateQueries({ queryKey: ["delivery-notes"] });
+    },
+    onError: (error: Error) => {
+      toast.error("Error: " + error.message);
+    },
+  });
 
   const { data: sales } = useQuery({
     queryKey: ["sales", searchQuery],
