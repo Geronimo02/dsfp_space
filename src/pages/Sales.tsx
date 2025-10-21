@@ -226,6 +226,14 @@ export default function Sales() {
                       >
                         <Printer className="h-4 w-4" />
                       </Button>
+                      <Button 
+                        size="icon" 
+                        variant="outline"
+                        onClick={() => createDeliveryNoteMutation.mutate(sale.id)}
+                        disabled={createDeliveryNoteMutation.isPending}
+                      >
+                        <Truck className="h-4 w-4" />
+                      </Button>
                     </TableCell>
                   </TableRow>
                 ))}
@@ -384,6 +392,17 @@ export default function Sales() {
                 <div className="flex justify-end gap-2">
                   <Button variant="outline" onClick={() => setIsDetailOpen(false)}>
                     Cerrar
+                  </Button>
+                  <Button 
+                    variant="outline" 
+                    onClick={() => {
+                      createDeliveryNoteMutation.mutate(saleDetails.id);
+                      setIsDetailOpen(false);
+                    }}
+                    disabled={createDeliveryNoteMutation.isPending}
+                  >
+                    <Truck className="mr-2 h-4 w-4" />
+                    Generar Remito
                   </Button>
                   <Button onClick={() => handlePrintReceipt(saleDetails)}>
                     <Printer className="mr-2 h-4 w-4" />
