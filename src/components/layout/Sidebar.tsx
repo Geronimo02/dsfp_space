@@ -10,7 +10,8 @@ import {
   LogOut,
   Wrench,
   Truck,
-  UserCog
+  UserCog,
+  Wallet
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { supabase } from "@/integrations/supabase/client";
@@ -26,6 +27,7 @@ const navigation = [
   { name: "Ventas", href: "/sales", icon: Receipt },
   { name: "Servicios Técnicos", href: "/technical-services", icon: Wrench },
   { name: "Empleados", href: "/employees", icon: UserCog },
+  { name: "Gestión de Caja", href: "/cash-register", icon: Wallet },
   { name: "Configuración", href: "/settings", icon: Settings },
 ];
 

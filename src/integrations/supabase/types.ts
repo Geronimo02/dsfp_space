@@ -14,6 +14,95 @@ export type Database = {
   }
   public: {
     Tables: {
+      cash_movements: {
+        Row: {
+          amount: number
+          cash_register_id: string
+          category: string
+          created_at: string
+          description: string | null
+          id: string
+          reference: string | null
+          type: string
+          user_id: string
+        }
+        Insert: {
+          amount: number
+          cash_register_id: string
+          category: string
+          created_at?: string
+          description?: string | null
+          id?: string
+          reference?: string | null
+          type: string
+          user_id: string
+        }
+        Update: {
+          amount?: number
+          cash_register_id?: string
+          category?: string
+          created_at?: string
+          description?: string | null
+          id?: string
+          reference?: string | null
+          type?: string
+          user_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "cash_movements_cash_register_id_fkey"
+            columns: ["cash_register_id"]
+            isOneToOne: false
+            referencedRelation: "cash_registers"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      cash_registers: {
+        Row: {
+          closing_amount: number | null
+          closing_date: string | null
+          created_at: string
+          difference: number | null
+          expected_amount: number | null
+          id: string
+          notes: string | null
+          opening_amount: number
+          opening_date: string
+          status: string
+          updated_at: string
+          user_id: string
+        }
+        Insert: {
+          closing_amount?: number | null
+          closing_date?: string | null
+          created_at?: string
+          difference?: number | null
+          expected_amount?: number | null
+          id?: string
+          notes?: string | null
+          opening_amount?: number
+          opening_date?: string
+          status?: string
+          updated_at?: string
+          user_id: string
+        }
+        Update: {
+          closing_amount?: number | null
+          closing_date?: string | null
+          created_at?: string
+          difference?: number | null
+          expected_amount?: number | null
+          id?: string
+          notes?: string | null
+          opening_amount?: number
+          opening_date?: string
+          status?: string
+          updated_at?: string
+          user_id?: string
+        }
+        Relationships: []
+      }
       company_settings: {
         Row: {
           address: string | null
