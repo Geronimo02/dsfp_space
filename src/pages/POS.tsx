@@ -8,8 +8,10 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { Separator } from "@/components/ui/separator";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
-import { Search, ShoppingCart, Trash2, Plus, Minus } from "lucide-react";
+import { Search, ShoppingCart, Trash2, Plus, Minus, Receipt, DollarSign } from "lucide-react";
 import { toast } from "sonner";
+import { BarcodeScanner } from "@/components/pos/BarcodeScanner";
+import { generateReceiptPDF } from "@/components/pos/ReceiptPDF";
 
 interface CartItem {
   product_id: string;
@@ -23,6 +25,8 @@ export default function POS() {
   const [searchQuery, setSearchQuery] = useState("");
   const [cart, setCart] = useState<CartItem[]>([]);
   const [paymentMethod, setPaymentMethod] = useState("cash");
+  const [discountRate, setDiscountRate] = useState(0);
+  const [installments, setInstallments] = useState(1);
   const queryClient = useQueryClient();
 
   const { data: products } = useQuery({
@@ -39,6 +43,24 @@ export default function POS() {
       return data;
     },
   });
+
+  const { data: companySettings } = useQuery({
+    queryKey: ["company-settings"],
+    queryFn: async () => {
+      const { data, error } = await supabase
+        .from("company_settings")
+        .select("*")
+        .single();
+      
+      if (error) throw error;
+      return data;
+    },
+  });
+
+  const handleBarcodeScanner = (code: string) => {
+    setSearchQuery(code);
+    toast.success(`Código escaneado: ${code}`);
+  };
 
   const addToCart = (product: any) => {
     const existingItem = cart.find(item => item.product_id === product.id);
@@ -91,10 +113,17 @@ export default function POS() {
 
   const clearCart = () => {
     setCart([]);
+    setDiscountRate(0);
+    setInstallments(1);
     toast.info("Carrito vaciado");
   };
 
-  const total = cart.reduce((sum, item) => sum + item.subtotal, 0);
+  const subtotal = cart.reduce((sum, item) => sum + item.subtotal, 0);
+  const discountAmount = (subtotal * discountRate) / 100;
+  const taxRate = companySettings?.default_tax_rate || 0;
+  const taxAmount = ((subtotal - discountAmount) * taxRate) / 100;
+  const total = subtotal - discountAmount + taxAmount;
+  const installmentAmount = installments > 1 ? total / installments : 0;
 
   const processSaleMutation = useMutation({
     mutationFn: async () => {
@@ -108,9 +137,15 @@ export default function POS() {
         .insert({
           sale_number: saleNumber,
           user_id: user.id,
-          subtotal: total,
+          subtotal: subtotal,
+          discount: discountAmount,
+          discount_rate: discountRate,
+          tax: taxAmount,
+          tax_rate: taxRate,
           total: total,
           payment_method: paymentMethod,
+          installments: installments,
+          installment_amount: installmentAmount,
           status: "completed"
         })
         .select()
@@ -148,8 +183,27 @@ export default function POS() {
 
       return sale;
     },
-    onSuccess: () => {
+    onSuccess: (sale) => {
       toast.success("¡Venta procesada exitosamente!");
+      
+      // Generate PDF receipt
+      generateReceiptPDF({
+        saleNumber: sale.sale_number,
+        items: cart,
+        subtotal: subtotal,
+        discount: discountAmount,
+        tax: taxAmount,
+        total: total,
+        paymentMethod: paymentMethod,
+        installments: installments > 1 ? installments : undefined,
+        installmentAmount: installments > 1 ? installmentAmount : undefined,
+        companyName: companySettings?.company_name || "Mi Empresa",
+        companyAddress: companySettings?.address,
+        companyPhone: companySettings?.phone,
+        companyTaxId: companySettings?.tax_id,
+        footer: companySettings?.receipt_footer,
+      });
+
       clearCart();
       queryClient.invalidateQueries({ queryKey: ["products"] });
       queryClient.invalidateQueries({ queryKey: ["sales-stats"] });
@@ -171,14 +225,17 @@ export default function POS() {
           <Card className="lg:col-span-2 shadow-soft">
             <CardHeader>
               <CardTitle>Productos</CardTitle>
-              <div className="relative">
-                <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
-                <Input
-                  placeholder="Buscar por nombre, código de barras o SKU..."
-                  value={searchQuery}
-                  onChange={(e) => setSearchQuery(e.target.value)}
-                  className="pl-10"
-                />
+              <div className="flex gap-2">
+                <div className="relative flex-1">
+                  <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
+                  <Input
+                    placeholder="Buscar por nombre, código de barras o SKU..."
+                    value={searchQuery}
+                    onChange={(e) => setSearchQuery(e.target.value)}
+                    className="pl-10"
+                  />
+                </div>
+                <BarcodeScanner onScan={handleBarcodeScanner} />
               </div>
             </CardHeader>
             <CardContent>
@@ -210,7 +267,7 @@ export default function POS() {
               </CardTitle>
             </CardHeader>
             <CardContent className="space-y-4">
-              <div className="space-y-2 max-h-96 overflow-y-auto">
+              <div className="space-y-2 max-h-64 overflow-y-auto">
                 {cart.map((item) => (
                   <div key={item.product_id} className="flex items-center justify-between p-3 bg-muted rounded-lg">
                     <div className="flex-1">
@@ -237,7 +294,38 @@ export default function POS() {
                 <>
                   <Separator />
                   <div className="space-y-3">
-                    <div className="flex justify-between text-lg font-bold">
+                    <div className="space-y-2">
+                      <Label className="text-xs">Descuento (%)</Label>
+                      <Input
+                        type="number"
+                        min="0"
+                        max="100"
+                        value={discountRate}
+                        onChange={(e) => setDiscountRate(parseFloat(e.target.value) || 0)}
+                        placeholder="0"
+                      />
+                    </div>
+
+                    <div className="space-y-1 text-sm">
+                      <div className="flex justify-between">
+                        <span className="text-muted-foreground">Subtotal:</span>
+                        <span>${subtotal.toFixed(2)}</span>
+                      </div>
+                      {discountAmount > 0 && (
+                        <div className="flex justify-between text-destructive">
+                          <span>Descuento ({discountRate}%):</span>
+                          <span>-${discountAmount.toFixed(2)}</span>
+                        </div>
+                      )}
+                      {taxAmount > 0 && (
+                        <div className="flex justify-between">
+                          <span className="text-muted-foreground">Impuesto ({taxRate}%):</span>
+                          <span>${taxAmount.toFixed(2)}</span>
+                        </div>
+                      )}
+                    </div>
+
+                    <div className="flex justify-between text-lg font-bold pt-2 border-t">
                       <span>Total:</span>
                       <span className="text-primary">${total.toFixed(2)}</span>
                     </div>
@@ -256,11 +344,34 @@ export default function POS() {
                       </Select>
                     </div>
 
-                    <div className="flex gap-2">
+                    {paymentMethod === "card" && (
+                      <div className="space-y-2">
+                        <Label>Cuotas</Label>
+                        <Select value={installments.toString()} onValueChange={(val) => setInstallments(parseInt(val))}>
+                          <SelectTrigger>
+                            <SelectValue />
+                          </SelectTrigger>
+                          <SelectContent>
+                            <SelectItem value="1">1 cuota</SelectItem>
+                            <SelectItem value="3">3 cuotas</SelectItem>
+                            <SelectItem value="6">6 cuotas</SelectItem>
+                            <SelectItem value="12">12 cuotas</SelectItem>
+                          </SelectContent>
+                        </Select>
+                        {installments > 1 && (
+                          <p className="text-xs text-muted-foreground">
+                            {installments} cuotas de ${installmentAmount.toFixed(2)}
+                          </p>
+                        )}
+                      </div>
+                    )}
+
+                    <div className="flex gap-2 pt-2">
                       <Button variant="outline" onClick={clearCart} className="flex-1">
                         Limpiar
                       </Button>
                       <Button onClick={() => processSaleMutation.mutate()} disabled={processSaleMutation.isPending} className="flex-1">
+                        <Receipt className="mr-2 h-4 w-4" />
                         {processSaleMutation.isPending ? "Procesando..." : "Cobrar"}
                       </Button>
                     </div>

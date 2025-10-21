@@ -8,12 +8,17 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from 
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
-import { Plus, Edit, Search } from "lucide-react";
+import { Plus, Edit, Search, Receipt, Eye } from "lucide-react";
 import { toast } from "sonner";
+import { Badge } from "@/components/ui/badge";
+import { format } from "date-fns";
+import { es } from "date-fns/locale";
 
 export default function Customers() {
   const [searchQuery, setSearchQuery] = useState("");
   const [isDialogOpen, setIsDialogOpen] = useState(false);
+  const [isHistoryOpen, setIsHistoryOpen] = useState(false);
+  const [selectedCustomer, setSelectedCustomer] = useState<any>(null);
   const [editingCustomer, setEditingCustomer] = useState<any>(null);
   const [formData, setFormData] = useState({
     name: "",
@@ -37,6 +42,23 @@ export default function Customers() {
       if (error) throw error;
       return data;
     },
+  });
+
+  const { data: customerSales } = useQuery({
+    queryKey: ["customer-sales", selectedCustomer?.id],
+    queryFn: async () => {
+      if (!selectedCustomer?.id) return [];
+      
+      const { data, error } = await supabase
+        .from("sales")
+        .select("*")
+        .eq("customer_id", selectedCustomer.id)
+        .order("created_at", { ascending: false });
+      
+      if (error) throw error;
+      return data;
+    },
+    enabled: !!selectedCustomer?.id,
   });
 
   const createCustomerMutation = useMutation({
@@ -111,6 +133,13 @@ export default function Customers() {
     });
     setIsDialogOpen(true);
   };
+
+  const handleViewHistory = (customer: any) => {
+    setSelectedCustomer(customer);
+    setIsHistoryOpen(true);
+  };
+
+  const totalSpent = customerSales?.reduce((sum, sale) => sum + Number(sale.total), 0) || 0;
 
   return (
     <Layout>
@@ -217,7 +246,10 @@ export default function Customers() {
                     <TableCell>{customer.email || "-"}</TableCell>
                     <TableCell>{customer.phone || "-"}</TableCell>
                     <TableCell>{customer.document || "-"}</TableCell>
-                    <TableCell className="text-right">
+                    <TableCell className="text-right space-x-2">
+                      <Button size="icon" variant="outline" onClick={() => handleViewHistory(customer)}>
+                        <Eye className="h-4 w-4" />
+                      </Button>
                       <Button size="icon" variant="outline" onClick={() => handleEdit(customer)}>
                         <Edit className="h-4 w-4" />
                       </Button>
@@ -228,6 +260,75 @@ export default function Customers() {
             </Table>
           </CardContent>
         </Card>
+
+        <Dialog open={isHistoryOpen} onOpenChange={setIsHistoryOpen}>
+          <DialogContent className="max-w-3xl">
+            <DialogHeader>
+              <DialogTitle className="flex items-center gap-2">
+                <Receipt className="h-5 w-5 text-primary" />
+                Historial de Compras - {selectedCustomer?.name}
+              </DialogTitle>
+            </DialogHeader>
+            <div className="space-y-4">
+              <Card>
+                <CardContent className="pt-6">
+                  <div className="grid grid-cols-3 gap-4 text-center">
+                    <div>
+                      <p className="text-sm text-muted-foreground">Total Compras</p>
+                      <p className="text-2xl font-bold text-primary">{customerSales?.length || 0}</p>
+                    </div>
+                    <div>
+                      <p className="text-sm text-muted-foreground">Total Gastado</p>
+                      <p className="text-2xl font-bold text-success">${totalSpent.toFixed(2)}</p>
+                    </div>
+                    <div>
+                      <p className="text-sm text-muted-foreground">Promedio</p>
+                      <p className="text-2xl font-bold">
+                        ${customerSales?.length ? (totalSpent / customerSales.length).toFixed(2) : "0.00"}
+                      </p>
+                    </div>
+                  </div>
+                </CardContent>
+              </Card>
+
+              <div className="max-h-96 overflow-y-auto">
+                <Table>
+                  <TableHeader>
+                    <TableRow>
+                      <TableHead>Número</TableHead>
+                      <TableHead>Fecha</TableHead>
+                      <TableHead>Método</TableHead>
+                      <TableHead>Total</TableHead>
+                      <TableHead>Estado</TableHead>
+                    </TableRow>
+                  </TableHeader>
+                  <TableBody>
+                    {customerSales?.map((sale) => (
+                      <TableRow key={sale.id}>
+                        <TableCell className="font-medium">{sale.sale_number}</TableCell>
+                        <TableCell>
+                          {format(new Date(sale.created_at), "dd/MM/yyyy HH:mm", { locale: es })}
+                        </TableCell>
+                        <TableCell>
+                          <Badge variant="outline">
+                            {sale.payment_method === "cash" ? "Efectivo" : 
+                             sale.payment_method === "card" ? "Tarjeta" : "Transferencia"}
+                          </Badge>
+                        </TableCell>
+                        <TableCell className="font-bold text-primary">
+                          ${Number(sale.total).toFixed(2)}
+                        </TableCell>
+                        <TableCell>
+                          <Badge className="bg-success">Completada</Badge>
+                        </TableCell>
+                      </TableRow>
+                    ))}
+                  </TableBody>
+                </Table>
+              </div>
+            </div>
+          </DialogContent>
+        </Dialog>
       </div>
     </Layout>
   );

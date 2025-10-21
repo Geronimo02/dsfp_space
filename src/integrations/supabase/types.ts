@@ -14,6 +14,51 @@ export type Database = {
   }
   public: {
     Tables: {
+      company_settings: {
+        Row: {
+          address: string | null
+          company_name: string
+          created_at: string
+          currency: string | null
+          default_tax_rate: number | null
+          email: string | null
+          id: string
+          logo_url: string | null
+          phone: string | null
+          receipt_footer: string | null
+          tax_id: string | null
+          updated_at: string
+        }
+        Insert: {
+          address?: string | null
+          company_name: string
+          created_at?: string
+          currency?: string | null
+          default_tax_rate?: number | null
+          email?: string | null
+          id?: string
+          logo_url?: string | null
+          phone?: string | null
+          receipt_footer?: string | null
+          tax_id?: string | null
+          updated_at?: string
+        }
+        Update: {
+          address?: string | null
+          company_name?: string
+          created_at?: string
+          currency?: string | null
+          default_tax_rate?: number | null
+          email?: string | null
+          id?: string
+          logo_url?: string | null
+          phone?: string | null
+          receipt_footer?: string | null
+          tax_id?: string | null
+          updated_at?: string
+        }
+        Relationships: []
+      }
       customers: {
         Row: {
           address: string | null
@@ -175,13 +220,17 @@ export type Database = {
           created_at: string
           customer_id: string | null
           discount: number | null
+          discount_rate: number | null
           id: string
+          installment_amount: number | null
+          installments: number | null
           notes: string | null
           payment_method: string
           sale_number: string
           status: string | null
           subtotal: number
           tax: number | null
+          tax_rate: number | null
           total: number
           user_id: string
         }
@@ -189,13 +238,17 @@ export type Database = {
           created_at?: string
           customer_id?: string | null
           discount?: number | null
+          discount_rate?: number | null
           id?: string
+          installment_amount?: number | null
+          installments?: number | null
           notes?: string | null
           payment_method: string
           sale_number: string
           status?: string | null
           subtotal?: number
           tax?: number | null
+          tax_rate?: number | null
           total: number
           user_id: string
         }
@@ -203,13 +256,17 @@ export type Database = {
           created_at?: string
           customer_id?: string | null
           discount?: number | null
+          discount_rate?: number | null
           id?: string
+          installment_amount?: number | null
+          installments?: number | null
           notes?: string | null
           payment_method?: string
           sale_number?: string
           status?: string | null
           subtotal?: number
           tax?: number | null
+          tax_rate?: number | null
           total?: number
           user_id?: string
         }
