@@ -13,7 +13,10 @@ import {
   UserCog,
   Wallet,
   ShoppingBag,
-  BarChart3
+  BarChart3,
+  FileText,
+  Activity,
+  Shield
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { supabase } from "@/integrations/supabase/client";
@@ -32,6 +35,8 @@ const navigation = [
   { name: "Gestión de Caja", href: "/cash-register", icon: Wallet },
   { name: "Compras", href: "/purchases", icon: ShoppingBag },
   { name: "Reportes", href: "/reports", icon: BarChart3 },
+  { name: "Auditoría", href: "/audit-logs", icon: FileText, adminOnly: true },
+  { name: "Logs de Acceso", href: "/access-logs", icon: Activity, adminOnly: true },
   { name: "Configuración", href: "/settings", icon: Settings },
 ];
 

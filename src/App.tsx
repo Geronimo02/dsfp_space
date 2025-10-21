@@ -19,6 +19,8 @@ import CashRegister from "./pages/CashRegister";
 import Purchases from "./pages/Purchases";
 import Reports from "./pages/Reports";
 import Settings from "./pages/Settings";
+import AuditLogs from "./pages/AuditLogs";
+import AccessLogs from "./pages/AccessLogs";
 import NotFound from "./pages/NotFound";
 
 const queryClient = new QueryClient();
@@ -76,6 +78,8 @@ const App = () => (
           <Route path="/cash-register" element={<ProtectedRoute><CashRegister /></ProtectedRoute>} />
           <Route path="/purchases" element={<ProtectedRoute><Purchases /></ProtectedRoute>} />
           <Route path="/reports" element={<ProtectedRoute><Reports /></ProtectedRoute>} />
+          <Route path="/audit-logs" element={<ProtectedRoute><AuditLogs /></ProtectedRoute>} />
+          <Route path="/access-logs" element={<ProtectedRoute><AccessLogs /></ProtectedRoute>} />
           <Route path="/settings" element={<ProtectedRoute><Settings /></ProtectedRoute>} />
           {/* ADD ALL CUSTOM ROUTES ABOVE THE CATCH-ALL "*" ROUTE */}
           <Route path="*" element={<NotFound />} />

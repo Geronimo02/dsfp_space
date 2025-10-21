@@ -45,7 +45,7 @@ import { UserPlus, Search, Users, Shield, UserCheck, Database, Trash2 } from "lu
 import { Label } from "@/components/ui/label";
 import { Checkbox } from "@/components/ui/checkbox";
 
-type AppRole = "admin" | "manager" | "employee";
+type AppRole = "admin" | "manager" | "cashier" | "accountant" | "viewer" | "employee";
 
 interface Employee {
   id: string;
@@ -68,10 +68,43 @@ export default function Employees() {
   const [isAdmin, setIsAdmin] = useState(false);
   const [resetLoading, setResetLoading] = useState(false);
 
-  const availableRoles: { value: AppRole; label: string; color: string }[] = [
-    { value: "admin", label: "Administrador", color: "bg-red-500" },
-    { value: "manager", label: "Gerente", color: "bg-blue-500" },
-    { value: "employee", label: "Empleado", color: "bg-green-500" },
+  const availableRoles: { value: AppRole; label: string; color: string; description: string }[] = [
+    { 
+      value: "admin", 
+      label: "Administrador", 
+      color: "bg-red-500",
+      description: "Acceso total al sistema"
+    },
+    { 
+      value: "manager", 
+      label: "Gerente", 
+      color: "bg-blue-500",
+      description: "Gestión completa excepto configuración crítica"
+    },
+    { 
+      value: "cashier", 
+      label: "Cajero", 
+      color: "bg-purple-500",
+      description: "Ventas y gestión de caja"
+    },
+    { 
+      value: "accountant", 
+      label: "Contador", 
+      color: "bg-yellow-500",
+      description: "Finanzas y reportes"
+    },
+    { 
+      value: "viewer", 
+      label: "Visualizador", 
+      color: "bg-gray-500",
+      description: "Solo lectura"
+    },
+    { 
+      value: "employee", 
+      label: "Empleado", 
+      color: "bg-green-500",
+      description: "Acceso limitado básico"
+    },
   ];
 
   useEffect(() => {
@@ -279,6 +312,9 @@ export default function Employees() {
 
   const totalAdmins = employees.filter((e) => e.roles.includes("admin")).length;
   const totalManagers = employees.filter((e) => e.roles.includes("manager")).length;
+  const totalCashiers = employees.filter((e) => e.roles.includes("cashier")).length;
+  const totalAccountants = employees.filter((e) => e.roles.includes("accountant")).length;
+  const totalViewers = employees.filter((e) => e.roles.includes("viewer")).length;
   const totalEmployees = employees.filter((e) => e.roles.includes("employee")).length;
 
   return (
@@ -372,10 +408,10 @@ export default function Employees() {
           </div>
         </div>
 
-        <div className="grid gap-4 md:grid-cols-4">
+        <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-6">
           <Card>
             <CardHeader className="flex flex-row items-center justify-between pb-2">
-              <CardTitle className="text-sm font-medium">Total Empleados</CardTitle>
+              <CardTitle className="text-sm font-medium">Total</CardTitle>
               <Users className="h-4 w-4 text-muted-foreground" />
             </CardHeader>
             <CardContent>
@@ -385,7 +421,7 @@ export default function Employees() {
 
           <Card>
             <CardHeader className="flex flex-row items-center justify-between pb-2">
-              <CardTitle className="text-sm font-medium">Administradores</CardTitle>
+              <CardTitle className="text-sm font-medium">Admins</CardTitle>
               <Shield className="h-4 w-4 text-red-500" />
             </CardHeader>
             <CardContent>
@@ -400,6 +436,26 @@ export default function Employees() {
             </CardHeader>
             <CardContent>
               <div className="text-2xl font-bold">{totalManagers}</div>
+            </CardContent>
+          </Card>
+
+          <Card>
+            <CardHeader className="flex flex-row items-center justify-between pb-2">
+              <CardTitle className="text-sm font-medium">Cajeros</CardTitle>
+              <UserCheck className="h-4 w-4 text-purple-500" />
+            </CardHeader>
+            <CardContent>
+              <div className="text-2xl font-bold">{totalCashiers}</div>
+            </CardContent>
+          </Card>
+
+          <Card>
+            <CardHeader className="flex flex-row items-center justify-between pb-2">
+              <CardTitle className="text-sm font-medium">Contadores</CardTitle>
+              <UserCheck className="h-4 w-4 text-yellow-500" />
+            </CardHeader>
+            <CardContent>
+              <div className="text-2xl font-bold">{totalAccountants}</div>
             </CardContent>
           </Card>
 
@@ -514,17 +570,21 @@ export default function Employees() {
             <div className="space-y-3">
               <Label className="text-sm font-medium">Roles asignados</Label>
               {availableRoles.map((role) => (
-                <div key={role.value} className="flex items-center space-x-2">
+                <div key={role.value} className="flex items-start space-x-3 p-3 rounded-lg border hover:bg-accent/50 transition-colors">
                   <Checkbox
                     id={role.value}
                     checked={selectedRoles.includes(role.value)}
                     onCheckedChange={(checked) => handleRoleChange(role.value, checked as boolean)}
+                    className="mt-1"
                   />
                   <label
                     htmlFor={role.value}
-                    className="text-sm font-medium leading-none peer-disabled:cursor-not-allowed peer-disabled:opacity-70 cursor-pointer"
+                    className="flex-1 cursor-pointer"
                   >
-                    <Badge className={`${role.color} text-white`}>{role.label}</Badge>
+                    <div className="flex items-center gap-2 mb-1">
+                      <Badge className={`${role.color} text-white`}>{role.label}</Badge>
+                    </div>
+                    <p className="text-xs text-muted-foreground">{role.description}</p>
                   </label>
                 </div>
               ))}
