@@ -256,11 +256,30 @@ export default function Products() {
         const data = results.data as any[];
         let successCount = 0;
         let errorCount = 0;
+        const errors: string[] = [];
+
+        // Validate file has data
+        if (data.length === 0) {
+          toast.error("El archivo CSV está vacío");
+          return;
+        }
+
+        // Validate file size (max 1000 rows)
+        if (data.length > 1000) {
+          toast.error("El archivo CSV es demasiado grande (máximo 1000 productos)");
+          return;
+        }
 
         for (const row of data) {
           try {
+            // Validate required fields exist
+            const nameField = row.nombre?.trim() || row.name?.trim();
+            if (!nameField) {
+              throw new Error("Falta el campo 'nombre'");
+            }
+
             const validatedData = productSchema.parse({
-              name: row.nombre?.trim() || row.name?.trim(),
+              name: nameField,
               price: parseFloat(row.precio || row.price),
               cost: row.costo || row.cost ? parseFloat(row.costo || row.cost) : undefined,
               stock: parseInt(row.stock),
@@ -284,9 +303,12 @@ export default function Products() {
             const { error } = await supabase.from("products").insert(productData);
             if (error) throw error;
             successCount++;
-          } catch (error) {
+          } catch (error: any) {
             errorCount++;
-            console.error("Error importing row:", row, error);
+            const errorMsg = error instanceof z.ZodError 
+              ? error.errors[0].message 
+              : error.message || "Error desconocido";
+            errors.push(`Fila ${successCount + errorCount}: ${errorMsg}`);
           }
         }
 
@@ -298,7 +320,7 @@ export default function Products() {
           toast.success(`${successCount} productos importados exitosamente`);
         }
         if (errorCount > 0) {
-          toast.error(`${errorCount} productos no pudieron ser importados`);
+          toast.error(`${errorCount} productos no pudieron ser importados. ${errors.slice(0, 3).join(", ")}`);
         }
       },
       error: (error) => {

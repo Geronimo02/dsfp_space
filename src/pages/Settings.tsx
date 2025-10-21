@@ -16,7 +16,7 @@ import { z } from "zod";
 
 const settingsSchema = z.object({
   company_name: z.string().trim().min(1, "El nombre de la empresa es requerido").max(200, "El nombre debe tener máximo 200 caracteres"),
-  email: z.string().trim().max(255, "El email debe tener máximo 255 caracteres")
+  email: z.string().trim().toLowerCase().max(255, "El email debe tener máximo 255 caracteres")
     .refine((val) => val === "" || z.string().email().safeParse(val).success, "Email inválido")
     .optional(),
   phone: z.string().max(20, "El teléfono debe tener máximo 20 caracteres").optional(),

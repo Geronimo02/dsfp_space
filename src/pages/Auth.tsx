@@ -11,8 +11,12 @@ import { ShoppingCart } from "lucide-react";
 import { z } from "zod";
 
 const authSchema = z.object({
-  email: z.string().trim().email({ message: "Email inválido" }),
-  password: z.string().min(6, { message: "La contraseña debe tener al menos 6 caracteres" }),
+  email: z.string().trim().toLowerCase().email({ message: "Email inválido" }),
+  password: z.string()
+    .min(8, { message: "La contraseña debe tener al menos 8 caracteres" })
+    .regex(/[A-Z]/, { message: "La contraseña debe contener al menos una mayúscula" })
+    .regex(/[a-z]/, { message: "La contraseña debe contener al menos una minúscula" })
+    .regex(/[0-9]/, { message: "La contraseña debe contener al menos un número" }),
   fullName: z.string().trim().min(1, { message: "El nombre es requerido" }).optional(),
 });
 

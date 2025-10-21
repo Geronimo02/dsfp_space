@@ -15,6 +15,22 @@ import { toast } from "sonner";
 import { Badge } from "@/components/ui/badge";
 import { format } from "date-fns";
 import { es } from "date-fns/locale";
+import { z } from "zod";
+
+const customerSchema = z.object({
+  name: z.string().trim().min(1, "El nombre es requerido").max(200, "El nombre debe tener máximo 200 caracteres"),
+  email: z.string().trim().toLowerCase().max(255, "El email debe tener máximo 255 caracteres")
+    .refine((val) => val === "" || z.string().email().safeParse(val).success, "Email inválido")
+    .optional(),
+  phone: z.string().max(20, "El teléfono debe tener máximo 20 caracteres").optional(),
+  document: z.string().max(50, "El documento debe tener máximo 50 caracteres").optional(),
+  address: z.string().max(500, "La dirección debe tener máximo 500 caracteres").optional(),
+  credit_limit: z.number({ invalid_type_error: "El límite de crédito debe ser un número" })
+    .nonnegative("El límite de crédito no puede ser negativo")
+    .max(999999999.99, "El límite de crédito es demasiado alto")
+    .optional(),
+  payment_terms: z.string().max(100, "Los términos de pago deben tener máximo 100 caracteres").optional(),
+});
 
 export default function Customers() {
   const [searchQuery, setSearchQuery] = useState("");
@@ -162,20 +178,38 @@ export default function Customers() {
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
     
-    const customerData = {
-      name: formData.name,
-      email: formData.email || null,
-      phone: formData.phone || null,
-      document: formData.document || null,
-      address: formData.address || null,
-      credit_limit: formData.credit_limit ? parseFloat(formData.credit_limit) : 0,
-      payment_terms: formData.payment_terms || null,
-    };
+    try {
+      const validatedData = customerSchema.parse({
+        name: formData.name,
+        email: formData.email || undefined,
+        phone: formData.phone || undefined,
+        document: formData.document || undefined,
+        address: formData.address || undefined,
+        credit_limit: formData.credit_limit ? parseFloat(formData.credit_limit) : undefined,
+        payment_terms: formData.payment_terms || undefined,
+      });
 
-    if (editingCustomer) {
-      updateCustomerMutation.mutate({ id: editingCustomer.id, data: customerData });
-    } else {
-      createCustomerMutation.mutate(customerData);
+      const customerData = {
+        name: validatedData.name,
+        email: validatedData.email || null,
+        phone: validatedData.phone || null,
+        document: validatedData.document || null,
+        address: validatedData.address || null,
+        credit_limit: validatedData.credit_limit ?? 0,
+        payment_terms: validatedData.payment_terms || null,
+      };
+
+      if (editingCustomer) {
+        updateCustomerMutation.mutate({ id: editingCustomer.id, data: customerData });
+      } else {
+        createCustomerMutation.mutate(customerData);
+      }
+    } catch (error) {
+      if (error instanceof z.ZodError) {
+        toast.error(error.errors[0].message);
+      } else {
+        toast.error("Error al validar los datos del cliente");
+      }
     }
   };
 
