@@ -183,8 +183,44 @@ export default function POS() {
 
       return sale;
     },
-    onSuccess: (sale) => {
+    onSuccess: async (sale) => {
       toast.success("¡Venta procesada exitosamente!");
+      
+      // Register cash movement if payment method is cash
+      if (paymentMethod === "cash") {
+        try {
+          const { data: { user } } = await supabase.auth.getUser();
+          
+          // Get open cash register
+          const { data: cashRegister } = await supabase
+            .from("cash_registers")
+            .select("*")
+            .eq("status", "open")
+            .order("opening_date", { ascending: false })
+            .limit(1)
+            .maybeSingle();
+
+          if (cashRegister && user) {
+            // Register income movement
+            await supabase
+              .from("cash_movements")
+              .insert({
+                cash_register_id: cashRegister.id,
+                user_id: user.id,
+                type: "income",
+                amount: total,
+                category: "Venta",
+                description: `Venta ${sale.sale_number}`,
+                reference: sale.sale_number,
+              });
+            
+            queryClient.invalidateQueries({ queryKey: ["cash-register"] });
+          }
+        } catch (error) {
+          console.error("Error registrando movimiento de caja:", error);
+          // Don't show error to user since sale was successful
+        }
+      }
       
       // Generate PDF receipt
       generateReceiptPDF({

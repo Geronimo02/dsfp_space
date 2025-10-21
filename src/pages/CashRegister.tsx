@@ -37,6 +37,7 @@ import {
 } from "lucide-react";
 import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
+import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 
 interface CashRegister {
   id: string;
@@ -60,9 +61,7 @@ interface CashMovement {
 }
 
 export default function CashRegister() {
-  const [currentRegister, setCurrentRegister] = useState<CashRegister | null>(null);
-  const [movements, setMovements] = useState<CashMovement[]>([]);
-  const [loading, setLoading] = useState(true);
+  const queryClient = useQueryClient();
   const [openDialog, setOpenDialog] = useState(false);
   const [closeDialog, setCloseDialog] = useState(false);
   const [movementDialog, setMovementDialog] = useState(false);
@@ -76,15 +75,10 @@ export default function CashRegister() {
   const [movementCategory, setMovementCategory] = useState("");
   const [movementDescription, setMovementDescription] = useState("");
 
-  useEffect(() => {
-    fetchCurrentRegister();
-  }, []);
-
-  const fetchCurrentRegister = async () => {
-    try {
-      setLoading(true);
-      
-      // Get current open register
+  // Query for current register
+  const { data: currentRegister, isLoading: loading } = useQuery({
+    queryKey: ["cash-register"],
+    queryFn: async () => {
       const { data: register, error: registerError } = await supabase
         .from("cash_registers")
         .select("*")
@@ -94,26 +88,29 @@ export default function CashRegister() {
         .maybeSingle();
 
       if (registerError) throw registerError;
+      return register;
+    },
+    refetchInterval: 5000, // Refetch every 5 seconds
+  });
 
-      setCurrentRegister(register);
+  // Query for movements
+  const { data: movements = [] } = useQuery({
+    queryKey: ["cash-movements", currentRegister?.id],
+    queryFn: async () => {
+      if (!currentRegister?.id) return [];
+      
+      const { data: movementsData, error: movementsError } = await supabase
+        .from("cash_movements")
+        .select("*")
+        .eq("cash_register_id", currentRegister.id)
+        .order("created_at", { ascending: false });
 
-      // Get movements if there's an open register
-      if (register) {
-        const { data: movementsData, error: movementsError } = await supabase
-          .from("cash_movements")
-          .select("*")
-          .eq("cash_register_id", register.id)
-          .order("created_at", { ascending: false });
-
-        if (movementsError) throw movementsError;
-        setMovements(movementsData || []);
-      }
-    } catch (error: any) {
-      toast.error("Error al cargar caja: " + error.message);
-    } finally {
-      setLoading(false);
-    }
-  };
+      if (movementsError) throw movementsError;
+      return movementsData || [];
+    },
+    enabled: !!currentRegister?.id,
+    refetchInterval: 5000, // Refetch every 5 seconds
+  });
 
   const handleOpenRegister = async () => {
     try {
@@ -133,7 +130,7 @@ export default function CashRegister() {
       toast.success("Caja abierta exitosamente");
       setOpenDialog(false);
       setOpeningAmount("");
-      fetchCurrentRegister();
+      queryClient.invalidateQueries({ queryKey: ["cash-register"] });
     } catch (error: any) {
       toast.error("Error al abrir caja: " + error.message);
     }
@@ -165,7 +162,7 @@ export default function CashRegister() {
       setCloseDialog(false);
       setClosingAmount("");
       setClosingNotes("");
-      fetchCurrentRegister();
+      queryClient.invalidateQueries({ queryKey: ["cash-register"] });
     } catch (error: any) {
       toast.error("Error al cerrar caja: " + error.message);
     }
@@ -196,7 +193,8 @@ export default function CashRegister() {
       setMovementAmount("");
       setMovementCategory("");
       setMovementDescription("");
-      fetchCurrentRegister();
+      queryClient.invalidateQueries({ queryKey: ["cash-register"] });
+      queryClient.invalidateQueries({ queryKey: ["cash-movements"] });
     } catch (error: any) {
       toast.error("Error al registrar movimiento: " + error.message);
     }
