@@ -13,6 +13,7 @@ import { Textarea } from "@/components/ui/textarea";
 import { Badge } from "@/components/ui/badge";
 import { Plus, Search, Eye, Trash2 } from "lucide-react";
 import { toast } from "sonner";
+import { sanitizeSearchQuery } from "@/lib/searchUtils";
 import { format } from "date-fns";
 
 interface PurchaseItem {
@@ -51,7 +52,10 @@ const Purchases = () => {
         .order("purchase_date", { ascending: false });
 
       if (searchQuery) {
-        query = query.ilike("purchase_number", `%${searchQuery}%`);
+        const sanitized = sanitizeSearchQuery(searchQuery);
+        if (sanitized) {
+          query = query.ilike("purchase_number", `%${sanitized}%`);
+        }
       }
 
       const { data, error } = await query;

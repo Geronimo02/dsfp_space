@@ -13,6 +13,7 @@ import { ReceiptPDF } from "@/components/pos/ReceiptPDF";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { toast } from "sonner";
 import { Badge } from "@/components/ui/badge";
+import { sanitizeSearchQuery } from "@/lib/searchUtils";
 import { format } from "date-fns";
 import { es } from "date-fns/locale";
 import { z } from "zod";
@@ -61,7 +62,10 @@ export default function Customers() {
       let query = supabase.from("customers").select("*").order("created_at", { ascending: false });
       
       if (searchQuery) {
-        query = query.or(`name.ilike.%${searchQuery}%,email.ilike.%${searchQuery}%,phone.ilike.%${searchQuery}%`);
+        const sanitized = sanitizeSearchQuery(searchQuery);
+        if (sanitized) {
+          query = query.or(`name.ilike.%${sanitized}%,email.ilike.%${sanitized}%,phone.ilike.%${sanitized}%`);
+        }
       }
       
       const { data, error } = await query;

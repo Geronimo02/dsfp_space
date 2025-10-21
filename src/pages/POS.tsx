@@ -13,6 +13,7 @@ import { toast } from "sonner";
 import { BarcodeScanner } from "@/components/pos/BarcodeScanner";
 import { generateReceiptPDF } from "@/components/pos/ReceiptPDF";
 import { Badge } from "@/components/ui/badge";
+import { sanitizeSearchQuery } from "@/lib/searchUtils";
 import { Alert, AlertDescription } from "@/components/ui/alert";
 
 interface CartItem {
@@ -38,7 +39,10 @@ export default function POS() {
       let query = supabase.from("products").select("*").eq("active", true);
       
       if (searchQuery) {
-        query = query.or(`name.ilike.%${searchQuery}%,barcode.eq.${searchQuery},sku.eq.${searchQuery}`);
+        const sanitized = sanitizeSearchQuery(searchQuery);
+        if (sanitized) {
+          query = query.or(`name.ilike.%${sanitized}%,barcode.eq.${sanitized},sku.eq.${sanitized}`);
+        }
       }
       
       const { data, error } = await query.limit(10);

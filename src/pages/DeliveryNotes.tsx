@@ -13,6 +13,7 @@ import { generateDeliveryNotePDF } from "@/components/pdf/DeliveryNotePDF";
 import { format } from "date-fns";
 import { es } from "date-fns/locale";
 import { usePermissions } from "@/hooks/usePermissions";
+import { sanitizeSearchQuery } from "@/lib/searchUtils";
 
 export default function DeliveryNotes() {
   const [searchQuery, setSearchQuery] = useState("");
@@ -28,7 +29,10 @@ export default function DeliveryNotes() {
         .order("created_at", { ascending: false });
 
       if (searchQuery) {
-        query = query.or(`delivery_number.ilike.%${searchQuery}%,customer_name.ilike.%${searchQuery}%`);
+        const sanitized = sanitizeSearchQuery(searchQuery);
+        if (sanitized) {
+          query = query.or(`delivery_number.ilike.%${sanitized}%,customer_name.ilike.%${sanitized}%`);
+        }
       }
 
       const { data, error } = await query;

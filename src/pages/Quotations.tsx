@@ -37,6 +37,7 @@ import { generateQuotationPDF } from "@/components/pdf/QuotationPDF";
 import { format } from "date-fns";
 import { es } from "date-fns/locale";
 import { usePermissions } from "@/hooks/usePermissions";
+import { sanitizeSearchQuery } from "@/lib/searchUtils";
 
 interface QuotationItem {
   product_id?: string;
@@ -66,7 +67,10 @@ export default function Quotations() {
         .order("created_at", { ascending: false });
 
       if (searchQuery) {
-        query = query.or(`quotation_number.ilike.%${searchQuery}%,customer_name.ilike.%${searchQuery}%`);
+        const sanitized = sanitizeSearchQuery(searchQuery);
+        if (sanitized) {
+          query = query.or(`quotation_number.ilike.%${sanitized}%,customer_name.ilike.%${sanitized}%`);
+        }
       }
 
       const { data, error } = await query;

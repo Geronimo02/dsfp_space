@@ -11,6 +11,7 @@ import { format } from "date-fns";
 import { es } from "date-fns/locale";
 import { usePermissions } from "@/hooks/usePermissions";
 import { Alert, AlertDescription } from "@/components/ui/alert";
+import { sanitizeSearchQuery } from "@/lib/searchUtils";
 
 export default function AuditLogs() {
   const [searchQuery, setSearchQuery] = useState("");
@@ -26,7 +27,10 @@ export default function AuditLogs() {
         .limit(100);
 
       if (searchQuery) {
-        query = query.or(`table_name.ilike.%${searchQuery}%,user_email.ilike.%${searchQuery}%,user_name.ilike.%${searchQuery}%`);
+        const sanitized = sanitizeSearchQuery(searchQuery);
+        if (sanitized) {
+          query = query.or(`table_name.ilike.%${sanitized}%,user_email.ilike.%${sanitized}%,user_name.ilike.%${sanitized}%`);
+        }
       }
 
       const { data, error } = await query;

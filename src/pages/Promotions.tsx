@@ -13,6 +13,7 @@ import { supabase } from "@/integrations/supabase/client";
 import { Search, Plus, Edit, Trash2, Tag, TrendingDown, Gift, Percent } from "lucide-react";
 import { Badge } from "@/components/ui/badge";
 import { format } from "date-fns";
+import { sanitizeSearchQuery } from "@/lib/searchUtils";
 import { es } from "date-fns/locale";
 import { toast } from "sonner";
 import { Switch } from "@/components/ui/switch";
@@ -48,7 +49,10 @@ export default function Promotions() {
         .order("created_at", { ascending: false });
 
       if (searchQuery) {
-        query = query.or(`code.ilike.%${searchQuery}%,name.ilike.%${searchQuery}%`);
+        const sanitized = sanitizeSearchQuery(searchQuery);
+        if (sanitized) {
+          query = query.or(`code.ilike.%${sanitized}%,name.ilike.%${sanitized}%`);
+        }
       }
 
       const { data, error } = await query;

@@ -13,6 +13,7 @@ import { supabase } from "@/integrations/supabase/client";
 import { Search, RotateCcw, CheckCircle, XCircle, Eye } from "lucide-react";
 import { Badge } from "@/components/ui/badge";
 import { format } from "date-fns";
+import { sanitizeSearchQuery } from "@/lib/searchUtils";
 import { es } from "date-fns/locale";
 import { toast } from "sonner";
 import { Separator } from "@/components/ui/separator";
@@ -32,7 +33,10 @@ export default function Returns() {
         .order("created_at", { ascending: false });
 
       if (searchQuery) {
-        query = query.or(`return_number.ilike.%${searchQuery}%,customer_name.ilike.%${searchQuery}%`);
+        const sanitized = sanitizeSearchQuery(searchQuery);
+        if (sanitized) {
+          query = query.or(`return_number.ilike.%${sanitized}%,customer_name.ilike.%${sanitized}%`);
+        }
       }
 
       const { data, error } = await query;

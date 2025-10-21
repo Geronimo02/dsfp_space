@@ -13,6 +13,7 @@ import { es } from "date-fns/locale";
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { Separator } from "@/components/ui/separator";
 import { ReceiptPDF } from "@/components/pos/ReceiptPDF";
+import { sanitizeSearchQuery } from "@/lib/searchUtils";
 import { useMutation, useQueryClient } from "@tanstack/react-query";
 import { toast } from "sonner";
 
@@ -90,7 +91,10 @@ export default function Sales() {
         .order("created_at", { ascending: false });
       
       if (searchQuery) {
-        query = query.or(`sale_number.ilike.%${searchQuery}%`);
+        const sanitized = sanitizeSearchQuery(searchQuery);
+        if (sanitized) {
+          query = query.or(`sale_number.ilike.%${sanitized}%`);
+        }
       }
       
       const { data, error } = await query;
