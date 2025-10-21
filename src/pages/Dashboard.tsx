@@ -70,6 +70,7 @@ export default function Dashboard() {
       icon: DollarSign,
       description: "Ingresos del día actual",
       color: "text-primary",
+      bgColor: "bg-primary/10",
     },
     {
       title: "Ventas Totales",
@@ -77,6 +78,7 @@ export default function Dashboard() {
       icon: ShoppingCart,
       description: "Transacciones registradas",
       color: "text-accent",
+      bgColor: "bg-accent/10",
     },
     {
       title: "Productos",
@@ -84,13 +86,15 @@ export default function Dashboard() {
       icon: Package,
       description: `${lowStockProducts || 0} con stock bajo`,
       color: "text-success",
+      bgColor: "bg-success/10",
     },
     {
       title: "Clientes",
       value: customersCount || 0,
       icon: Users,
       description: "Clientes registrados",
-      color: "text-blue-600",
+      color: "text-muted-foreground",
+      bgColor: "bg-muted",
     },
   ];
 
@@ -104,16 +108,19 @@ export default function Dashboard() {
 
         <div className="grid gap-6 md:grid-cols-2 lg:grid-cols-4">
           {stats.map((stat) => (
-            <Card key={stat.title} className="shadow-soft hover:shadow-medium transition-all">
-              <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-                <CardTitle className="text-sm font-medium">
+            <Card key={stat.title} className="shadow-soft hover:shadow-medium transition-all overflow-hidden">
+              <div className={`h-1 w-full ${stat.bgColor}`} />
+              <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-3">
+                <CardTitle className="text-sm font-medium text-muted-foreground">
                   {stat.title}
                 </CardTitle>
-                <stat.icon className={`h-5 w-5 ${stat.color}`} />
+                <div className={`p-2 rounded-lg ${stat.bgColor}`}>
+                  <stat.icon className={`h-5 w-5 ${stat.color}`} />
+                </div>
               </CardHeader>
               <CardContent>
-                <div className="text-2xl font-bold">{stat.value}</div>
-                <p className="text-xs text-muted-foreground mt-1">
+                <div className="text-3xl font-bold text-foreground">{stat.value}</div>
+                <p className="text-xs text-muted-foreground mt-2">
                   {stat.description}
                 </p>
               </CardContent>
