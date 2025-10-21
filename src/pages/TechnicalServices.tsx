@@ -286,25 +286,36 @@ export default function TechnicalServices() {
               <form onSubmit={handleSubmit} className="space-y-4">
                 <div className="grid grid-cols-2 gap-4">
                   <div className="space-y-2">
-                    <Label htmlFor="customer_id">Cliente</Label>
-                    <Select
-                      value={formData.customer_id}
-                      onValueChange={(value) =>
-                        setFormData({ ...formData, customer_id: value })
-                      }
-                    >
-                      <SelectTrigger>
-                        <SelectValue placeholder="Seleccionar cliente (opcional)" />
-                      </SelectTrigger>
-                      <SelectContent>
-                        <SelectItem value="">Sin cliente</SelectItem>
-                        {customers.map((customer) => (
-                          <SelectItem key={customer.id} value={customer.id}>
-                            {customer.name}
-                          </SelectItem>
-                        ))}
-                      </SelectContent>
-                    </Select>
+                    <Label htmlFor="customer_id">Cliente (opcional)</Label>
+                    <div className="flex gap-2">
+                      <Select
+                        value={formData.customer_id || undefined}
+                        onValueChange={(value) =>
+                          setFormData({ ...formData, customer_id: value })
+                        }
+                      >
+                        <SelectTrigger className="flex-1">
+                          <SelectValue placeholder="Seleccionar cliente" />
+                        </SelectTrigger>
+                        <SelectContent>
+                          {customers.map((customer) => (
+                            <SelectItem key={customer.id} value={customer.id}>
+                              {customer.name}
+                            </SelectItem>
+                          ))}
+                        </SelectContent>
+                      </Select>
+                      {formData.customer_id && (
+                        <Button
+                          type="button"
+                          variant="outline"
+                          size="icon"
+                          onClick={() => setFormData({ ...formData, customer_id: "" })}
+                        >
+                          ×
+                        </Button>
+                      )}
+                    </div>
                   </div>
 
                   <div className="space-y-2">
