@@ -122,7 +122,9 @@ export default function POS() {
   const discountAmount = (subtotal * discountRate) / 100;
   const taxRate = companySettings?.default_tax_rate || 0;
   const taxAmount = ((subtotal - discountAmount) * taxRate) / 100;
-  const total = subtotal - discountAmount + taxAmount;
+  const cardSurchargeRate = paymentMethod === "card" ? (companySettings?.card_surcharge_rate || 0) : 0;
+  const cardSurchargeAmount = ((subtotal - discountAmount + taxAmount) * cardSurchargeRate) / 100;
+  const total = subtotal - discountAmount + taxAmount + cardSurchargeAmount;
   const installmentAmount = installments > 1 ? total / installments : 0;
 
   const processSaleMutation = useMutation({
@@ -229,6 +231,7 @@ export default function POS() {
         subtotal: subtotal,
         discount: discountAmount,
         tax: taxAmount,
+        cardSurcharge: cardSurchargeAmount > 0 ? cardSurchargeAmount : undefined,
         total: total,
         paymentMethod: paymentMethod,
         installments: installments > 1 ? installments : undefined,
@@ -357,6 +360,12 @@ export default function POS() {
                         <div className="flex justify-between">
                           <span className="text-muted-foreground">Impuesto ({taxRate}%):</span>
                           <span>${taxAmount.toFixed(2)}</span>
+                        </div>
+                      )}
+                      {cardSurchargeAmount > 0 && (
+                        <div className="flex justify-between text-warning">
+                          <span>Recargo Tarjeta ({cardSurchargeRate}%):</span>
+                          <span>+${cardSurchargeAmount.toFixed(2)}</span>
                         </div>
                       )}
                     </div>

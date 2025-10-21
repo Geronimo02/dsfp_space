@@ -15,6 +15,7 @@ interface ReceiptData {
   subtotal: number;
   discount: number;
   tax: number;
+  cardSurcharge?: number;
   total: number;
   paymentMethod: string;
   installments?: number;
@@ -123,6 +124,12 @@ export const generateReceiptPDF = (data: ReceiptData) => {
   if (data.tax > 0) {
     doc.text("Impuesto:", leftMargin, y);
     doc.text(`$${data.tax.toFixed(2)}`, pageWidth - 5, y, { align: "right" });
+    y += 5;
+  }
+
+  if (data.cardSurcharge && data.cardSurcharge > 0) {
+    doc.text("Recargo Tarjeta:", leftMargin, y);
+    doc.text(`$${data.cardSurcharge.toFixed(2)}`, pageWidth - 5, y, { align: "right" });
     y += 5;
   }
 
