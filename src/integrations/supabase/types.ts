@@ -340,6 +340,115 @@ export type Database = {
         }
         Relationships: []
       }
+      delivery_note_items: {
+        Row: {
+          created_at: string | null
+          delivery_note_id: string
+          id: string
+          product_id: string | null
+          product_name: string
+          quantity: number
+          subtotal: number
+          unit_price: number
+        }
+        Insert: {
+          created_at?: string | null
+          delivery_note_id: string
+          id?: string
+          product_id?: string | null
+          product_name: string
+          quantity: number
+          subtotal: number
+          unit_price: number
+        }
+        Update: {
+          created_at?: string | null
+          delivery_note_id?: string
+          id?: string
+          product_id?: string | null
+          product_name?: string
+          quantity?: number
+          subtotal?: number
+          unit_price?: number
+        }
+        Relationships: [
+          {
+            foreignKeyName: "delivery_note_items_delivery_note_id_fkey"
+            columns: ["delivery_note_id"]
+            isOneToOne: false
+            referencedRelation: "delivery_notes"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      delivery_notes: {
+        Row: {
+          created_at: string | null
+          customer_id: string
+          customer_name: string
+          delivery_address: string | null
+          delivery_date: string | null
+          delivery_number: string
+          id: string
+          notes: string | null
+          received_at: string | null
+          received_by: string | null
+          sale_id: string | null
+          signature_url: string | null
+          status: Database["public"]["Enums"]["delivery_status"] | null
+          subtotal: number
+          total: number
+          updated_at: string | null
+          user_id: string
+        }
+        Insert: {
+          created_at?: string | null
+          customer_id: string
+          customer_name: string
+          delivery_address?: string | null
+          delivery_date?: string | null
+          delivery_number: string
+          id?: string
+          notes?: string | null
+          received_at?: string | null
+          received_by?: string | null
+          sale_id?: string | null
+          signature_url?: string | null
+          status?: Database["public"]["Enums"]["delivery_status"] | null
+          subtotal?: number
+          total: number
+          updated_at?: string | null
+          user_id: string
+        }
+        Update: {
+          created_at?: string | null
+          customer_id?: string
+          customer_name?: string
+          delivery_address?: string | null
+          delivery_date?: string | null
+          delivery_number?: string
+          id?: string
+          notes?: string | null
+          received_at?: string | null
+          received_by?: string | null
+          sale_id?: string | null
+          signature_url?: string | null
+          status?: Database["public"]["Enums"]["delivery_status"] | null
+          subtotal?: number
+          total?: number
+          updated_at?: string | null
+          user_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "delivery_notes_sale_id_fkey"
+            columns: ["sale_id"]
+            isOneToOne: false
+            referencedRelation: "sales"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       products: {
         Row: {
           active: boolean | null
@@ -518,6 +627,107 @@ export type Database = {
             referencedColumns: ["id"]
           },
         ]
+      }
+      quotation_items: {
+        Row: {
+          created_at: string | null
+          id: string
+          product_id: string | null
+          product_name: string
+          quantity: number
+          quotation_id: string
+          subtotal: number
+          unit_price: number
+        }
+        Insert: {
+          created_at?: string | null
+          id?: string
+          product_id?: string | null
+          product_name: string
+          quantity: number
+          quotation_id: string
+          subtotal: number
+          unit_price: number
+        }
+        Update: {
+          created_at?: string | null
+          id?: string
+          product_id?: string | null
+          product_name?: string
+          quantity?: number
+          quotation_id?: string
+          subtotal?: number
+          unit_price?: number
+        }
+        Relationships: [
+          {
+            foreignKeyName: "quotation_items_quotation_id_fkey"
+            columns: ["quotation_id"]
+            isOneToOne: false
+            referencedRelation: "quotations"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      quotations: {
+        Row: {
+          converted_to_sale_id: string | null
+          created_at: string | null
+          customer_id: string
+          customer_name: string
+          discount: number | null
+          discount_rate: number | null
+          id: string
+          notes: string | null
+          quotation_number: string
+          status: Database["public"]["Enums"]["quotation_status"] | null
+          subtotal: number
+          tax: number | null
+          tax_rate: number | null
+          total: number
+          updated_at: string | null
+          user_id: string
+          valid_until: string | null
+        }
+        Insert: {
+          converted_to_sale_id?: string | null
+          created_at?: string | null
+          customer_id: string
+          customer_name: string
+          discount?: number | null
+          discount_rate?: number | null
+          id?: string
+          notes?: string | null
+          quotation_number: string
+          status?: Database["public"]["Enums"]["quotation_status"] | null
+          subtotal?: number
+          tax?: number | null
+          tax_rate?: number | null
+          total: number
+          updated_at?: string | null
+          user_id: string
+          valid_until?: string | null
+        }
+        Update: {
+          converted_to_sale_id?: string | null
+          created_at?: string | null
+          customer_id?: string
+          customer_name?: string
+          discount?: number | null
+          discount_rate?: number | null
+          id?: string
+          notes?: string | null
+          quotation_number?: string
+          status?: Database["public"]["Enums"]["quotation_status"] | null
+          subtotal?: number
+          tax?: number | null
+          tax_rate?: number | null
+          total?: number
+          updated_at?: string | null
+          user_id?: string
+          valid_until?: string | null
+        }
+        Relationships: []
       }
       role_permissions: {
         Row: {
@@ -958,6 +1168,14 @@ export type Database = {
       }
     }
     Functions: {
+      generate_delivery_number: {
+        Args: Record<PropertyKey, never>
+        Returns: string
+      }
+      generate_quotation_number: {
+        Args: Record<PropertyKey, never>
+        Returns: string
+      }
       generate_service_number: {
         Args: Record<PropertyKey, never>
         Returns: string
@@ -982,6 +1200,14 @@ export type Database = {
         | "cashier"
         | "accountant"
         | "viewer"
+      delivery_status: "pending" | "in_transit" | "delivered" | "cancelled"
+      quotation_status:
+        | "draft"
+        | "sent"
+        | "accepted"
+        | "rejected"
+        | "expired"
+        | "converted"
       service_status:
         | "received"
         | "in_diagnosis"
@@ -1122,6 +1348,15 @@ export const Constants = {
         "cashier",
         "accountant",
         "viewer",
+      ],
+      delivery_status: ["pending", "in_transit", "delivered", "cancelled"],
+      quotation_status: [
+        "draft",
+        "sent",
+        "accepted",
+        "rejected",
+        "expired",
+        "converted",
       ],
       service_status: [
         "received",

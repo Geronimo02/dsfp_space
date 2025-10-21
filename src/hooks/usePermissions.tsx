@@ -12,7 +12,9 @@ export type Module =
   | "employees" 
   | "settings" 
   | "cash_register" 
-  | "technical_services";
+  | "technical_services"
+  | "quotations"
+  | "delivery_notes";
 
 interface RolePermission {
   role: string;

@@ -21,6 +21,8 @@ import Reports from "./pages/Reports";
 import Settings from "./pages/Settings";
 import AuditLogs from "./pages/AuditLogs";
 import AccessLogs from "./pages/AccessLogs";
+import Quotations from "./pages/Quotations";
+import DeliveryNotes from "./pages/DeliveryNotes";
 import NotFound from "./pages/NotFound";
 
 const queryClient = new QueryClient();
@@ -73,6 +75,8 @@ const App = () => (
           <Route path="/suppliers" element={<ProtectedRoute><Suppliers /></ProtectedRoute>} />
           <Route path="/customers" element={<ProtectedRoute><Customers /></ProtectedRoute>} />
           <Route path="/sales" element={<ProtectedRoute><Sales /></ProtectedRoute>} />
+          <Route path="/quotations" element={<ProtectedRoute><Quotations /></ProtectedRoute>} />
+          <Route path="/delivery-notes" element={<ProtectedRoute><DeliveryNotes /></ProtectedRoute>} />
           <Route path="/technical-services" element={<ProtectedRoute><TechnicalServices /></ProtectedRoute>} />
           <Route path="/employees" element={<ProtectedRoute><Employees /></ProtectedRoute>} />
           <Route path="/cash-register" element={<ProtectedRoute><CashRegister /></ProtectedRoute>} />
