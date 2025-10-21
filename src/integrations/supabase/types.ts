@@ -537,6 +537,13 @@ export type Database = {
             foreignKeyName: "sales_customer_id_fkey"
             columns: ["customer_id"]
             isOneToOne: false
+            referencedRelation: "customer_pos_view"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "sales_customer_id_fkey"
+            columns: ["customer_id"]
+            isOneToOne: false
             referencedRelation: "customers"
             referencedColumns: ["id"]
           },
@@ -767,6 +774,13 @@ export type Database = {
             foreignKeyName: "technical_services_customer_id_fkey"
             columns: ["customer_id"]
             isOneToOne: false
+            referencedRelation: "customer_pos_view"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "technical_services_customer_id_fkey"
+            columns: ["customer_id"]
+            isOneToOne: false
             referencedRelation: "customers"
             referencedColumns: ["id"]
           },
@@ -792,7 +806,27 @@ export type Database = {
       }
     }
     Views: {
-      [_ in never]: never
+      customer_pos_view: {
+        Row: {
+          credit_limit: number | null
+          current_balance: number | null
+          id: string | null
+          name: string | null
+        }
+        Insert: {
+          credit_limit?: number | null
+          current_balance?: number | null
+          id?: string | null
+          name?: string | null
+        }
+        Update: {
+          credit_limit?: number | null
+          current_balance?: number | null
+          id?: string | null
+          name?: string | null
+        }
+        Relationships: []
+      }
     }
     Functions: {
       generate_service_number: {
