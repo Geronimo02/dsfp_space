@@ -17,7 +17,8 @@ import {
   FileText,
   Activity,
   FileSignature,
-  PackageCheck
+  PackageCheck,
+  CreditCard
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { supabase } from "@/integrations/supabase/client";
@@ -40,6 +41,7 @@ const navigationSections = [
       { name: "Presupuestos", href: "/quotations", icon: FileSignature },
       { name: "Remitos", href: "/delivery-notes", icon: PackageCheck },
       { name: "Clientes", href: "/customers", icon: Users },
+      { name: "Cuentas Corrientes", href: "/customer-account", icon: CreditCard },
     ]
   },
   {
