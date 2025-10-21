@@ -61,10 +61,10 @@ export default function POS() {
   });
 
   const { data: customers } = useQuery({
-    queryKey: ["customers"],
+    queryKey: ["customers-pos"],
     queryFn: async () => {
       const { data, error } = await supabase
-        .from("customers")
+        .from("customer_pos_view")
         .select("*")
         .order("name", { ascending: true });
       
