@@ -8,7 +8,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { Separator } from "@/components/ui/separator";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
-import { Search, ShoppingCart, Trash2, Plus, Minus, Receipt, DollarSign, CreditCard, AlertCircle } from "lucide-react";
+import { Search, ShoppingCart, Trash2, Plus, Minus, Receipt, DollarSign, CreditCard, AlertCircle, Star, Award, Percent } from "lucide-react";
 import { toast } from "sonner";
 import { BarcodeScanner } from "@/components/pos/BarcodeScanner";
 import { generateReceiptPDF } from "@/components/pos/ReceiptPDF";
@@ -24,11 +24,20 @@ interface CartItem {
   subtotal: number;
 }
 
+interface PaymentMethod {
+  id: string;
+  method: string;
+  amount: number;
+}
+
 export default function POS() {
   const [searchQuery, setSearchQuery] = useState("");
   const [cart, setCart] = useState<CartItem[]>([]);
-  const [paymentMethod, setPaymentMethod] = useState("cash");
+  const [paymentMethods, setPaymentMethods] = useState<PaymentMethod[]>([]);
+  const [currentPaymentMethod, setCurrentPaymentMethod] = useState("cash");
+  const [currentPaymentAmount, setCurrentPaymentAmount] = useState("");
   const [discountRate, setDiscountRate] = useState(0);
+  const [loyaltyPointsToUse, setLoyaltyPointsToUse] = useState(0);
   const [installments, setInstallments] = useState(1);
   const [selectedCustomer, setSelectedCustomer] = useState<any>(null);
   const queryClient = useQueryClient();
@@ -136,37 +145,99 @@ export default function POS() {
     setDiscountRate(0);
     setInstallments(1);
     setSelectedCustomer(null);
-    setPaymentMethod("cash");
+    setPaymentMethods([]);
+    setCurrentPaymentMethod("cash");
+    setCurrentPaymentAmount("");
+    setLoyaltyPointsToUse(0);
     toast.info("Carrito vaciado");
   };
 
+  // Calculate loyalty discount based on customer tier
+  const loyaltyDiscountRate = selectedCustomer && companySettings?.loyalty_enabled
+    ? selectedCustomer.loyalty_tier === 'gold'
+      ? companySettings.loyalty_gold_discount || 0
+      : selectedCustomer.loyalty_tier === 'silver'
+      ? companySettings.loyalty_silver_discount || 0
+      : companySettings.loyalty_bronze_discount || 0
+    : 0;
+
+  // Calculate loyalty points value
+  const loyaltyPointsValue = companySettings?.loyalty_enabled && loyaltyPointsToUse > 0
+    ? loyaltyPointsToUse * (companySettings.loyalty_currency_per_point || 0.01)
+    : 0;
+
   const subtotal = cart.reduce((sum, item) => sum + item.subtotal, 0);
-  const discountAmount = (subtotal * discountRate) / 100;
+  const manualDiscountAmount = (subtotal * discountRate) / 100;
+  const loyaltyDiscountAmount = (subtotal * loyaltyDiscountRate) / 100;
+  const totalDiscount = manualDiscountAmount + loyaltyDiscountAmount + loyaltyPointsValue;
   const taxRate = companySettings?.default_tax_rate || 0;
-  const taxAmount = ((subtotal - discountAmount) * taxRate) / 100;
-  const cardSurchargeRate = paymentMethod === "card" ? (companySettings?.card_surcharge_rate || 0) : 0;
-  const cardSurchargeAmount = ((subtotal - discountAmount + taxAmount) * cardSurchargeRate) / 100;
-  const total = subtotal - discountAmount + taxAmount + cardSurchargeAmount;
+  const taxAmount = ((subtotal - totalDiscount) * taxRate) / 100;
+  
+  // Calculate card surcharge based on payment methods
+  let cardSurchargeAmount = 0;
+  const cardSurchargeRate = companySettings?.card_surcharge_rate || 0;
+  
+  if (paymentMethods.length > 0) {
+    // Calculate surcharge for card payments
+    const cardPayments = paymentMethods.filter(p => p.method === 'card');
+    cardSurchargeAmount = cardPayments.reduce((sum, p) => {
+      return sum + (p.amount * cardSurchargeRate / 100);
+    }, 0);
+  }
+  
+  const total = subtotal - totalDiscount + taxAmount + cardSurchargeAmount;
+  const totalPaid = paymentMethods.reduce((sum, p) => sum + p.amount, 0);
+  const remaining = total - totalPaid;
   const installmentAmount = installments > 1 ? total / installments : 0;
+
+  const addPaymentMethod = () => {
+    const amount = parseFloat(currentPaymentAmount);
+    if (!amount || amount <= 0) {
+      toast.error("Ingrese un monto válido");
+      return;
+    }
+    if (totalPaid + amount > total) {
+      toast.error("El monto excede el total");
+      return;
+    }
+    
+    setPaymentMethods([...paymentMethods, {
+      id: Date.now().toString(),
+      method: currentPaymentMethod,
+      amount: amount
+    }]);
+    setCurrentPaymentAmount("");
+    toast.success("Método de pago agregado");
+  };
+
+  const removePaymentMethod = (id: string) => {
+    setPaymentMethods(paymentMethods.filter(p => p.id !== id));
+    toast.success("Método de pago eliminado");
+  };
 
   const processSaleMutation = useMutation({
     mutationFn: async () => {
       const { data: { user } } = await supabase.auth.getUser();
       if (!user) throw new Error("Usuario no autenticado");
 
-      // Validate credit limit if payment is on credit
-      if (paymentMethod === "credit") {
-        if (!selectedCustomer) {
-          throw new Error("Debe seleccionar un cliente para ventas a crédito");
-        }
-        const availableCredit = Number(selectedCustomer.credit_limit) - Number(selectedCustomer.current_balance);
-        if (total > availableCredit) {
-          throw new Error(`Crédito insuficiente. Disponible: $${availableCredit.toFixed(2)}`);
+      // Validate payment is complete
+      if (remaining > 0.01) {
+        throw new Error("Debe completar el pago antes de procesar la venta");
+      }
+
+      // Validate loyalty points
+      if (loyaltyPointsToUse > 0 && selectedCustomer) {
+        if (loyaltyPointsToUse > selectedCustomer.loyalty_points) {
+          throw new Error("Puntos insuficientes");
         }
       }
 
       const saleNumber = `S-${Date.now()}`;
       
+      // Determine primary payment method (the one with highest amount)
+      const primaryPayment = paymentMethods.sort((a, b) => b.amount - a.amount)[0];
+      const primaryMethod = primaryPayment ? primaryPayment.method : 'cash';
+
       const { data: sale, error: saleError } = await supabase
         .from("sales")
         .insert({
@@ -174,12 +245,12 @@ export default function POS() {
           user_id: user.id,
           customer_id: selectedCustomer?.id || null,
           subtotal: subtotal,
-          discount: discountAmount,
-          discount_rate: discountRate,
+          discount: totalDiscount,
+          discount_rate: discountRate + loyaltyDiscountRate,
           tax: taxAmount,
           tax_rate: taxRate,
           total: total,
-          payment_method: paymentMethod,
+          payment_method: primaryMethod,
           installments: installments,
           installment_amount: installmentAmount,
           status: "completed"
@@ -189,6 +260,7 @@ export default function POS() {
 
       if (saleError) throw saleError;
 
+      // Insert sale items
       const { error: itemsError } = await supabase
         .from("sale_items")
         .insert(cart.map(item => ({
@@ -202,6 +274,20 @@ export default function POS() {
 
       if (itemsError) throw itemsError;
 
+      // Insert payment methods
+      const { error: paymentsError } = await supabase
+        .from("sale_payments")
+        .insert(paymentMethods.map(payment => ({
+          sale_id: sale.id,
+          payment_method: payment.method,
+          amount: payment.amount,
+          card_surcharge: payment.method === 'card' ? (payment.amount * cardSurchargeRate / 100) : 0,
+          installments: payment.method === 'card' ? installments : 1
+        })));
+
+      if (paymentsError) throw paymentsError;
+
+      // Update product stock
       for (const item of cart) {
         const { data: product } = await supabase
           .from("products")
@@ -217,45 +303,70 @@ export default function POS() {
         }
       }
 
+      // Process loyalty points
+      if (selectedCustomer && companySettings?.loyalty_enabled) {
+        // Deduct used points
+        if (loyaltyPointsToUse > 0) {
+          await supabase
+            .from("customers")
+            .update({
+              loyalty_points: selectedCustomer.loyalty_points - loyaltyPointsToUse
+            })
+            .eq("id", selectedCustomer.id);
+
+          await supabase
+            .from("loyalty_transactions")
+            .insert({
+              customer_id: selectedCustomer.id,
+              points: -loyaltyPointsToUse,
+              type: 'redeemed',
+              reference_type: 'sale',
+              reference_id: sale.id,
+              description: `Puntos canjeados en venta ${sale.sale_number}`,
+              user_id: user.id
+            });
+        }
+      }
+
       return sale;
     },
     onSuccess: async (sale) => {
       toast.success("¡Venta procesada exitosamente!");
       
-      // Register cash movement if payment method is cash
-      if (paymentMethod === "cash") {
-        try {
-          const { data: { user } } = await supabase.auth.getUser();
-          
-          // Get open cash register
-          const { data: cashRegister } = await supabase
-            .from("cash_registers")
-            .select("*")
-            .eq("status", "open")
-            .order("opening_date", { ascending: false })
-            .limit(1)
-            .maybeSingle();
+      // Register cash movements for cash payments
+      try {
+        const { data: { user } } = await supabase.auth.getUser();
+        
+        // Get open cash register
+        const { data: cashRegister } = await supabase
+          .from("cash_registers")
+          .select("*")
+          .eq("status", "open")
+          .order("opening_date", { ascending: false })
+          .limit(1)
+          .maybeSingle();
 
-          if (cashRegister && user) {
-            // Register income movement
+        if (cashRegister && user) {
+          const cashPayments = paymentMethods.filter(p => p.method === 'cash');
+          
+          for (const payment of cashPayments) {
             await supabase
               .from("cash_movements")
               .insert({
                 cash_register_id: cashRegister.id,
                 user_id: user.id,
                 type: "income",
-                amount: total,
+                amount: payment.amount,
                 category: "Venta",
-                description: `Venta ${sale.sale_number}`,
+                description: `Venta ${sale.sale_number} (Pago en efectivo)`,
                 reference: sale.sale_number,
               });
-            
-            queryClient.invalidateQueries({ queryKey: ["cash-register"] });
           }
-        } catch (error) {
-          console.error("Error registrando movimiento de caja:", error);
-          // Don't show error to user since sale was successful
+          
+          queryClient.invalidateQueries({ queryKey: ["cash-register"] });
         }
+      } catch (error) {
+        console.error("Error registrando movimiento de caja:", error);
       }
       
       // Generate PDF receipt
@@ -263,11 +374,13 @@ export default function POS() {
         saleNumber: sale.sale_number,
         items: cart,
         subtotal: subtotal,
-        discount: discountAmount,
+        discount: totalDiscount,
         tax: taxAmount,
         cardSurcharge: cardSurchargeAmount > 0 ? cardSurchargeAmount : undefined,
         total: total,
-        paymentMethod: paymentMethod,
+        paymentMethod: paymentMethods.length > 0 ? 
+          paymentMethods.map(p => `${p.method}: $${p.amount.toFixed(2)}`).join(', ') : 
+          'cash',
         installments: installments > 1 ? installments : undefined,
         installmentAmount: installments > 1 ? installmentAmount : undefined,
         companyName: companySettings?.company_name || "Mi Empresa",
@@ -280,6 +393,7 @@ export default function POS() {
       clearCart();
       queryClient.invalidateQueries({ queryKey: ["products"] });
       queryClient.invalidateQueries({ queryKey: ["sales-stats"] });
+      queryClient.invalidateQueries({ queryKey: ["customers-pos"] });
     },
     onError: (error: any) => {
       toast.error(error.message || "Error al procesar la venta");
@@ -384,10 +498,22 @@ export default function POS() {
                         <span className="text-muted-foreground">Subtotal:</span>
                         <span>${subtotal.toFixed(2)}</span>
                       </div>
-                      {discountAmount > 0 && (
+                      {manualDiscountAmount > 0 && (
                         <div className="flex justify-between text-destructive">
-                          <span>Descuento ({discountRate}%):</span>
-                          <span>-${discountAmount.toFixed(2)}</span>
+                          <span>Descuento Manual ({discountRate}%):</span>
+                          <span>-${manualDiscountAmount.toFixed(2)}</span>
+                        </div>
+                      )}
+                      {loyaltyDiscountAmount > 0 && (
+                        <div className="flex justify-between text-primary">
+                          <span>Descuento Fidelidad ({loyaltyDiscountRate}%):</span>
+                          <span>-${loyaltyDiscountAmount.toFixed(2)}</span>
+                        </div>
+                      )}
+                      {loyaltyPointsValue > 0 && (
+                        <div className="flex justify-between text-primary">
+                          <span>Puntos Canjeados ({loyaltyPointsToUse}):</span>
+                          <span>-${loyaltyPointsValue.toFixed(2)}</span>
                         </div>
                       )}
                       {taxAmount > 0 && (
@@ -398,7 +524,7 @@ export default function POS() {
                       )}
                       {cardSurchargeAmount > 0 && (
                         <div className="flex justify-between text-warning">
-                          <span>Recargo Tarjeta ({cardSurchargeRate}%):</span>
+                          <span>Recargo Tarjeta:</span>
                           <span>+${cardSurchargeAmount.toFixed(2)}</span>
                         </div>
                       )}
@@ -409,6 +535,41 @@ export default function POS() {
                       <span className="text-primary">${total.toFixed(2)}</span>
                     </div>
 
+                    {selectedCustomer && companySettings?.loyalty_enabled && (
+                      <div className="bg-primary/10 p-3 rounded-lg space-y-2">
+                        <div className="flex items-center justify-between">
+                          <div className="flex items-center gap-2">
+                            <Award className="h-4 w-4 text-primary" />
+                            <span className="text-sm font-medium">Nivel: {selectedCustomer.loyalty_tier?.toUpperCase()}</span>
+                          </div>
+                          <Badge variant="secondary">
+                            <Star className="h-3 w-3 mr-1" />
+                            {selectedCustomer.loyalty_points || 0} pts
+                          </Badge>
+                        </div>
+                        {loyaltyDiscountRate > 0 && (
+                          <p className="text-xs text-muted-foreground">
+                            <Percent className="h-3 w-3 inline mr-1" />
+                            Descuento aplicado: {loyaltyDiscountRate}%
+                          </p>
+                        )}
+                        <div className="space-y-1">
+                          <Label className="text-xs">Canjear Puntos</Label>
+                          <Input
+                            type="number"
+                            min="0"
+                            max={selectedCustomer.loyalty_points || 0}
+                            value={loyaltyPointsToUse}
+                            onChange={(e) => setLoyaltyPointsToUse(parseInt(e.target.value) || 0)}
+                            placeholder="0"
+                          />
+                          <p className="text-xs text-muted-foreground">
+                            Valor: ${loyaltyPointsValue.toFixed(2)}
+                          </p>
+                        </div>
+                      </div>
+                    )}
+
                     <div className="space-y-2">
                       <Label>Cliente (Opcional)</Label>
                       <Select 
@@ -416,6 +577,7 @@ export default function POS() {
                         onValueChange={(val) => {
                           if (val === "none") {
                             setSelectedCustomer(null);
+                            setLoyaltyPointsToUse(0);
                           } else {
                             const customer = customers?.find(c => c.id === val);
                             setSelectedCustomer(customer || null);
@@ -430,89 +592,59 @@ export default function POS() {
                           {customers?.map((customer) => (
                             <SelectItem key={customer.id} value={customer.id}>
                               {customer.name}
-                              {Number(customer.current_balance) > 0 && 
-                                ` (Debe: $${Number(customer.current_balance).toFixed(2)})`
-                              }
                             </SelectItem>
                           ))}
                         </SelectContent>
                       </Select>
                     </div>
 
-                    {selectedCustomer && Number(selectedCustomer.current_balance) > 0 && (
-                      <Alert>
-                        <AlertCircle className="h-4 w-4" />
-                        <AlertDescription className="text-xs">
-                          Saldo pendiente: ${Number(selectedCustomer.current_balance).toFixed(2)}
-                        </AlertDescription>
-                      </Alert>
-                    )}
-
                     <div className="space-y-2">
-                      <Label>Método de Pago</Label>
-                      <Select value={paymentMethod} onValueChange={setPaymentMethod}>
-                        <SelectTrigger>
-                          <SelectValue />
-                        </SelectTrigger>
-                        <SelectContent>
-                          <SelectItem value="cash">Efectivo</SelectItem>
-                          <SelectItem value="card">Tarjeta</SelectItem>
-                          <SelectItem value="transfer">Transferencia</SelectItem>
-                          {selectedCustomer && (
-                            <SelectItem value="credit">
-                              <div className="flex items-center gap-2">
-                                <CreditCard className="h-4 w-4" />
-                                Cuenta Corriente
-                              </div>
-                            </SelectItem>
-                          )}
-                        </SelectContent>
-                      </Select>
-                    </div>
-
-                    {paymentMethod === "credit" && selectedCustomer && (
-                      <Alert>
-                        <DollarSign className="h-4 w-4" />
-                        <AlertDescription className="text-xs space-y-1">
-                          <div className="flex justify-between">
-                            <span>Límite de crédito:</span>
-                            <span className="font-medium">${Number(selectedCustomer.credit_limit).toFixed(2)}</span>
-                          </div>
-                          <div className="flex justify-between">
-                            <span>Saldo actual:</span>
-                            <span className="font-medium text-destructive">
-                              ${Number(selectedCustomer.current_balance).toFixed(2)}
-                            </span>
-                          </div>
-                          <div className="flex justify-between pt-1 border-t">
-                            <span>Disponible:</span>
-                            <span className="font-bold">
-                              ${(Number(selectedCustomer.credit_limit) - Number(selectedCustomer.current_balance)).toFixed(2)}
-                            </span>
-                          </div>
-                        </AlertDescription>
-                      </Alert>
-                    )}
-
-                    {paymentMethod === "card" && (
-                      <div className="space-y-2">
-                        <Label>Cuotas</Label>
-                        <Select value={installments.toString()} onValueChange={(val) => setInstallments(parseInt(val))}>
-                          <SelectTrigger>
+                      <Label>Métodos de Pago</Label>
+                      <div className="flex gap-2">
+                        <Select value={currentPaymentMethod} onValueChange={setCurrentPaymentMethod}>
+                          <SelectTrigger className="flex-1">
                             <SelectValue />
                           </SelectTrigger>
                           <SelectContent>
-                            <SelectItem value="1">1 cuota</SelectItem>
-                            <SelectItem value="3">3 cuotas</SelectItem>
-                            <SelectItem value="6">6 cuotas</SelectItem>
-                            <SelectItem value="12">12 cuotas</SelectItem>
+                            <SelectItem value="cash">Efectivo</SelectItem>
+                            <SelectItem value="card">Tarjeta</SelectItem>
+                            <SelectItem value="transfer">Transferencia</SelectItem>
                           </SelectContent>
                         </Select>
-                        {installments > 1 && (
-                          <p className="text-xs text-muted-foreground">
-                            {installments} cuotas de ${installmentAmount.toFixed(2)}
-                          </p>
-                        )}
+                        <Input
+                          type="number"
+                          step="0.01"
+                          placeholder="Monto"
+                          value={currentPaymentAmount}
+                          onChange={(e) => setCurrentPaymentAmount(e.target.value)}
+                          className="w-24"
+                        />
+                        <Button type="button" size="icon" onClick={addPaymentMethod}>
+                          <Plus className="h-4 w-4" />
+                        </Button>
+                      </div>
+                    </div>
+
+                    {paymentMethods.length > 0 && (
+                      <div className="space-y-2">
+                        {paymentMethods.map((pm) => (
+                          <div key={pm.id} className="flex items-center justify-between p-2 bg-muted rounded">
+                            <span className="text-sm">{pm.method}: ${pm.amount.toFixed(2)}</span>
+                            <Button size="icon" variant="ghost" className="h-6 w-6" onClick={() => removePaymentMethod(pm.id)}>
+                              <Trash2 className="h-3 w-3" />
+                            </Button>
+                          </div>
+                        ))}
+                        <div className="flex justify-between pt-2 border-t font-medium">
+                          <span>Pagado:</span>
+                          <span>${totalPaid.toFixed(2)}</span>
+                        </div>
+                        <div className="flex justify-between">
+                          <span>Restante:</span>
+                          <span className={remaining > 0.01 ? "text-destructive" : "text-success"}>
+                            ${remaining.toFixed(2)}
+                          </span>
+                        </div>
                       </div>
                     )}
 
@@ -520,7 +652,11 @@ export default function POS() {
                       <Button variant="outline" onClick={clearCart} className="flex-1">
                         Limpiar
                       </Button>
-                      <Button onClick={() => processSaleMutation.mutate()} disabled={processSaleMutation.isPending} className="flex-1">
+                      <Button 
+                        onClick={() => processSaleMutation.mutate()} 
+                        disabled={processSaleMutation.isPending || remaining > 0.01} 
+                        className="flex-1"
+                      >
                         <Receipt className="mr-2 h-4 w-4" />
                         {processSaleMutation.isPending ? "Procesando..." : "Cobrar"}
                       </Button>

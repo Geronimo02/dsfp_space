@@ -4,7 +4,7 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/com
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Switch } from "@/components/ui/switch";
-import { Building2, DollarSign, Receipt, MessageSquare, Database, AlertTriangle, Package } from "lucide-react";
+import { Building2, DollarSign, Receipt, MessageSquare, Database, AlertTriangle, Package, Users } from "lucide-react";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Button } from "@/components/ui/button";
@@ -54,6 +54,15 @@ export default function Settings() {
     whatsapp_number: "",
     whatsapp_enabled: false,
     low_stock_alert: true,
+    loyalty_enabled: false,
+    loyalty_points_per_currency: "1",
+    loyalty_currency_per_point: "0.01",
+    loyalty_bronze_threshold: "0",
+    loyalty_silver_threshold: "10000",
+    loyalty_gold_threshold: "50000",
+    loyalty_bronze_discount: "0",
+    loyalty_silver_discount: "5",
+    loyalty_gold_discount: "10",
   });
 
   const { data: settings, isLoading } = useQuery({
@@ -82,6 +91,15 @@ export default function Settings() {
         whatsapp_number: data.whatsapp_number || "",
         whatsapp_enabled: data.whatsapp_enabled || false,
         low_stock_alert: data.low_stock_alert !== false,
+        loyalty_enabled: data.loyalty_enabled || false,
+        loyalty_points_per_currency: data.loyalty_points_per_currency?.toString() || "1",
+        loyalty_currency_per_point: data.loyalty_currency_per_point?.toString() || "0.01",
+        loyalty_bronze_threshold: data.loyalty_bronze_threshold?.toString() || "0",
+        loyalty_silver_threshold: data.loyalty_silver_threshold?.toString() || "10000",
+        loyalty_gold_threshold: data.loyalty_gold_threshold?.toString() || "50000",
+        loyalty_bronze_discount: data.loyalty_bronze_discount?.toString() || "0",
+        loyalty_silver_discount: data.loyalty_silver_discount?.toString() || "5",
+        loyalty_gold_discount: data.loyalty_gold_discount?.toString() || "10",
       });
       
       return data;
@@ -109,6 +127,15 @@ export default function Settings() {
           whatsapp_number: data.whatsapp_number || null,
           whatsapp_enabled: data.whatsapp_enabled,
           low_stock_alert: data.low_stock_alert,
+          loyalty_enabled: data.loyalty_enabled,
+          loyalty_points_per_currency: parseFloat(data.loyalty_points_per_currency) || 1,
+          loyalty_currency_per_point: parseFloat(data.loyalty_currency_per_point) || 0.01,
+          loyalty_bronze_threshold: parseFloat(data.loyalty_bronze_threshold) || 0,
+          loyalty_silver_threshold: parseFloat(data.loyalty_silver_threshold) || 10000,
+          loyalty_gold_threshold: parseFloat(data.loyalty_gold_threshold) || 50000,
+          loyalty_bronze_discount: parseFloat(data.loyalty_bronze_discount) || 0,
+          loyalty_silver_discount: parseFloat(data.loyalty_silver_discount) || 5,
+          loyalty_gold_discount: parseFloat(data.loyalty_gold_discount) || 10,
         })
         .eq("id", settings.id);
       
@@ -175,9 +202,10 @@ export default function Settings() {
         </div>
 
         <Tabs defaultValue="company" className="space-y-6">
-          <TabsList className="grid w-full grid-cols-6">
+          <TabsList className="grid w-full grid-cols-7">
             <TabsTrigger value="company">Empresa</TabsTrigger>
             <TabsTrigger value="financial">Finanzas</TabsTrigger>
+            <TabsTrigger value="loyalty">Fidelización</TabsTrigger>
             <TabsTrigger value="receipts">Tickets</TabsTrigger>
             <TabsTrigger value="inventory">Inventario</TabsTrigger>
             <TabsTrigger value="integrations">WhatsApp</TabsTrigger>
@@ -314,6 +342,150 @@ export default function Settings() {
                       </p>
                     </div>
                   </div>
+
+                  <div className="flex justify-end pt-4">
+                    <Button type="submit" disabled={updateSettingsMutation.isPending}>
+                      {updateSettingsMutation.isPending ? "Guardando..." : "Guardar Cambios"}
+                    </Button>
+                  </div>
+                </form>
+              </CardContent>
+            </Card>
+          </TabsContent>
+
+          {/* Programa de Fidelización */}
+          <TabsContent value="loyalty" className="space-y-6">
+            <Card className="shadow-soft">
+              <CardHeader>
+                <CardTitle className="flex items-center gap-2">
+                  <Users className="h-5 w-5 text-primary" />
+                  Programa de Fidelización
+                </CardTitle>
+                <CardDescription>
+                  Configura el sistema de puntos y recompensas para tus clientes
+                </CardDescription>
+              </CardHeader>
+              <CardContent>
+                <form onSubmit={handleSubmit} className="space-y-4">
+                  <div className="flex items-center justify-between rounded-lg border p-4">
+                    <div className="space-y-0.5">
+                      <Label htmlFor="loyalty_enabled">Activar Programa de Fidelización</Label>
+                      <p className="text-sm text-muted-foreground">
+                        Los clientes acumularán puntos por cada compra
+                      </p>
+                    </div>
+                    <Switch
+                      id="loyalty_enabled"
+                      checked={formData.loyalty_enabled}
+                      onCheckedChange={(checked) => setFormData({ ...formData, loyalty_enabled: checked })}
+                    />
+                  </div>
+
+                  {formData.loyalty_enabled && (
+                    <>
+                      <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                        <div className="space-y-2">
+                          <Label htmlFor="loyalty_points_per_currency">Puntos por Unidad de Moneda</Label>
+                          <Input
+                            id="loyalty_points_per_currency"
+                            type="number"
+                            step="0.01"
+                            value={formData.loyalty_points_per_currency}
+                            onChange={(e) => setFormData({ ...formData, loyalty_points_per_currency: e.target.value })}
+                          />
+                          <p className="text-xs text-muted-foreground">
+                            Ej: Si es 1, por cada $1 gastado se otorga 1 punto
+                          </p>
+                        </div>
+
+                        <div className="space-y-2">
+                          <Label htmlFor="loyalty_currency_per_point">Valor de Cada Punto</Label>
+                          <Input
+                            id="loyalty_currency_per_point"
+                            type="number"
+                            step="0.01"
+                            value={formData.loyalty_currency_per_point}
+                            onChange={(e) => setFormData({ ...formData, loyalty_currency_per_point: e.target.value })}
+                          />
+                          <p className="text-xs text-muted-foreground">
+                            Ej: Si es 0.01, cada punto vale $0.01 en descuentos
+                          </p>
+                        </div>
+                      </div>
+
+                      <div className="space-y-4 pt-4">
+                        <h3 className="font-semibold">Niveles de Fidelización</h3>
+                        
+                        <div className="grid grid-cols-3 gap-4">
+                          <div className="space-y-2">
+                            <Label className="flex items-center gap-2">
+                              🥉 Nivel Bronze
+                            </Label>
+                            <div className="space-y-2">
+                              <Input
+                                type="number"
+                                step="0.01"
+                                placeholder="Monto mínimo"
+                                value={formData.loyalty_bronze_threshold}
+                                onChange={(e) => setFormData({ ...formData, loyalty_bronze_threshold: e.target.value })}
+                              />
+                              <Input
+                                type="number"
+                                step="0.01"
+                                placeholder="% Descuento"
+                                value={formData.loyalty_bronze_discount}
+                                onChange={(e) => setFormData({ ...formData, loyalty_bronze_discount: e.target.value })}
+                              />
+                            </div>
+                          </div>
+
+                          <div className="space-y-2">
+                            <Label className="flex items-center gap-2">
+                              🥈 Nivel Silver
+                            </Label>
+                            <div className="space-y-2">
+                              <Input
+                                type="number"
+                                step="0.01"
+                                placeholder="Monto mínimo"
+                                value={formData.loyalty_silver_threshold}
+                                onChange={(e) => setFormData({ ...formData, loyalty_silver_threshold: e.target.value })}
+                              />
+                              <Input
+                                type="number"
+                                step="0.01"
+                                placeholder="% Descuento"
+                                value={formData.loyalty_silver_discount}
+                                onChange={(e) => setFormData({ ...formData, loyalty_silver_discount: e.target.value })}
+                              />
+                            </div>
+                          </div>
+
+                          <div className="space-y-2">
+                            <Label className="flex items-center gap-2">
+                              🏆 Nivel Gold
+                            </Label>
+                            <div className="space-y-2">
+                              <Input
+                                type="number"
+                                step="0.01"
+                                placeholder="Monto mínimo"
+                                value={formData.loyalty_gold_threshold}
+                                onChange={(e) => setFormData({ ...formData, loyalty_gold_threshold: e.target.value })}
+                              />
+                              <Input
+                                type="number"
+                                step="0.01"
+                                placeholder="% Descuento"
+                                value={formData.loyalty_gold_discount}
+                                onChange={(e) => setFormData({ ...formData, loyalty_gold_discount: e.target.value })}
+                              />
+                            </div>
+                          </div>
+                        </div>
+                      </div>
+                    </>
+                  )}
 
                   <div className="flex justify-end pt-4">
                     <Button type="submit" disabled={updateSettingsMutation.isPending}>
