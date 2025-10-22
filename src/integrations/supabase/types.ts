@@ -207,6 +207,15 @@ export type Database = {
           last_backup_date: string | null
           logo_url: string | null
           low_stock_alert: boolean | null
+          loyalty_bronze_discount: number | null
+          loyalty_bronze_threshold: number | null
+          loyalty_currency_per_point: number | null
+          loyalty_enabled: boolean | null
+          loyalty_gold_discount: number | null
+          loyalty_gold_threshold: number | null
+          loyalty_points_per_currency: number | null
+          loyalty_silver_discount: number | null
+          loyalty_silver_threshold: number | null
           phone: string | null
           receipt_footer: string | null
           receipt_format: string | null
@@ -229,6 +238,15 @@ export type Database = {
           last_backup_date?: string | null
           logo_url?: string | null
           low_stock_alert?: boolean | null
+          loyalty_bronze_discount?: number | null
+          loyalty_bronze_threshold?: number | null
+          loyalty_currency_per_point?: number | null
+          loyalty_enabled?: boolean | null
+          loyalty_gold_discount?: number | null
+          loyalty_gold_threshold?: number | null
+          loyalty_points_per_currency?: number | null
+          loyalty_silver_discount?: number | null
+          loyalty_silver_threshold?: number | null
           phone?: string | null
           receipt_footer?: string | null
           receipt_format?: string | null
@@ -251,6 +269,15 @@ export type Database = {
           last_backup_date?: string | null
           logo_url?: string | null
           low_stock_alert?: boolean | null
+          loyalty_bronze_discount?: number | null
+          loyalty_bronze_threshold?: number | null
+          loyalty_currency_per_point?: number | null
+          loyalty_enabled?: boolean | null
+          loyalty_gold_discount?: number | null
+          loyalty_gold_threshold?: number | null
+          loyalty_points_per_currency?: number | null
+          loyalty_silver_discount?: number | null
+          loyalty_silver_threshold?: number | null
           phone?: string | null
           receipt_footer?: string | null
           receipt_format?: string | null
@@ -371,9 +398,12 @@ export type Database = {
           document: string | null
           email: string | null
           id: string
+          loyalty_points: number | null
+          loyalty_tier: string | null
           name: string
           payment_terms: string | null
           phone: string | null
+          total_purchases: number | null
           updated_at: string
         }
         Insert: {
@@ -384,9 +414,12 @@ export type Database = {
           document?: string | null
           email?: string | null
           id?: string
+          loyalty_points?: number | null
+          loyalty_tier?: string | null
           name: string
           payment_terms?: string | null
           phone?: string | null
+          total_purchases?: number | null
           updated_at?: string
         }
         Update: {
@@ -397,9 +430,12 @@ export type Database = {
           document?: string | null
           email?: string | null
           id?: string
+          loyalty_points?: number | null
+          loyalty_tier?: string | null
           name?: string
           payment_terms?: string | null
           phone?: string | null
+          total_purchases?: number | null
           updated_at?: string
         }
         Relationships: []
@@ -509,6 +545,57 @@ export type Database = {
             columns: ["sale_id"]
             isOneToOne: false
             referencedRelation: "sales"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      loyalty_transactions: {
+        Row: {
+          created_at: string | null
+          customer_id: string
+          description: string | null
+          id: string
+          points: number
+          reference_id: string | null
+          reference_type: string | null
+          type: string
+          user_id: string | null
+        }
+        Insert: {
+          created_at?: string | null
+          customer_id: string
+          description?: string | null
+          id?: string
+          points: number
+          reference_id?: string | null
+          reference_type?: string | null
+          type: string
+          user_id?: string | null
+        }
+        Update: {
+          created_at?: string | null
+          customer_id?: string
+          description?: string | null
+          id?: string
+          points?: number
+          reference_id?: string | null
+          reference_type?: string | null
+          type?: string
+          user_id?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "loyalty_transactions_customer_id_fkey"
+            columns: ["customer_id"]
+            isOneToOne: false
+            referencedRelation: "customer_pos_view"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "loyalty_transactions_customer_id_fkey"
+            columns: ["customer_id"]
+            isOneToOne: false
+            referencedRelation: "customers"
             referencedColumns: ["id"]
           },
         ]
@@ -912,6 +999,180 @@ export type Database = {
         }
         Relationships: []
       }
+      reservation_items: {
+        Row: {
+          created_at: string | null
+          id: string
+          product_id: string | null
+          product_name: string
+          quantity: number
+          reservation_id: string
+          subtotal: number
+          unit_price: number
+        }
+        Insert: {
+          created_at?: string | null
+          id?: string
+          product_id?: string | null
+          product_name: string
+          quantity: number
+          reservation_id: string
+          subtotal: number
+          unit_price: number
+        }
+        Update: {
+          created_at?: string | null
+          id?: string
+          product_id?: string | null
+          product_name?: string
+          quantity?: number
+          reservation_id?: string
+          subtotal?: number
+          unit_price?: number
+        }
+        Relationships: [
+          {
+            foreignKeyName: "reservation_items_product_id_fkey"
+            columns: ["product_id"]
+            isOneToOne: false
+            referencedRelation: "products"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "reservation_items_reservation_id_fkey"
+            columns: ["reservation_id"]
+            isOneToOne: false
+            referencedRelation: "reservations"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      reservation_payments: {
+        Row: {
+          amount: number
+          created_at: string | null
+          id: string
+          notes: string | null
+          payment_date: string | null
+          payment_method: string
+          reservation_id: string
+          user_id: string
+        }
+        Insert: {
+          amount: number
+          created_at?: string | null
+          id?: string
+          notes?: string | null
+          payment_date?: string | null
+          payment_method: string
+          reservation_id: string
+          user_id: string
+        }
+        Update: {
+          amount?: number
+          created_at?: string | null
+          id?: string
+          notes?: string | null
+          payment_date?: string | null
+          payment_method?: string
+          reservation_id?: string
+          user_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "reservation_payments_reservation_id_fkey"
+            columns: ["reservation_id"]
+            isOneToOne: false
+            referencedRelation: "reservations"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      reservations: {
+        Row: {
+          completed_at: string | null
+          converted_to_sale_id: string | null
+          created_at: string | null
+          customer_id: string
+          customer_name: string
+          expiration_date: string | null
+          id: string
+          notes: string | null
+          paid_amount: number | null
+          remaining_amount: number
+          reservation_number: string
+          status: string | null
+          subtotal: number
+          tax: number | null
+          tax_rate: number | null
+          total: number
+          updated_at: string | null
+          user_id: string
+        }
+        Insert: {
+          completed_at?: string | null
+          converted_to_sale_id?: string | null
+          created_at?: string | null
+          customer_id: string
+          customer_name: string
+          expiration_date?: string | null
+          id?: string
+          notes?: string | null
+          paid_amount?: number | null
+          remaining_amount: number
+          reservation_number: string
+          status?: string | null
+          subtotal?: number
+          tax?: number | null
+          tax_rate?: number | null
+          total: number
+          updated_at?: string | null
+          user_id: string
+        }
+        Update: {
+          completed_at?: string | null
+          converted_to_sale_id?: string | null
+          created_at?: string | null
+          customer_id?: string
+          customer_name?: string
+          expiration_date?: string | null
+          id?: string
+          notes?: string | null
+          paid_amount?: number | null
+          remaining_amount?: number
+          reservation_number?: string
+          status?: string | null
+          subtotal?: number
+          tax?: number | null
+          tax_rate?: number | null
+          total?: number
+          updated_at?: string | null
+          user_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "reservations_converted_to_sale_id_fkey"
+            columns: ["converted_to_sale_id"]
+            isOneToOne: false
+            referencedRelation: "sales"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "reservations_customer_id_fkey"
+            columns: ["customer_id"]
+            isOneToOne: false
+            referencedRelation: "customer_pos_view"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "reservations_customer_id_fkey"
+            columns: ["customer_id"]
+            isOneToOne: false
+            referencedRelation: "customers"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       return_items: {
         Row: {
           created_at: string | null
@@ -1116,6 +1377,47 @@ export type Database = {
           },
           {
             foreignKeyName: "sale_items_sale_id_fkey"
+            columns: ["sale_id"]
+            isOneToOne: false
+            referencedRelation: "sales"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      sale_payments: {
+        Row: {
+          amount: number
+          card_surcharge: number | null
+          created_at: string | null
+          id: string
+          installments: number | null
+          notes: string | null
+          payment_method: string
+          sale_id: string
+        }
+        Insert: {
+          amount: number
+          card_surcharge?: number | null
+          created_at?: string | null
+          id?: string
+          installments?: number | null
+          notes?: string | null
+          payment_method: string
+          sale_id: string
+        }
+        Update: {
+          amount?: number
+          card_surcharge?: number | null
+          created_at?: string | null
+          id?: string
+          installments?: number | null
+          notes?: string | null
+          payment_method?: string
+          sale_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "sale_payments_sale_id_fkey"
             columns: ["sale_id"]
             isOneToOne: false
             referencedRelation: "sales"
@@ -1475,34 +1777,14 @@ export type Database = {
       }
     }
     Functions: {
-      check_expiring_products: {
-        Args: Record<PropertyKey, never>
-        Returns: undefined
-      }
-      check_low_stock_alerts: {
-        Args: Record<PropertyKey, never>
-        Returns: undefined
-      }
-      generate_credit_note_number: {
-        Args: Record<PropertyKey, never>
-        Returns: string
-      }
-      generate_delivery_number: {
-        Args: Record<PropertyKey, never>
-        Returns: string
-      }
-      generate_quotation_number: {
-        Args: Record<PropertyKey, never>
-        Returns: string
-      }
-      generate_return_number: {
-        Args: Record<PropertyKey, never>
-        Returns: string
-      }
-      generate_service_number: {
-        Args: Record<PropertyKey, never>
-        Returns: string
-      }
+      check_expiring_products: { Args: never; Returns: undefined }
+      check_low_stock_alerts: { Args: never; Returns: undefined }
+      generate_credit_note_number: { Args: never; Returns: string }
+      generate_delivery_number: { Args: never; Returns: string }
+      generate_quotation_number: { Args: never; Returns: string }
+      generate_reservation_number: { Args: never; Returns: string }
+      generate_return_number: { Args: never; Returns: string }
+      generate_service_number: { Args: never; Returns: string }
       has_permission: {
         Args: { _module: string; _permission: string; _user_id: string }
         Returns: boolean

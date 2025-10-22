@@ -372,6 +372,8 @@ export default function Customers() {
                   <TableHead>Nombre</TableHead>
                   <TableHead>Email</TableHead>
                   <TableHead>Teléfono</TableHead>
+                  <TableHead>Puntos</TableHead>
+                  <TableHead>Nivel</TableHead>
                   <TableHead>Saldo</TableHead>
                   <TableHead>Límite</TableHead>
                   <TableHead className="text-right">Acciones</TableHead>
@@ -383,6 +385,22 @@ export default function Customers() {
                     <TableCell className="font-medium">{customer.name}</TableCell>
                     <TableCell>{customer.email || "-"}</TableCell>
                     <TableCell>{customer.phone || "-"}</TableCell>
+                    <TableCell>
+                      <Badge variant="secondary">
+                        {customer.loyalty_points || 0} pts
+                      </Badge>
+                    </TableCell>
+                    <TableCell>
+                      <Badge variant={
+                        customer.loyalty_tier === 'gold' ? 'default' : 
+                        customer.loyalty_tier === 'silver' ? 'secondary' : 
+                        'outline'
+                      }>
+                        {customer.loyalty_tier === 'gold' ? '🏆 Gold' : 
+                         customer.loyalty_tier === 'silver' ? '🥈 Silver' : 
+                         '🥉 Bronze'}
+                      </Badge>
+                    </TableCell>
                     <TableCell>
                       <Badge variant={Number(customer.current_balance) > 0 ? "destructive" : "default"}>
                         ${Number(customer.current_balance || 0).toFixed(2)}
@@ -427,7 +445,21 @@ export default function Customers() {
             <div className="space-y-4">
               <Card>
                 <CardContent className="pt-6">
-                  <div className="grid grid-cols-4 gap-4 text-center">
+                  <div className="grid grid-cols-6 gap-4 text-center">
+                    <div>
+                      <p className="text-sm text-muted-foreground">Puntos Fidelización</p>
+                      <p className="text-2xl font-bold text-primary">
+                        {selectedCustomer?.loyalty_points || 0}
+                      </p>
+                    </div>
+                    <div>
+                      <p className="text-sm text-muted-foreground">Nivel</p>
+                      <p className="text-xl font-bold">
+                        {selectedCustomer?.loyalty_tier === 'gold' ? '🏆 Gold' : 
+                         selectedCustomer?.loyalty_tier === 'silver' ? '🥈 Silver' : 
+                         '🥉 Bronze'}
+                      </p>
+                    </div>
                     <div>
                       <p className="text-sm text-muted-foreground">Saldo Actual</p>
                       <p className={`text-2xl font-bold ${Number(selectedCustomer?.current_balance) > 0 ? 'text-destructive' : 'text-success'}`}>

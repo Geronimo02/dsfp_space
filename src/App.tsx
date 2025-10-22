@@ -27,6 +27,7 @@ import CustomerAccount from "./pages/CustomerAccount";
 import Promotions from "./pages/Promotions";
 import Returns from "./pages/Returns";
 import InventoryAlerts from "./pages/InventoryAlerts";
+import Reservations from "./pages/Reservations";
 import NotFound from "./pages/NotFound";
 
 const queryClient = new QueryClient();
@@ -84,6 +85,7 @@ const App = () => (
           <Route path="/customer-account" element={<ProtectedRoute><CustomerAccount /></ProtectedRoute>} />
           <Route path="/promotions" element={<ProtectedRoute><Promotions /></ProtectedRoute>} />
           <Route path="/returns" element={<ProtectedRoute><Returns /></ProtectedRoute>} />
+          <Route path="/reservations" element={<ProtectedRoute><Reservations /></ProtectedRoute>} />
           <Route path="/technical-services" element={<ProtectedRoute><TechnicalServices /></ProtectedRoute>} />
           <Route path="/employees" element={<ProtectedRoute><Employees /></ProtectedRoute>} />
           <Route path="/cash-register" element={<ProtectedRoute><CashRegister /></ProtectedRoute>} />
