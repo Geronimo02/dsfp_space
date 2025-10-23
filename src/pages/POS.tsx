@@ -10,6 +10,7 @@ import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
 import { Search, ShoppingCart, Trash2, Plus, Minus, Receipt, DollarSign, CreditCard, AlertCircle, Star, Award, Percent } from "lucide-react";
 import { toast } from "sonner";
+import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { BarcodeScanner } from "@/components/pos/BarcodeScanner";
 import { generateReceiptPDF } from "@/components/pos/ReceiptPDF";
 import { Badge } from "@/components/ui/badge";
@@ -28,6 +29,7 @@ interface PaymentMethod {
   id: string;
   method: string;
   amount: number;
+  installments?: number;
 }
 
 export default function POS() {
@@ -36,10 +38,14 @@ export default function POS() {
   const [paymentMethods, setPaymentMethods] = useState<PaymentMethod[]>([]);
   const [currentPaymentMethod, setCurrentPaymentMethod] = useState("cash");
   const [currentPaymentAmount, setCurrentPaymentAmount] = useState("");
+  const [currentInstallments, setCurrentInstallments] = useState(1);
   const [discountRate, setDiscountRate] = useState(0);
   const [loyaltyPointsToUse, setLoyaltyPointsToUse] = useState(0);
-  const [installments, setInstallments] = useState(1);
   const [selectedCustomer, setSelectedCustomer] = useState<any>(null);
+  const [createCustomerDialog, setCreateCustomerDialog] = useState(false);
+  const [newCustomerName, setNewCustomerName] = useState("");
+  const [newCustomerPhone, setNewCustomerPhone] = useState("");
+  const [newCustomerEmail, setNewCustomerEmail] = useState("");
   const queryClient = useQueryClient();
 
   const { data: products } = useQuery({
@@ -143,7 +149,7 @@ export default function POS() {
   const clearCart = () => {
     setCart([]);
     setDiscountRate(0);
-    setInstallments(1);
+    setCurrentInstallments(1);
     setSelectedCustomer(null);
     setPaymentMethods([]);
     setCurrentPaymentMethod("cash");
@@ -188,7 +194,6 @@ export default function POS() {
   const total = subtotal - totalDiscount + taxAmount + cardSurchargeAmount;
   const totalPaid = paymentMethods.reduce((sum, p) => sum + p.amount, 0);
   const remaining = total - totalPaid;
-  const installmentAmount = installments > 1 ? total / installments : 0;
 
   const addPaymentMethod = () => {
     const amount = parseFloat(currentPaymentAmount);
@@ -204,9 +209,11 @@ export default function POS() {
     setPaymentMethods([...paymentMethods, {
       id: Date.now().toString(),
       method: currentPaymentMethod,
-      amount: amount
+      amount: amount,
+      installments: currentPaymentMethod === 'card' ? currentInstallments : 1
     }]);
     setCurrentPaymentAmount("");
+    setCurrentInstallments(1);
     toast.success("Método de pago agregado");
   };
 
@@ -214,6 +221,39 @@ export default function POS() {
     setPaymentMethods(paymentMethods.filter(p => p.id !== id));
     toast.success("Método de pago eliminado");
   };
+
+  const createCustomerMutation = useMutation({
+    mutationFn: async () => {
+      if (!newCustomerName.trim()) {
+        throw new Error("El nombre es requerido");
+      }
+
+      const { data, error } = await supabase
+        .from("customers")
+        .insert({
+          name: newCustomerName.trim(),
+          phone: newCustomerPhone.trim() || null,
+          email: newCustomerEmail.trim() || null,
+        })
+        .select()
+        .single();
+
+      if (error) throw error;
+      return data;
+    },
+    onSuccess: (customer) => {
+      toast.success("Cliente creado exitosamente");
+      setSelectedCustomer(customer);
+      setCreateCustomerDialog(false);
+      setNewCustomerName("");
+      setNewCustomerPhone("");
+      setNewCustomerEmail("");
+      queryClient.invalidateQueries({ queryKey: ["customers-pos"] });
+    },
+    onError: (error: any) => {
+      toast.error(error.message || "Error al crear cliente");
+    }
+  });
 
   const processSaleMutation = useMutation({
     mutationFn: async () => {
@@ -237,6 +277,7 @@ export default function POS() {
       // Determine primary payment method (the one with highest amount)
       const primaryPayment = paymentMethods.sort((a, b) => b.amount - a.amount)[0];
       const primaryMethod = primaryPayment ? primaryPayment.method : 'cash';
+      const maxInstallments = Math.max(...paymentMethods.map(p => p.installments || 1));
 
       const { data: sale, error: saleError } = await supabase
         .from("sales")
@@ -251,8 +292,8 @@ export default function POS() {
           tax_rate: taxRate,
           total: total,
           payment_method: primaryMethod,
-          installments: installments,
-          installment_amount: installmentAmount,
+          installments: maxInstallments,
+          installment_amount: maxInstallments > 1 ? total / maxInstallments : 0,
           status: "completed"
         })
         .select()
@@ -282,7 +323,7 @@ export default function POS() {
           payment_method: payment.method,
           amount: payment.amount,
           card_surcharge: payment.method === 'card' ? (payment.amount * cardSurchargeRate / 100) : 0,
-          installments: payment.method === 'card' ? installments : 1
+          installments: payment.installments || 1
         })));
 
       if (paymentsError) throw paymentsError;
@@ -350,6 +391,11 @@ export default function POS() {
           const cashPayments = paymentMethods.filter(p => p.method === 'cash');
           
           for (const payment of cashPayments) {
+            // Create detailed product list for description
+            const productDetails = cart.map(item => 
+              `${item.product_name} (${item.quantity}x$${item.unit_price.toFixed(2)})`
+            ).join(', ');
+
             await supabase
               .from("cash_movements")
               .insert({
@@ -358,7 +404,7 @@ export default function POS() {
                 type: "income",
                 amount: payment.amount,
                 category: "Venta",
-                description: `Venta ${sale.sale_number} (Pago en efectivo)`,
+                description: `Venta ${sale.sale_number} - Productos: ${productDetails}`,
                 reference: sale.sale_number,
               });
           }
@@ -379,10 +425,12 @@ export default function POS() {
         cardSurcharge: cardSurchargeAmount > 0 ? cardSurchargeAmount : undefined,
         total: total,
         paymentMethod: paymentMethods.length > 0 ? 
-          paymentMethods.map(p => `${p.method}: $${p.amount.toFixed(2)}`).join(', ') : 
-          'cash',
-        installments: installments > 1 ? installments : undefined,
-        installmentAmount: installments > 1 ? installmentAmount : undefined,
+          paymentMethods.map(p => {
+            const methodName = p.method === 'cash' ? 'Efectivo' : p.method === 'card' ? 'Tarjeta' : 'Transferencia';
+            const installmentInfo = p.installments && p.installments > 1 ? ` (${p.installments} cuotas)` : '';
+            return `${methodName}: $${p.amount.toFixed(2)}${installmentInfo}`;
+          }).join(', ') : 
+          'Efectivo',
         companyName: companySettings?.company_name || "Mi Empresa",
         companyAddress: companySettings?.address,
         companyPhone: companySettings?.phone,
@@ -571,7 +619,18 @@ export default function POS() {
                     )}
 
                     <div className="space-y-2">
-                      <Label>Cliente (Opcional)</Label>
+                      <div className="flex justify-between items-center">
+                        <Label>Cliente (Opcional)</Label>
+                        <Button 
+                          type="button" 
+                          variant="ghost" 
+                          size="sm"
+                          onClick={() => setCreateCustomerDialog(true)}
+                        >
+                          <Plus className="h-3 w-3 mr-1" />
+                          Nuevo
+                        </Button>
+                      </div>
                       <Select 
                         value={selectedCustomer?.id || "none"} 
                         onValueChange={(val) => {
@@ -623,18 +682,41 @@ export default function POS() {
                           <Plus className="h-4 w-4" />
                         </Button>
                       </div>
+                      {currentPaymentMethod === 'card' && (
+                        <div className="space-y-1">
+                          <Label className="text-xs">Cuotas</Label>
+                          <Select 
+                            value={currentInstallments.toString()} 
+                            onValueChange={(val) => setCurrentInstallments(parseInt(val))}
+                          >
+                            <SelectTrigger>
+                              <SelectValue />
+                            </SelectTrigger>
+                            <SelectContent>
+                              <SelectItem value="1">1 cuota (sin interés)</SelectItem>
+                              <SelectItem value="3">3 cuotas</SelectItem>
+                              <SelectItem value="6">6 cuotas</SelectItem>
+                              <SelectItem value="12">12 cuotas</SelectItem>
+                            </SelectContent>
+                          </Select>
+                        </div>
+                      )}
                     </div>
 
                     {paymentMethods.length > 0 && (
                       <div className="space-y-2">
-                        {paymentMethods.map((pm) => (
-                          <div key={pm.id} className="flex items-center justify-between p-2 bg-muted rounded">
-                            <span className="text-sm">{pm.method}: ${pm.amount.toFixed(2)}</span>
-                            <Button size="icon" variant="ghost" className="h-6 w-6" onClick={() => removePaymentMethod(pm.id)}>
-                              <Trash2 className="h-3 w-3" />
-                            </Button>
-                          </div>
-                        ))}
+                        {paymentMethods.map((pm) => {
+                          const methodLabel = pm.method === 'cash' ? 'Efectivo' : pm.method === 'card' ? 'Tarjeta' : 'Transferencia';
+                          const installmentInfo = pm.installments && pm.installments > 1 ? ` (${pm.installments} cuotas)` : '';
+                          return (
+                            <div key={pm.id} className="flex items-center justify-between p-2 bg-muted rounded">
+                              <span className="text-sm">{methodLabel}: ${pm.amount.toFixed(2)}{installmentInfo}</span>
+                              <Button size="icon" variant="ghost" className="h-6 w-6" onClick={() => removePaymentMethod(pm.id)}>
+                                <Trash2 className="h-3 w-3" />
+                              </Button>
+                            </div>
+                          );
+                        })}
                         <div className="flex justify-between pt-2 border-t font-medium">
                           <span>Pagado:</span>
                           <span>${totalPaid.toFixed(2)}</span>
@@ -668,6 +750,56 @@ export default function POS() {
           </Card>
         </div>
       </div>
+
+      {/* Create Customer Dialog */}
+      <Dialog open={createCustomerDialog} onOpenChange={setCreateCustomerDialog}>
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle>Nuevo Cliente</DialogTitle>
+          </DialogHeader>
+          <div className="space-y-4">
+            <div>
+              <Label htmlFor="customer-name">Nombre *</Label>
+              <Input
+                id="customer-name"
+                value={newCustomerName}
+                onChange={(e) => setNewCustomerName(e.target.value)}
+                placeholder="Nombre del cliente"
+              />
+            </div>
+            <div>
+              <Label htmlFor="customer-phone">Teléfono</Label>
+              <Input
+                id="customer-phone"
+                value={newCustomerPhone}
+                onChange={(e) => setNewCustomerPhone(e.target.value)}
+                placeholder="Teléfono"
+              />
+            </div>
+            <div>
+              <Label htmlFor="customer-email">Email</Label>
+              <Input
+                id="customer-email"
+                type="email"
+                value={newCustomerEmail}
+                onChange={(e) => setNewCustomerEmail(e.target.value)}
+                placeholder="Email"
+              />
+            </div>
+            <div className="flex justify-end gap-2">
+              <Button variant="outline" onClick={() => setCreateCustomerDialog(false)}>
+                Cancelar
+              </Button>
+              <Button 
+                onClick={() => createCustomerMutation.mutate()}
+                disabled={createCustomerMutation.isPending}
+              >
+                {createCustomerMutation.isPending ? "Creando..." : "Crear Cliente"}
+              </Button>
+            </div>
+          </div>
+        </DialogContent>
+      </Dialog>
     </Layout>
   );
 }
