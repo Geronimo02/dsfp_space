@@ -659,9 +659,9 @@ export default function POS() {
 
                     <div className="space-y-2">
                       <Label>Métodos de Pago</Label>
-                      <div className="flex gap-2">
+                      <div className="space-y-2">
                         <Select value={currentPaymentMethod} onValueChange={setCurrentPaymentMethod}>
-                          <SelectTrigger className="flex-1">
+                          <SelectTrigger>
                             <SelectValue />
                           </SelectTrigger>
                           <SelectContent>
@@ -670,37 +670,41 @@ export default function POS() {
                             <SelectItem value="transfer">Transferencia</SelectItem>
                           </SelectContent>
                         </Select>
-                        <Input
-                          type="number"
-                          step="0.01"
-                          placeholder="Monto"
-                          value={currentPaymentAmount}
-                          onChange={(e) => setCurrentPaymentAmount(e.target.value)}
-                          className="w-24"
-                        />
-                        <Button type="button" size="icon" onClick={addPaymentMethod}>
-                          <Plus className="h-4 w-4" />
-                        </Button>
-                      </div>
-                      {currentPaymentMethod === 'card' && (
-                        <div className="space-y-1">
-                          <Label className="text-xs">Cuotas</Label>
-                          <Select 
-                            value={currentInstallments.toString()} 
-                            onValueChange={(val) => setCurrentInstallments(parseInt(val))}
-                          >
-                            <SelectTrigger>
-                              <SelectValue />
-                            </SelectTrigger>
-                            <SelectContent>
-                              <SelectItem value="1">1 cuota (sin interés)</SelectItem>
-                              <SelectItem value="3">3 cuotas</SelectItem>
-                              <SelectItem value="6">6 cuotas</SelectItem>
-                              <SelectItem value="12">12 cuotas</SelectItem>
-                            </SelectContent>
-                          </Select>
+                        
+                        {currentPaymentMethod === 'card' && (
+                          <div className="space-y-1">
+                            <Label className="text-xs">Cuotas</Label>
+                            <Select 
+                              value={currentInstallments.toString()} 
+                              onValueChange={(val) => setCurrentInstallments(parseInt(val))}
+                            >
+                              <SelectTrigger>
+                                <SelectValue />
+                              </SelectTrigger>
+                              <SelectContent>
+                                <SelectItem value="1">1 cuota (sin interés)</SelectItem>
+                                <SelectItem value="3">3 cuotas</SelectItem>
+                                <SelectItem value="6">6 cuotas</SelectItem>
+                                <SelectItem value="12">12 cuotas</SelectItem>
+                              </SelectContent>
+                            </Select>
+                          </div>
+                        )}
+                        
+                        <div className="flex gap-2">
+                          <Input
+                            type="number"
+                            step="0.01"
+                            placeholder="Monto"
+                            value={currentPaymentAmount}
+                            onChange={(e) => setCurrentPaymentAmount(e.target.value)}
+                            className="flex-1"
+                          />
+                          <Button type="button" size="icon" onClick={addPaymentMethod}>
+                            <Plus className="h-4 w-4" />
+                          </Button>
                         </div>
-                      )}
+                      </div>
                     </div>
 
                     {paymentMethods.length > 0 && (
