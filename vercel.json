@@ -1,7 +1,7 @@
 {
   "rewrites": [
-    { "source": "/assets/(.*)", "destination": "/assets/$1" },
-    { "source": "/(.*\\.(js|css|map|json|png|jpg|jpeg|gif|svg|ico|txt|webp|woff|woff2|ttf))", "destination": "/$1" },
-    { "source": "/(.*)", "destination": "/" }
+    { "source": "/assets/:match*", "destination": "/assets/:match*" },
+    { "source": "/:file*.:ext(js|css|map|json|png|jpg|jpeg|gif|svg|ico|txt|webp|woff|woff2|ttf)", "destination": "/:file.:ext" },
+    { "source": "/:path*", "destination": "/" }
   ]
 }
