@@ -17,6 +17,7 @@ import { sanitizeSearchQuery } from "@/lib/searchUtils";
 import { format } from "date-fns";
 import { es } from "date-fns/locale";
 import { z } from "zod";
+import { usePermissions } from "@/hooks/usePermissions";
 
 const customerSchema = z.object({
   name: z.string().trim().min(1, "El nombre es requerido").max(200, "El nombre debe tener máximo 200 caracteres"),
@@ -34,6 +35,10 @@ const customerSchema = z.object({
 });
 
 export default function Customers() {
+  const { hasPermission } = usePermissions();
+  const canCreate = hasPermission('customers', 'create');
+  const canEdit = hasPermission('customers', 'edit');
+  
   const [searchQuery, setSearchQuery] = useState("");
   const [isDialogOpen, setIsDialogOpen] = useState(false);
   const [isHistoryOpen, setIsHistoryOpen] = useState(false);
@@ -267,13 +272,14 @@ export default function Customers() {
             <h1 className="text-3xl font-bold text-foreground">Clientes</h1>
             <p className="text-muted-foreground">Gestiona tu base de clientes</p>
           </div>
-          <Dialog open={isDialogOpen} onOpenChange={setIsDialogOpen}>
-            <DialogTrigger asChild>
-              <Button onClick={() => { setEditingCustomer(null); resetForm(); }}>
-                <Plus className="mr-2 h-4 w-4" />
-                Nuevo Cliente
-              </Button>
-            </DialogTrigger>
+          {canCreate && (
+            <Dialog open={isDialogOpen} onOpenChange={setIsDialogOpen}>
+              <DialogTrigger asChild>
+                <Button onClick={() => { setEditingCustomer(null); resetForm(); }}>
+                  <Plus className="mr-2 h-4 w-4" />
+                  Nuevo Cliente
+                </Button>
+              </DialogTrigger>
             <DialogContent className="max-w-lg">
               <DialogHeader>
                 <DialogTitle>{editingCustomer ? "Editar Cliente" : "Nuevo Cliente"}</DialogTitle>
@@ -351,6 +357,7 @@ export default function Customers() {
               </form>
             </DialogContent>
           </Dialog>
+          )}
         </div>
 
         <Card className="shadow-soft">
@@ -423,9 +430,11 @@ export default function Customers() {
                       <Button size="icon" variant="outline" onClick={() => handleViewHistory(customer)}>
                         <Eye className="h-4 w-4" />
                       </Button>
-                      <Button size="icon" variant="outline" onClick={() => handleEdit(customer)}>
-                        <Edit className="h-4 w-4" />
-                      </Button>
+                      {canEdit && (
+                        <Button size="icon" variant="outline" onClick={() => handleEdit(customer)}>
+                          <Edit className="h-4 w-4" />
+                        </Button>
+                      )}
                     </TableCell>
                   </TableRow>
                 ))}

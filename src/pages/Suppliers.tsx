@@ -26,6 +26,7 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Plus, Search, Edit, TrendingUp, TrendingDown } from "lucide-react";
 import { toast } from "sonner";
+import { usePermissions } from "@/hooks/usePermissions";
 
 interface Supplier {
   id: string;
@@ -44,6 +45,10 @@ interface Supplier {
 }
 
 export default function Suppliers() {
+  const { hasPermission } = usePermissions();
+  const canCreate = hasPermission('suppliers', 'create');
+  const canEdit = hasPermission('suppliers', 'edit');
+  
   const [searchQuery, setSearchQuery] = useState("");
   const [dialogOpen, setDialogOpen] = useState(false);
   const [editingSupplier, setEditingSupplier] = useState<Supplier | null>(null);
@@ -198,13 +203,14 @@ export default function Suppliers() {
             <h1 className="text-3xl font-bold">Proveedores</h1>
             <p className="text-muted-foreground">Gestión de proveedores y crédito</p>
           </div>
-          <Dialog open={dialogOpen} onOpenChange={setDialogOpen}>
-            <DialogTrigger asChild>
-              <Button onClick={resetForm}>
-                <Plus className="mr-2 h-4 w-4" />
-                Nuevo Proveedor
-              </Button>
-            </DialogTrigger>
+          {canCreate && (
+            <Dialog open={dialogOpen} onOpenChange={setDialogOpen}>
+              <DialogTrigger asChild>
+                <Button onClick={resetForm}>
+                  <Plus className="mr-2 h-4 w-4" />
+                  Nuevo Proveedor
+                </Button>
+              </DialogTrigger>
             <DialogContent className="max-w-2xl max-h-[90vh] overflow-y-auto">
               <DialogHeader>
                 <DialogTitle>
@@ -339,6 +345,7 @@ export default function Suppliers() {
               </form>
             </DialogContent>
           </Dialog>
+          )}
         </div>
 
         <div className="grid gap-4 md:grid-cols-3">
@@ -448,13 +455,15 @@ export default function Suppliers() {
                           </Badge>
                         </TableCell>
                         <TableCell>
-                          <Button
-                            variant="outline"
-                            size="sm"
-                            onClick={() => handleEdit(supplier)}
-                          >
-                            <Edit className="h-4 w-4" />
-                          </Button>
+                          {canEdit && (
+                            <Button
+                              variant="outline"
+                              size="sm"
+                              onClick={() => handleEdit(supplier)}
+                            >
+                              <Edit className="h-4 w-4" />
+                            </Button>
+                          )}
                         </TableCell>
                       </TableRow>
                     );

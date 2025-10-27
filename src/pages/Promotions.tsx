@@ -17,8 +17,14 @@ import { sanitizeSearchQuery } from "@/lib/searchUtils";
 import { es } from "date-fns/locale";
 import { toast } from "sonner";
 import { Switch } from "@/components/ui/switch";
+import { usePermissions } from "@/hooks/usePermissions";
 
 export default function Promotions() {
+  const { hasPermission } = usePermissions();
+  const canCreate = hasPermission('promotions', 'create');
+  const canEdit = hasPermission('promotions', 'edit');
+  const canDelete = hasPermission('promotions', 'delete');
+  
   const [searchQuery, setSearchQuery] = useState("");
   const [isDialogOpen, setIsDialogOpen] = useState(false);
   const [editingPromotion, setEditingPromotion] = useState<any>(null);
@@ -190,16 +196,17 @@ export default function Promotions() {
             <h1 className="text-3xl font-bold text-foreground">Promociones y Descuentos</h1>
             <p className="text-muted-foreground">Gestión de cupones y ofertas</p>
           </div>
-          <Dialog open={isDialogOpen} onOpenChange={(open) => {
-            setIsDialogOpen(open);
-            if (!open) resetForm();
-          }}>
-            <DialogTrigger asChild>
-              <Button>
-                <Plus className="mr-2 h-4 w-4" />
-                Nueva Promoción
-              </Button>
-            </DialogTrigger>
+          {canCreate && (
+            <Dialog open={isDialogOpen} onOpenChange={(open) => {
+              setIsDialogOpen(open);
+              if (!open) resetForm();
+            }}>
+              <DialogTrigger asChild>
+                <Button>
+                  <Plus className="mr-2 h-4 w-4" />
+                  Nueva Promoción
+                </Button>
+              </DialogTrigger>
             <DialogContent className="max-w-2xl max-h-[90vh] overflow-y-auto">
               <DialogHeader>
                 <DialogTitle>
@@ -342,6 +349,7 @@ export default function Promotions() {
               </form>
             </DialogContent>
           </Dialog>
+          )}
         </div>
 
         <Card className="shadow-soft">
@@ -399,20 +407,24 @@ export default function Promotions() {
                       </Badge>
                     </TableCell>
                     <TableCell className="text-right space-x-2">
-                      <Button size="icon" variant="outline" onClick={() => handleEdit(promo)}>
-                        <Edit className="h-4 w-4" />
-                      </Button>
-                      <Button
-                        size="icon"
-                        variant="outline"
-                        onClick={() => {
-                          if (confirm("¿Eliminar esta promoción?")) {
-                            deleteMutation.mutate(promo.id);
-                          }
-                        }}
-                      >
-                        <Trash2 className="h-4 w-4" />
-                      </Button>
+                      {canEdit && (
+                        <Button size="icon" variant="outline" onClick={() => handleEdit(promo)}>
+                          <Edit className="h-4 w-4" />
+                        </Button>
+                      )}
+                      {canDelete && (
+                        <Button
+                          size="icon"
+                          variant="outline"
+                          onClick={() => {
+                            if (confirm("¿Eliminar esta promoción?")) {
+                              deleteMutation.mutate(promo.id);
+                            }
+                          }}
+                        >
+                          <Trash2 className="h-4 w-4" />
+                        </Button>
+                      )}
                     </TableCell>
                   </TableRow>
                 ))}

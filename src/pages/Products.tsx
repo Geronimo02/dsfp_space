@@ -16,6 +16,7 @@ import { z } from "zod";
 import Papa from "papaparse";
 import { Checkbox } from "@/components/ui/checkbox";
 import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle, AlertDialogTrigger } from "@/components/ui/alert-dialog";
+import { usePermissions } from "@/hooks/usePermissions";
 
 const productSchema = z.object({
   name: z.string().trim().min(1, "El nombre es requerido").max(200, "El nombre debe tener máximo 200 caracteres"),
@@ -44,6 +45,12 @@ const productSchema = z.object({
 });
 
 export default function Products() {
+  const { hasPermission } = usePermissions();
+  const canCreate = hasPermission('products', 'create');
+  const canEdit = hasPermission('products', 'edit');
+  const canDelete = hasPermission('products', 'delete');
+  const canExport = hasPermission('products', 'export');
+
   const [searchQuery, setSearchQuery] = useState("");
   const [isDialogOpen, setIsDialogOpen] = useState(false);
   const [editingProduct, setEditingProduct] = useState<any>(null);
@@ -423,17 +430,20 @@ export default function Products() {
             <p className="text-muted-foreground">Gestiona tu inventario</p>
           </div>
           <div className="flex gap-2">
-            <Button variant="outline" onClick={handleExportCSV}>
-              <Download className="mr-2 h-4 w-4" />
-              Exportar CSV
-            </Button>
-            <Dialog open={isImportDialogOpen} onOpenChange={setIsImportDialogOpen}>
-              <DialogTrigger asChild>
-                <Button variant="outline">
-                  <Upload className="mr-2 h-4 w-4" />
-                  Importar CSV
-                </Button>
-              </DialogTrigger>
+            {canExport && (
+              <Button variant="outline" onClick={handleExportCSV}>
+                <Download className="mr-2 h-4 w-4" />
+                Exportar CSV
+              </Button>
+            )}
+            {canCreate && (
+              <Dialog open={isImportDialogOpen} onOpenChange={setIsImportDialogOpen}>
+                <DialogTrigger asChild>
+                  <Button variant="outline">
+                    <Upload className="mr-2 h-4 w-4" />
+                    Importar CSV
+                  </Button>
+                </DialogTrigger>
               <DialogContent>
                 <DialogHeader>
                   <DialogTitle>Importar Productos desde CSV</DialogTitle>
@@ -460,8 +470,10 @@ export default function Products() {
                     </Button>
                   </div>
                 </div>
-              </DialogContent>
-            </Dialog>
+            </DialogContent>
+          </Dialog>
+          )}
+          {canCreate && (
             <Dialog open={isDialogOpen} onOpenChange={setIsDialogOpen}>
               <DialogTrigger asChild>
                 <Button onClick={() => { setEditingProduct(null); resetForm(); }}>
@@ -587,6 +599,7 @@ export default function Products() {
               </form>
             </DialogContent>
           </Dialog>
+          )}
           </div>
         </div>
 
@@ -608,13 +621,14 @@ export default function Products() {
                   </Button>
                 </div>
                 <div className="flex gap-2">
-                  <Dialog open={isMassEditDialogOpen} onOpenChange={setIsMassEditDialogOpen}>
-                    <DialogTrigger asChild>
-                      <Button variant="outline" size="sm">
-                        <Edit className="mr-2 h-4 w-4" />
-                        Editar seleccionados
-                      </Button>
-                    </DialogTrigger>
+                  {canEdit && (
+                    <Dialog open={isMassEditDialogOpen} onOpenChange={setIsMassEditDialogOpen}>
+                      <DialogTrigger asChild>
+                        <Button variant="outline" size="sm">
+                          <Edit className="mr-2 h-4 w-4" />
+                          Editar seleccionados
+                        </Button>
+                      </DialogTrigger>
                     <DialogContent>
                       <DialogHeader>
                         <DialogTitle>Edición Masiva</DialogTitle>
@@ -675,13 +689,15 @@ export default function Products() {
                       </div>
                     </DialogContent>
                   </Dialog>
-                  <AlertDialog open={isDeleteDialogOpen} onOpenChange={setIsDeleteDialogOpen}>
-                    <AlertDialogTrigger asChild>
-                      <Button variant="outline" size="sm" className="text-destructive">
-                        <Trash2 className="mr-2 h-4 w-4" />
-                        Eliminar seleccionados
-                      </Button>
-                    </AlertDialogTrigger>
+                  )}
+                  {canDelete && (
+                    <AlertDialog open={isDeleteDialogOpen} onOpenChange={setIsDeleteDialogOpen}>
+                      <AlertDialogTrigger asChild>
+                        <Button variant="outline" size="sm" className="text-destructive">
+                          <Trash2 className="mr-2 h-4 w-4" />
+                          Eliminar seleccionados
+                        </Button>
+                      </AlertDialogTrigger>
                     <AlertDialogContent>
                       <AlertDialogHeader>
                         <AlertDialogTitle>¿Estás seguro?</AlertDialogTitle>
@@ -697,6 +713,7 @@ export default function Products() {
                       </AlertDialogFooter>
                     </AlertDialogContent>
                   </AlertDialog>
+                  )}
                 </div>
               </div>
             </CardContent>
@@ -754,12 +771,16 @@ export default function Products() {
                       )}
                     </TableCell>
                     <TableCell className="text-right space-x-2">
-                      <Button size="icon" variant="outline" onClick={() => handleEdit(product)}>
-                        <Edit className="h-4 w-4" />
-                      </Button>
-                      <Button size="icon" variant="outline" className="text-destructive" onClick={() => deleteProductMutation.mutate(product.id)}>
-                        <Trash2 className="h-4 w-4" />
-                      </Button>
+                      {canEdit && (
+                        <Button size="icon" variant="outline" onClick={() => handleEdit(product)}>
+                          <Edit className="h-4 w-4" />
+                        </Button>
+                      )}
+                      {canDelete && (
+                        <Button size="icon" variant="outline" className="text-destructive" onClick={() => deleteProductMutation.mutate(product.id)}>
+                          <Trash2 className="h-4 w-4" />
+                        </Button>
+                      )}
                     </TableCell>
                   </TableRow>
                 ))}
