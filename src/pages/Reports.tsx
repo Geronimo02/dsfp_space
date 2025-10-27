@@ -6,8 +6,7 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Button } from "@/components/ui/button";
-import { Input } from "@/components/ui/input";
-import { Switch } from "@/components/ui/switch";
+import { AutoReportsCard } from "@/components/auto-reports/auto-reports-card";
 import { BarChart, Bar, LineChart, Line, PieChart, Pie, Cell, XAxis, YAxis, CartesianGrid, Tooltip, Legend, ResponsiveContainer } from "recharts";
 import { TrendingUp, DollarSign, Package, ShoppingCart, Wallet, ArrowUpRight, ArrowDownRight } from "lucide-react";
 import { format, subDays, startOfDay, endOfDay } from "date-fns";
@@ -242,14 +241,7 @@ const Reports = () => {
           </div>
         </div>
         {/* Administrar reportes automáticos */}
-        <Card>
-          <CardHeader>
-            <CardTitle>Administrar reportes automáticos</CardTitle>
-          </CardHeader>
-          <CardContent>
-            <AutoReportsManager />
-          </CardContent>
-        </Card>
+        <AutoReportsCard />
 
         {/* Resumen de métricas */}
         <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-4">
@@ -384,94 +376,3 @@ const Reports = () => {
 };
 
 export default Reports;
-
-// Local component: Administra reportes automáticos guardados en localStorage.
-const AUTO_REPORTS_KEY = "auto_reports_presets";
-
-type AutoReport = {
-  id: string;
-  name: string;
-  range: string; // "7" | "30" | "90" | "365"
-  enabled: boolean;
-};
-
-function AutoReportsManager() {
-  const [presets, setPresets] = useState<AutoReport[]>(() => {
-    try {
-      const raw = localStorage.getItem(AUTO_REPORTS_KEY);
-      return raw ? JSON.parse(raw) : [];
-    } catch (e) {
-      return [];
-    }
-  });
-
-  const [name, setName] = useState("");
-  const [range, setRange] = useState("7");
-
-  const persist = (next: AutoReport[]) => {
-    setPresets(next);
-    try {
-      localStorage.setItem(AUTO_REPORTS_KEY, JSON.stringify(next));
-    } catch (e) {
-      console.error("Failed to persist auto reports", e);
-    }
-  };
-
-  const addPreset = () => {
-    if (!name.trim()) return;
-    const next: AutoReport = { id: Date.now().toString(), name: name.trim(), range, enabled: true };
-    persist([next, ...presets]);
-    setName("");
-    setRange("7");
-  };
-
-  const toggleEnabled = (id: string) => {
-    persist(presets.map(p => (p.id === id ? { ...p, enabled: !p.enabled } : p)));
-  };
-
-  const removePreset = (id: string) => {
-    persist(presets.filter(p => p.id !== id));
-  };
-
-  return (
-    <div className="space-y-4">
-      <div className="flex flex-col gap-2 md:flex-row md:items-center md:justify-between">
-        <div className="flex-1 md:mr-4">
-          <Input value={name} onChange={e => setName(e.target.value)} placeholder="Nombre del preset (ej. Reporte semanal)" />
-        </div>
-        <div className="w-[180px]">
-          <Select value={range} onValueChange={setRange}>
-            <SelectTrigger className="w-full">
-              <SelectValue />
-            </SelectTrigger>
-            <SelectContent>
-              <SelectItem value="7">Semanal</SelectItem>
-              <SelectItem value="30">Mensual</SelectItem>
-              <SelectItem value="90">Trimestral</SelectItem>
-              <SelectItem value="365">Anual</SelectItem>
-            </SelectContent>
-          </Select>
-        </div>
-        <div className="flex items-center gap-2">
-          <Button onClick={addPreset} size="sm">Agregar preset</Button>
-        </div>
-      </div>
-
-      <div className="space-y-2">
-        {presets.length === 0 && <div className="text-sm text-muted-foreground">No hay presets guardados.</div>}
-        {presets.map(p => (
-          <div key={p.id} className="flex items-center justify-between gap-2 border rounded-md p-2">
-            <div className="flex items-center gap-4">
-              <div className="font-medium">{p.name}</div>
-              <div className="text-sm text-muted-foreground">{p.range === "7" ? "Semanal" : p.range === "30" ? "Mensual" : p.range === "90" ? "Trimestral" : "Anual"}</div>
-            </div>
-            <div className="flex items-center gap-2">
-              <Switch checked={p.enabled} onCheckedChange={() => toggleEnabled(p.id)} />
-              <Button size="sm" variant="ghost" onClick={() => removePreset(p.id)}>Eliminar</Button>
-            </div>
-          </div>
-        ))}
-      </div>
-    </div>
-  );
-}
