@@ -3,7 +3,9 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { PresetForm } from "./preset-form";
 import { PresetList } from "./preset-list";
 import { AutoReportPreset } from "./types";
-import { v4 as uuidv4 } from "uuid";
+
+// Lightweight id generator to avoid adding the `uuid` dependency in the frontend bundle.
+const generateId = () => `ar_${Date.now().toString(36)}${Math.random().toString(36).slice(2, 8)}`;
 import { toast } from "sonner";
 
 const STORAGE_KEY = "auto_reports_presets_v2";
@@ -40,7 +42,7 @@ export function AutoReportsCard() {
   const handleCreate = (data: { name: string; frequency: any }) => {
     setLoading(true);
     try {
-      const newItem: AutoReportPreset = { id: uuidv4(), name: data.name, frequency: data.frequency, enabled: true, createdAt: new Date().toISOString() };
+  const newItem: AutoReportPreset = { id: generateId(), name: data.name, frequency: data.frequency, enabled: true, createdAt: new Date().toISOString() };
       const next = [newItem, ...items];
       persist(next);
       toast.success("Preset creado");
