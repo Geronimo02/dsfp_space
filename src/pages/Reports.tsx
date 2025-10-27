@@ -216,7 +216,7 @@ const Reports = () => {
       <div className="space-y-6">
         <div className="flex items-center justify-between">
           <div>
-            <h1 className="text-3xl font-bold">Reportes y Análisis</h1>
+            <h1 className="text-3xl font-bold">Reportess y Análisis</h1>
             <p className="text-muted-foreground">Visualiza el rendimiento de tu negocio</p>
           </div>
           <div className="flex items-center gap-2">
