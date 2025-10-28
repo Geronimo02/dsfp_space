@@ -1805,6 +1805,9 @@ export type Database = {
         | "cashier"
         | "accountant"
         | "viewer"
+        | "warehouse"
+        | "technician"
+        | "auditor"
       delivery_status: "pending" | "in_transit" | "delivered" | "cancelled"
       quotation_status:
         | "draft"
@@ -1953,6 +1956,9 @@ export const Constants = {
         "cashier",
         "accountant",
         "viewer",
+        "warehouse",
+        "technician",
+        "auditor",
       ],
       delivery_status: ["pending", "in_transit", "delivered", "cancelled"],
       quotation_status: [
