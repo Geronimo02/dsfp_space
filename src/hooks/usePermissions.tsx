@@ -97,6 +97,9 @@ export const usePermissions = () => {
   const isCashier = hasRole("cashier");
   const isAccountant = hasRole("accountant");
   const isViewer = hasRole("viewer");
+  const isWarehouse = hasRole("warehouse");
+  const isTechnician = hasRole("technician");
+  const isAuditor = hasRole("auditor");
 
   return {
     permissions,
@@ -108,6 +111,9 @@ export const usePermissions = () => {
     isCashier,
     isAccountant,
     isViewer,
+    isWarehouse,
+    isTechnician,
+    isAuditor,
     loading: !permissions,
   };
 };
