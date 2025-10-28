@@ -45,7 +45,7 @@ import { UserPlus, Search, Users, Shield, UserCheck, Database, Trash2 } from "lu
 import { Label } from "@/components/ui/label";
 import { Checkbox } from "@/components/ui/checkbox";
 
-type AppRole = "admin" | "manager" | "cashier" | "accountant" | "viewer" | "employee";
+type AppRole = "admin" | "manager" | "cashier" | "accountant" | "viewer" | "employee" | "warehouse" | "technician" | "auditor";
 
 interface Employee {
   id: string;
@@ -92,6 +92,24 @@ export default function Employees() {
       label: "Contador", 
       color: "bg-yellow-500",
       description: "Finanzas y reportes"
+    },
+    { 
+      value: "warehouse", 
+      label: "Depósito", 
+      color: "bg-orange-500",
+      description: "Gestión de inventario y compras"
+    },
+    { 
+      value: "technician", 
+      label: "Técnico", 
+      color: "bg-cyan-500",
+      description: "Servicios técnicos y reparaciones"
+    },
+    { 
+      value: "auditor", 
+      label: "Auditor", 
+      color: "bg-indigo-500",
+      description: "Revisión y auditoría (solo lectura)"
     },
     { 
       value: "viewer", 
@@ -314,6 +332,9 @@ export default function Employees() {
   const totalManagers = employees.filter((e) => e.roles.includes("manager")).length;
   const totalCashiers = employees.filter((e) => e.roles.includes("cashier")).length;
   const totalAccountants = employees.filter((e) => e.roles.includes("accountant")).length;
+  const totalWarehouse = employees.filter((e) => e.roles.includes("warehouse")).length;
+  const totalTechnicians = employees.filter((e) => e.roles.includes("technician")).length;
+  const totalAuditors = employees.filter((e) => e.roles.includes("auditor")).length;
   const totalViewers = employees.filter((e) => e.roles.includes("viewer")).length;
   const totalEmployees = employees.filter((e) => e.roles.includes("employee")).length;
 
@@ -408,7 +429,7 @@ export default function Employees() {
           </div>
         </div>
 
-        <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-6">
+        <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4">
           <Card>
             <CardHeader className="flex flex-row items-center justify-between pb-2">
               <CardTitle className="text-sm font-medium">Total</CardTitle>
@@ -456,6 +477,36 @@ export default function Employees() {
             </CardHeader>
             <CardContent>
               <div className="text-2xl font-bold">{totalAccountants}</div>
+            </CardContent>
+          </Card>
+
+          <Card>
+            <CardHeader className="flex flex-row items-center justify-between pb-2">
+              <CardTitle className="text-sm font-medium">Depósito</CardTitle>
+              <UserCheck className="h-4 w-4 text-orange-500" />
+            </CardHeader>
+            <CardContent>
+              <div className="text-2xl font-bold">{totalWarehouse}</div>
+            </CardContent>
+          </Card>
+
+          <Card>
+            <CardHeader className="flex flex-row items-center justify-between pb-2">
+              <CardTitle className="text-sm font-medium">Técnicos</CardTitle>
+              <UserCheck className="h-4 w-4 text-cyan-500" />
+            </CardHeader>
+            <CardContent>
+              <div className="text-2xl font-bold">{totalTechnicians}</div>
+            </CardContent>
+          </Card>
+
+          <Card>
+            <CardHeader className="flex flex-row items-center justify-between pb-2">
+              <CardTitle className="text-sm font-medium">Auditores</CardTitle>
+              <UserCheck className="h-4 w-4 text-indigo-500" />
+            </CardHeader>
+            <CardContent>
+              <div className="text-2xl font-bold">{totalAuditors}</div>
             </CardContent>
           </Card>
 
