@@ -103,12 +103,12 @@ export function Sidebar() {
       return href !== "/settings";
     }
 
-    // Cashier: POS, Cash Register, Customers, Products, Reservations
+    // Cashier: Dashboard, POS, Cash Register, Customers, Products, Reservations
     if (isCashier) {
       return ["/", "/pos", "/cash-register", "/customers", "/products", "/reservations"].includes(href);
     }
 
-    // Warehouse: Products, Inventory Alerts, Purchases, Suppliers
+    // Warehouse: Dashboard, Products, Inventory Alerts, Purchases, Suppliers
     if (isWarehouse) {
       return ["/", "/products", "/inventory-alerts", "/purchases", "/suppliers"].includes(href);
     }
@@ -118,18 +118,22 @@ export function Sidebar() {
       return ["/", "/sales", "/customer-account", "/reports", "/audit-logs"].includes(href);
     }
 
-    // Technician: Technical Services, Products (read), Customers (read)
+    // Technician: Dashboard, Technical Services, Products (read), Customers (read)
     if (isTechnician) {
       return ["/", "/technical-services", "/products", "/customers"].includes(href);
     }
 
-    // Auditor: Dashboard, Products, Customers, Suppliers, Sales, Reports (all read-only)
+    // Auditor: Dashboard, Products, Customers, Suppliers, Sales, Reports, Audit Logs, Access Logs (all read-only)
     if (isAuditor) {
       return ["/", "/products", "/customers", "/suppliers", "/sales", "/reports", "/audit-logs", "/access-logs"].includes(href);
     }
 
-    return false;
+    // Default: show only dashboard if no role is assigned
+    return href === "/";
   };
+
+  // Check if user has any roles assigned
+  const hasAnyRole = isAdmin || isManager || isCashier || isWarehouse || isAccountant || isTechnician || isAuditor;
 
   if (loading) {
     return (
@@ -160,6 +164,15 @@ export function Sidebar() {
       </div>
 
       <nav className="flex-1 overflow-y-auto p-4 space-y-6 sidebar-scroll">
+        {!hasAnyRole && !loading && (
+          <div className="p-4 bg-destructive/10 border border-destructive/20 rounded-lg">
+            <p className="text-sm text-destructive font-medium mb-2">Sin rol asignado</p>
+            <p className="text-xs text-muted-foreground">
+              Contacta al administrador para que te asigne un rol y puedas acceder a las funcionalidades del sistema.
+            </p>
+          </div>
+        )}
+        
         {navigationSections.map((section, index) => {
           const visibleItems = section.items.filter(item => canViewMenuItem(item.href));
           
