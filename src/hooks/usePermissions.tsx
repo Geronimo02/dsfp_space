@@ -30,7 +30,7 @@ interface RolePermission {
 }
 
 export const usePermissions = () => {
-  const { data: user } = useQuery({
+  const { data: user, isLoading: userLoading } = useQuery({
     queryKey: ["current-user"],
     queryFn: async () => {
       const { data: { user } } = await supabase.auth.getUser();
@@ -38,7 +38,7 @@ export const usePermissions = () => {
     },
   });
 
-  const { data: userRoles } = useQuery({
+  const { data: userRoles, isLoading: rolesLoading } = useQuery({
     queryKey: ["user-roles", user?.id],
     queryFn: async () => {
       if (!user?.id) return [];
@@ -54,7 +54,7 @@ export const usePermissions = () => {
     enabled: !!user?.id,
   });
 
-  const { data: permissions } = useQuery({
+  const { data: permissions, isLoading: permissionsLoading } = useQuery({
     queryKey: ["role-permissions", userRoles],
     queryFn: async () => {
       if (!userRoles || userRoles.length === 0) return [];
@@ -114,6 +114,6 @@ export const usePermissions = () => {
     isWarehouse,
     isTechnician,
     isAuditor,
-    loading: !permissions,
+    loading: userLoading || rolesLoading || permissionsLoading,
   };
 };

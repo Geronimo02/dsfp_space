@@ -82,7 +82,7 @@ const navigationSections = [
 export function Sidebar() {
   const location = useLocation();
   const navigate = useNavigate();
-  const { isAdmin, isManager, isCashier, isWarehouse, isAccountant, isTechnician, isAuditor, loading } = usePermissions();
+  const { isAdmin, isManager, isCashier, isWarehouse, isAccountant, isTechnician, isAuditor, isViewer, loading } = usePermissions();
 
   const handleLogout = async () => {
     const { error } = await supabase.auth.signOut();
@@ -128,12 +128,17 @@ export function Sidebar() {
       return ["/", "/products", "/customers", "/suppliers", "/sales", "/reports", "/audit-logs", "/access-logs"].includes(href);
     }
 
+    // Viewer: Only dashboard
+    if (isViewer) {
+      return href === "/";
+    }
+
     // Default: show only dashboard if no role is assigned
     return href === "/";
   };
 
   // Check if user has any roles assigned
-  const hasAnyRole = isAdmin || isManager || isCashier || isWarehouse || isAccountant || isTechnician || isAuditor;
+  const hasAnyRole = isAdmin || isManager || isCashier || isWarehouse || isAccountant || isTechnician || isAuditor || isViewer;
 
   if (loading) {
     return (
