@@ -103,29 +103,43 @@ export function Sidebar() {
       return href !== "/settings";
     }
 
-    // Cashier: Dashboard, POS, Cash Register, Customers, Products, Reservations
+    // Cashier: POS, Cash Register, Customers, Products (view), Quotations, Delivery Notes, Returns
     if (isCashier) {
-      return ["/", "/pos", "/cash-register", "/customers", "/products", "/reservations"].includes(href);
+      return [
+        "/", "/pos", "/cash-register", "/customers", "/products", 
+        "/sales", "/quotations", "/delivery-notes", "/returns", "/reservations"
+      ].includes(href);
     }
 
-    // Warehouse: Dashboard, Products, Inventory Alerts, Purchases, Suppliers
+    // Warehouse: Products, Inventory, Purchases, Suppliers, Delivery Notes, Returns
     if (isWarehouse) {
-      return ["/", "/products", "/inventory-alerts", "/purchases", "/suppliers"].includes(href);
+      return [
+        "/", "/products", "/inventory-alerts", "/purchases", "/suppliers",
+        "/delivery-notes", "/returns"
+      ].includes(href);
     }
 
-    // Accountant: Dashboard, Sales, Customer Account, Reports, Audit Logs
+    // Accountant: Sales, Reports, Audit, Customer Account, Customers, Suppliers, Quotations, Delivery Notes, Returns, Credit Notes
     if (isAccountant) {
-      return ["/", "/sales", "/customer-account", "/reports", "/audit-logs"].includes(href);
+      return [
+        "/", "/sales", "/customer-account", "/reports", "/audit-logs",
+        "/customers", "/suppliers", "/quotations", "/delivery-notes", 
+        "/returns", "/cash-register", "/purchases", "/promotions", "/technical-services"
+      ].includes(href);
     }
 
-    // Technician: Dashboard, Technical Services, Products (read), Customers (read)
+    // Technician: Technical Services, Customers (view/create), Products (view only)
     if (isTechnician) {
       return ["/", "/technical-services", "/products", "/customers"].includes(href);
     }
 
-    // Auditor: Dashboard, Products, Customers, Suppliers, Sales, Reports, Audit Logs, Access Logs (all read-only)
+    // Auditor: All read-only except Settings and Employees
     if (isAuditor) {
-      return ["/", "/products", "/customers", "/suppliers", "/sales", "/reports", "/audit-logs", "/access-logs"].includes(href);
+      return [
+        "/", "/products", "/customers", "/suppliers", "/sales", "/reports", 
+        "/audit-logs", "/access-logs", "/quotations", "/delivery-notes", 
+        "/returns", "/cash-register", "/purchases", "/promotions", "/technical-services"
+      ].includes(href);
     }
 
     // Viewer: Only dashboard
