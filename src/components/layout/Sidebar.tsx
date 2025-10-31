@@ -82,7 +82,7 @@ const navigationSections = [
 export function Sidebar() {
   const location = useLocation();
   const navigate = useNavigate();
-  const { isAdmin, isManager, isCashier, isWarehouse, isAccountant, isTechnician, isAuditor, isViewer, loading } = usePermissions();
+  const { hasPermission, isAdmin, loading } = usePermissions();
 
   const handleLogout = async () => {
     const { error } = await supabase.auth.signOut();
@@ -98,61 +98,43 @@ export function Sidebar() {
     // Admin sees everything
     if (isAdmin) return true;
 
-    // Manager sees everything except Settings
-    if (isManager) {
-      return href !== "/settings";
-    }
+    // Dashboard is always visible
+    if (href === "/") return true;
 
-    // Cashier: POS, Cash Register, Customers, Products (view), Quotations, Delivery Notes, Returns
-    if (isCashier) {
-      return [
-        "/", "/pos", "/cash-register", "/customers", "/products", 
-        "/sales", "/quotations", "/delivery-notes", "/returns", "/reservations"
-      ].includes(href);
-    }
+    // Map routes to modules
+    const routeToModule: Record<string, string> = {
+      "/pos": "sales",
+      "/sales": "sales",
+      "/products": "products",
+      "/inventory-alerts": "products",
+      "/customers": "customers",
+      "/customer-account": "customers",
+      "/suppliers": "suppliers",
+      "/purchases": "purchases",
+      "/reports": "reports",
+      "/audit-logs": "reports",
+      "/access-logs": "reports",
+      "/employees": "employees",
+      "/settings": "settings",
+      "/cash-register": "cash_register",
+      "/technical-services": "technical_services",
+      "/quotations": "quotations",
+      "/delivery-notes": "delivery_notes",
+      "/promotions": "promotions",
+      "/returns": "returns",
+      "/reservations": "sales",
+    };
 
-    // Warehouse: Products, Inventory, Purchases, Suppliers, Delivery Notes, Returns
-    if (isWarehouse) {
-      return [
-        "/", "/products", "/inventory-alerts", "/purchases", "/suppliers",
-        "/delivery-notes", "/returns"
-      ].includes(href);
-    }
+    const module = routeToModule[href];
+    if (!module) return false;
 
-    // Accountant: Sales, Reports, Audit, Customer Account, Customers, Suppliers, Quotations, Delivery Notes, Returns, Credit Notes
-    if (isAccountant) {
-      return [
-        "/", "/sales", "/customer-account", "/reports", "/audit-logs",
-        "/customers", "/suppliers", "/quotations", "/delivery-notes", 
-        "/returns", "/cash-register", "/purchases", "/promotions", "/technical-services"
-      ].includes(href);
-    }
-
-    // Technician: Technical Services, Customers (view/create), Products (view only)
-    if (isTechnician) {
-      return ["/", "/technical-services", "/products", "/customers"].includes(href);
-    }
-
-    // Auditor: All read-only except Settings and Employees
-    if (isAuditor) {
-      return [
-        "/", "/products", "/customers", "/suppliers", "/sales", "/reports", 
-        "/audit-logs", "/access-logs", "/quotations", "/delivery-notes", 
-        "/returns", "/cash-register", "/purchases", "/promotions", "/technical-services"
-      ].includes(href);
-    }
-
-    // Viewer: Only dashboard
-    if (isViewer) {
-      return href === "/";
-    }
-
-    // Default: show only dashboard if no role is assigned
-    return href === "/";
+    return hasPermission(module as any, "view");
   };
 
-  // Check if user has any roles assigned
-  const hasAnyRole = isAdmin || isManager || isCashier || isWarehouse || isAccountant || isTechnician || isAuditor || isViewer;
+  // Check if user can see any menu items
+  const hasAnyVisibleItems = navigationSections.some(section => 
+    section.items.some(item => canViewMenuItem(item.href))
+  );
 
   if (loading) {
     return (
@@ -183,11 +165,11 @@ export function Sidebar() {
       </div>
 
       <nav className="flex-1 overflow-y-auto p-4 space-y-6 sidebar-scroll">
-        {!hasAnyRole && !loading && (
+        {!hasAnyVisibleItems && !loading && (
           <div className="p-4 bg-destructive/10 border border-destructive/20 rounded-lg">
-            <p className="text-sm text-destructive font-medium mb-2">Sin rol asignado</p>
+            <p className="text-sm text-destructive font-medium mb-2">Sin permisos asignados</p>
             <p className="text-xs text-muted-foreground">
-              Contacta al administrador para que te asigne un rol y puedas acceder a las funcionalidades del sistema.
+              Contacta al administrador para que te asigne permisos y puedas acceder a las funcionalidades del sistema.
             </p>
           </div>
         )}
