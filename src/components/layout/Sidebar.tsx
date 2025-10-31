@@ -21,7 +21,9 @@ import {
   CreditCard,
   RotateCcw,
   Tag,
-  CalendarCheck
+  CalendarCheck,
+  DollarSign,
+  Zap
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { supabase } from "@/integrations/supabase/client";
@@ -65,6 +67,7 @@ const navigationSections = [
       { name: "Servicios Técnicos", href: "/technical-services", icon: Wrench },
       { name: "Promociones", href: "/promotions", icon: Tag },
       { name: "Gestión de Caja", href: "/cash-register", icon: Wallet },
+      { name: "Gastos", href: "/expenses", icon: DollarSign },
       { name: "Usuarios", href: "/employees", icon: UserCog },
     ]
   },
@@ -74,6 +77,7 @@ const navigationSections = [
       { name: "Reportes", href: "/reports", icon: BarChart3 },
       { name: "Auditoría", href: "/audit-logs", icon: FileText },
       { name: "Logs de Acceso", href: "/access-logs", icon: Activity },
+      { name: "Operaciones Masivas", href: "/bulk-operations", icon: Zap },
       { name: "Configuración", href: "/settings", icon: Settings },
     ]
   }
@@ -123,6 +127,8 @@ export function Sidebar() {
       "/promotions": "promotions",
       "/returns": "returns",
       "/reservations": "sales",
+      "/expenses": "expenses",
+      "/bulk-operations": "bulk_operations",
     };
 
     const module = routeToModule[href];

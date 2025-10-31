@@ -28,6 +28,8 @@ import Promotions from "./pages/Promotions";
 import Returns from "./pages/Returns";
 import InventoryAlerts from "./pages/InventoryAlerts";
 import Reservations from "./pages/Reservations";
+import Expenses from "./pages/Expenses";
+import BulkOperations from "./pages/BulkOperations";
 import NotFound from "./pages/NotFound";
 
 const queryClient = new QueryClient();
@@ -94,6 +96,8 @@ const App = () => (
           <Route path="/audit-logs" element={<ProtectedRoute><AuditLogs /></ProtectedRoute>} />
           <Route path="/access-logs" element={<ProtectedRoute><AccessLogs /></ProtectedRoute>} />
           <Route path="/inventory-alerts" element={<ProtectedRoute><InventoryAlerts /></ProtectedRoute>} />
+          <Route path="/expenses" element={<ProtectedRoute><Expenses /></ProtectedRoute>} />
+          <Route path="/bulk-operations" element={<ProtectedRoute><BulkOperations /></ProtectedRoute>} />
           <Route path="/settings" element={<ProtectedRoute><Settings /></ProtectedRoute>} />
           {/* ADD ALL CUSTOM ROUTES ABOVE THE CATCH-ALL "*" ROUTE */}
           <Route path="*" element={<NotFound />} />

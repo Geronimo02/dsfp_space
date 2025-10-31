@@ -17,7 +17,9 @@ export type Module =
   | "delivery_notes"
   | "promotions"
   | "returns"
-  | "credit_notes";
+  | "credit_notes"
+  | "expenses"
+  | "bulk_operations";
 
 interface RolePermission {
   role: string;

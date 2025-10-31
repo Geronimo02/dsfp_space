@@ -104,6 +104,45 @@ export type Database = {
         }
         Relationships: []
       }
+      bulk_operations: {
+        Row: {
+          completed_at: string | null
+          created_at: string
+          entity_type: string
+          error_message: string | null
+          id: string
+          operation_data: Json | null
+          operation_type: string
+          records_affected: number
+          status: string
+          user_id: string
+        }
+        Insert: {
+          completed_at?: string | null
+          created_at?: string
+          entity_type: string
+          error_message?: string | null
+          id?: string
+          operation_data?: Json | null
+          operation_type: string
+          records_affected?: number
+          status?: string
+          user_id: string
+        }
+        Update: {
+          completed_at?: string | null
+          created_at?: string
+          entity_type?: string
+          error_message?: string | null
+          id?: string
+          operation_data?: Json | null
+          operation_type?: string
+          records_affected?: number
+          status?: string
+          user_id?: string
+        }
+        Relationships: []
+      }
       cash_movements: {
         Row: {
           amount: number
@@ -545,6 +584,111 @@ export type Database = {
             columns: ["sale_id"]
             isOneToOne: false
             referencedRelation: "sales"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      expense_categories: {
+        Row: {
+          active: boolean | null
+          color: string | null
+          created_at: string
+          description: string | null
+          id: string
+          name: string
+          updated_at: string
+        }
+        Insert: {
+          active?: boolean | null
+          color?: string | null
+          created_at?: string
+          description?: string | null
+          id?: string
+          name: string
+          updated_at?: string
+        }
+        Update: {
+          active?: boolean | null
+          color?: string | null
+          created_at?: string
+          description?: string | null
+          id?: string
+          name?: string
+          updated_at?: string
+        }
+        Relationships: []
+      }
+      expenses: {
+        Row: {
+          amount: number
+          approved_at: string | null
+          approved_by: string | null
+          category_id: string | null
+          created_at: string
+          description: string
+          expense_date: string
+          expense_number: string
+          id: string
+          notes: string | null
+          payment_method: string
+          receipt_url: string | null
+          reference_number: string | null
+          status: string
+          supplier_id: string | null
+          updated_at: string
+          user_id: string
+        }
+        Insert: {
+          amount: number
+          approved_at?: string | null
+          approved_by?: string | null
+          category_id?: string | null
+          created_at?: string
+          description: string
+          expense_date?: string
+          expense_number: string
+          id?: string
+          notes?: string | null
+          payment_method: string
+          receipt_url?: string | null
+          reference_number?: string | null
+          status?: string
+          supplier_id?: string | null
+          updated_at?: string
+          user_id: string
+        }
+        Update: {
+          amount?: number
+          approved_at?: string | null
+          approved_by?: string | null
+          category_id?: string | null
+          created_at?: string
+          description?: string
+          expense_date?: string
+          expense_number?: string
+          id?: string
+          notes?: string | null
+          payment_method?: string
+          receipt_url?: string | null
+          reference_number?: string | null
+          status?: string
+          supplier_id?: string | null
+          updated_at?: string
+          user_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "expenses_category_id_fkey"
+            columns: ["category_id"]
+            isOneToOne: false
+            referencedRelation: "expense_categories"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "expenses_supplier_id_fkey"
+            columns: ["supplier_id"]
+            isOneToOne: false
+            referencedRelation: "suppliers"
             referencedColumns: ["id"]
           },
         ]
@@ -1781,6 +1925,7 @@ export type Database = {
       check_low_stock_alerts: { Args: never; Returns: undefined }
       generate_credit_note_number: { Args: never; Returns: string }
       generate_delivery_number: { Args: never; Returns: string }
+      generate_expense_number: { Args: never; Returns: string }
       generate_quotation_number: { Args: never; Returns: string }
       generate_reservation_number: { Args: never; Returns: string }
       generate_return_number: { Args: never; Returns: string }
