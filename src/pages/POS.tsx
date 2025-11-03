@@ -201,7 +201,21 @@ export default function POS() {
       toast.error("Ingrese un monto válido");
       return;
     }
-    if (totalPaid + amount > total) {
+    
+    // Calculate the new total considering the surcharge this payment will add
+    let newTotalPaid = totalPaid + amount;
+    let newCardSurcharge = cardSurchargeAmount;
+    
+    // If adding a card payment, calculate the additional surcharge
+    if (currentPaymentMethod === 'card') {
+      newCardSurcharge += (amount * cardSurchargeRate / 100);
+    }
+    
+    // Recalculate the new total with the new surcharge
+    const newTotal = subtotal - totalDiscount + taxAmount + newCardSurcharge;
+    
+    // Check if the new total paid exceeds the new total
+    if (newTotalPaid > newTotal + 0.01) {
       toast.error("El monto excede el total");
       return;
     }
@@ -672,23 +686,33 @@ export default function POS() {
                         </Select>
                         
                         {currentPaymentMethod === 'card' && (
-                          <div className="space-y-1">
-                            <Label className="text-xs">Cuotas</Label>
-                            <Select 
-                              value={currentInstallments.toString()} 
-                              onValueChange={(val) => setCurrentInstallments(parseInt(val))}
-                            >
-                              <SelectTrigger>
-                                <SelectValue />
-                              </SelectTrigger>
-                              <SelectContent>
-                                <SelectItem value="1">1 cuota (sin interés)</SelectItem>
-                                <SelectItem value="3">3 cuotas</SelectItem>
-                                <SelectItem value="6">6 cuotas</SelectItem>
-                                <SelectItem value="12">12 cuotas</SelectItem>
-                              </SelectContent>
-                            </Select>
-                          </div>
+                          <>
+                            <div className="space-y-1">
+                              <Label className="text-xs">Cuotas</Label>
+                              <Select 
+                                value={currentInstallments.toString()} 
+                                onValueChange={(val) => setCurrentInstallments(parseInt(val))}
+                              >
+                                <SelectTrigger>
+                                  <SelectValue />
+                                </SelectTrigger>
+                                <SelectContent>
+                                  <SelectItem value="1">1 cuota (sin interés)</SelectItem>
+                                  <SelectItem value="3">3 cuotas</SelectItem>
+                                  <SelectItem value="6">6 cuotas</SelectItem>
+                                  <SelectItem value="12">12 cuotas</SelectItem>
+                                </SelectContent>
+                              </Select>
+                            </div>
+                            {cardSurchargeRate > 0 && currentPaymentAmount && parseFloat(currentPaymentAmount) > 0 && (
+                              <Alert className="py-2">
+                                <AlertCircle className="h-4 w-4" />
+                                <AlertDescription className="text-xs">
+                                  Recargo tarjeta ({cardSurchargeRate}%): +${(parseFloat(currentPaymentAmount) * cardSurchargeRate / 100).toFixed(2)}
+                                </AlertDescription>
+                              </Alert>
+                            )}
+                          </>
                         )}
                         
                         <div className="flex gap-2">
