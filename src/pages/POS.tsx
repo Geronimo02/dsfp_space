@@ -191,7 +191,16 @@ export default function POS() {
     }, 0);
   }
   
-  const total = subtotal - totalDiscount + taxAmount + cardSurchargeAmount;
+  // Calculate potential surcharge if current method is card
+  let potentialCardSurcharge = 0;
+  if (currentPaymentMethod === 'card' && cardSurchargeRate > 0) {
+    const totalPaid = paymentMethods.reduce((sum, p) => sum + p.amount, 0);
+    const baseTotal = subtotal - totalDiscount + taxAmount + cardSurchargeAmount;
+    const remaining = baseTotal - totalPaid;
+    potentialCardSurcharge = remaining > 0 ? (remaining * cardSurchargeRate / 100) : 0;
+  }
+  
+  const total = subtotal - totalDiscount + taxAmount + cardSurchargeAmount + potentialCardSurcharge;
   const totalPaid = paymentMethods.reduce((sum, p) => sum + p.amount, 0);
   const remaining = total - totalPaid;
 
@@ -586,8 +595,14 @@ export default function POS() {
                       )}
                       {cardSurchargeAmount > 0 && (
                         <div className="flex justify-between text-warning">
-                          <span>Recargo Tarjeta:</span>
+                          <span>Recargo Tarjeta (pagado):</span>
                           <span>+${cardSurchargeAmount.toFixed(2)}</span>
+                        </div>
+                      )}
+                      {potentialCardSurcharge > 0 && (
+                        <div className="flex justify-between text-warning">
+                          <span>Recargo Tarjeta ({cardSurchargeRate}%):</span>
+                          <span>+${potentialCardSurcharge.toFixed(2)}</span>
                         </div>
                       )}
                     </div>
@@ -686,36 +701,23 @@ export default function POS() {
                         </Select>
                         
                         {currentPaymentMethod === 'card' && (
-                          <>
-                            <div className="space-y-1">
-                              <Label className="text-xs">Cuotas</Label>
-                              <Select 
-                                value={currentInstallments.toString()} 
-                                onValueChange={(val) => setCurrentInstallments(parseInt(val))}
-                              >
-                                <SelectTrigger>
-                                  <SelectValue />
-                                </SelectTrigger>
-                                <SelectContent>
-                                  <SelectItem value="1">1 cuota (sin interés)</SelectItem>
-                                  <SelectItem value="3">3 cuotas</SelectItem>
-                                  <SelectItem value="6">6 cuotas</SelectItem>
-                                  <SelectItem value="12">12 cuotas</SelectItem>
-                                </SelectContent>
-                              </Select>
-                            </div>
-                            {cardSurchargeRate > 0 && (
-                              <Alert className="py-2">
-                                <AlertCircle className="h-4 w-4" />
-                                <AlertDescription className="text-xs">
-                                  Se aplicará recargo del {cardSurchargeRate}%
-                                  {currentPaymentAmount && parseFloat(currentPaymentAmount) > 0 && (
-                                    <span className="font-semibold"> (+${(parseFloat(currentPaymentAmount) * cardSurchargeRate / 100).toFixed(2)})</span>
-                                  )}
-                                </AlertDescription>
-                              </Alert>
-                            )}
-                          </>
+                          <div className="space-y-1">
+                            <Label className="text-xs">Cuotas</Label>
+                            <Select 
+                              value={currentInstallments.toString()} 
+                              onValueChange={(val) => setCurrentInstallments(parseInt(val))}
+                            >
+                              <SelectTrigger>
+                                <SelectValue />
+                              </SelectTrigger>
+                              <SelectContent>
+                                <SelectItem value="1">1 cuota (sin interés)</SelectItem>
+                                <SelectItem value="3">3 cuotas</SelectItem>
+                                <SelectItem value="6">6 cuotas</SelectItem>
+                                <SelectItem value="12">12 cuotas</SelectItem>
+                              </SelectContent>
+                            </Select>
+                          </div>
                         )}
                         
                         <div className="flex gap-2">
