@@ -184,10 +184,11 @@ export default function POS() {
   const cardSurchargeRate = companySettings?.card_surcharge_rate || 0;
   
   if (paymentMethods.length > 0) {
-    // Calculate surcharge for card payments
+    // Calculate surcharge for card payments with installments multiplier
     const cardPayments = paymentMethods.filter(p => p.method === 'card');
     cardSurchargeAmount = cardPayments.reduce((sum, p) => {
-      return sum + (p.amount * cardSurchargeRate / 100);
+      const installmentMultiplier = p.installments || 1;
+      return sum + (p.amount * cardSurchargeRate * installmentMultiplier / 100);
     }, 0);
   }
   
@@ -197,15 +198,16 @@ export default function POS() {
     const totalPaid = paymentMethods.reduce((sum, p) => sum + p.amount, 0);
     const baseTotal = subtotal - totalDiscount + taxAmount + cardSurchargeAmount;
     const remaining = baseTotal - totalPaid;
-    potentialCardSurcharge = remaining > 0 ? (remaining * cardSurchargeRate / 100) : 0;
+    const installmentMultiplier = currentInstallments || 1;
+    potentialCardSurcharge = remaining > 0 ? (remaining * cardSurchargeRate * installmentMultiplier / 100) : 0;
   }
   
   const total = subtotal - totalDiscount + taxAmount + cardSurchargeAmount + potentialCardSurcharge;
   const totalPaid = paymentMethods.reduce((sum, p) => sum + p.amount, 0);
   const remaining = total - totalPaid;
 
-  const addPaymentMethod = () => {
-    const amount = parseFloat(currentPaymentAmount);
+  const addPaymentMethod = (autoAmount?: number) => {
+    const amount = autoAmount || parseFloat(currentPaymentAmount);
     if (!amount || amount <= 0) {
       toast.error("Ingrese un monto válido");
       return;
@@ -217,7 +219,8 @@ export default function POS() {
     
     // If adding a card payment, calculate the additional surcharge
     if (currentPaymentMethod === 'card') {
-      newCardSurcharge += (amount * cardSurchargeRate / 100);
+      const installmentMultiplier = currentInstallments || 1;
+      newCardSurcharge += (amount * cardSurchargeRate * installmentMultiplier / 100);
     }
     
     // Recalculate the new total with the new surcharge
@@ -238,6 +241,14 @@ export default function POS() {
     setCurrentPaymentAmount("");
     setCurrentInstallments(1);
     toast.success("Método de pago agregado");
+  };
+
+  const payTotalAmount = () => {
+    if (remaining <= 0) {
+      toast.error("Ya está pagado el total");
+      return;
+    }
+    addPaymentMethod(remaining);
   };
 
   const removePaymentMethod = (id: string) => {
@@ -601,7 +612,7 @@ export default function POS() {
                       )}
                       {potentialCardSurcharge > 0 && (
                         <div className="flex justify-between text-warning">
-                          <span>Recargo Tarjeta ({cardSurchargeRate}%):</span>
+                          <span>Recargo Tarjeta ({cardSurchargeRate * currentInstallments}% - {currentInstallments} cuota{currentInstallments > 1 ? 's' : ''}):</span>
                           <span>+${potentialCardSurcharge.toFixed(2)}</span>
                         </div>
                       )}
@@ -721,15 +732,27 @@ export default function POS() {
                         )}
                         
                         <div className="flex gap-2">
+                          <Button 
+                            type="button" 
+                            variant="outline"
+                            onClick={payTotalAmount}
+                            className="flex-1"
+                            disabled={remaining <= 0}
+                          >
+                            Pagar Total (${remaining.toFixed(2)})
+                          </Button>
+                        </div>
+                        
+                        <div className="flex gap-2">
                           <Input
                             type="number"
                             step="0.01"
-                            placeholder="Monto"
+                            placeholder="Monto parcial (opcional)"
                             value={currentPaymentAmount}
                             onChange={(e) => setCurrentPaymentAmount(e.target.value)}
                             className="flex-1"
                           />
-                          <Button type="button" size="icon" onClick={addPaymentMethod}>
+                          <Button type="button" size="icon" onClick={() => addPaymentMethod()}>
                             <Plus className="h-4 w-4" />
                           </Button>
                         </div>
