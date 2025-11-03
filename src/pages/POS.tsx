@@ -704,11 +704,14 @@ export default function POS() {
                                 </SelectContent>
                               </Select>
                             </div>
-                            {cardSurchargeRate > 0 && currentPaymentAmount && parseFloat(currentPaymentAmount) > 0 && (
+                            {cardSurchargeRate > 0 && (
                               <Alert className="py-2">
                                 <AlertCircle className="h-4 w-4" />
                                 <AlertDescription className="text-xs">
-                                  Recargo tarjeta ({cardSurchargeRate}%): +${(parseFloat(currentPaymentAmount) * cardSurchargeRate / 100).toFixed(2)}
+                                  Se aplicará recargo del {cardSurchargeRate}%
+                                  {currentPaymentAmount && parseFloat(currentPaymentAmount) > 0 && (
+                                    <span className="font-semibold"> (+${(parseFloat(currentPaymentAmount) * cardSurchargeRate / 100).toFixed(2)})</span>
+                                  )}
                                 </AlertDescription>
                               </Alert>
                             )}
