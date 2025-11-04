@@ -192,19 +192,19 @@ export default function POS() {
     }, 0);
   }
   
-  // Calculate potential surcharge if current method is card
+  // Calculate base total and remaining without potential surcharge
+  const baseTotal = subtotal - totalDiscount + taxAmount + cardSurchargeAmount;
+  const totalPaid = paymentMethods.reduce((sum, p) => sum + p.amount, 0);
+  const remaining = baseTotal - totalPaid;
+  
+  // Calculate potential surcharge only for display (not included in remaining)
   let potentialCardSurcharge = 0;
-  if (currentPaymentMethod === 'card' && cardSurchargeRate > 0) {
-    const totalPaid = paymentMethods.reduce((sum, p) => sum + p.amount, 0);
-    const baseTotal = subtotal - totalDiscount + taxAmount + cardSurchargeAmount;
-    const remaining = baseTotal - totalPaid;
+  if (currentPaymentMethod === 'card' && cardSurchargeRate > 0 && remaining > 0) {
     const installmentMultiplier = currentInstallments || 1;
-    potentialCardSurcharge = remaining > 0 ? (remaining * cardSurchargeRate * installmentMultiplier / 100) : 0;
+    potentialCardSurcharge = (remaining * cardSurchargeRate * installmentMultiplier / 100);
   }
   
-  const total = subtotal - totalDiscount + taxAmount + cardSurchargeAmount + potentialCardSurcharge;
-  const totalPaid = paymentMethods.reduce((sum, p) => sum + p.amount, 0);
-  const remaining = total - totalPaid;
+  const total = baseTotal + potentialCardSurcharge;
 
   const addPaymentMethod = (autoAmount?: number) => {
     const amount = autoAmount || parseFloat(currentPaymentAmount);
