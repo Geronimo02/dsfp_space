@@ -46,6 +46,7 @@ export default function POS() {
   const [newCustomerName, setNewCustomerName] = useState("");
   const [newCustomerPhone, setNewCustomerPhone] = useState("");
   const [newCustomerEmail, setNewCustomerEmail] = useState("");
+  const [newCustomerDocument, setNewCustomerDocument] = useState("");
   const queryClient = useQueryClient();
 
   const { data: products } = useQuery({
@@ -271,6 +272,7 @@ export default function POS() {
           name: newCustomerName.trim(),
           phone: newCustomerPhone.trim() || null,
           email: newCustomerEmail.trim() || null,
+          document: newCustomerDocument.trim() || null,
         })
         .select()
         .single();
@@ -285,6 +287,7 @@ export default function POS() {
       setNewCustomerName("");
       setNewCustomerPhone("");
       setNewCustomerEmail("");
+      setNewCustomerDocument("");
       queryClient.invalidateQueries({ queryKey: ["customers-pos"] });
     },
     onError: (error: any) => {
@@ -461,13 +464,9 @@ export default function POS() {
         tax: taxAmount,
         cardSurcharge: cardSurchargeAmount > 0 ? cardSurchargeAmount : undefined,
         total: total,
-        paymentMethod: paymentMethods.length > 0 ? 
-          paymentMethods.map(p => {
-            const methodName = p.method === 'cash' ? 'Efectivo' : p.method === 'card' ? 'Tarjeta' : 'Transferencia';
-            const installmentInfo = p.installments && p.installments > 1 ? ` (${p.installments} cuotas)` : '';
-            return `${methodName}: $${p.amount.toFixed(2)}${installmentInfo}`;
-          }).join(', ') : 
-          'Efectivo',
+        paymentMethods: paymentMethods,
+        customer: selectedCustomer,
+        cardSurchargeRate: cardSurchargeRate,
         companyName: companySettings?.company_name || "Mi Empresa",
         companyAddress: companySettings?.address,
         companyPhone: companySettings?.phone,
@@ -566,8 +565,10 @@ export default function POS() {
                 <>
                   <Separator />
                   <div className="space-y-3">
+                    <Label className="text-base font-semibold">Resumen</Label>
+                    
                     <div className="space-y-2">
-                      <Label className="text-xs">Descuento (%)</Label>
+                      <Label className="text-xs">Descuento Manual (%)</Label>
                       <Input
                         type="number"
                         min="0"
@@ -578,10 +579,10 @@ export default function POS() {
                       />
                     </div>
 
-                    <div className="space-y-1 text-sm">
+                    <div className="space-y-1 text-sm p-3 bg-muted/30 rounded-lg">
                       <div className="flex justify-between">
                         <span className="text-muted-foreground">Subtotal:</span>
-                        <span>${subtotal.toFixed(2)}</span>
+                        <span className="font-medium">${subtotal.toFixed(2)}</span>
                       </div>
                       {manualDiscountAmount > 0 && (
                         <div className="flex justify-between text-destructive">
@@ -615,15 +616,17 @@ export default function POS() {
                       )}
                       {potentialCardSurcharge > 0 && (
                         <div className="flex justify-between text-warning">
-                          <span>Recargo Tarjeta ({cardSurchargeRate * currentInstallments}% - {currentInstallments} cuota{currentInstallments > 1 ? 's' : ''}):</span>
+                          <span>Recargo Tarjeta Potencial:</span>
                           <span>+${potentialCardSurcharge.toFixed(2)}</span>
                         </div>
                       )}
-                    </div>
-
-                    <div className="flex justify-between text-lg font-bold pt-2 border-t">
-                      <span>Total:</span>
-                      <span className="text-primary">${total.toFixed(2)}</span>
+                      
+                      <Separator className="my-2" />
+                      
+                      <div className="flex justify-between text-base font-bold pt-1">
+                        <span>Total a Pagar:</span>
+                        <span className="text-primary text-lg">${total.toFixed(2)}</span>
+                      </div>
                     </div>
 
                     {selectedCustomer && companySettings?.loyalty_enabled && (
@@ -700,22 +703,31 @@ export default function POS() {
                       </Select>
                     </div>
 
-                    <div className="space-y-2">
-                      <Label>Métodos de Pago</Label>
+                    <Separator />
+                    
+                    <div className="space-y-3">
+                      <div className="flex items-center justify-between">
+                        <Label className="text-base font-semibold">Panel de Cobro</Label>
+                        {paymentMethods.length > 1 && (
+                          <Badge variant="secondary">Pago Mixto</Badge>
+                        )}
+                      </div>
+                      
                       <div className="space-y-2">
+                        <Label className="text-xs text-muted-foreground">Método de Pago</Label>
                         <Select value={currentPaymentMethod} onValueChange={setCurrentPaymentMethod}>
                           <SelectTrigger>
                             <SelectValue />
                           </SelectTrigger>
                           <SelectContent>
-                            <SelectItem value="cash">Efectivo</SelectItem>
-                            <SelectItem value="card">Tarjeta</SelectItem>
-                            <SelectItem value="transfer">Transferencia</SelectItem>
+                            <SelectItem value="cash">💵 Efectivo</SelectItem>
+                            <SelectItem value="card">💳 Tarjeta de Crédito</SelectItem>
+                            <SelectItem value="transfer">🏦 Transferencia</SelectItem>
                           </SelectContent>
                         </Select>
                         
-                        {currentPaymentMethod === 'card' && (
-                          <div className="space-y-1">
+                      {currentPaymentMethod === 'card' && (
+                          <div className="space-y-2">
                             <Label className="text-xs">Cuotas</Label>
                             <Select 
                               value={currentInstallments.toString()} 
@@ -731,6 +743,14 @@ export default function POS() {
                                 <SelectItem value="12">12 cuotas</SelectItem>
                               </SelectContent>
                             </Select>
+                            {currentInstallments > 1 && cardSurchargeRate > 0 && (
+                              <Alert className="py-2">
+                                <AlertCircle className="h-4 w-4" />
+                                <AlertDescription className="text-xs">
+                                  Recargo +{cardSurchargeRate}% por cada cuota ({currentInstallments} cuotas = +{cardSurchargeRate * currentInstallments}%)
+                                </AlertDescription>
+                              </Alert>
+                            )}
                           </div>
                         )}
                         
@@ -763,28 +783,46 @@ export default function POS() {
                     </div>
 
                     {paymentMethods.length > 0 && (
-                      <div className="space-y-2">
+                      <div className="space-y-3 p-3 bg-muted/50 rounded-lg border">
+                        <div className="flex items-center gap-2">
+                          <Receipt className="h-4 w-4 text-muted-foreground" />
+                          <Label className="text-xs font-semibold">Tramos de Pago Agregados</Label>
+                        </div>
                         {paymentMethods.map((pm) => {
-                          const methodLabel = pm.method === 'cash' ? 'Efectivo' : pm.method === 'card' ? 'Tarjeta' : 'Transferencia';
+                          const methodLabel = pm.method === 'cash' ? '💵 Efectivo' : pm.method === 'card' ? '💳 Tarjeta' : '🏦 Transferencia';
                           const installmentInfo = pm.installments && pm.installments > 1 ? ` (${pm.installments} cuotas)` : '';
+                          const cardSurchargeForThisPayment = pm.method === 'card' ? (pm.amount * cardSurchargeRate * (pm.installments || 1) / 100) : 0;
                           return (
-                            <div key={pm.id} className="flex items-center justify-between p-2 bg-muted rounded">
-                              <span className="text-sm">{methodLabel}: ${pm.amount.toFixed(2)}{installmentInfo}</span>
-                              <Button size="icon" variant="ghost" className="h-6 w-6" onClick={() => removePaymentMethod(pm.id)}>
-                                <Trash2 className="h-3 w-3" />
-                              </Button>
+                            <div key={pm.id} className="flex items-center justify-between p-2 bg-background rounded border">
+                              <div className="flex-1">
+                                <div className="text-sm font-medium">{methodLabel}{installmentInfo}</div>
+                                {cardSurchargeForThisPayment > 0 && (
+                                  <div className="text-xs text-muted-foreground">
+                                    Incluye recargo: +${cardSurchargeForThisPayment.toFixed(2)}
+                                  </div>
+                                )}
+                              </div>
+                              <div className="flex items-center gap-2">
+                                <span className="text-sm font-semibold">${pm.amount.toFixed(2)}</span>
+                                <Button size="icon" variant="ghost" className="h-6 w-6" onClick={() => removePaymentMethod(pm.id)}>
+                                  <Trash2 className="h-3 w-3" />
+                                </Button>
+                              </div>
                             </div>
                           );
                         })}
-                        <div className="flex justify-between pt-2 border-t font-medium">
-                          <span>Pagado:</span>
-                          <span>${totalPaid.toFixed(2)}</span>
-                        </div>
-                        <div className="flex justify-between">
-                          <span>Restante:</span>
-                          <span className={remaining > 0.01 ? "text-destructive" : "text-success"}>
-                            ${remaining.toFixed(2)}
-                          </span>
+                        <Separator />
+                        <div className="space-y-1">
+                          <div className="flex justify-between text-sm">
+                            <span className="text-muted-foreground">Total pagado:</span>
+                            <span className="font-medium">${totalPaid.toFixed(2)}</span>
+                          </div>
+                          <div className="flex justify-between text-sm">
+                            <span className="text-muted-foreground">Restante:</span>
+                            <span className={`font-semibold ${remaining > 0.01 ? "text-destructive" : "text-success"}`}>
+                              ${remaining.toFixed(2)}
+                            </span>
+                          </div>
                         </div>
                       </div>
                     )}
@@ -843,6 +881,15 @@ export default function POS() {
                 value={newCustomerEmail}
                 onChange={(e) => setNewCustomerEmail(e.target.value)}
                 placeholder="Email"
+              />
+            </div>
+            <div>
+              <Label htmlFor="customer-document">DNI (Opcional)</Label>
+              <Input
+                id="customer-document"
+                value={newCustomerDocument}
+                onChange={(e) => setNewCustomerDocument(e.target.value)}
+                placeholder="DNI"
               />
             </div>
             <div className="flex justify-end gap-2">

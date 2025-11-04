@@ -9,6 +9,12 @@ interface ReceiptItem {
   subtotal: number;
 }
 
+interface PaymentMethodItem {
+  method: string;
+  amount: number;
+  installments?: number;
+}
+
 interface ReceiptData {
   saleNumber?: string;
   sale_number?: string;
@@ -23,9 +29,11 @@ interface ReceiptData {
   total: number;
   paymentMethod?: string;
   payment_method?: string;
+  paymentMethods?: PaymentMethodItem[];
   installments?: number;
   installmentAmount?: number;
   installment_amount?: number;
+  cardSurchargeRate?: number;
   companyName?: string;
   companyAddress?: string;
   companyPhone?: string;
@@ -49,8 +57,11 @@ export const ReceiptPDF = (data: ReceiptData) => {
     cardSurcharge: data.cardSurcharge,
     total: data.total,
     paymentMethod,
+    paymentMethods: data.paymentMethods,
     installments: data.installments,
     installmentAmount,
+    cardSurchargeRate: data.cardSurchargeRate,
+    customer: data.customer,
     companyName: data.companyName || "Mi Negocio",
     companyAddress: data.companyAddress,
     companyPhone: data.companyPhone,
@@ -67,9 +78,12 @@ export const generateReceiptPDF = (data: {
   tax: number;
   cardSurcharge?: number;
   total: number;
-  paymentMethod: string;
+  paymentMethod?: string;
+  paymentMethods?: PaymentMethodItem[];
   installments?: number;
   installmentAmount?: number;
+  cardSurchargeRate?: number;
+  customer?: any;
   companyName: string;
   companyAddress?: string;
   companyPhone?: string;
@@ -119,8 +133,21 @@ export const generateReceiptPDF = (data: {
   doc.setFont("helvetica", "normal");
   doc.text(`Fecha: ${format(new Date(), "dd/MM/yyyy HH:mm", { locale: es })}`, leftMargin, y);
   y += 5;
-  doc.text(`Pago: ${getPaymentMethodLabel(data.paymentMethod)}`, leftMargin, y);
-  y += 3;
+  
+  // Customer info if available
+  if (data.customer) {
+    doc.setFont("helvetica", "bold");
+    doc.text(`Cliente:`, leftMargin, y);
+    y += 4;
+    doc.setFont("helvetica", "normal");
+    doc.text(data.customer.name, leftMargin, y);
+    y += 4;
+    if (data.customer.document) {
+      doc.text(`DNI: ${data.customer.document}`, leftMargin, y);
+      y += 4;
+    }
+    y += 1;
+  }
 
   // Line separator
   doc.line(leftMargin, y, pageWidth - leftMargin, y);
@@ -176,7 +203,7 @@ export const generateReceiptPDF = (data: {
   }
 
   if (data.cardSurcharge && data.cardSurcharge > 0) {
-    doc.text("Recargo Tarjeta:", leftMargin, y);
+    doc.text("Recargo Financiación:", leftMargin, y);
     doc.text(`$${data.cardSurcharge.toFixed(2)}`, pageWidth - 5, y, { align: "right" });
     y += 5;
   }
@@ -187,10 +214,40 @@ export const generateReceiptPDF = (data: {
   doc.text(`$${data.total.toFixed(2)}`, pageWidth - 5, y, { align: "right" });
   y += 6;
 
-  if (data.installments && data.installments > 1) {
+  // Payment methods breakdown
+  if (data.paymentMethods && data.paymentMethods.length > 0) {
+    doc.setFont("helvetica", "bold");
+    doc.setFontSize(9);
+    doc.text("DESGLOSE DE PAGOS:", leftMargin, y);
+    y += 5;
+    doc.line(leftMargin, y, pageWidth - leftMargin, y);
+    y += 4;
+    
     doc.setFont("helvetica", "normal");
     doc.setFontSize(8);
-    doc.text(`${data.installments} cuotas de $${data.installmentAmount?.toFixed(2)}`, leftMargin, y);
+    data.paymentMethods.forEach((pm) => {
+      const methodName = getPaymentMethodLabel(pm.method);
+      doc.text(`${methodName}:`, leftMargin, y);
+      doc.text(`$${pm.amount.toFixed(2)}`, pageWidth - 5, y, { align: "right" });
+      y += 4;
+      
+      if (pm.method === 'card' && pm.installments && pm.installments > 1) {
+        const surchargeForThisPayment = (pm.amount * (data.cardSurchargeRate || 0) * pm.installments / 100);
+        const totalWithSurcharge = pm.amount + surchargeForThisPayment;
+        const installmentAmount = totalWithSurcharge / pm.installments;
+        doc.setFontSize(7);
+        doc.text(`  Plan: ${pm.installments} cuotas de $${installmentAmount.toFixed(2)}`, leftMargin, y);
+        y += 3;
+        doc.text(`  Recargo: +${(data.cardSurchargeRate || 0) * pm.installments}% ($${surchargeForThisPayment.toFixed(2)})`, leftMargin, y);
+        y += 4;
+        doc.setFontSize(8);
+      }
+    });
+    y += 2;
+  } else if (data.installments && data.installments > 1) {
+    doc.setFont("helvetica", "normal");
+    doc.setFontSize(8);
+    doc.text(`Plan: ${data.installments} cuotas de $${data.installmentAmount?.toFixed(2)}`, leftMargin, y);
     y += 5;
   }
 
