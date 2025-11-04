@@ -28,7 +28,9 @@ interface CartItem {
 interface PaymentMethod {
   id: string;
   method: string;
-  amount: number;
+  baseAmount: number;    // Monto base (parte del total_base que cubre)
+  surcharge: number;     // Recargo aplicado (solo tarjeta con cuotas > 1)
+  amount: number;        // Total del tramo (baseAmount + surcharge)
   installments?: number;
 }
 
@@ -173,73 +175,65 @@ export default function POS() {
     ? loyaltyPointsToUse * (companySettings.loyalty_currency_per_point || 0.01)
     : 0;
 
+  // 1. TOTALES BASE (sin financiación)
   const subtotal = cart.reduce((sum, item) => sum + item.subtotal, 0);
   const manualDiscountAmount = (subtotal * discountRate) / 100;
   const loyaltyDiscountAmount = (subtotal * loyaltyDiscountRate) / 100;
   const totalDiscount = manualDiscountAmount + loyaltyDiscountAmount + loyaltyPointsValue;
   const taxRate = companySettings?.default_tax_rate || 0;
   const taxAmount = ((subtotal - totalDiscount) * taxRate) / 100;
+  const total_base = subtotal - totalDiscount + taxAmount;
   
-  // Calculate card surcharge based on payment methods
-  let cardSurchargeAmount = 0;
   const cardSurchargeRate = companySettings?.card_surcharge_rate || 0;
   
-  if (paymentMethods.length > 0) {
-    // Calculate surcharge for card payments with installments multiplier
-    const cardPayments = paymentMethods.filter(p => p.method === 'card');
-    cardSurchargeAmount = cardPayments.reduce((sum, p) => {
-      const installmentMultiplier = p.installments || 1;
-      return sum + (p.amount * cardSurchargeRate * installmentMultiplier / 100);
-    }, 0);
-  }
+  // 2. SUMATORIAS de pagos por tramos
+  const totalBaseAmount = paymentMethods.reduce((sum, p) => sum + p.baseAmount, 0);
+  const recargo_pagado = paymentMethods.reduce((sum, p) => sum + p.surcharge, 0);
+  const total_cobrado = paymentMethods.reduce((sum, p) => sum + p.amount, 0);
   
-  // Calculate potential surcharge if current method is card
+  // 3. RESTANTE y POTENCIAL
+  const restante_base = total_base - totalBaseAmount;
+  
   let potentialCardSurcharge = 0;
-  if (currentPaymentMethod === 'card' && cardSurchargeRate > 0) {
-    const totalPaid = paymentMethods.reduce((sum, p) => sum + p.amount, 0);
-    const baseTotal = subtotal - totalDiscount + taxAmount + cardSurchargeAmount;
-    const remainingBeforeSurcharge = baseTotal - totalPaid;
-    
-    if (remainingBeforeSurcharge > 0) {
-      const installmentMultiplier = currentInstallments || 1;
-      potentialCardSurcharge = (remainingBeforeSurcharge * cardSurchargeRate * installmentMultiplier / 100);
+  if (currentPaymentMethod === 'card' && cardSurchargeRate > 0 && restante_base > 0) {
+    if (currentInstallments > 1) {
+      const tasa_recargo = cardSurchargeRate * currentInstallments / 100;
+      potentialCardSurcharge = restante_base * tasa_recargo;
     }
   }
   
-  const total = subtotal - totalDiscount + taxAmount + cardSurchargeAmount + potentialCardSurcharge;
-  const totalPaid = paymentMethods.reduce((sum, p) => sum + p.amount, 0);
-  const remaining = total - totalPaid;
+  // 4. TOTAL A PAGAR (actual, sin potencial)
+  const total = total_base + recargo_pagado;
+  const remaining = restante_base;
 
-  const addPaymentMethod = (autoAmount?: number) => {
-    const amount = autoAmount || parseFloat(currentPaymentAmount);
-    if (!amount || amount <= 0) {
+  const addPaymentMethod = (autoBaseAmount?: number) => {
+    const baseAmount = autoBaseAmount || parseFloat(currentPaymentAmount);
+    if (!baseAmount || baseAmount <= 0) {
       toast.error("Ingrese un monto válido");
       return;
     }
     
-    // Calculate the new total considering the surcharge this payment will add
-    let newTotalPaid = totalPaid + amount;
-    let newCardSurcharge = cardSurchargeAmount;
-    
-    // If adding a card payment, calculate the additional surcharge
-    if (currentPaymentMethod === 'card') {
-      const installmentMultiplier = currentInstallments || 1;
-      newCardSurcharge += (amount * cardSurchargeRate * installmentMultiplier / 100);
-    }
-    
-    // Recalculate the new total with the new surcharge
-    const newTotal = subtotal - totalDiscount + taxAmount + newCardSurcharge;
-    
-    // Check if the new total paid exceeds the new total
-    if (newTotalPaid > newTotal + 0.01) {
-      toast.error("El monto excede el total");
+    // Validar que no exceda el restante_base
+    if (baseAmount > restante_base + 0.01) {
+      toast.error("El monto base excede el restante");
       return;
     }
+    
+    // Calcular recargo solo si es tarjeta con cuotas > 1
+    let surcharge = 0;
+    if (currentPaymentMethod === 'card' && currentInstallments > 1) {
+      const tasa_recargo = cardSurchargeRate * currentInstallments / 100;
+      surcharge = baseAmount * tasa_recargo;
+    }
+    
+    const totalAmount = baseAmount + surcharge;
     
     setPaymentMethods([...paymentMethods, {
       id: Date.now().toString(),
       method: currentPaymentMethod,
-      amount: amount,
+      baseAmount: baseAmount,
+      surcharge: surcharge,
+      amount: totalAmount,
       installments: currentPaymentMethod === 'card' ? currentInstallments : 1
     }]);
     setCurrentPaymentAmount("");
@@ -248,11 +242,12 @@ export default function POS() {
   };
 
   const payTotalAmount = () => {
-    if (remaining <= 0) {
+    if (restante_base <= 0) {
       toast.error("Ya está pagado el total");
       return;
     }
-    addPaymentMethod(remaining);
+    // Pagar exactamente restante_base (el recargo se calcula automáticamente en addPaymentMethod)
+    addPaymentMethod(restante_base);
   };
 
   const removePaymentMethod = (id: string) => {
@@ -362,7 +357,7 @@ export default function POS() {
           sale_id: sale.id,
           payment_method: payment.method,
           amount: payment.amount,
-          card_surcharge: payment.method === 'card' ? (payment.amount * cardSurchargeRate / 100) : 0,
+          card_surcharge: payment.surcharge,
           installments: payment.installments || 1
         })));
 
@@ -462,7 +457,7 @@ export default function POS() {
         subtotal: subtotal,
         discount: totalDiscount,
         tax: taxAmount,
-        cardSurcharge: cardSurchargeAmount > 0 ? cardSurchargeAmount : undefined,
+        cardSurcharge: recargo_pagado > 0 ? recargo_pagado : undefined,
         total: total,
         paymentMethods: paymentMethods,
         customer: selectedCustomer,
@@ -608,10 +603,10 @@ export default function POS() {
                           <span>${taxAmount.toFixed(2)}</span>
                         </div>
                       )}
-                      {cardSurchargeAmount > 0 && (
+                      {recargo_pagado > 0 && (
                         <div className="flex justify-between text-warning">
                           <span>Recargo Tarjeta (pagado):</span>
-                          <span>+${cardSurchargeAmount.toFixed(2)}</span>
+                          <span>+${recargo_pagado.toFixed(2)}</span>
                         </div>
                       )}
                       {potentialCardSurcharge > 0 && (
@@ -762,7 +757,7 @@ export default function POS() {
                             className="flex-1"
                             disabled={remaining <= 0}
                           >
-                            Pagar Total (${remaining.toFixed(2)})
+                            Pagar Total (${(restante_base + potentialCardSurcharge).toFixed(2)})
                           </Button>
                         </div>
                         
@@ -791,16 +786,14 @@ export default function POS() {
                         {paymentMethods.map((pm) => {
                           const methodLabel = pm.method === 'cash' ? '💵 Efectivo' : pm.method === 'card' ? '💳 Tarjeta' : '🏦 Transferencia';
                           const installmentInfo = pm.installments && pm.installments > 1 ? ` (${pm.installments} cuotas)` : '';
-                          const cardSurchargeForThisPayment = pm.method === 'card' ? (pm.amount * cardSurchargeRate * (pm.installments || 1) / 100) : 0;
                           return (
                             <div key={pm.id} className="flex items-center justify-between p-2 bg-background rounded border">
                               <div className="flex-1">
                                 <div className="text-sm font-medium">{methodLabel}{installmentInfo}</div>
-                                {cardSurchargeForThisPayment > 0 && (
-                                  <div className="text-xs text-muted-foreground">
-                                    Incluye recargo: +${cardSurchargeForThisPayment.toFixed(2)}
-                                  </div>
-                                )}
+                                <div className="text-xs text-muted-foreground">
+                                  Base: ${pm.baseAmount.toFixed(2)}
+                                  {pm.surcharge > 0 && ` + Recargo: $${pm.surcharge.toFixed(2)}`}
+                                </div>
                               </div>
                               <div className="flex items-center gap-2">
                                 <span className="text-sm font-semibold">${pm.amount.toFixed(2)}</span>
@@ -815,7 +808,7 @@ export default function POS() {
                         <div className="space-y-1">
                           <div className="flex justify-between text-sm">
                             <span className="text-muted-foreground">Total pagado:</span>
-                            <span className="font-medium">${totalPaid.toFixed(2)}</span>
+                            <span className="font-medium">${total_cobrado.toFixed(2)}</span>
                           </div>
                           <div className="flex justify-between text-sm">
                             <span className="text-muted-foreground">Restante:</span>
