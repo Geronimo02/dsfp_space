@@ -506,8 +506,13 @@ export default function POS() {
             </CardHeader>
             <CardContent>
               <div className="grid gap-3 sm:grid-cols-2">
-                {products?.map((product) => (
-                  <Card key={product.id} className="cursor-pointer hover:shadow-medium transition-all" onClick={() => addToCart(product)}>
+                {products?.map((product, index) => (
+                  <Card 
+                    key={product.id} 
+                    className="cursor-pointer hover:shadow-medium transition-all animate-fade-in hover:scale-[1.02]" 
+                    onClick={() => addToCart(product)}
+                    style={{ animationDelay: `${index * 50}ms` }}
+                  >
                     <CardContent className="p-4">
                       <div className="flex justify-between items-start">
                         <div>
@@ -534,21 +539,25 @@ export default function POS() {
             </CardHeader>
             <CardContent className="space-y-4">
               <div className="space-y-2 max-h-64 overflow-y-auto">
-                {cart.map((item) => (
-                  <div key={item.product_id} className="flex items-center justify-between p-3 bg-muted rounded-lg">
+                {cart.map((item, index) => (
+                  <div 
+                    key={item.product_id} 
+                    className="flex items-center justify-between p-3 bg-muted rounded-lg animate-slide-in-right"
+                    style={{ animationDelay: `${index * 50}ms` }}
+                  >
                     <div className="flex-1">
                       <p className="font-medium text-sm">{item.product_name}</p>
                       <p className="text-xs text-muted-foreground">${item.unit_price.toFixed(2)} c/u</p>
                     </div>
                     <div className="flex items-center gap-2">
-                      <Button size="icon" variant="outline" className="h-7 w-7" onClick={() => updateQuantity(item.product_id, -1)}>
+                      <Button size="icon" variant="outline" className="h-7 w-7 hover:scale-110 transition-transform" onClick={() => updateQuantity(item.product_id, -1)}>
                         <Minus className="h-3 w-3" />
                       </Button>
                       <span className="w-8 text-center font-medium">{item.quantity}</span>
-                      <Button size="icon" variant="outline" className="h-7 w-7" onClick={() => updateQuantity(item.product_id, 1)}>
+                      <Button size="icon" variant="outline" className="h-7 w-7 hover:scale-110 transition-transform" onClick={() => updateQuantity(item.product_id, 1)}>
                         <Plus className="h-3 w-3" />
                       </Button>
-                      <Button size="icon" variant="ghost" className="h-7 w-7 text-destructive" onClick={() => removeFromCart(item.product_id)}>
+                      <Button size="icon" variant="ghost" className="h-7 w-7 text-destructive hover:scale-110 transition-transform" onClick={() => removeFromCart(item.product_id)}>
                         <Trash2 className="h-3 w-3" />
                       </Button>
                     </div>
@@ -574,25 +583,25 @@ export default function POS() {
                       />
                     </div>
 
-                    <div className="space-y-1 text-sm p-3 bg-muted/30 rounded-lg">
+                    <div className="space-y-1 text-sm p-3 bg-muted/30 rounded-lg animate-fade-in">
                       <div className="flex justify-between">
                         <span className="text-muted-foreground">Subtotal:</span>
                         <span className="font-medium">${subtotal.toFixed(2)}</span>
                       </div>
                       {manualDiscountAmount > 0 && (
-                        <div className="flex justify-between text-destructive">
+                        <div className="flex justify-between text-destructive animate-slide-in-right">
                           <span>Descuento Manual ({discountRate}%):</span>
                           <span>-${manualDiscountAmount.toFixed(2)}</span>
                         </div>
                       )}
                       {loyaltyDiscountAmount > 0 && (
-                        <div className="flex justify-between text-primary">
+                        <div className="flex justify-between text-primary animate-slide-in-right">
                           <span>Descuento Fidelidad ({loyaltyDiscountRate}%):</span>
                           <span>-${loyaltyDiscountAmount.toFixed(2)}</span>
                         </div>
                       )}
                       {loyaltyPointsValue > 0 && (
-                        <div className="flex justify-between text-primary">
+                        <div className="flex justify-between text-primary animate-slide-in-right">
                           <span>Puntos Canjeados ({loyaltyPointsToUse}):</span>
                           <span>-${loyaltyPointsValue.toFixed(2)}</span>
                         </div>
@@ -604,13 +613,13 @@ export default function POS() {
                         </div>
                       )}
                       {recargo_pagado > 0 && (
-                        <div className="flex justify-between text-warning">
+                        <div className="flex justify-between text-warning animate-slide-in-right">
                           <span>Recargo Tarjeta (pagado):</span>
                           <span>+${recargo_pagado.toFixed(2)}</span>
                         </div>
                       )}
                       {potentialCardSurcharge > 0 && (
-                        <div className="flex justify-between text-warning">
+                        <div className="flex justify-between text-warning animate-pulse-subtle">
                           <span>Recargo Tarjeta Potencial:</span>
                           <span>+${potentialCardSurcharge.toFixed(2)}</span>
                         </div>
@@ -618,7 +627,7 @@ export default function POS() {
                       
                       <Separator className="my-2" />
                       
-                      <div className="flex justify-between text-base font-bold pt-1">
+                      <div className="flex justify-between text-base font-bold pt-1 animate-scale-in">
                         <span>Total a Pagar:</span>
                         <span className="text-primary text-lg">${total.toFixed(2)}</span>
                       </div>
@@ -783,11 +792,15 @@ export default function POS() {
                           <Receipt className="h-4 w-4 text-muted-foreground" />
                           <Label className="text-xs font-semibold">Tramos de Pago Agregados</Label>
                         </div>
-                        {paymentMethods.map((pm) => {
+                        {paymentMethods.map((pm, index) => {
                           const methodLabel = pm.method === 'cash' ? '💵 Efectivo' : pm.method === 'card' ? '💳 Tarjeta' : '🏦 Transferencia';
                           const installmentInfo = pm.installments && pm.installments > 1 ? ` (${pm.installments} cuotas)` : '';
                           return (
-                            <div key={pm.id} className="flex items-center justify-between p-2 bg-background rounded border">
+                            <div 
+                              key={pm.id} 
+                              className="flex items-center justify-between p-2 bg-background rounded border animate-slide-in-right"
+                              style={{ animationDelay: `${index * 50}ms` }}
+                            >
                               <div className="flex-1">
                                 <div className="text-sm font-medium">{methodLabel}{installmentInfo}</div>
                                 <div className="text-xs text-muted-foreground">
@@ -797,7 +810,7 @@ export default function POS() {
                               </div>
                               <div className="flex items-center gap-2">
                                 <span className="text-sm font-semibold">${pm.amount.toFixed(2)}</span>
-                                <Button size="icon" variant="ghost" className="h-6 w-6" onClick={() => removePaymentMethod(pm.id)}>
+                                <Button size="icon" variant="ghost" className="h-6 w-6 hover:scale-110 transition-transform" onClick={() => removePaymentMethod(pm.id)}>
                                   <Trash2 className="h-3 w-3" />
                                 </Button>
                               </div>
@@ -805,7 +818,7 @@ export default function POS() {
                           );
                         })}
                         <Separator />
-                        <div className="space-y-1">
+                        <div className="space-y-1 animate-fade-in">
                           <div className="flex justify-between text-sm">
                             <span className="text-muted-foreground">Total pagado:</span>
                             <span className="font-medium">${total_cobrado.toFixed(2)}</span>
@@ -821,13 +834,13 @@ export default function POS() {
                     )}
 
                     <div className="flex gap-2 pt-2">
-                      <Button variant="outline" onClick={clearCart} className="flex-1">
+                      <Button variant="outline" onClick={clearCart} className="flex-1 hover:scale-105 transition-transform">
                         Limpiar
                       </Button>
                       <Button 
                         onClick={() => processSaleMutation.mutate()} 
                         disabled={processSaleMutation.isPending || remaining > 0.01} 
-                        className="flex-1"
+                        className="flex-1 hover:scale-105 transition-transform"
                       >
                         <Receipt className="mr-2 h-4 w-4" />
                         {processSaleMutation.isPending ? "Procesando..." : "Cobrar"}
