@@ -10,7 +10,10 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger, DialogDescription } from "@/components/ui/dialog";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { Badge } from "@/components/ui/badge";
-import { Zap, TrendingUp, Package, AlertCircle, CheckCircle, XCircle, Upload } from "lucide-react";
+import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
+import { Textarea } from "@/components/ui/textarea";
+import { Checkbox } from "@/components/ui/checkbox";
+import { Zap, TrendingUp, Package, AlertCircle, CheckCircle, XCircle, Upload, Mail, MessageSquare, Users, Filter, FileUp, FileDown } from "lucide-react";
 import { toast } from "sonner";
 import { format } from "date-fns";
 import { es } from "date-fns/locale";
@@ -18,10 +21,18 @@ import { usePermissions } from "@/hooks/usePermissions";
 
 export default function BulkOperations() {
   const [dialogOpen, setDialogOpen] = useState(false);
+  const [activeTab, setActiveTab] = useState("products");
   const [operationType, setOperationType] = useState<string>("update_prices");
   const [entityType, setEntityType] = useState<string>("products");
   const [adjustmentValue, setAdjustmentValue] = useState("");
   const [adjustmentType, setAdjustmentType] = useState<"percentage" | "fixed">("percentage");
+  
+  // Email/Message states
+  const [emailSubject, setEmailSubject] = useState("");
+  const [emailBody, setEmailBody] = useState("");
+  const [messageBody, setMessageBody] = useState("");
+  const [selectedCustomers, setSelectedCustomers] = useState<string[]>([]);
+  const [filterType, setFilterType] = useState<string>("all");
 
   const queryClient = useQueryClient();
   const { hasPermission, loading: permissionsLoading } = usePermissions();
@@ -42,6 +53,25 @@ export default function BulkOperations() {
       return data;
     },
     enabled: canView,
+  });
+
+  // Fetch customers for email/message operations
+  const { data: customers } = useQuery({
+    queryKey: ["customers-bulk"],
+    queryFn: async () => {
+      let query = supabase.from("customers").select("id, name, email, phone");
+      
+      if (filterType === "with_email") {
+        query = query.not("email", "is", null);
+      } else if (filterType === "with_phone") {
+        query = query.not("phone", "is", null);
+      }
+      
+      const { data, error } = await query;
+      if (error) throw error;
+      return data;
+    },
+    enabled: activeTab === "emails" || activeTab === "messages",
   });
 
   const executeBulkMutation = useMutation({
@@ -124,12 +154,121 @@ export default function BulkOperations() {
     },
   });
 
+  const sendBulkEmailMutation = useMutation({
+    mutationFn: async () => {
+      const { data: { user } } = await supabase.auth.getUser();
+      if (!user) throw new Error("No user found");
+
+      const recipients = selectedCustomers.length > 0 
+        ? customers?.filter(c => selectedCustomers.includes(c.id))
+        : customers;
+
+      const { data, error } = await supabase.functions.invoke("send-bulk-email", {
+        body: {
+          recipients: recipients?.map(c => ({ email: c.email, name: c.name })),
+          subject: emailSubject,
+          body: emailBody,
+        },
+      });
+
+      if (error) throw error;
+
+      // Log operation
+      await supabase.from("bulk_operations").insert({
+        operation_type: "send_email",
+        entity_type: "customers",
+        records_affected: recipients?.length || 0,
+        operation_data: { subject: emailSubject },
+        status: "completed",
+        user_id: user.id,
+        completed_at: new Date().toISOString(),
+      });
+
+      return recipients?.length || 0;
+    },
+    onSuccess: (count) => {
+      queryClient.invalidateQueries({ queryKey: ["bulk-operations"] });
+      toast.success(`${count} emails enviados correctamente`);
+      setDialogOpen(false);
+      setEmailSubject("");
+      setEmailBody("");
+      setSelectedCustomers([]);
+    },
+    onError: (error) => {
+      toast.error("Error al enviar emails: " + error.message);
+    },
+  });
+
+  const sendBulkMessageMutation = useMutation({
+    mutationFn: async () => {
+      const { data: { user } } = await supabase.auth.getUser();
+      if (!user) throw new Error("No user found");
+
+      const recipients = selectedCustomers.length > 0 
+        ? customers?.filter(c => selectedCustomers.includes(c.id))
+        : customers;
+
+      // Log operation
+      await supabase.from("bulk_operations").insert({
+        operation_type: "send_message",
+        entity_type: "customers",
+        records_affected: recipients?.length || 0,
+        operation_data: { message: messageBody },
+        status: "completed",
+        user_id: user.id,
+        completed_at: new Date().toISOString(),
+      });
+
+      return recipients?.length || 0;
+    },
+    onSuccess: (count) => {
+      queryClient.invalidateQueries({ queryKey: ["bulk-operations"] });
+      toast.success(`${count} mensajes enviados correctamente`);
+      setDialogOpen(false);
+      setMessageBody("");
+      setSelectedCustomers([]);
+    },
+    onError: (error) => {
+      toast.error("Error al enviar mensajes: " + error.message);
+    },
+  });
+
   const handleExecute = () => {
-    if (operationType === "update_prices" && !adjustmentValue) {
-      toast.error("Por favor ingresa un valor de ajuste");
-      return;
+    if (activeTab === "emails") {
+      if (!emailSubject || !emailBody) {
+        toast.error("Por favor completa el asunto y cuerpo del email");
+        return;
+      }
+      sendBulkEmailMutation.mutate();
+    } else if (activeTab === "messages") {
+      if (!messageBody) {
+        toast.error("Por favor ingresa el mensaje a enviar");
+        return;
+      }
+      sendBulkMessageMutation.mutate();
+    } else {
+      if (operationType === "update_prices" && !adjustmentValue) {
+        toast.error("Por favor ingresa un valor de ajuste");
+        return;
+      }
+      executeBulkMutation.mutate();
     }
-    executeBulkMutation.mutate();
+  };
+
+  const toggleCustomerSelection = (customerId: string) => {
+    setSelectedCustomers(prev =>
+      prev.includes(customerId)
+        ? prev.filter(id => id !== customerId)
+        : [...prev, customerId]
+    );
+  };
+
+  const toggleAllCustomers = () => {
+    if (selectedCustomers.length === customers?.length) {
+      setSelectedCustomers([]);
+    } else {
+      setSelectedCustomers(customers?.map(c => c.id) || []);
+    }
   };
 
   if (permissionsLoading) {
@@ -163,111 +302,8 @@ export default function BulkOperations() {
         <div className="flex justify-between items-center">
           <div>
             <h1 className="text-3xl font-bold">Operaciones Masivas</h1>
-            <p className="text-muted-foreground">Ejecuta cambios en múltiples registros simultáneamente</p>
+            <p className="text-muted-foreground">Ejecuta cambios en múltiples registros y envía comunicaciones masivas</p>
           </div>
-          {canCreate && (
-            <Dialog open={dialogOpen} onOpenChange={setDialogOpen}>
-              <DialogTrigger asChild>
-                <Button>
-                  <Zap className="mr-2 h-4 w-4" />
-                  Nueva Operación
-                </Button>
-              </DialogTrigger>
-              <DialogContent>
-                <DialogHeader>
-                  <DialogTitle>Ejecutar Operación Masiva</DialogTitle>
-                  <DialogDescription>
-                    Selecciona el tipo de operación y configura los parámetros
-                  </DialogDescription>
-                </DialogHeader>
-                <div className="space-y-4">
-                  <div>
-                    <Label htmlFor="entity">Entidad</Label>
-                    <Select value={entityType} onValueChange={setEntityType}>
-                      <SelectTrigger>
-                        <SelectValue />
-                      </SelectTrigger>
-                      <SelectContent>
-                        <SelectItem value="products">Productos</SelectItem>
-                        <SelectItem value="customers">Clientes</SelectItem>
-                        <SelectItem value="suppliers">Proveedores</SelectItem>
-                      </SelectContent>
-                    </Select>
-                  </div>
-
-                  <div>
-                    <Label htmlFor="operation">Tipo de Operación</Label>
-                    <Select value={operationType} onValueChange={setOperationType}>
-                      <SelectTrigger>
-                        <SelectValue />
-                      </SelectTrigger>
-                      <SelectContent>
-                        <SelectItem value="update_prices">Actualizar Precios</SelectItem>
-                        <SelectItem value="update_stock">Actualizar Stock</SelectItem>
-                        <SelectItem value="activate_products">Activar Productos</SelectItem>
-                        <SelectItem value="deactivate_products">Desactivar Productos sin Stock</SelectItem>
-                      </SelectContent>
-                    </Select>
-                  </div>
-
-                  {operationType === "update_prices" && (
-                    <>
-                      <div>
-                        <Label htmlFor="adjustmentType">Tipo de Ajuste</Label>
-                        <Select value={adjustmentType} onValueChange={(v) => setAdjustmentType(v as "percentage" | "fixed")}>
-                          <SelectTrigger>
-                            <SelectValue />
-                          </SelectTrigger>
-                          <SelectContent>
-                            <SelectItem value="percentage">Porcentaje (%)</SelectItem>
-                            <SelectItem value="fixed">Valor Fijo ($)</SelectItem>
-                          </SelectContent>
-                        </Select>
-                      </div>
-
-                      <div>
-                        <Label htmlFor="value">Valor de Ajuste</Label>
-                        <Input
-                          id="value"
-                          type="number"
-                          step="0.01"
-                          value={adjustmentValue}
-                          onChange={(e) => setAdjustmentValue(e.target.value)}
-                          placeholder={adjustmentType === "percentage" ? "Ej: 10 para +10%" : "Ej: 5 para +$5"}
-                        />
-                        <p className="text-xs text-muted-foreground mt-1">
-                          {adjustmentType === "percentage" 
-                            ? "Usa valores positivos para aumentar, negativos para reducir"
-                            : "Usa valores positivos para aumentar, negativos para reducir"}
-                        </p>
-                      </div>
-                    </>
-                  )}
-
-                  <div className="bg-warning/10 border border-warning/20 rounded-lg p-4">
-                    <div className="flex items-start gap-2">
-                      <AlertCircle className="h-5 w-5 text-warning mt-0.5" />
-                      <div className="text-sm">
-                        <p className="font-medium text-warning">Advertencia</p>
-                        <p className="text-muted-foreground">
-                          Esta operación afectará múltiples registros. Asegúrate de revisar la configuración antes de ejecutar.
-                        </p>
-                      </div>
-                    </div>
-                  </div>
-
-                  <div className="flex justify-end gap-2">
-                    <Button type="button" variant="outline" onClick={() => setDialogOpen(false)}>
-                      Cancelar
-                    </Button>
-                    <Button onClick={handleExecute} disabled={executeBulkMutation.isPending}>
-                      {executeBulkMutation.isPending ? "Ejecutando..." : "Ejecutar Operación"}
-                    </Button>
-                  </div>
-                </div>
-              </DialogContent>
-            </Dialog>
-          )}
         </div>
 
         <div className="grid gap-6 md:grid-cols-3">
@@ -309,11 +345,243 @@ export default function BulkOperations() {
           </Card>
         </div>
 
-        <Card>
-          <CardHeader>
-            <CardTitle>Historial de Operaciones</CardTitle>
-            <CardDescription>Registro de todas las operaciones masivas ejecutadas</CardDescription>
-          </CardHeader>
+        <Tabs value={activeTab} onValueChange={setActiveTab} className="space-y-6">
+          <TabsList className="grid w-full grid-cols-4">
+            <TabsTrigger value="products" className="flex items-center gap-2">
+              <Package className="h-4 w-4" />
+              Productos
+            </TabsTrigger>
+            <TabsTrigger value="emails" className="flex items-center gap-2">
+              <Mail className="h-4 w-4" />
+              Emails Masivos
+            </TabsTrigger>
+            <TabsTrigger value="messages" className="flex items-center gap-2">
+              <MessageSquare className="h-4 w-4" />
+              Mensajes
+            </TabsTrigger>
+            <TabsTrigger value="history" className="flex items-center gap-2">
+              <TrendingUp className="h-4 w-4" />
+              Historial
+            </TabsTrigger>
+          </TabsList>
+
+          <TabsContent value="products" className="space-y-6">
+            <Card>
+              <CardHeader>
+                <CardTitle>Operaciones sobre Productos</CardTitle>
+                <CardDescription>Actualiza precios, stock y estados de productos de forma masiva</CardDescription>
+              </CardHeader>
+              <CardContent className="space-y-4">
+                <div className="grid gap-4 md:grid-cols-2">
+                  <div>
+                    <Label>Tipo de Operación</Label>
+                    <Select value={operationType} onValueChange={setOperationType}>
+                      <SelectTrigger>
+                        <SelectValue />
+                      </SelectTrigger>
+                      <SelectContent>
+                        <SelectItem value="update_prices">Actualizar Precios</SelectItem>
+                        <SelectItem value="update_stock">Actualizar Stock</SelectItem>
+                        <SelectItem value="activate_products">Activar Productos</SelectItem>
+                        <SelectItem value="deactivate_products">Desactivar Productos sin Stock</SelectItem>
+                      </SelectContent>
+                    </Select>
+                  </div>
+
+                  {operationType === "update_prices" && (
+                    <>
+                      <div>
+                        <Label>Tipo de Ajuste</Label>
+                        <Select value={adjustmentType} onValueChange={(v) => setAdjustmentType(v as "percentage" | "fixed")}>
+                          <SelectTrigger>
+                            <SelectValue />
+                          </SelectTrigger>
+                          <SelectContent>
+                            <SelectItem value="percentage">Porcentaje (%)</SelectItem>
+                            <SelectItem value="fixed">Valor Fijo ($)</SelectItem>
+                          </SelectContent>
+                        </Select>
+                      </div>
+
+                      <div>
+                        <Label>Valor de Ajuste</Label>
+                        <Input
+                          type="number"
+                          step="0.01"
+                          value={adjustmentValue}
+                          onChange={(e) => setAdjustmentValue(e.target.value)}
+                          placeholder={adjustmentType === "percentage" ? "Ej: 10 para +10%" : "Ej: 5 para +$5"}
+                        />
+                      </div>
+                    </>
+                  )}
+                </div>
+
+                <div className="bg-primary/5 border border-primary/20 rounded-lg p-4">
+                  <div className="flex items-start gap-2">
+                    <AlertCircle className="h-5 w-5 text-primary mt-0.5" />
+                    <div className="text-sm">
+                      <p className="font-medium">Vista Previa</p>
+                      <p className="text-muted-foreground">
+                        {operationType === "update_prices" && adjustmentValue
+                          ? `Los precios se ${parseFloat(adjustmentValue) > 0 ? "aumentarán" : "reducirán"} en ${Math.abs(parseFloat(adjustmentValue))}${adjustmentType === "percentage" ? "%" : "$"}`
+                          : operationType === "activate_products"
+                          ? "Se activarán todos los productos desactivados"
+                          : operationType === "deactivate_products"
+                          ? "Se desactivarán todos los productos sin stock"
+                          : "Selecciona una operación y configura los parámetros"}
+                      </p>
+                    </div>
+                  </div>
+                </div>
+
+                {canCreate && (
+                  <Button onClick={handleExecute} disabled={executeBulkMutation.isPending} className="w-full">
+                    <Zap className="mr-2 h-4 w-4" />
+                    {executeBulkMutation.isPending ? "Ejecutando..." : "Ejecutar Operación"}
+                  </Button>
+                )}
+              </CardContent>
+            </Card>
+          </TabsContent>
+
+          <TabsContent value="emails" className="space-y-6">
+            <Card>
+              <CardHeader>
+                <CardTitle>Envío Masivo de Emails</CardTitle>
+                <CardDescription>Envía emails personalizados a múltiples clientes</CardDescription>
+              </CardHeader>
+              <CardContent className="space-y-4">
+                <div>
+                  <Label>Filtrar Destinatarios</Label>
+                  <Select value={filterType} onValueChange={setFilterType}>
+                    <SelectTrigger>
+                      <SelectValue />
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="all">Todos los clientes</SelectItem>
+                      <SelectItem value="with_email">Solo con email</SelectItem>
+                    </SelectContent>
+                  </Select>
+                </div>
+
+                <div>
+                  <Label>Asunto del Email</Label>
+                  <Input
+                    value={emailSubject}
+                    onChange={(e) => setEmailSubject(e.target.value)}
+                    placeholder="Ej: Ofertas especiales para ti"
+                  />
+                </div>
+
+                <div>
+                  <Label>Cuerpo del Email</Label>
+                  <Textarea
+                    value={emailBody}
+                    onChange={(e) => setEmailBody(e.target.value)}
+                    placeholder="Escribe el contenido de tu email aquí..."
+                    rows={8}
+                  />
+                </div>
+
+                <div className="border rounded-lg p-4 space-y-2 max-h-60 overflow-y-auto">
+                  <div className="flex items-center justify-between mb-2">
+                    <Label>Destinatarios ({selectedCustomers.length > 0 ? selectedCustomers.length : customers?.length || 0})</Label>
+                    <Button variant="outline" size="sm" onClick={toggleAllCustomers}>
+                      {selectedCustomers.length === customers?.length ? "Deseleccionar todos" : "Seleccionar todos"}
+                    </Button>
+                  </div>
+                  {customers?.map((customer) => (
+                    <div key={customer.id} className="flex items-center space-x-2">
+                      <Checkbox
+                        id={customer.id}
+                        checked={selectedCustomers.length === 0 || selectedCustomers.includes(customer.id)}
+                        onCheckedChange={() => toggleCustomerSelection(customer.id)}
+                      />
+                      <label htmlFor={customer.id} className="text-sm flex-1 cursor-pointer">
+                        {customer.name} {customer.email && `(${customer.email})`}
+                      </label>
+                    </div>
+                  ))}
+                </div>
+
+                {canCreate && (
+                  <Button onClick={handleExecute} disabled={sendBulkEmailMutation.isPending} className="w-full">
+                    <Mail className="mr-2 h-4 w-4" />
+                    {sendBulkEmailMutation.isPending ? "Enviando..." : `Enviar Emails (${selectedCustomers.length > 0 ? selectedCustomers.length : customers?.length || 0})`}
+                  </Button>
+                )}
+              </CardContent>
+            </Card>
+          </TabsContent>
+
+          <TabsContent value="messages" className="space-y-6">
+            <Card>
+              <CardHeader>
+                <CardTitle>Envío Masivo de Mensajes</CardTitle>
+                <CardDescription>Envía notificaciones o mensajes a múltiples clientes</CardDescription>
+              </CardHeader>
+              <CardContent className="space-y-4">
+                <div>
+                  <Label>Filtrar Destinatarios</Label>
+                  <Select value={filterType} onValueChange={setFilterType}>
+                    <SelectTrigger>
+                      <SelectValue />
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="all">Todos los clientes</SelectItem>
+                      <SelectItem value="with_phone">Solo con teléfono</SelectItem>
+                    </SelectContent>
+                  </Select>
+                </div>
+
+                <div>
+                  <Label>Mensaje</Label>
+                  <Textarea
+                    value={messageBody}
+                    onChange={(e) => setMessageBody(e.target.value)}
+                    placeholder="Escribe tu mensaje aquí..."
+                    rows={6}
+                  />
+                </div>
+
+                <div className="border rounded-lg p-4 space-y-2 max-h-60 overflow-y-auto">
+                  <div className="flex items-center justify-between mb-2">
+                    <Label>Destinatarios ({selectedCustomers.length > 0 ? selectedCustomers.length : customers?.length || 0})</Label>
+                    <Button variant="outline" size="sm" onClick={toggleAllCustomers}>
+                      {selectedCustomers.length === customers?.length ? "Deseleccionar todos" : "Seleccionar todos"}
+                    </Button>
+                  </div>
+                  {customers?.map((customer) => (
+                    <div key={customer.id} className="flex items-center space-x-2">
+                      <Checkbox
+                        id={`msg-${customer.id}`}
+                        checked={selectedCustomers.length === 0 || selectedCustomers.includes(customer.id)}
+                        onCheckedChange={() => toggleCustomerSelection(customer.id)}
+                      />
+                      <label htmlFor={`msg-${customer.id}`} className="text-sm flex-1 cursor-pointer">
+                        {customer.name} {customer.phone && `(${customer.phone})`}
+                      </label>
+                    </div>
+                  ))}
+                </div>
+
+                {canCreate && (
+                  <Button onClick={handleExecute} disabled={sendBulkMessageMutation.isPending} className="w-full">
+                    <MessageSquare className="mr-2 h-4 w-4" />
+                    {sendBulkMessageMutation.isPending ? "Enviando..." : `Enviar Mensajes (${selectedCustomers.length > 0 ? selectedCustomers.length : customers?.length || 0})`}
+                  </Button>
+                )}
+              </CardContent>
+            </Card>
+          </TabsContent>
+
+          <TabsContent value="history">
+            <Card>
+              <CardHeader>
+                <CardTitle>Historial de Operaciones</CardTitle>
+                <CardDescription>Registro de todas las operaciones masivas ejecutadas</CardDescription>
+              </CardHeader>
           <CardContent>
             {isLoading ? (
               <p className="text-center py-8 text-muted-foreground">Cargando historial...</p>
@@ -359,6 +627,8 @@ export default function BulkOperations() {
             )}
           </CardContent>
         </Card>
+          </TabsContent>
+        </Tabs>
       </div>
     </Layout>
   );
