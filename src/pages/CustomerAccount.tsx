@@ -59,6 +59,28 @@ export default function CustomerAccount() {
     enabled: !!selectedCustomer,
   });
 
+  const { data: customerMovements } = useQuery({
+    queryKey: ["customer-movements", selectedCustomer],
+    queryFn: async () => {
+      if (!selectedCustomer) return [];
+      
+      try {
+        const { data, error } = await (supabase as any)
+          .rpc('get_customer_movements', { customer_id: selectedCustomer });
+        
+        if (error) {
+          console.warn("Error fetching movements:", error);
+          return [];
+        }
+        return Array.isArray(data) ? data : [];
+      } catch (error) {
+        console.warn("Error fetching movements:", error);
+        return [];
+      }
+    },
+    enabled: !!selectedCustomer,
+  });
+
   const filteredCustomers = customers?.filter(c =>
     c.name.toLowerCase().includes(searchQuery.toLowerCase()) ||
     c.document?.toLowerCase().includes(searchQuery.toLowerCase())
@@ -176,75 +198,109 @@ export default function CustomerAccount() {
                   <div>
                     <h3 className="font-semibold mb-4 flex items-center gap-2">
                       <Clock className="h-4 w-4 text-primary" />
-                      Historial de Movimientos
+                      Movimientos de Cuenta Corriente
                     </h3>
                     
-                    <div className="space-y-3 max-h-[400px] overflow-y-auto">
-                      {/* Combinar ventas y pagos */}
-                      {[
-                        ...customerDetails.sales.map(s => ({ ...s, type: 'sale' as const })),
-                        ...customerDetails.payments.map(p => ({ ...p, type: 'payment' as const }))
-                      ]
-                        .sort((a, b) => {
-                          const dateA = new Date(a.type === 'sale' ? a.created_at : (a as any).payment_date);
-                          const dateB = new Date(b.type === 'sale' ? b.created_at : (b as any).payment_date);
-                          return dateB.getTime() - dateA.getTime();
-                        })
-                        .map((item, index) => {
-                          const isSale = item.type === 'sale';
-                          const date = isSale ? item.created_at : (item as any).payment_date;
-                          const amount = isSale ? item.total : (item as any).amount;
-                          
-                          return (
-                            <div
-                              key={`${item.type}-${item.id}`}
-                              className={`p-3 rounded-lg border ${
-                                isSale
-                                  ? 'bg-destructive/5 border-destructive/20' 
-                                  : 'bg-success/5 border-success/20'
-                              }`}
-                            >
-                              <div className="flex items-start justify-between">
-                                <div className="flex items-start gap-3">
-                                  {isSale ? (
-                                    <TrendingDown className="h-5 w-5 text-destructive mt-0.5" />
-                                  ) : (
-                                    <CheckCircle className="h-5 w-5 text-success mt-0.5" />
-                                  )}
-                                  <div>
-                                    <p className="font-medium text-sm">
-                                      {isSale ? `Venta ${(item as any).sale_number}` : 'Pago Recibido'}
-                                    </p>
-                                    <p className="text-xs text-muted-foreground">
-                                      {format(new Date(date), "dd/MM/yyyy HH:mm", { locale: es })}
-                                    </p>
-                                    {isSale && (item as any).payment_method === 'credit' && (
-                                      <Badge variant="outline" className="mt-1 text-xs">A crédito</Badge>
-                                    )}
-                                    {!isSale && (
-                                      <p className="text-xs text-muted-foreground mt-1">
-                                        Método: {(item as any).payment_method}
-                                      </p>
-                                    )}
-                                  </div>
+                    <div className="max-h-[400px] overflow-y-auto">
+                      <Table>
+                        <TableHeader>
+                          <TableRow>
+                            <TableHead>Fecha</TableHead>
+                            <TableHead>Tipo</TableHead>
+                            <TableHead>Comprobante</TableHead>
+                            <TableHead>Concepto</TableHead>
+                            <TableHead className="text-right">Debe</TableHead>
+                            <TableHead className="text-right">Haber</TableHead>
+                            <TableHead className="text-right">Saldo</TableHead>
+                            <TableHead>Estado</TableHead>
+                          </TableRow>
+                        </TableHeader>
+                        <TableBody>
+                          {Array.isArray(customerMovements) && customerMovements.length > 0 ? (
+                            customerMovements.map((movement: any, index: number) => (
+                              <TableRow key={movement.id} className={
+                                movement.movement_type === 'sale' && movement.status === 'pending' ? 'bg-red-50 hover:bg-red-100' :
+                                movement.movement_type === 'sale' && movement.status === 'partial' ? 'bg-yellow-50 hover:bg-yellow-100' :
+                                movement.movement_type === 'sale' && movement.status === 'paid' ? 'bg-green-50 hover:bg-green-100' :
+                                movement.movement_type === 'payment' ? 'bg-blue-50 hover:bg-blue-100' : 'hover:bg-muted/50'
+                              }>
+                                <TableCell>
+                                  {format(new Date(movement.movement_date), "dd/MM/yyyy HH:mm", { locale: es })}
+                                </TableCell>
+                                <TableCell>
+                                  <Badge variant="outline" className={
+                                    movement.movement_type === 'sale' && movement.status === 'paid' ? 'border-green-500 text-green-700 bg-green-50' :
+                                    movement.movement_type === 'sale' && movement.status === 'partial' ? 'border-yellow-500 text-yellow-700 bg-yellow-50' :
+                                    movement.movement_type === 'sale' && movement.status === 'pending' ? 'border-red-500 text-red-700 bg-red-50' :
+                                    movement.movement_type === 'payment' ? 'border-green-500 text-green-700 bg-green-50' :
+                                    movement.movement_type === 'credit_note' ? 'border-blue-500 text-blue-700 bg-blue-50' :
+                                    'border-gray-500 text-gray-700'
+                                  }>
+                                    {movement.movement_type === 'sale' ? 
+                                      (movement.status === 'paid' ? '✅ Venta Pagada' :
+                                       movement.status === 'partial' ? '🟡 Venta Parcial' :
+                                       '🔴 Venta Pendiente') :
+                                     movement.movement_type === 'payment' ? '💰 Pago Recibido' :
+                                     movement.movement_type === 'credit_note' ? '📄 Nota Crédito' :
+                                     'Otro'}
+                                  </Badge>
+                                </TableCell>
+                                <TableCell className="font-mono text-sm">
+                                  {movement.reference_number || '-'}
+                                </TableCell>
+                                <TableCell className="text-sm">
+                                  {movement.description}
+                                </TableCell>
+                                <TableCell className="text-right font-medium">
+                                  {movement.debit_amount > 0 ? (
+                                    <span className="text-red-600 font-bold">
+                                      ${movement.debit_amount.toFixed(2)}
+                                    </span>
+                                  ) : '-'}
+                                </TableCell>
+                                <TableCell className="text-right font-medium">
+                                  {movement.credit_amount > 0 ? (
+                                    <span className="text-green-600 font-bold">
+                                      ${movement.credit_amount.toFixed(2)}
+                                    </span>
+                                  ) : '-'}
+                                </TableCell>
+                                <TableCell className="text-right font-bold text-lg">
+                                  <span className={movement.balance >= 0 ? 'text-red-600' : 'text-green-600'}>
+                                    ${Math.abs(movement.balance).toFixed(2)}
+                                    <span className="text-xs ml-1">
+                                      {movement.balance < 0 ? 'CR' : 'DB'}
+                                    </span>
+                                  </span>
+                                </TableCell>
+                                <TableCell>
+                                  <Badge variant={
+                                    movement.status === 'paid' ? 'default' :
+                                    movement.status === 'partial' ? 'secondary' :
+                                    movement.status === 'pending' ? 'destructive' :
+                                    movement.status === 'overdue' ? 'destructive' : 'outline'
+                                  }>
+                                    {movement.status === 'pending' ? '⏳ Pendiente' :
+                                     movement.status === 'paid' ? '✅ Pagado' :
+                                     movement.status === 'overdue' ? '🔴 Vencido' :
+                                     movement.status === 'partial' ? '🟡 Parcial' : movement.status}
+                                  </Badge>
+                                </TableCell>
+                              </TableRow>
+                            ))
+                          ) : (
+                            <TableRow>
+                              <TableCell colSpan={8} className="text-center text-muted-foreground py-8">
+                                <div className="flex flex-col items-center space-y-2">
+                                  <Clock className="h-8 w-8 text-muted-foreground/50" />
+                                  <p>No hay movimientos de cuenta corriente</p>
+                                  <p className="text-xs">Los movimientos aparecerán cuando se realicen ventas a crédito o pagos</p>
                                 </div>
-                                <div className="text-right">
-                                  <p className={`text-lg font-bold ${
-                                    isSale ? 'text-destructive' : 'text-success'
-                                  }`}>
-                                    {isSale ? '+' : '-'}${Number(amount).toFixed(2)}
-                                  </p>
-                                </div>
-                              </div>
-                            </div>
-                          );
-                        })}
-                      
-                      {customerDetails.sales.length === 0 && customerDetails.payments.length === 0 && (
-                        <p className="text-center py-8 text-sm text-muted-foreground">
-                          No hay movimientos registrados
-                        </p>
-                      )}
+                              </TableCell>
+                            </TableRow>
+                          )}
+                        </TableBody>
+                      </Table>
                     </div>
                   </div>
                 </div>

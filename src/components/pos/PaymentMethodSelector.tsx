@@ -140,69 +140,23 @@ export default function Customers() {
     enabled: !!selectedCustomer?.id,
   });
 
-  // Nueva query para obtener TODOS los movimientos del cliente (incluyendo ventas no a crédito)
-  const { data: allCustomerTransactions } = useQuery({
-    queryKey: ["all-customer-transactions", selectedCustomer?.id],
+  const { data: invoicePayments } = useQuery({
+    queryKey: ["invoice-payments", selectedCustomer?.id],
     queryFn: async () => {
       if (!selectedCustomer?.id) return [];
       
       try {
-        // Obtener todas las ventas del cliente
-        const { data: sales, error: salesError } = await supabase
-          .from("sales")
-          .select("*")
-          .eq("customer_id", selectedCustomer.id)
-          .order("created_at", { ascending: false });
-
-        if (salesError) throw salesError;
-
-        // Obtener todos los pagos del cliente
-        const { data: payments, error: paymentsError } = await supabase
-          .from("customer_payments")
-          .select("*")
-          .eq("customer_id", selectedCustomer.id)
-          .order("payment_date", { ascending: false });
-
-        if (paymentsError) throw paymentsError;
-
-        // Combinar y formatear los datos
-        const allTransactions = [];
-
-        // Agregar ventas
-        sales?.forEach(sale => {
-          allTransactions.push({
-            id: `sale-${sale.id}`,
-            date: sale.created_at,
-            type: sale.payment_method === 'credit' ? 'credit_sale' : 'cash_sale',
-            reference: sale.sale_number,
-            description: `Venta (${sale.payment_method === 'cash' ? 'Efectivo' : 
-                                  sale.payment_method === 'card' ? 'Tarjeta' : 
-                                  sale.payment_method === 'transfer' ? 'Transferencia' : 'Crédito'})`,
-            amount: sale.total,
-            status: sale.payment_method === 'credit' ? 'pending' : 'completed'
-          });
-        });
-
-        // Agregar pagos
-        payments?.forEach(payment => {
-          allTransactions.push({
-            id: `payment-${payment.id}`,
-            date: payment.payment_date,
-            type: 'payment',
-            reference: `PAG-${payment.id.slice(-6)}`,
-            description: `Pago recibido (${payment.payment_method === 'cash' ? 'Efectivo' : 
-                                           payment.payment_method === 'card' ? 'Tarjeta' : 'Transferencia'})`,
-            amount: payment.amount,
-            status: 'completed',
-            notes: payment.notes
-          });
-        });
-
-        // Ordenar por fecha descendente
-        return allTransactions.sort((a, b) => new Date(b.date).getTime() - new Date(a.date).getTime());
-
+        // Usar query directa con casting de tipos
+        const { data, error } = await (supabase as any)
+          .rpc('get_invoice_payments', { customer_id: selectedCustomer.id });
+        
+        if (error) {
+          console.warn("Error fetching invoice payments:", error);
+          return [];
+        }
+        return Array.isArray(data) ? data : [];
       } catch (error) {
-        console.warn("Error fetching all customer transactions:", error);
+        console.warn("Error fetching invoice payments:", error);
         return [];
       }
     },
@@ -433,6 +387,13 @@ export default function Customers() {
     };
     ReceiptPDF(saleData);
   };
+
+  const paymentMethods = [
+    { value: 'cash', label: 'Efectivo', icon: '💵' },
+    { value: 'card', label: 'Tarjeta', icon: '💳' },
+    { value: 'transfer', label: 'Transferencia', icon: '🏦' },
+    { value: 'credit', label: 'Crédito', icon: '📝' },
+  ];
 
   return (
     <Layout>
@@ -665,86 +626,12 @@ export default function Customers() {
                 </CardContent>
               </Card>
 
-              <Tabs defaultValue="all-transactions" className="w-full">
-                <TabsList className="grid w-full grid-cols-4">
-                  <TabsTrigger value="all-transactions">Todos los Movimientos</TabsTrigger>
+              <Tabs defaultValue="movements" className="w-full">
+                <TabsList className="grid w-full grid-cols-3">
                   <TabsTrigger value="movements">Cuenta Corriente</TabsTrigger>
                   <TabsTrigger value="sales">Ventas</TabsTrigger>
                   <TabsTrigger value="payments">Pagos</TabsTrigger>
                 </TabsList>
-
-                <TabsContent value="all-transactions" className="mt-4">
-                  <div className="space-y-4">
-                    <h3 className="text-lg font-semibold">Historial Completo de Transacciones</h3>
-                    
-                    <div className="max-h-96 overflow-y-auto">
-                      <Table>
-                        <TableHeader>
-                          <TableRow>
-                            <TableHead>Fecha</TableHead>
-                            <TableHead>Tipo</TableHead>
-                            <TableHead>Comprobante</TableHead>
-                            <TableHead>Concepto</TableHead>
-                            <TableHead className="text-right">Monto</TableHead>
-                            <TableHead>Estado</TableHead>
-                            <TableHead>Notas</TableHead>
-                          </TableRow>
-                        </TableHeader>
-                        <TableBody>
-                          {Array.isArray(allCustomerTransactions) && allCustomerTransactions.length > 0 ? (
-                            allCustomerTransactions.map((transaction: any) => (
-                              <TableRow key={transaction.id}>
-                                <TableCell>
-                                  {format(new Date(transaction.date), "dd/MM/yyyy HH:mm", { locale: es })}
-                                </TableCell>
-                                <TableCell>
-                                  <Badge variant="outline" className={
-                                    transaction.type === 'credit_sale' ? 'border-orange-500 text-orange-700' :
-                                    transaction.type === 'cash_sale' ? 'border-blue-500 text-blue-700' :
-                                    transaction.type === 'payment' ? 'border-green-500 text-green-700' :
-                                    'border-gray-500 text-gray-700'
-                                  }>
-                                    {transaction.type === 'credit_sale' ? '📝 Venta a Crédito' :
-                                     transaction.type === 'cash_sale' ? '💵 Venta al Contado' :
-                                     transaction.type === 'payment' ? '💰 Pago' : 'Otro'}
-                                  </Badge>
-                                </TableCell>
-                                <TableCell className="font-mono">
-                                  {transaction.reference}
-                                </TableCell>
-                                <TableCell>{transaction.description}</TableCell>
-                                <TableCell className={`text-right font-medium ${
-                                  transaction.type === 'payment' ? 'text-green-600' : 
-                                  transaction.type === 'credit_sale' ? 'text-orange-600' : 'text-blue-600'
-                                }`}>
-                                  {transaction.type === 'payment' ? '+' : ''}${Number(transaction.amount).toFixed(2)}
-                                </TableCell>
-                                <TableCell>
-                                  <Badge variant={
-                                    transaction.status === 'completed' ? 'default' :
-                                    transaction.status === 'pending' ? 'destructive' : 'secondary'
-                                  }>
-                                    {transaction.status === 'completed' ? 'Completado' :
-                                     transaction.status === 'pending' ? 'Pendiente' : transaction.status}
-                                  </Badge>
-                                </TableCell>
-                                <TableCell className="text-sm text-muted-foreground">
-                                  {transaction.notes || '-'}
-                                </TableCell>
-                              </TableRow>
-                            ))
-                          ) : (
-                            <TableRow>
-                              <TableCell colSpan={7} className="text-center text-muted-foreground">
-                                No hay transacciones registradas
-                              </TableCell>
-                            </TableRow>
-                          )}
-                        </TableBody>
-                      </Table>
-                    </div>
-                  </div>
-                </TabsContent>
 
                 <TabsContent value="movements" className="mt-4">
                   <div className="space-y-4">
@@ -778,13 +665,6 @@ export default function Customers() {
                       </div>
                     </Card>
 
-                    <div className="flex justify-between items-center">
-                      <h3 className="text-lg font-semibold">Movimientos de Cuenta Corriente</h3>
-                      <div className="text-sm text-muted-foreground">
-                        Solo se muestran las operaciones que afectan el saldo del cliente
-                      </div>
-                    </div>
-
                     {/* Account Movements */}
                     <div className="max-h-96 overflow-y-auto">
                       <Table>
@@ -803,82 +683,55 @@ export default function Customers() {
                         <TableBody>
                           {Array.isArray(customerMovements) && customerMovements.length > 0 ? (
                             customerMovements.map((movement: any, index: number) => (
-                              <TableRow key={movement.id} className={
-                                movement.movement_type === 'sale' && movement.status === 'pending' ? 'bg-red-50' :
-                                movement.movement_type === 'sale' && movement.status === 'partial' ? 'bg-yellow-50' :
-                                movement.movement_type === 'sale' && movement.status === 'paid' ? 'bg-green-50' :
-                                movement.movement_type === 'payment' ? 'bg-blue-50' : ''
-                              }>
+                              <TableRow key={movement.id}>
                                 <TableCell>
-                                  {format(new Date(movement.movement_date), "dd/MM/yyyy HH:mm", { locale: es })}
+                                  {format(new Date(movement.movement_date), "dd/MM/yyyy", { locale: es })}
                                 </TableCell>
                                 <TableCell>
                                   <Badge variant="outline" className={
-                                    movement.movement_type === 'sale' && movement.status === 'paid' ? 'border-green-500 text-green-700 bg-green-50' :
-                                    movement.movement_type === 'sale' && movement.status === 'partial' ? 'border-yellow-500 text-yellow-700 bg-yellow-50' :
-                                    movement.movement_type === 'sale' && movement.status === 'pending' ? 'border-red-500 text-red-700 bg-red-50' :
-                                    movement.movement_type === 'payment' ? 'border-green-500 text-green-700 bg-green-50' :
-                                    movement.movement_type === 'credit_note' ? 'border-blue-500 text-blue-700 bg-blue-50' :
+                                    movement.movement_type === 'sale' ? 'border-red-500 text-red-700' :
+                                    movement.movement_type === 'payment' ? 'border-green-500 text-green-700' :
+                                    movement.movement_type === 'credit_note' ? 'border-blue-500 text-blue-700' :
                                     'border-gray-500 text-gray-700'
                                   }>
-                                    {movement.movement_type === 'sale' ? 
-                                      (movement.status === 'paid' ? '✅ Venta Pagada' :
-                                       movement.status === 'partial' ? '🟡 Venta Parcial' :
-                                       '🔴 Venta Pendiente') :
-                                     movement.movement_type === 'payment' ? '💰 Pago Recibido' :
-                                     movement.movement_type === 'credit_note' ? '📄 Nota Crédito' :
-                                     'Otro'}
+                                    {movement.movement_type === 'sale' ? 'Venta' :
+                                     movement.movement_type === 'payment' ? 'Pago' :
+                                     movement.movement_type === 'credit_note' ? 'Nota Crédito' :
+                                     movement.movement_type === 'quotation' ? 'Presupuesto' :
+                                     movement.movement_type === 'reservation' ? 'Reserva' : 'Otro'}
                                   </Badge>
                                 </TableCell>
-                                <TableCell className="font-mono text-sm">
+                                <TableCell className="font-mono">
                                   {movement.reference_number || '-'}
                                 </TableCell>
-                                <TableCell className="text-sm">
-                                  {movement.description}
+                                <TableCell>{movement.description}</TableCell>
+                                <TableCell className="text-right font-medium text-red-600">
+                                  {movement.debit_amount > 0 ? `$${movement.debit_amount.toFixed(2)}` : '-'}
                                 </TableCell>
-                                <TableCell className="text-right font-medium">
-                                  {movement.debit_amount > 0 ? (
-                                    <span className="text-red-600 font-bold">
-                                      ${movement.debit_amount.toFixed(2)}
-                                    </span>
-                                  ) : '-'}
+                                <TableCell className="text-right font-medium text-green-600">
+                                  {movement.credit_amount > 0 ? `$${movement.credit_amount.toFixed(2)}` : '-'}
                                 </TableCell>
-                                <TableCell className="text-right font-medium">
-                                  {movement.credit_amount > 0 ? (
-                                    <span className="text-green-600 font-bold">
-                                      ${movement.credit_amount.toFixed(2)}
-                                    </span>
-                                  ) : '-'}
-                                </TableCell>
-                                <TableCell className="text-right font-bold text-lg">
-                                  <span className={movement.balance >= 0 ? 'text-red-600' : 'text-green-600'}>
-                                    ${Math.abs(movement.balance).toFixed(2)}
-                                    {movement.balance < 0 ? ' CR' : ' DB'}
-                                  </span>
+                                <TableCell className="text-right font-bold">
+                                  ${movement.balance.toFixed(2)}
                                 </TableCell>
                                 <TableCell>
                                   <Badge variant={
-                                    movement.status === 'paid' ? 'default' :
-                                    movement.status === 'partial' ? 'secondary' :
                                     movement.status === 'pending' ? 'destructive' :
-                                    movement.status === 'overdue' ? 'destructive' : 'outline'
+                                    movement.status === 'paid' ? 'default' :
+                                    movement.status === 'overdue' ? 'destructive' : 'secondary'
                                   }>
-                                    {movement.status === 'pending' ? '⏳ Pendiente' :
-                                     movement.status === 'paid' ? '✅ Pagado' :
-                                     movement.status === 'overdue' ? '🔴 Vencido' :
-                                     movement.status === 'partial' ? '🟡 Parcial' : movement.status}
+                                    {movement.status === 'pending' ? 'Pendiente' :
+                                     movement.status === 'paid' ? 'Pagado' :
+                                     movement.status === 'overdue' ? 'Vencido' :
+                                     movement.status === 'partial' ? 'Parcial' : movement.status}
                                   </Badge>
                                 </TableCell>
                               </TableRow>
                             ))
                           ) : (
                             <TableRow>
-                              <TableCell colSpan={8} className="text-center text-muted-foreground py-8">
-                                <div className="flex flex-col items-center space-y-2">
-                                  <Receipt className="h-8 w-8 text-muted-foreground/50" />
-                                  <p>No hay movimientos de cuenta corriente</p>
-                                  <p className="text-xs">Los movimientos aparecerán cuando se realicen ventas a crédito o pagos</p>
-                                </div>
+                              <TableCell colSpan={8} className="text-center text-muted-foreground">
+                                {!customerMovements ? "Cargando movimientos..." : "No hay movimientos de cuenta corriente"}
                               </TableCell>
                             </TableRow>
                           )}
@@ -895,6 +748,7 @@ export default function Customers() {
                       <Button 
                         size="sm" 
                         onClick={() => {
+                          // Generar estado de cuenta
                           window.open(`/customers/${selectedCustomer.id}/account-statement`, '_blank');
                         }}
                       >
@@ -918,7 +772,9 @@ export default function Customers() {
                         </TableHeader>
                         <TableBody>
                           {customerSales?.filter(sale => sale.payment_method === 'credit').map((sale) => {
-                            const totalPaid = 0; // Simplificado por ahora
+                            const totalPaid = Array.isArray(invoicePayments) ? invoicePayments
+                              .filter((ip: any) => ip.sale_id === sale.id)
+                              .reduce((sum: number, ip: any) => sum + Number(ip.amount_applied), 0) : 0;
                             const balance = Number(sale.total) - totalPaid;
                             const isOverdue = new Date(sale.created_at) < new Date(Date.now() - 30 * 24 * 60 * 60 * 1000);
                             
@@ -1026,6 +882,40 @@ export default function Customers() {
               </DialogTitle>
             </DialogHeader>
             <form onSubmit={handlePaymentSubmit} className="space-y-4">
+              {selectedCustomer?.selectedSale && (
+                <Card>
+                  <CardContent className="pt-6">
+                    <div className="space-y-2">
+                      <div className="flex justify-between">
+                        <span>Factura:</span>
+                        <span className="font-medium">{selectedCustomer.selectedSale.sale_number}</span>
+                      </div>
+                      <div className="flex justify-between">
+                        <span>Total Factura:</span>
+                        <span className="font-bold">${Number(selectedCustomer.selectedSale.total).toFixed(2)}</span>
+                      </div>
+                      <div className="flex justify-between">
+                        <span>Ya Pagado:</span>
+                        <span className="text-green-600">
+                          ${(Array.isArray(invoicePayments) ? invoicePayments
+                            .filter((ip: any) => ip.sale_id === selectedCustomer.selectedSale.id)
+                            .reduce((sum: number, ip: any) => sum + Number(ip.amount_applied), 0) : 0).toFixed(2)}
+                        </span>
+                      </div>
+                      <div className="flex justify-between text-lg font-bold">
+                        <span>Saldo Pendiente:</span>
+                        <span className="text-red-600">
+                          ${(Number(selectedCustomer.selectedSale.total) - 
+                            (Array.isArray(invoicePayments) ? invoicePayments
+                              .filter((ip: any) => ip.sale_id === selectedCustomer.selectedSale.id)
+                              .reduce((sum: number, ip: any) => sum + Number(ip.amount_applied), 0) : 0)).toFixed(2)}
+                        </span>
+                      </div>
+                    </div>
+                  </CardContent>
+                </Card>
+              )}
+              
               {!selectedCustomer?.selectedSale && (
                 <Card>
                   <CardContent className="pt-6">
@@ -1049,6 +939,22 @@ export default function Customers() {
                   onChange={(e) => setPaymentData({ ...paymentData, amount: e.target.value })}
                   required
                 />
+                {selectedCustomer?.selectedSale && (
+                  <Button 
+                    type="button" 
+                    variant="link" 
+                    size="sm"
+                    onClick={() => {
+                      const pendingAmount = Number(selectedCustomer.selectedSale.total) - 
+                        (Array.isArray(invoicePayments) ? invoicePayments
+                          .filter((ip: any) => ip.sale_id === selectedCustomer.selectedSale.id)
+                          .reduce((sum: number, ip: any) => sum + Number(ip.amount_applied), 0) : 0);
+                      setPaymentData({ ...paymentData, amount: pendingAmount.toString() });
+                    }}
+                  >
+                    Aplicar saldo completo
+                  </Button>
+                )}
               </div>
 
               <div className="space-y-2">
@@ -1060,9 +966,11 @@ export default function Customers() {
                   value={paymentData.payment_method}
                   onChange={(e) => setPaymentData({ ...paymentData, payment_method: e.target.value })}
                 >
-                  <option value="cash">Efectivo</option>
-                  <option value="card">Tarjeta</option>
-                  <option value="transfer">Transferencia</option>
+                  {paymentMethods.map(method => (
+                    <option key={method.value} value={method.value}>
+                      {method.icon} {method.label}
+                    </option>
+                  ))}
                 </select>
               </div>
 
