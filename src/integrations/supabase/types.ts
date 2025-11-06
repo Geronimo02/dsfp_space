@@ -392,6 +392,112 @@ export type Database = {
           },
         ]
       }
+      customer_account_movements: {
+        Row: {
+          balance: number | null
+          created_at: string | null
+          credit_amount: number | null
+          customer_id: string
+          debit_amount: number | null
+          description: string | null
+          due_date: string | null
+          id: string
+          movement_date: string | null
+          movement_type: string
+          quotation_id: string | null
+          reference_number: string | null
+          reservation_id: string | null
+          return_id: string | null
+          sale_id: string | null
+          status: string | null
+          updated_at: string | null
+          user_id: string
+        }
+        Insert: {
+          balance?: number | null
+          created_at?: string | null
+          credit_amount?: number | null
+          customer_id: string
+          debit_amount?: number | null
+          description?: string | null
+          due_date?: string | null
+          id?: string
+          movement_date?: string | null
+          movement_type: string
+          quotation_id?: string | null
+          reference_number?: string | null
+          reservation_id?: string | null
+          return_id?: string | null
+          sale_id?: string | null
+          status?: string | null
+          updated_at?: string | null
+          user_id: string
+        }
+        Update: {
+          balance?: number | null
+          created_at?: string | null
+          credit_amount?: number | null
+          customer_id?: string
+          debit_amount?: number | null
+          description?: string | null
+          due_date?: string | null
+          id?: string
+          movement_date?: string | null
+          movement_type?: string
+          quotation_id?: string | null
+          reference_number?: string | null
+          reservation_id?: string | null
+          return_id?: string | null
+          sale_id?: string | null
+          status?: string | null
+          updated_at?: string | null
+          user_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "customer_account_movements_customer_id_fkey"
+            columns: ["customer_id"]
+            isOneToOne: false
+            referencedRelation: "customer_pos_view"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "customer_account_movements_customer_id_fkey"
+            columns: ["customer_id"]
+            isOneToOne: false
+            referencedRelation: "customers"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "customer_account_movements_quotation_id_fkey"
+            columns: ["quotation_id"]
+            isOneToOne: false
+            referencedRelation: "quotations"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "customer_account_movements_reservation_id_fkey"
+            columns: ["reservation_id"]
+            isOneToOne: false
+            referencedRelation: "reservations"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "customer_account_movements_return_id_fkey"
+            columns: ["return_id"]
+            isOneToOne: false
+            referencedRelation: "returns"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "customer_account_movements_sale_id_fkey"
+            columns: ["sale_id"]
+            isOneToOne: false
+            referencedRelation: "sales"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       customer_payments: {
         Row: {
           amount: number
@@ -689,6 +795,68 @@ export type Database = {
             columns: ["supplier_id"]
             isOneToOne: false
             referencedRelation: "suppliers"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      invoice_payment_applications: {
+        Row: {
+          amount_applied: number
+          applied_date: string | null
+          created_at: string | null
+          customer_id: string
+          id: string
+          payment_id: string
+          sale_id: string
+          user_id: string
+        }
+        Insert: {
+          amount_applied: number
+          applied_date?: string | null
+          created_at?: string | null
+          customer_id: string
+          id?: string
+          payment_id: string
+          sale_id: string
+          user_id: string
+        }
+        Update: {
+          amount_applied?: number
+          applied_date?: string | null
+          created_at?: string | null
+          customer_id?: string
+          id?: string
+          payment_id?: string
+          sale_id?: string
+          user_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "invoice_payment_applications_customer_id_fkey"
+            columns: ["customer_id"]
+            isOneToOne: false
+            referencedRelation: "customer_pos_view"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "invoice_payment_applications_customer_id_fkey"
+            columns: ["customer_id"]
+            isOneToOne: false
+            referencedRelation: "customers"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "invoice_payment_applications_payment_id_fkey"
+            columns: ["payment_id"]
+            isOneToOne: false
+            referencedRelation: "customer_payments"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "invoice_payment_applications_sale_id_fkey"
+            columns: ["sale_id"]
+            isOneToOne: false
+            referencedRelation: "sales"
             referencedColumns: ["id"]
           },
         ]
@@ -1001,6 +1169,7 @@ export type Database = {
           total: number
           updated_at: string
           user_id: string
+          warehouse_id: string | null
         }
         Insert: {
           created_at?: string
@@ -1016,6 +1185,7 @@ export type Database = {
           total: number
           updated_at?: string
           user_id: string
+          warehouse_id?: string | null
         }
         Update: {
           created_at?: string
@@ -1031,6 +1201,7 @@ export type Database = {
           total?: number
           updated_at?: string
           user_id?: string
+          warehouse_id?: string | null
         }
         Relationships: [
           {
@@ -1038,6 +1209,13 @@ export type Database = {
             columns: ["supplier_id"]
             isOneToOne: false
             referencedRelation: "suppliers"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "purchases_warehouse_id_fkey"
+            columns: ["warehouse_id"]
+            isOneToOne: false
+            referencedRelation: "warehouses"
             referencedColumns: ["id"]
           },
         ]
@@ -1587,6 +1765,7 @@ export type Database = {
           tax_rate: number | null
           total: number
           user_id: string
+          warehouse_id: string | null
         }
         Insert: {
           created_at?: string
@@ -1605,6 +1784,7 @@ export type Database = {
           tax_rate?: number | null
           total: number
           user_id: string
+          warehouse_id?: string | null
         }
         Update: {
           created_at?: string
@@ -1623,6 +1803,7 @@ export type Database = {
           tax_rate?: number | null
           total?: number
           user_id?: string
+          warehouse_id?: string | null
         }
         Relationships: [
           {
@@ -1637,6 +1818,13 @@ export type Database = {
             columns: ["customer_id"]
             isOneToOne: false
             referencedRelation: "customers"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "sales_warehouse_id_fkey"
+            columns: ["warehouse_id"]
+            isOneToOne: false
+            referencedRelation: "warehouses"
             referencedColumns: ["id"]
           },
         ]
@@ -1878,6 +2066,63 @@ export type Database = {
           },
         ]
       }
+      ticket_config: {
+        Row: {
+          accent_color: string | null
+          company_address: string | null
+          company_email: string | null
+          company_name: string
+          company_phone: string | null
+          created_at: string | null
+          font_size: string | null
+          footer_message: string | null
+          header_color: string | null
+          id: string
+          logo_url: string | null
+          paper_width: string | null
+          show_logo: boolean | null
+          show_qr: boolean | null
+          text_color: string | null
+          updated_at: string | null
+        }
+        Insert: {
+          accent_color?: string | null
+          company_address?: string | null
+          company_email?: string | null
+          company_name?: string
+          company_phone?: string | null
+          created_at?: string | null
+          font_size?: string | null
+          footer_message?: string | null
+          header_color?: string | null
+          id?: string
+          logo_url?: string | null
+          paper_width?: string | null
+          show_logo?: boolean | null
+          show_qr?: boolean | null
+          text_color?: string | null
+          updated_at?: string | null
+        }
+        Update: {
+          accent_color?: string | null
+          company_address?: string | null
+          company_email?: string | null
+          company_name?: string
+          company_phone?: string | null
+          created_at?: string | null
+          font_size?: string | null
+          footer_message?: string | null
+          header_color?: string | null
+          id?: string
+          logo_url?: string | null
+          paper_width?: string | null
+          show_logo?: boolean | null
+          show_qr?: boolean | null
+          text_color?: string | null
+          updated_at?: string | null
+        }
+        Relationships: []
+      }
       user_roles: {
         Row: {
           id: string
@@ -1893,6 +2138,201 @@ export type Database = {
           id?: string
           role?: Database["public"]["Enums"]["app_role"]
           user_id?: string
+        }
+        Relationships: []
+      }
+      warehouse_stock: {
+        Row: {
+          created_at: string
+          id: string
+          last_restock_date: string | null
+          min_stock: number | null
+          product_id: string
+          stock: number
+          updated_at: string
+          warehouse_id: string
+        }
+        Insert: {
+          created_at?: string
+          id?: string
+          last_restock_date?: string | null
+          min_stock?: number | null
+          product_id: string
+          stock?: number
+          updated_at?: string
+          warehouse_id: string
+        }
+        Update: {
+          created_at?: string
+          id?: string
+          last_restock_date?: string | null
+          min_stock?: number | null
+          product_id?: string
+          stock?: number
+          updated_at?: string
+          warehouse_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "warehouse_stock_product_id_fkey"
+            columns: ["product_id"]
+            isOneToOne: false
+            referencedRelation: "products"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "warehouse_stock_warehouse_id_fkey"
+            columns: ["warehouse_id"]
+            isOneToOne: false
+            referencedRelation: "warehouses"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      warehouse_transfer_items: {
+        Row: {
+          created_at: string | null
+          id: string
+          product_id: string
+          product_name: string
+          quantity: number
+          transfer_id: string
+        }
+        Insert: {
+          created_at?: string | null
+          id?: string
+          product_id: string
+          product_name: string
+          quantity: number
+          transfer_id: string
+        }
+        Update: {
+          created_at?: string | null
+          id?: string
+          product_id?: string
+          product_name?: string
+          quantity?: number
+          transfer_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "warehouse_transfer_items_product_id_fkey"
+            columns: ["product_id"]
+            isOneToOne: false
+            referencedRelation: "products"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "warehouse_transfer_items_transfer_id_fkey"
+            columns: ["transfer_id"]
+            isOneToOne: false
+            referencedRelation: "warehouse_transfers"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      warehouse_transfers: {
+        Row: {
+          approved_at: string | null
+          approved_by: string | null
+          created_at: string
+          from_warehouse_id: string
+          id: string
+          notes: string | null
+          received_at: string | null
+          received_by: string | null
+          requested_by: string
+          status: string
+          to_warehouse_id: string
+          transfer_date: string
+          transfer_number: string
+          updated_at: string
+        }
+        Insert: {
+          approved_at?: string | null
+          approved_by?: string | null
+          created_at?: string
+          from_warehouse_id: string
+          id?: string
+          notes?: string | null
+          received_at?: string | null
+          received_by?: string | null
+          requested_by: string
+          status?: string
+          to_warehouse_id: string
+          transfer_date?: string
+          transfer_number: string
+          updated_at?: string
+        }
+        Update: {
+          approved_at?: string | null
+          approved_by?: string | null
+          created_at?: string
+          from_warehouse_id?: string
+          id?: string
+          notes?: string | null
+          received_at?: string | null
+          received_by?: string | null
+          requested_by?: string
+          status?: string
+          to_warehouse_id?: string
+          transfer_date?: string
+          transfer_number?: string
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "warehouse_transfers_from_warehouse_id_fkey"
+            columns: ["from_warehouse_id"]
+            isOneToOne: false
+            referencedRelation: "warehouses"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "warehouse_transfers_to_warehouse_id_fkey"
+            columns: ["to_warehouse_id"]
+            isOneToOne: false
+            referencedRelation: "warehouses"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      warehouses: {
+        Row: {
+          active: boolean | null
+          address: string | null
+          code: string
+          created_at: string
+          id: string
+          is_main: boolean | null
+          manager_name: string | null
+          name: string
+          phone: string | null
+          updated_at: string
+        }
+        Insert: {
+          active?: boolean | null
+          address?: string | null
+          code: string
+          created_at?: string
+          id?: string
+          is_main?: boolean | null
+          manager_name?: string | null
+          name: string
+          phone?: string | null
+          updated_at?: string
+        }
+        Update: {
+          active?: boolean | null
+          address?: string | null
+          code?: string
+          created_at?: string
+          id?: string
+          is_main?: boolean | null
+          manager_name?: string | null
+          name?: string
+          phone?: string | null
+          updated_at?: string
         }
         Relationships: []
       }
@@ -1921,8 +2361,28 @@ export type Database = {
       }
     }
     Functions: {
+      apply_payment_to_invoice: {
+        Args: {
+          p_amount_applied: number
+          p_customer_id: string
+          p_payment_id: string
+          p_sale_id: string
+          p_user_id: string
+        }
+        Returns: undefined
+      }
       check_expiring_products: { Args: never; Returns: undefined }
       check_low_stock_alerts: { Args: never; Returns: undefined }
+      create_customer_payment: {
+        Args: {
+          p_amount: number
+          p_customer_id: string
+          p_notes: string
+          p_payment_method: string
+          p_user_id: string
+        }
+        Returns: string
+      }
       generate_credit_note_number: { Args: never; Returns: string }
       generate_delivery_number: { Args: never; Returns: string }
       generate_expense_number: { Args: never; Returns: string }
@@ -1930,6 +2390,47 @@ export type Database = {
       generate_reservation_number: { Args: never; Returns: string }
       generate_return_number: { Args: never; Returns: string }
       generate_service_number: { Args: never; Returns: string }
+      generate_transfer_number: { Args: never; Returns: string }
+      get_all_customer_movements: {
+        Args: { search_query?: string }
+        Returns: {
+          balance: number
+          credit_amount: number
+          customer_id: string
+          customer_name: string
+          debit_amount: number
+          description: string
+          id: string
+          movement_date: string
+          movement_type: string
+          reference_number: string
+          sale_id: string
+          status: string
+        }[]
+      }
+      get_customer_movements: {
+        Args: { customer_id: string }
+        Returns: {
+          balance: number
+          credit_amount: number
+          debit_amount: number
+          description: string
+          id: string
+          movement_date: string
+          movement_type: string
+          reference_number: string
+          status: string
+        }[]
+      }
+      get_invoice_payments: {
+        Args: { customer_id: string }
+        Returns: {
+          amount_applied: number
+          applied_date: string
+          id: string
+          sale_id: string
+        }[]
+      }
       has_permission: {
         Args: { _module: string; _permission: string; _user_id: string }
         Returns: boolean
