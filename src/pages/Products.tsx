@@ -9,7 +9,7 @@ import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
 import { sanitizeSearchQuery } from "@/lib/searchUtils";
-import { Plus, Edit, Trash2, Search, Upload, Download, X } from "lucide-react";
+import { Plus, Edit, Trash2, Search, Upload, Download, X, Package, ChevronDown, ChevronRight } from "lucide-react";
 import { toast } from "sonner";
 import { Badge } from "@/components/ui/badge";
 import { z } from "zod";
@@ -17,6 +17,8 @@ import Papa from "papaparse";
 import { Checkbox } from "@/components/ui/checkbox";
 import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle, AlertDialogTrigger } from "@/components/ui/alert-dialog";
 import { usePermissions } from "@/hooks/usePermissions";
+import { Separator } from "@/components/ui/separator";
+import { Collapsible, CollapsibleContent, CollapsibleTrigger } from "@/components/ui/collapsible";
 
 const productSchema = z.object({
   name: z.string().trim().min(1, "El nombre es requerido").max(200, "El nombre debe tener máximo 200 caracteres"),
@@ -78,6 +80,11 @@ export default function Products() {
     category: "",
   });
   const [isDeleteDialogOpen, setIsDeleteDialogOpen] = useState(false);
+  const [expandedProducts, setExpandedProducts] = useState<Set<string>>(new Set());
+  const [warehouseStockData, setWarehouseStockData] = useState<Record<string, Record<string, number>>>({});
+  const [isStockAdjustDialogOpen, setIsStockAdjustDialogOpen] = useState(false);
+  const [adjustingProduct, setAdjustingProduct] = useState<any>(null);
+  const [stockAdjustments, setStockAdjustments] = useState<Record<string, string>>({});
   const queryClient = useQueryClient();
 
   const { data: products, isLoading } = useQuery({
@@ -98,16 +105,74 @@ export default function Products() {
     },
   });
 
+  const { data: warehouses } = useQuery({
+    queryKey: ["warehouses"],
+    queryFn: async () => {
+      const { data, error } = await supabase
+        .from("warehouses")
+        .select("*")
+        .eq("active", true)
+        .order("is_main", { ascending: false });
+      if (error) throw error;
+      return data;
+    },
+  });
+
+  // Fetch warehouse stock for expanded products
+  const { data: warehouseStock } = useQuery({
+    queryKey: ["warehouse-stock-detail", Array.from(expandedProducts)],
+    queryFn: async () => {
+      if (expandedProducts.size === 0) return [];
+      
+      const { data, error } = await supabase
+        .from("warehouse_stock")
+        .select(`
+          *,
+          warehouses (code, name)
+        `)
+        .in("product_id", Array.from(expandedProducts));
+      
+      if (error) throw error;
+      return data;
+    },
+    enabled: expandedProducts.size > 0,
+  });
+
   const createProductMutation = useMutation({
     mutationFn: async (data: any) => {
-      const { error } = await supabase.from("products").insert(data);
+      const { data: product, error } = await supabase
+        .from("products")
+        .insert(data)
+        .select()
+        .single();
+      
       if (error) throw error;
+      
+      // Create warehouse stock entries if distribution was configured
+      if (warehouses && warehouseStockData["new"] && Object.keys(warehouseStockData["new"]).length > 0) {
+        const warehouseStockEntries = Object.entries(warehouseStockData["new"]).map(([warehouseId, stock]) => ({
+          warehouse_id: warehouseId,
+          product_id: product.id,
+          stock: stock || 0,
+          min_stock: data.min_stock || 0,
+        }));
+        
+        const { error: stockError } = await supabase
+          .from("warehouse_stock")
+          .insert(warehouseStockEntries);
+        
+        if (stockError) throw stockError;
+      }
+      
+      return product;
     },
     onSuccess: () => {
       toast.success("Producto creado exitosamente");
       queryClient.invalidateQueries({ queryKey: ["products"] });
+      queryClient.invalidateQueries({ queryKey: ["warehouse-stock"] });
       setIsDialogOpen(false);
       resetForm();
+      setWarehouseStockData({});
     },
     onError: (error: any) => {
       toast.error(error.message || "Error al crear producto");
@@ -166,7 +231,17 @@ export default function Products() {
     e.preventDefault();
     
     try {
-      // Parse and validate input data
+      // Validate warehouse distribution if provided
+      if (warehouseStockData["new"]) {
+        const totalDistributed = Object.values(warehouseStockData["new"]).reduce((sum, val) => sum + (val || 0), 0);
+        const totalStock = parseInt(formData.stock);
+        
+        if (totalDistributed > 0 && totalDistributed !== totalStock) {
+          toast.error(`La distribución (${totalDistributed}) debe coincidir con el stock total (${totalStock})`);
+          return;
+        }
+      }
+
       const validatedData = productSchema.parse({
         name: formData.name,
         price: parseFloat(formData.price),
@@ -181,7 +256,6 @@ export default function Products() {
         expiration_date: formData.expiration_date || undefined,
       });
 
-      // Prepare data for database
       const productData = {
         name: validatedData.name,
         barcode: validatedData.barcode || null,
@@ -230,6 +304,78 @@ export default function Products() {
     setIsDialogOpen(true);
   };
 
+  const toggleProductExpand = (productId: string) => {
+    const newExpanded = new Set(expandedProducts);
+    if (newExpanded.has(productId)) {
+      newExpanded.delete(productId);
+    } else {
+      newExpanded.add(productId);
+    }
+    setExpandedProducts(newExpanded);
+  };
+
+  const handleStockAdjust = (product: any) => {
+    setAdjustingProduct(product);
+    setStockAdjustments({});
+    setIsStockAdjustDialogOpen(true);
+  };
+
+  const submitStockAdjustments = async () => {
+    if (!adjustingProduct) return;
+
+    try {
+      for (const [warehouseId, adjustment] of Object.entries(stockAdjustments)) {
+        if (!adjustment || parseInt(adjustment) === 0) continue;
+
+        const adjustmentValue = parseInt(adjustment);
+        
+        // Get current warehouse stock
+        const { data: currentStock } = await supabase
+          .from("warehouse_stock")
+          .select("stock")
+          .eq("warehouse_id", warehouseId)
+          .eq("product_id", adjustingProduct.id)
+          .single();
+
+        if (currentStock) {
+          const newStock = currentStock.stock + adjustmentValue;
+          if (newStock < 0) {
+            toast.error(`Stock insuficiente en depósito ${warehouseId}`);
+            continue;
+          }
+
+          await supabase
+            .from("warehouse_stock")
+            .update({ stock: newStock })
+            .eq("warehouse_id", warehouseId)
+            .eq("product_id", adjustingProduct.id);
+        }
+      }
+
+      // Recalculate total stock
+      const { data: allStocks } = await supabase
+        .from("warehouse_stock")
+        .select("stock")
+        .eq("product_id", adjustingProduct.id);
+
+      const totalStock = allStocks?.reduce((sum, s) => sum + s.stock, 0) || 0;
+
+      await supabase
+        .from("products")
+        .update({ stock: totalStock })
+        .eq("id", adjustingProduct.id);
+
+      toast.success("Stock ajustado exitosamente");
+      queryClient.invalidateQueries({ queryKey: ["products"] });
+      queryClient.invalidateQueries({ queryKey: ["warehouse-stock"] });
+      queryClient.invalidateQueries({ queryKey: ["warehouse-stock-detail"] });
+      setIsStockAdjustDialogOpen(false);
+      setStockAdjustments({});
+    } catch (error: any) {
+      toast.error(error.message || "Error al ajustar stock");
+    }
+  };
+
   const handleSelectAll = (checked: boolean) => {
     if (checked && products) {
       setSelectedProducts(new Set(products.map(p => p.id)));
@@ -254,16 +400,27 @@ export default function Products() {
       return;
     }
 
-    const csvData = products.map(p => ({
-      nombre: p.name,
-      categoria: p.category || "",
-      codigo_barras: p.barcode || "",
-      sku: p.sku || "",
-      precio: p.price,
-      costo: p.cost || "",
-      stock: p.stock,
-      stock_minimo: p.min_stock || "",
-    }));
+    const csvData = products.map(p => {
+      const row: any = {
+        nombre: p.name,
+        categoria: p.category || "",
+        codigo_barras: p.barcode || "",
+        sku: p.sku || "",
+        precio: p.price,
+        costo: p.cost || "",
+        stock: p.stock,
+        stock_minimo: p.min_stock || "",
+      };
+
+      // Add warehouse columns if warehouses exist
+      if (warehouses) {
+        warehouses.forEach(w => {
+          row[`deposito_${w.code}`] = 0;
+        });
+      }
+
+      return row;
+    });
 
     const csv = Papa.unparse(csvData);
     const blob = new Blob([csv], { type: "text/csv;charset=utf-8;" });
@@ -289,13 +446,11 @@ export default function Products() {
         let errorCount = 0;
         const errors: string[] = [];
 
-        // Validate file has data
         if (data.length === 0) {
           toast.error("El archivo CSV está vacío");
           return;
         }
 
-        // Validate file size (max 1000 rows)
         if (data.length > 1000) {
           toast.error("El archivo CSV es demasiado grande (máximo 1000 productos)");
           return;
@@ -303,7 +458,6 @@ export default function Products() {
 
         for (const row of data) {
           try {
-            // Validate required fields exist
             const nameField = row.nombre?.trim() || row.name?.trim();
             if (!nameField) {
               throw new Error("Falta el campo 'nombre'");
@@ -331,8 +485,37 @@ export default function Products() {
               category: validatedData.category || null,
             };
 
-            const { error } = await supabase.from("products").insert(productData);
+            const { data: product, error } = await supabase
+              .from("products")
+              .insert(productData)
+              .select()
+              .single();
+            
             if (error) throw error;
+
+            // Handle warehouse distribution if columns exist
+            if (warehouses && product) {
+              const warehouseStockEntries: any[] = [];
+              
+              warehouses.forEach(w => {
+                const columnName = `deposito_${w.code}`;
+                const stockValue = row[columnName];
+                
+                if (stockValue && parseInt(stockValue) > 0) {
+                  warehouseStockEntries.push({
+                    warehouse_id: w.id,
+                    product_id: product.id,
+                    stock: parseInt(stockValue),
+                    min_stock: validatedData.min_stock ?? 0,
+                  });
+                }
+              });
+
+              if (warehouseStockEntries.length > 0) {
+                await supabase.from("warehouse_stock").insert(warehouseStockEntries);
+              }
+            }
+
             successCount++;
           } catch (error: any) {
             errorCount++;
@@ -344,6 +527,7 @@ export default function Products() {
         }
 
         queryClient.invalidateQueries({ queryKey: ["products"] });
+        queryClient.invalidateQueries({ queryKey: ["warehouse-stock"] });
         setIsImportDialogOpen(false);
         setImportFile(null);
         
@@ -421,13 +605,23 @@ export default function Products() {
     }
   };
 
+  const getWarehouseStockForProduct = (productId: string) => {
+    return warehouseStock?.filter(ws => ws.product_id === productId) || [];
+  };
+
+  const getStockBadgeColor = (stock: number, minStock: number) => {
+    if (stock <= minStock) return "destructive";
+    if (stock <= minStock * 1.5) return "secondary";
+    return "default";
+  };
+
   return (
     <Layout>
       <div className="space-y-6">
         <div className="flex justify-between items-center">
           <div>
             <h1 className="text-3xl font-bold text-foreground">Productos</h1>
-            <p className="text-muted-foreground">Gestiona tu inventario</p>
+            <p className="text-muted-foreground">Gestiona tu inventario con control de depósitos</p>
           </div>
           <div className="flex gap-2">
             {canExport && (
@@ -448,7 +642,12 @@ export default function Products() {
                 <DialogHeader>
                   <DialogTitle>Importar Productos desde CSV</DialogTitle>
                   <DialogDescription>
-                    El archivo debe contener las columnas: nombre, categoria, codigo_barras, sku, precio, costo, stock, stock_minimo
+                    Columnas requeridas: nombre, precio, stock. 
+                    {warehouses && warehouses.length > 0 && (
+                      <span className="block mt-2">
+                        Opcional: {warehouses.map(w => `deposito_${w.code}`).join(", ")}
+                      </span>
+                    )}
                   </DialogDescription>
                 </DialogHeader>
                 <div className="space-y-4">
@@ -481,7 +680,7 @@ export default function Products() {
                   Nuevo Producto
                 </Button>
               </DialogTrigger>
-            <DialogContent className="max-w-2xl">
+            <DialogContent className="max-w-3xl max-h-[90vh] overflow-y-auto">
               <DialogHeader>
                 <DialogTitle>{editingProduct ? "Editar Producto" : "Nuevo Producto"}</DialogTitle>
               </DialogHeader>
@@ -542,7 +741,7 @@ export default function Products() {
                     />
                   </div>
                   <div className="space-y-2">
-                    <Label htmlFor="stock">Stock *</Label>
+                    <Label htmlFor="stock">Stock Total *</Label>
                     <Input
                       id="stock"
                       type="number"
@@ -588,6 +787,57 @@ export default function Products() {
                     />
                   </div>
                 </div>
+
+                {/* Warehouse Distribution Section - Only for new products */}
+                {!editingProduct && warehouses && warehouses.length > 0 && (
+                  <>
+                    <Separator />
+                    <div className="space-y-3">
+                      <Label className="text-base font-semibold">Distribución por Depósito (Opcional)</Label>
+                      <p className="text-sm text-muted-foreground">
+                        Distribuye el stock total entre los depósitos. Si no distribuyes, el stock quedará sin asignar.
+                      </p>
+                      <div className="grid grid-cols-2 gap-4">
+                        {warehouses.map((warehouse) => (
+                          <div key={warehouse.id} className="space-y-2">
+                            <Label htmlFor={`warehouse-${warehouse.id}`}>
+                              {warehouse.code} - {warehouse.name}
+                              {warehouse.is_main && <Badge variant="default" className="ml-2">Principal</Badge>}
+                            </Label>
+                            <Input
+                              id={`warehouse-${warehouse.id}`}
+                              type="number"
+                              min="0"
+                              placeholder="0"
+                              value={warehouseStockData["new"]?.[warehouse.id] || ""}
+                              onChange={(e) => {
+                                const value = parseInt(e.target.value) || 0;
+                                setWarehouseStockData({
+                                  ...warehouseStockData,
+                                  new: {
+                                    ...warehouseStockData["new"],
+                                    [warehouse.id]: value
+                                  }
+                                });
+                              }}
+                            />
+                          </div>
+                        ))}
+                      </div>
+                      {warehouseStockData["new"] && Object.values(warehouseStockData["new"]).some(v => v > 0) && (
+                        <div className="p-3 bg-muted rounded-lg">
+                          <div className="flex justify-between text-sm">
+                            <span>Total distribuido:</span>
+                            <span className="font-semibold">
+                              {Object.values(warehouseStockData["new"]).reduce((sum, val) => sum + (val || 0), 0)} / {formData.stock || 0}
+                            </span>
+                          </div>
+                        </div>
+                      )}
+                    </div>
+                  </>
+                )}
+
                 <div className="flex justify-end gap-2">
                   <Button type="button" variant="outline" onClick={() => setIsDialogOpen(false)}>
                     Cancelar
@@ -742,52 +992,174 @@ export default function Products() {
                       onCheckedChange={handleSelectAll}
                     />
                   </TableHead>
+                  <TableHead className="w-12"></TableHead>
                   <TableHead>Nombre</TableHead>
                   <TableHead>Categoría</TableHead>
                   <TableHead>Precio</TableHead>
-                  <TableHead>Stock</TableHead>
+                  <TableHead>Stock Total</TableHead>
                   <TableHead>Estado</TableHead>
                   <TableHead className="text-right">Acciones</TableHead>
                 </TableRow>
               </TableHeader>
               <TableBody>
-                {products?.map((product) => (
-                  <TableRow key={product.id}>
-                    <TableCell>
-                      <Checkbox
-                        checked={selectedProducts.has(product.id)}
-                        onCheckedChange={(checked) => handleSelectProduct(product.id, checked as boolean)}
-                      />
-                    </TableCell>
-                    <TableCell className="font-medium">{product.name}</TableCell>
-                    <TableCell>{product.category || "-"}</TableCell>
-                    <TableCell>${Number(product.price).toFixed(2)}</TableCell>
-                    <TableCell>{product.stock}</TableCell>
-                    <TableCell>
-                      {product.stock <= (product.min_stock || 0) ? (
-                        <Badge variant="destructive">Stock Bajo</Badge>
-                      ) : (
-                        <Badge variant="default" className="bg-success">En Stock</Badge>
+                {products?.map((product) => {
+                  const isExpanded = expandedProducts.has(product.id);
+                  const productWarehouseStock = getWarehouseStockForProduct(product.id);
+                  
+                  return (
+                    <>
+                      <TableRow key={product.id}>
+                        <TableCell>
+                          <Checkbox
+                            checked={selectedProducts.has(product.id)}
+                            onCheckedChange={(checked) => handleSelectProduct(product.id, checked as boolean)}
+                          />
+                        </TableCell>
+                        <TableCell>
+                          <Button
+                            variant="ghost"
+                            size="icon"
+                            className="h-6 w-6"
+                            onClick={() => toggleProductExpand(product.id)}
+                          >
+                            {isExpanded ? (
+                              <ChevronDown className="h-4 w-4" />
+                            ) : (
+                              <ChevronRight className="h-4 w-4" />
+                            )}
+                          </Button>
+                        </TableCell>
+                        <TableCell className="font-medium">{product.name}</TableCell>
+                        <TableCell>{product.category || "-"}</TableCell>
+                        <TableCell>${Number(product.price).toFixed(2)}</TableCell>
+                        <TableCell>
+                          <div className="flex items-center gap-2">
+                            <span className="font-medium">{product.stock}</span>
+                            {productWarehouseStock.length > 0 && (
+                              <div className="flex gap-1">
+                                {productWarehouseStock.slice(0, 3).map((ws: any) => (
+                                  <Badge
+                                    key={ws.id}
+                                    variant="outline"
+                                    className="text-xs"
+                                  >
+                                    {ws.warehouses.code}: {ws.stock}
+                                  </Badge>
+                                ))}
+                                {productWarehouseStock.length > 3 && (
+                                  <Badge variant="outline" className="text-xs">
+                                    +{productWarehouseStock.length - 3}
+                                  </Badge>
+                                )}
+                              </div>
+                            )}
+                          </div>
+                        </TableCell>
+                        <TableCell>
+                          <Badge variant={getStockBadgeColor(product.stock, product.min_stock || 0)}>
+                            {product.stock <= (product.min_stock || 0) ? "Stock Bajo" : 
+                             product.stock <= (product.min_stock || 0) * 1.5 ? "Stock Medio" : "En Stock"}
+                          </Badge>
+                        </TableCell>
+                        <TableCell className="text-right space-x-2">
+                          {canEdit && (
+                            <>
+                              <Button size="sm" variant="outline" onClick={() => handleStockAdjust(product)}>
+                                <Package className="h-4 w-4 mr-1" />
+                                Ajustar
+                              </Button>
+                              <Button size="icon" variant="outline" onClick={() => handleEdit(product)}>
+                                <Edit className="h-4 w-4" />
+                              </Button>
+                            </>
+                          )}
+                          {canDelete && (
+                            <Button size="icon" variant="outline" className="text-destructive" onClick={() => deleteProductMutation.mutate(product.id)}>
+                              <Trash2 className="h-4 w-4" />
+                            </Button>
+                          )}
+                        </TableCell>
+                      </TableRow>
+                      {isExpanded && productWarehouseStock.length > 0 && (
+                        <TableRow>
+                          <TableCell colSpan={8} className="bg-muted/30">
+                            <div className="p-4 space-y-2">
+                              <h4 className="font-semibold text-sm">Stock por Depósito</h4>
+                              <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
+                                {productWarehouseStock.map((ws: any) => (
+                                  <div key={ws.id} className="flex items-center justify-between p-2 bg-background rounded border">
+                                    <div>
+                                      <div className="font-medium text-sm">{ws.warehouses.code}</div>
+                                      <div className="text-xs text-muted-foreground">{ws.warehouses.name}</div>
+                                    </div>
+                                    <Badge variant={getStockBadgeColor(ws.stock, ws.min_stock)}>
+                                      {ws.stock}
+                                    </Badge>
+                                  </div>
+                                ))}
+                              </div>
+                            </div>
+                          </TableCell>
+                        </TableRow>
                       )}
-                    </TableCell>
-                    <TableCell className="text-right space-x-2">
-                      {canEdit && (
-                        <Button size="icon" variant="outline" onClick={() => handleEdit(product)}>
-                          <Edit className="h-4 w-4" />
-                        </Button>
-                      )}
-                      {canDelete && (
-                        <Button size="icon" variant="outline" className="text-destructive" onClick={() => deleteProductMutation.mutate(product.id)}>
-                          <Trash2 className="h-4 w-4" />
-                        </Button>
-                      )}
-                    </TableCell>
-                  </TableRow>
-                ))}
+                    </>
+                  );
+                })}
               </TableBody>
             </Table>
           </CardContent>
         </Card>
+
+        {/* Stock Adjustment Dialog */}
+        <Dialog open={isStockAdjustDialogOpen} onOpenChange={setIsStockAdjustDialogOpen}>
+          <DialogContent>
+            <DialogHeader>
+              <DialogTitle>Ajustar Stock por Depósito</DialogTitle>
+              <DialogDescription>
+                {adjustingProduct?.name} - Stock Total: {adjustingProduct?.stock}
+              </DialogDescription>
+            </DialogHeader>
+            <div className="space-y-4">
+              <p className="text-sm text-muted-foreground">
+                Ingresa valores positivos para agregar o negativos para restar stock de cada depósito.
+              </p>
+              {warehouses?.map((warehouse) => {
+                const warehouseStock = getWarehouseStockForProduct(adjustingProduct?.id || "")
+                  .find((ws: any) => ws.warehouse_id === warehouse.id);
+                
+                return (
+                  <div key={warehouse.id} className="space-y-2">
+                    <Label>
+                      {warehouse.code} - {warehouse.name}
+                      {warehouseStock && (
+                        <span className="ml-2 text-sm text-muted-foreground">
+                          (Actual: {warehouseStock.stock})
+                        </span>
+                      )}
+                    </Label>
+                    <Input
+                      type="number"
+                      placeholder="0"
+                      value={stockAdjustments[warehouse.id] || ""}
+                      onChange={(e) => setStockAdjustments({
+                        ...stockAdjustments,
+                        [warehouse.id]: e.target.value
+                      })}
+                    />
+                  </div>
+                );
+              })}
+              <div className="flex justify-end gap-2">
+                <Button variant="outline" onClick={() => setIsStockAdjustDialogOpen(false)}>
+                  Cancelar
+                </Button>
+                <Button onClick={submitStockAdjustments}>
+                  Aplicar Ajustes
+                </Button>
+              </div>
+            </div>
+          </DialogContent>
+        </Dialog>
       </div>
     </Layout>
   );
