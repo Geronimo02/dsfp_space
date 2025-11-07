@@ -62,6 +62,7 @@ export default function POS() {
   const [discountRate, setDiscountRate] = useState(0);
   const [loyaltyPointsToUse, setLoyaltyPointsToUse] = useState(0);
   const [selectedCustomer, setSelectedCustomer] = useState<any>(null);
+  const [selectedWarehouse, setSelectedWarehouse] = useState<string>("");
   const [createCustomerDialog, setCreateCustomerDialog] = useState(false);
   const [newCustomerName, setNewCustomerName] = useState("");
   const [newCustomerPhone, setNewCustomerPhone] = useState("");
@@ -117,6 +118,24 @@ export default function POS() {
         .order("name", { ascending: true });
       
       if (error) throw error;
+      return data;
+    },
+  });
+
+  const { data: warehouses } = useQuery({
+    queryKey: ["warehouses"],
+    queryFn: async () => {
+      const { data, error } = await supabase
+        .from("warehouses")
+        .select("id, name, code")
+        .eq("active", true)
+        .order("is_main", { ascending: false });
+      
+      if (error) throw error;
+      // Auto-select main warehouse
+      if (data && data.length > 0 && !selectedWarehouse) {
+        setSelectedWarehouse(data[0].id);
+      }
       return data;
     },
   });
@@ -347,6 +366,7 @@ export default function POS() {
           sale_number: saleNumber,
           user_id: user.id,
           customer_id: selectedCustomer?.id || null,
+          warehouse_id: selectedWarehouse || null,
           subtotal: subtotal,
           discount: totalDiscount,
           discount_rate: discountRate + loyaltyDiscountRate,
@@ -390,7 +410,27 @@ export default function POS() {
 
       if (paymentsError) throw paymentsError;
 
-      // Update product stock
+      // Update warehouse stock
+      if (selectedWarehouse) {
+        for (const item of cart) {
+          const { data: warehouseStock } = await supabase
+            .from("warehouse_stock")
+            .select("stock")
+            .eq("warehouse_id", selectedWarehouse)
+            .eq("product_id", item.product_id)
+            .single();
+          
+          if (warehouseStock) {
+            await supabase
+              .from("warehouse_stock")
+              .update({ stock: warehouseStock.stock - item.quantity })
+              .eq("warehouse_id", selectedWarehouse)
+              .eq("product_id", item.product_id);
+          }
+        }
+      }
+
+      // Update product stock (total)
       for (const item of cart) {
         const { data: product } = await supabase
           .from("products")
@@ -1085,6 +1125,25 @@ Impuestos: $${saleData.tax.toFixed(2)}
                       )}
 
                       <div className="space-y-2">
+                        <Label>Depósito</Label>
+                        <Select 
+                          value={selectedWarehouse} 
+                          onValueChange={setSelectedWarehouse}
+                        >
+                          <SelectTrigger>
+                            <SelectValue placeholder="Seleccionar depósito..." />
+                          </SelectTrigger>
+                          <SelectContent>
+                            {warehouses?.map((warehouse) => (
+                              <SelectItem key={warehouse.id} value={warehouse.id}>
+                                {warehouse.code} - {warehouse.name}
+                              </SelectItem>
+                            ))}
+                          </SelectContent>
+                        </Select>
+                      </div>
+
+                      <div className="space-y-2">
                         <div className="flex justify-between items-center">
                           <Label>Cliente (Opcional)</Label>
                           <Button 
@@ -1097,7 +1156,7 @@ Impuestos: $${saleData.tax.toFixed(2)}
                             Nuevo
                           </Button>
                         </div>
-                        <Select 
+                        <Select
                           value={selectedCustomer?.id || "none"} 
                           onValueChange={(val) => {
                             if (val === "none") {

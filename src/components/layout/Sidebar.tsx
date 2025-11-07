@@ -23,7 +23,9 @@ import {
   Tag,
   CalendarCheck,
   DollarSign,
-  Zap
+  Zap,
+  Building2,
+  ArrowLeftRight
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { supabase } from "@/integrations/supabase/client";
@@ -57,6 +59,9 @@ const navigationSections = [
     items: [
       { name: "Productos", href: "/products", icon: Package },
       { name: "Alertas de Inventario", href: "/inventory-alerts", icon: Activity },
+      { name: "Depósitos", href: "/warehouses", icon: Building2 },
+      { name: "Stock por Depósito", href: "/warehouse-stock", icon: Package },
+      { name: "Transferencias", href: "/warehouse-transfers", icon: ArrowLeftRight },
       { name: "Compras", href: "/purchases", icon: ShoppingBag },
       { name: "Proveedores", href: "/suppliers", icon: Truck },
     ]
@@ -111,6 +116,9 @@ export function Sidebar() {
       "/sales": "sales",
       "/products": "products",
       "/inventory-alerts": "products",
+      "/warehouses": "products",
+      "/warehouse-stock": "products",
+      "/warehouse-transfers": "products",
       "/customers": "customers",
       "/customer-account": "customers",
       "/suppliers": "suppliers",
