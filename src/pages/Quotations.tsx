@@ -32,7 +32,7 @@ import {
 import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
 import { toast } from "sonner";
-import { Plus, Search, FileText, Trash2, Eye, CheckCircle, XCircle, Send, Download, ShoppingCart } from "lucide-react";
+import { Plus, Search, FileText, Trash2, Eye, CheckCircle, XCircle, Send, Download, ShoppingCart, Truck } from "lucide-react";
 import { generateQuotationPDF } from "@/components/pdf/QuotationPDF";
 import { format } from "date-fns";
 import { es } from "date-fns/locale";
@@ -45,6 +45,7 @@ interface QuotationItem {
   quantity: number;
   unit_price: number;
   subtotal: number;
+  total_delivered?: number;
 }
 
 export default function Quotations() {
@@ -55,6 +56,10 @@ export default function Quotations() {
   const [notes, setNotes] = useState("");
   const [validUntil, setValidUntil] = useState("");
   const [discountRate, setDiscountRate] = useState(0);
+  const [selectedCurrency, setSelectedCurrency] = useState("ARS");
+  const [isDeliveryDialogOpen, setIsDeliveryDialogOpen] = useState(false);
+  const [selectedQuotation, setSelectedQuotation] = useState<any>(null);
+  const [deliveryItems, setDeliveryItems] = useState<any[]>([]);
   const queryClient = useQueryClient();
   const { hasPermission } = usePermissions();
 
@@ -116,6 +121,31 @@ export default function Quotations() {
     },
   });
 
+  const { data: exchangeRates } = useQuery({
+    queryKey: ["exchange-rates"],
+    queryFn: async () => {
+      const { data, error } = await supabase
+        .from("exchange_rates")
+        .select("*");
+      if (error) throw error;
+      return data;
+    },
+  });
+
+  const { data: quotationItems } = useQuery({
+    queryKey: ["quotation-items", selectedQuotation?.id],
+    queryFn: async () => {
+      if (!selectedQuotation?.id) return [];
+      const { data, error } = await supabase
+        .from("quotation_items")
+        .select("*")
+        .eq("quotation_id", selectedQuotation.id);
+      if (error) throw error;
+      return data;
+    },
+    enabled: !!selectedQuotation?.id,
+  });
+
   const createQuotationMutation = useMutation({
     mutationFn: async () => {
       if (!selectedCustomer || items.length === 0) {
@@ -133,9 +163,12 @@ export default function Quotations() {
         .rpc("generate_quotation_number");
       if (numberError) throw numberError;
 
+      // Obtener tipo de cambio
+      const exchangeRate = exchangeRates?.find(r => r.currency === selectedCurrency)?.rate || 1;
+
       const subtotal = items.reduce((sum, item) => sum + item.subtotal, 0);
       const discount = subtotal * (discountRate / 100);
-      const taxRate = 0; // Por ahora sin impuesto, se puede agregar después
+      const taxRate = 0;
       const tax = (subtotal - discount) * (taxRate / 100);
       const total = subtotal - discount + tax;
 
@@ -156,6 +189,10 @@ export default function Quotations() {
           notes,
           valid_until: validUntil || null,
           status: "draft",
+          currency: selectedCurrency,
+          exchange_rate: exchangeRate,
+          delivery_status: "pending",
+          total_delivered: 0,
         })
         .select()
         .single();
@@ -385,6 +422,98 @@ export default function Quotations() {
     setNotes("");
     setValidUntil("");
     setDiscountRate(0);
+    setSelectedCurrency("ARS");
+  };
+
+  const createDeliveryNoteMutation = useMutation({
+    mutationFn: async () => {
+      if (!selectedQuotation || deliveryItems.length === 0) {
+        throw new Error("Debe seleccionar al menos un producto para entregar");
+      }
+
+      const { data: { user } } = await supabase.auth.getUser();
+      if (!user) throw new Error("Usuario no autenticado");
+
+      const { data: numberData } = await supabase.rpc("generate_delivery_number");
+
+      const subtotal = deliveryItems.reduce((sum, item) => sum + (item.unit_price * item.quantity_to_deliver), 0);
+
+      // Crear remito
+      const { data: deliveryNote, error: noteError } = await supabase
+        .from("delivery_notes")
+        .insert({
+          delivery_number: numberData,
+          quotation_id: selectedQuotation.id,
+          customer_id: selectedQuotation.customer_id,
+          customer_name: selectedQuotation.customer_name,
+          user_id: user.id,
+          subtotal,
+          total: subtotal,
+          status: "pending",
+        })
+        .select()
+        .single();
+
+      if (noteError) throw noteError;
+
+      // Crear items del remito
+      const items = deliveryItems
+        .filter(item => item.quantity_to_deliver > 0)
+        .map(item => ({
+          delivery_note_id: deliveryNote.id,
+          product_id: item.product_id,
+          product_name: item.product_name,
+          quantity: item.quantity_to_deliver,
+          unit_price: item.unit_price,
+          subtotal: item.unit_price * item.quantity_to_deliver,
+          quotation_item_id: item.id,
+        }));
+
+      await supabase.from("delivery_note_items").insert(items);
+
+      // Actualizar cantidades entregadas en items de presupuesto
+      for (const item of deliveryItems.filter(i => i.quantity_to_deliver > 0)) {
+        const newDelivered = (item.total_delivered || 0) + item.quantity_to_deliver;
+        await supabase
+          .from("quotation_items")
+          .update({ total_delivered: newDelivered })
+          .eq("id", item.id);
+      }
+
+      // Actualizar estado de entrega del presupuesto
+      const allItems = await supabase
+        .from("quotation_items")
+        .select("quantity, total_delivered")
+        .eq("quotation_id", selectedQuotation.id);
+
+      const allDelivered = allItems.data?.every(i => (i.total_delivered || 0) >= i.quantity);
+      const someDelivered = allItems.data?.some(i => (i.total_delivered || 0) > 0);
+
+      await supabase
+        .from("quotations")
+        .update({
+          delivery_status: allDelivered ? "completed" : someDelivered ? "partial" : "pending",
+          total_delivered: deliveryItems.reduce((sum, i) => sum + (i.quantity_to_deliver * i.unit_price), 0),
+        })
+        .eq("id", selectedQuotation.id);
+
+      return deliveryNote;
+    },
+    onSuccess: () => {
+      toast.success("Remito generado exitosamente");
+      queryClient.invalidateQueries({ queryKey: ["quotations"] });
+      queryClient.invalidateQueries({ queryKey: ["delivery-notes"] });
+      setIsDeliveryDialogOpen(false);
+      setDeliveryItems([]);
+    },
+    onError: (error: Error) => {
+      toast.error("Error: " + error.message);
+    },
+  });
+
+  const handleOpenDeliveryDialog = (quotation: any) => {
+    setSelectedQuotation(quotation);
+    setIsDeliveryDialogOpen(true);
   };
 
   const subtotal = items.reduce((sum, item) => sum + item.subtotal, 0);
@@ -428,7 +557,7 @@ export default function Quotations() {
                   <DialogTitle>Crear Presupuesto</DialogTitle>
                 </DialogHeader>
                 <div className="space-y-4">
-                  <div className="grid grid-cols-2 gap-4">
+                  <div className="grid grid-cols-3 gap-4">
                     <div>
                       <Label>Cliente *</Label>
                       <Select value={selectedCustomer} onValueChange={setSelectedCustomer}>
@@ -439,6 +568,21 @@ export default function Quotations() {
                           {customers?.map(customer => (
                             <SelectItem key={customer.id} value={customer.id}>
                               {customer.name}
+                            </SelectItem>
+                          ))}
+                        </SelectContent>
+                      </Select>
+                    </div>
+                    <div>
+                      <Label>Moneda *</Label>
+                      <Select value={selectedCurrency} onValueChange={setSelectedCurrency}>
+                        <SelectTrigger>
+                          <SelectValue />
+                        </SelectTrigger>
+                        <SelectContent>
+                          {exchangeRates?.map(rate => (
+                            <SelectItem key={rate.currency} value={rate.currency}>
+                              {rate.currency} {rate.currency !== "ARS" && `(${rate.rate})`}
                             </SelectItem>
                           ))}
                         </SelectContent>
@@ -545,7 +689,7 @@ export default function Quotations() {
                       </div>
                     )}
                     <div className="flex justify-between text-lg font-bold">
-                      <span>Total:</span>
+                      <span>Total ({selectedCurrency}):</span>
                       <span>${total.toFixed(2)}</span>
                     </div>
                   </div>
@@ -584,7 +728,9 @@ export default function Quotations() {
                   <TableHead>Número</TableHead>
                   <TableHead>Cliente</TableHead>
                   <TableHead>Total</TableHead>
+                  <TableHead>Moneda</TableHead>
                   <TableHead>Estado</TableHead>
+                  <TableHead>Entrega</TableHead>
                   <TableHead>Válido hasta</TableHead>
                   <TableHead>Fecha</TableHead>
                   <TableHead>Acciones</TableHead>
@@ -593,7 +739,7 @@ export default function Quotations() {
               <TableBody>
                 {isLoading ? (
                   <TableRow>
-                    <TableCell colSpan={7} className="text-center">Cargando...</TableCell>
+                    <TableCell colSpan={9} className="text-center">Cargando...</TableCell>
                   </TableRow>
                 ) : quotations && quotations.length > 0 ? (
                   quotations.map((quotation) => (
@@ -601,7 +747,19 @@ export default function Quotations() {
                       <TableCell className="font-medium">{quotation.quotation_number}</TableCell>
                       <TableCell>{quotation.customer_name}</TableCell>
                       <TableCell>${Number(quotation.total).toFixed(2)}</TableCell>
+                      <TableCell>
+                        <Badge variant="outline">{quotation.currency || "ARS"}</Badge>
+                      </TableCell>
                       <TableCell>{getStatusBadge(quotation.status)}</TableCell>
+                      <TableCell>
+                        <Badge variant={
+                          quotation.delivery_status === "completed" ? "default" : 
+                          quotation.delivery_status === "partial" ? "secondary" : "outline"
+                        }>
+                          {quotation.delivery_status === "completed" ? "Completo" :
+                           quotation.delivery_status === "partial" ? "Parcial" : "Pendiente"}
+                        </Badge>
+                      </TableCell>
                       <TableCell>
                         {quotation.valid_until 
                           ? format(new Date(quotation.valid_until), "dd/MM/yyyy", { locale: es })
@@ -620,6 +778,17 @@ export default function Quotations() {
                           >
                             <Download className="h-4 w-4" />
                           </Button>
+                          {canEdit && quotation.status === "accepted" && (
+                            <Button
+                              size="sm"
+                              variant="outline"
+                              onClick={() => handleOpenDeliveryDialog(quotation)}
+                              title="Generar remito"
+                            >
+                              <Truck className="h-4 w-4 mr-1" />
+                              Remito
+                            </Button>
+                          )}
                           {canEdit && quotation.status === "draft" && (
                             <>
                               <Button
@@ -663,7 +832,7 @@ export default function Quotations() {
                   ))
                 ) : (
                   <TableRow>
-                    <TableCell colSpan={7} className="text-center text-muted-foreground">
+                    <TableCell colSpan={9} className="text-center text-muted-foreground">
                       No hay presupuestos
                     </TableCell>
                   </TableRow>
@@ -672,6 +841,84 @@ export default function Quotations() {
             </Table>
           </CardContent>
         </Card>
+
+        {/* Diálogo para generar remito con entregas parciales */}
+        <Dialog open={isDeliveryDialogOpen} onOpenChange={(open) => {
+          setIsDeliveryDialogOpen(open);
+          if (!open) setDeliveryItems([]);
+        }}>
+          <DialogContent className="max-w-4xl max-h-[90vh] overflow-y-auto">
+            <DialogHeader>
+              <DialogTitle>Generar Remito - {selectedQuotation?.quotation_number}</DialogTitle>
+            </DialogHeader>
+            {quotationItems && (
+              <div className="space-y-4">
+                <p className="text-sm text-muted-foreground">
+                  Seleccione las cantidades a entregar. Puede generar múltiples remitos para entregas parciales.
+                </p>
+                <Table>
+                  <TableHeader>
+                    <TableRow>
+                      <TableHead>Producto</TableHead>
+                      <TableHead>Cant. Total</TableHead>
+                      <TableHead>Entregado</TableHead>
+                      <TableHead>Pendiente</TableHead>
+                      <TableHead>A Entregar</TableHead>
+                    </TableRow>
+                  </TableHeader>
+                  <TableBody>
+                    {quotationItems.map((item: any) => {
+                      const pending = item.quantity - (item.total_delivered || 0);
+                      const toDeliver = deliveryItems.find(d => d.id === item.id)?.quantity_to_deliver || 0;
+                      return (
+                        <TableRow key={item.id}>
+                          <TableCell className="font-medium">{item.product_name}</TableCell>
+                          <TableCell>{item.quantity}</TableCell>
+                          <TableCell>{item.total_delivered || 0}</TableCell>
+                          <TableCell>{pending}</TableCell>
+                          <TableCell>
+                            <Input
+                              type="number"
+                              min="0"
+                              max={pending}
+                              value={toDeliver}
+                              onChange={(e) => {
+                                const qty = Number(e.target.value);
+                                setDeliveryItems(prev => {
+                                  const existing = prev.find(d => d.id === item.id);
+                                  if (existing) {
+                                    return prev.map(d => d.id === item.id 
+                                      ? { ...d, quantity_to_deliver: qty }
+                                      : d
+                                    );
+                                  }
+                                  return [...prev, { ...item, quantity_to_deliver: qty }];
+                                });
+                              }}
+                              className="w-20"
+                            />
+                          </TableCell>
+                        </TableRow>
+                      );
+                    })}
+                  </TableBody>
+                </Table>
+              </div>
+            )}
+            <DialogFooter>
+              <Button variant="outline" onClick={() => setIsDeliveryDialogOpen(false)}>
+                Cancelar
+              </Button>
+              <Button 
+                onClick={() => createDeliveryNoteMutation.mutate()}
+                disabled={!deliveryItems.some(i => i.quantity_to_deliver > 0)}
+              >
+                <Truck className="h-4 w-4 mr-2" />
+                Generar Remito
+              </Button>
+            </DialogFooter>
+          </DialogContent>
+        </Dialog>
       </div>
     </Layout>
   );

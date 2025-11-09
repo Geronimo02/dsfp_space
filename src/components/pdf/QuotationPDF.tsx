@@ -11,6 +11,8 @@ interface QuotationData {
   tax: number;
   total: number;
   notes?: string;
+  currency?: string;
+  exchange_rate?: number;
   items: Array<{
     product_name: string;
     quantity: number;
@@ -128,27 +130,41 @@ export const generateQuotationPDF = async (
   yPos += 8;
 
   // Totals
+  const currency = quotation.currency || "ARS";
+  const currencySymbol = currency === "USD" ? "US$" : currency === "EUR" ? "€" : "$";
+  
   doc.setFont("helvetica", "normal");
   doc.text("Subtotal:", pageWidth - 60, yPos);
-  doc.text(`$${quotation.subtotal.toFixed(2)}`, pageWidth - 20, yPos, { align: "right" });
+  doc.text(`${currencySymbol}${quotation.subtotal.toFixed(2)}`, pageWidth - 20, yPos, { align: "right" });
 
   if (quotation.discount > 0) {
     yPos += 6;
     doc.text(`Descuento (${quotation.discount_rate}%):`, pageWidth - 60, yPos);
-    doc.text(`-$${quotation.discount.toFixed(2)}`, pageWidth - 20, yPos, { align: "right" });
+    doc.text(`-${currencySymbol}${quotation.discount.toFixed(2)}`, pageWidth - 20, yPos, { align: "right" });
   }
 
   if (quotation.tax > 0) {
     yPos += 6;
     doc.text("Impuestos:", pageWidth - 60, yPos);
-    doc.text(`$${quotation.tax.toFixed(2)}`, pageWidth - 20, yPos, { align: "right" });
+    doc.text(`${currencySymbol}${quotation.tax.toFixed(2)}`, pageWidth - 20, yPos, { align: "right" });
   }
 
   yPos += 8;
   doc.setFont("helvetica", "bold");
   doc.setFontSize(12);
-  doc.text("TOTAL:", pageWidth - 60, yPos);
-  doc.text(`$${quotation.total.toFixed(2)}`, pageWidth - 20, yPos, { align: "right" });
+  doc.text(`TOTAL (${currency}):`, pageWidth - 60, yPos);
+  doc.text(`${currencySymbol}${quotation.total.toFixed(2)}`, pageWidth - 20, yPos, { align: "right" });
+  
+  // Si hay tipo de cambio, mostrar equivalencia en ARS
+  if (currency !== "ARS" && quotation.exchange_rate) {
+    yPos += 6;
+    doc.setFontSize(9);
+    doc.setFont("helvetica", "normal");
+    doc.setTextColor(100);
+    const totalARS = quotation.total * quotation.exchange_rate;
+    doc.text(`(Equivalente: $${totalARS.toFixed(2)} ARS - TC: ${quotation.exchange_rate})`, pageWidth - 20, yPos, { align: "right" });
+    doc.setTextColor(0);
+  }
 
   // Notes
   if (quotation.notes) {

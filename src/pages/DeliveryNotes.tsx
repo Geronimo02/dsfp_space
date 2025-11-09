@@ -8,7 +8,7 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { toast } from "sonner";
-import { Search, Truck, Package, CheckCircle, Download } from "lucide-react";
+import { Search, Truck, Package, CheckCircle, Download, FileText } from "lucide-react";
 import { generateDeliveryNotePDF } from "@/components/pdf/DeliveryNotePDF";
 import { format } from "date-fns";
 import { es } from "date-fns/locale";
@@ -74,6 +74,91 @@ export default function DeliveryNotes() {
     },
     onError: (error: Error) => {
       toast.error("Error: " + error.message);
+    },
+  });
+
+  const convertToSaleMutation = useMutation({
+    mutationFn: async (deliveryNoteId: string) => {
+      const { data: deliveryNote, error: noteError } = await supabase
+        .from("delivery_notes")
+        .select("*, delivery_note_items(*)")
+        .eq("id", deliveryNoteId)
+        .single();
+      
+      if (noteError) throw noteError;
+
+      const { data: { user } } = await supabase.auth.getUser();
+      if (!user) throw new Error("Usuario no autenticado");
+
+      // Generar número de venta
+      const { data: salesData } = await supabase
+        .from("sales")
+        .select("sale_number")
+        .order("created_at", { ascending: false })
+        .limit(1);
+
+      const lastNumber = salesData?.[0]?.sale_number || "VENTA-00000000-0000";
+      const parts = lastNumber.split("-");
+      const counter = parseInt(parts[2]) + 1;
+      const saleNumber = `VENTA-${new Date().toISOString().split("T")[0].replace(/-/g, "")}-${counter.toString().padStart(4, "0")}`;
+
+      // Crear venta
+      const { data: sale, error: saleError } = await supabase
+        .from("sales")
+        .insert({
+          sale_number: saleNumber,
+          customer_id: deliveryNote.customer_id,
+          user_id: user.id,
+          subtotal: deliveryNote.subtotal,
+          total: deliveryNote.total,
+          payment_method: "credit",
+          installments: 1,
+          notes: `Facturado desde remito ${deliveryNote.delivery_number}`,
+          status: "completed",
+        })
+        .select()
+        .single();
+
+      if (saleError) throw saleError;
+
+      // Crear items de venta
+      const saleItems = deliveryNote.delivery_note_items.map((item: any) => ({
+        sale_id: sale.id,
+        product_id: item.product_id,
+        product_name: item.product_name,
+        quantity: item.quantity,
+        unit_price: item.unit_price,
+        subtotal: item.subtotal,
+      }));
+
+      await supabase.from("sale_items").insert(saleItems);
+
+      // Actualizar stock de productos
+      for (const item of deliveryNote.delivery_note_items) {
+        if (item.product_id) {
+          const { data: product } = await supabase
+            .from("products")
+            .select("stock")
+            .eq("id", item.product_id)
+            .single();
+          
+          if (product) {
+            await supabase
+              .from("products")
+              .update({ stock: product.stock - item.quantity })
+              .eq("id", item.product_id);
+          }
+        }
+      }
+
+      return sale;
+    },
+    onSuccess: () => {
+      toast.success("Remito facturado exitosamente");
+      queryClient.invalidateQueries({ queryKey: ["sales"] });
+    },
+    onError: (error: Error) => {
+      toast.error("Error al facturar: " + error.message);
     },
   });
 
@@ -246,6 +331,18 @@ export default function DeliveryNotes() {
                           >
                             <Download className="h-4 w-4" />
                           </Button>
+                          {canEdit && note.status === "delivered" && (
+                            <Button
+                              size="sm"
+                              variant="default"
+                              onClick={() => convertToSaleMutation.mutate(note.id)}
+                              title="Facturar remito"
+                              disabled={convertToSaleMutation.isPending}
+                            >
+                              <FileText className="h-4 w-4 mr-1" />
+                              Facturar
+                            </Button>
+                          )}
                           {canEdit && (
                             <>
                               {note.status === "pending" && (

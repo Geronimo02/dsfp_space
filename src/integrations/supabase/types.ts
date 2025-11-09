@@ -593,6 +593,7 @@ export type Database = {
           product_id: string | null
           product_name: string
           quantity: number
+          quotation_item_id: string | null
           subtotal: number
           unit_price: number
         }
@@ -603,6 +604,7 @@ export type Database = {
           product_id?: string | null
           product_name: string
           quantity: number
+          quotation_item_id?: string | null
           subtotal: number
           unit_price: number
         }
@@ -613,6 +615,7 @@ export type Database = {
           product_id?: string | null
           product_name?: string
           quantity?: number
+          quotation_item_id?: string | null
           subtotal?: number
           unit_price?: number
         }
@@ -622,6 +625,13 @@ export type Database = {
             columns: ["delivery_note_id"]
             isOneToOne: false
             referencedRelation: "delivery_notes"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "delivery_note_items_quotation_item_id_fkey"
+            columns: ["quotation_item_id"]
+            isOneToOne: false
+            referencedRelation: "quotation_items"
             referencedColumns: ["id"]
           },
         ]
@@ -636,6 +646,7 @@ export type Database = {
           delivery_number: string
           id: string
           notes: string | null
+          quotation_id: string | null
           received_at: string | null
           received_by: string | null
           sale_id: string | null
@@ -655,6 +666,7 @@ export type Database = {
           delivery_number: string
           id?: string
           notes?: string | null
+          quotation_id?: string | null
           received_at?: string | null
           received_by?: string | null
           sale_id?: string | null
@@ -674,6 +686,7 @@ export type Database = {
           delivery_number?: string
           id?: string
           notes?: string | null
+          quotation_id?: string | null
           received_at?: string | null
           received_by?: string | null
           sale_id?: string | null
@@ -686,6 +699,13 @@ export type Database = {
         }
         Relationships: [
           {
+            foreignKeyName: "delivery_notes_quotation_id_fkey"
+            columns: ["quotation_id"]
+            isOneToOne: false
+            referencedRelation: "quotations"
+            referencedColumns: ["id"]
+          },
+          {
             foreignKeyName: "delivery_notes_sale_id_fkey"
             columns: ["sale_id"]
             isOneToOne: false
@@ -693,6 +713,30 @@ export type Database = {
             referencedColumns: ["id"]
           },
         ]
+      }
+      exchange_rates: {
+        Row: {
+          created_at: string | null
+          currency: string
+          id: string
+          rate: number
+          updated_at: string | null
+        }
+        Insert: {
+          created_at?: string | null
+          currency: string
+          id?: string
+          rate: number
+          updated_at?: string | null
+        }
+        Update: {
+          created_at?: string | null
+          currency?: string
+          id?: string
+          rate?: number
+          updated_at?: string | null
+        }
+        Relationships: []
       }
       expense_categories: {
         Row: {
@@ -1229,6 +1273,7 @@ export type Database = {
           quantity: number
           quotation_id: string
           subtotal: number
+          total_delivered: number | null
           unit_price: number
         }
         Insert: {
@@ -1239,6 +1284,7 @@ export type Database = {
           quantity: number
           quotation_id: string
           subtotal: number
+          total_delivered?: number | null
           unit_price: number
         }
         Update: {
@@ -1249,6 +1295,7 @@ export type Database = {
           quantity?: number
           quotation_id?: string
           subtotal?: number
+          total_delivered?: number | null
           unit_price?: number
         }
         Relationships: [
@@ -1265,10 +1312,13 @@ export type Database = {
         Row: {
           converted_to_sale_id: string | null
           created_at: string | null
+          currency: string | null
           customer_id: string
           customer_name: string
+          delivery_status: string | null
           discount: number | null
           discount_rate: number | null
+          exchange_rate: number | null
           id: string
           notes: string | null
           quotation_number: string
@@ -1277,6 +1327,7 @@ export type Database = {
           tax: number | null
           tax_rate: number | null
           total: number
+          total_delivered: number | null
           updated_at: string | null
           user_id: string
           valid_until: string | null
@@ -1284,10 +1335,13 @@ export type Database = {
         Insert: {
           converted_to_sale_id?: string | null
           created_at?: string | null
+          currency?: string | null
           customer_id: string
           customer_name: string
+          delivery_status?: string | null
           discount?: number | null
           discount_rate?: number | null
+          exchange_rate?: number | null
           id?: string
           notes?: string | null
           quotation_number: string
@@ -1296,6 +1350,7 @@ export type Database = {
           tax?: number | null
           tax_rate?: number | null
           total: number
+          total_delivered?: number | null
           updated_at?: string | null
           user_id: string
           valid_until?: string | null
@@ -1303,10 +1358,13 @@ export type Database = {
         Update: {
           converted_to_sale_id?: string | null
           created_at?: string | null
+          currency?: string | null
           customer_id?: string
           customer_name?: string
+          delivery_status?: string | null
           discount?: number | null
           discount_rate?: number | null
+          exchange_rate?: number | null
           id?: string
           notes?: string | null
           quotation_number?: string
@@ -1315,6 +1373,7 @@ export type Database = {
           tax?: number | null
           tax_rate?: number | null
           total?: number
+          total_delivered?: number | null
           updated_at?: string | null
           user_id?: string
           valid_until?: string | null
