@@ -1,5 +1,6 @@
 import { useQuery } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
+import { useCompany } from "@/contexts/CompanyContext";
 
 export type Permission = "view" | "create" | "edit" | "delete" | "export";
 export type Module = 
@@ -32,6 +33,8 @@ interface RolePermission {
 }
 
 export const usePermissions = () => {
+  const { currentCompany } = useCompany();
+  
   const { data: user, isLoading: userLoading } = useQuery({
     queryKey: ["current-user"],
     queryFn: async () => {
@@ -41,19 +44,21 @@ export const usePermissions = () => {
   });
 
   const { data: userRoles, isLoading: rolesLoading } = useQuery({
-    queryKey: ["user-roles", user?.id],
+    queryKey: ["user-roles", user?.id, currentCompany?.id],
     queryFn: async () => {
-      if (!user?.id) return [];
+      if (!user?.id || !currentCompany?.id) return [];
       
       const { data, error } = await supabase
-        .from("user_roles")
+        .from("company_users")
         .select("role")
-        .eq("user_id", user.id);
+        .eq("user_id", user.id)
+        .eq("company_id", currentCompany.id)
+        .eq("active", true);
       
       if (error) throw error;
       return data.map(r => r.role);
     },
-    enabled: !!user?.id,
+    enabled: !!user?.id && !!currentCompany?.id,
   });
 
   const { data: permissions, isLoading: permissionsLoading } = useQuery({

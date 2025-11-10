@@ -5,6 +5,7 @@ import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { BrowserRouter, Routes, Route, Navigate } from "react-router-dom";
 import { useEffect, useState } from "react";
 import { supabase } from "@/integrations/supabase/client";
+import { CompanyProvider } from "@/contexts/CompanyContext";
 import { User, Session } from "@supabase/supabase-js";
 import Dashboard from "./pages/Dashboard";
 import Auth from "./pages/Auth";
@@ -33,6 +34,7 @@ import BulkOperations from "./pages/BulkOperations";
 import Warehouses from "./pages/Warehouses";
 import WarehouseStock from "./pages/WarehouseStock";
 import WarehouseTransfers from "./pages/WarehouseTransfers";
+import CompanySetup from "./pages/CompanySetup";
 import NotFound from "./pages/NotFound";
 
 const queryClient = new QueryClient();
@@ -77,8 +79,10 @@ const App = () => (
       <Toaster />
       <Sonner />
       <BrowserRouter>
-        <Routes>
+        <CompanyProvider>
+          <Routes>
           <Route path="/auth" element={<Auth />} />
+          <Route path="/company-setup" element={<ProtectedRoute><CompanySetup /></ProtectedRoute>} />
           <Route path="/" element={<ProtectedRoute><Dashboard /></ProtectedRoute>} />
           <Route path="/pos" element={<ProtectedRoute><POS /></ProtectedRoute>} />
           <Route path="/products" element={<ProtectedRoute><Products /></ProtectedRoute>} />
@@ -108,6 +112,7 @@ const App = () => (
           {/* ADD ALL CUSTOM ROUTES ABOVE THE CATCH-ALL "*" ROUTE */}
           <Route path="*" element={<NotFound />} />
         </Routes>
+        </CompanyProvider>
       </BrowserRouter>
     </TooltipProvider>
   </QueryClientProvider>

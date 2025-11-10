@@ -1,0 +1,167 @@
+import React, { createContext, useContext, useState, useEffect } from 'react';
+import { supabase } from '@/integrations/supabase/client';
+import { useToast } from '@/hooks/use-toast';
+
+interface Company {
+  id: string;
+  name: string;
+  tax_id: string | null;
+  address: string | null;
+  phone: string | null;
+  email: string | null;
+  logo_url: string | null;
+  currency: string;
+  active: boolean;
+}
+
+interface CompanyUser {
+  id: string;
+  company_id: string;
+  user_id: string;
+  role: 'admin' | 'manager' | 'accountant' | 'employee' | 'cashier';
+  active: boolean;
+  companies: Company;
+}
+
+interface CompanyContextType {
+  currentCompany: Company | null;
+  userCompanies: CompanyUser[];
+  loading: boolean;
+  switchCompany: (companyId: string) => void;
+  refreshCompanies: () => Promise<void>;
+}
+
+const CompanyContext = createContext<CompanyContextType | undefined>(undefined);
+
+export function CompanyProvider({ children }: { children: React.ReactNode }) {
+  const [currentCompany, setCurrentCompany] = useState<Company | null>(null);
+  const [userCompanies, setUserCompanies] = useState<CompanyUser[]>([]);
+  const [loading, setLoading] = useState(true);
+  const { toast } = useToast();
+
+  const fetchUserCompanies = async () => {
+    try {
+      const { data: { user } } = await supabase.auth.getUser();
+      if (!user) {
+        setLoading(false);
+        return;
+      }
+
+      const { data, error } = await supabase
+        .from('company_users')
+        .select(`
+          id,
+          company_id,
+          user_id,
+          role,
+          active,
+          companies (
+            id,
+            name,
+            tax_id,
+            address,
+            phone,
+            email,
+            logo_url,
+            currency,
+            active
+          )
+        `)
+        .eq('user_id', user.id)
+        .eq('active', true)
+        .order('created_at', { ascending: true });
+
+      if (error) throw error;
+
+      setUserCompanies(data as CompanyUser[]);
+
+      // Set current company from localStorage or first company
+      const savedCompanyId = localStorage.getItem('currentCompanyId');
+      if (savedCompanyId) {
+        const savedCompany = data?.find((cu) => cu.company_id === savedCompanyId);
+        if (savedCompany) {
+          setCurrentCompany(savedCompany.companies);
+        } else if (data && data.length > 0) {
+          setCurrentCompany(data[0].companies);
+          localStorage.setItem('currentCompanyId', data[0].company_id);
+        }
+      } else if (data && data.length > 0) {
+        setCurrentCompany(data[0].companies);
+        localStorage.setItem('currentCompanyId', data[0].company_id);
+      }
+    } catch (error) {
+      console.error('Error fetching companies:', error);
+      toast({
+        title: 'Error',
+        description: 'No se pudieron cargar las empresas',
+        variant: 'destructive',
+      });
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  useEffect(() => {
+    fetchUserCompanies();
+
+    // Subscribe to changes in company_users
+    const subscription = supabase
+      .channel('company_users_changes')
+      .on(
+        'postgres_changes',
+        {
+          event: '*',
+          schema: 'public',
+          table: 'company_users',
+        },
+        () => {
+          fetchUserCompanies();
+        }
+      )
+      .subscribe();
+
+    return () => {
+      subscription.unsubscribe();
+    };
+  }, []);
+
+  const switchCompany = (companyId: string) => {
+    const company = userCompanies.find((cu) => cu.company_id === companyId);
+    if (company) {
+      setCurrentCompany(company.companies);
+      localStorage.setItem('currentCompanyId', companyId);
+      toast({
+        title: 'Empresa cambiada',
+        description: `Ahora estás trabajando en ${company.companies.name}`,
+      });
+      // Reload page to refresh all data
+      window.location.reload();
+    }
+  };
+
+  const refreshCompanies = async () => {
+    await fetchUserCompanies();
+  };
+
+  return (
+    <CompanyContext.Provider
+      value={{
+        currentCompany,
+        userCompanies,
+        loading,
+        switchCompany,
+        refreshCompanies,
+      }}
+    >
+      {children}
+    </CompanyContext.Provider>
+  );
+}
+
+export function useCompany() {
+  const context = useContext(CompanyContext);
+  if (context === undefined) {
+    throw new Error('useCompany must be used within a CompanyProvider');
+  }
+  return context;
+}
