@@ -38,6 +38,7 @@ import {
 import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
+import { useCompany } from "@/contexts/CompanyContext";
 
 interface CashRegister {
   id: string;
@@ -61,6 +62,7 @@ interface CashMovement {
 }
 
 export default function CashRegister() {
+  const { currentCompany } = useCompany();
   const queryClient = useQueryClient();
   const [openDialog, setOpenDialog] = useState(false);
   const [closeDialog, setCloseDialog] = useState(false);
@@ -123,6 +125,7 @@ export default function CashRegister() {
           user_id: user.id,
           opening_amount: parseFloat(openingAmount) || 0,
           status: "open",
+          company_id: currentCompany?.id,
         });
 
       if (error) throw error;
@@ -184,6 +187,7 @@ export default function CashRegister() {
           amount: parseFloat(movementAmount) || 0,
           category: movementCategory,
           description: movementDescription || null,
+          company_id: currentCompany?.id,
         });
 
       if (error) throw error;

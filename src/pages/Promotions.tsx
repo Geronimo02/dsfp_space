@@ -18,8 +18,10 @@ import { es } from "date-fns/locale";
 import { toast } from "sonner";
 import { Switch } from "@/components/ui/switch";
 import { usePermissions } from "@/hooks/usePermissions";
+import { useCompany } from "@/contexts/CompanyContext";
 
 export default function Promotions() {
+  const { currentCompany } = useCompany();
   const { hasPermission } = usePermissions();
   const canCreate = hasPermission('promotions', 'create');
   const canEdit = hasPermission('promotions', 'edit');
@@ -122,6 +124,7 @@ export default function Promotions() {
       min_quantity: parseInt(formData.min_quantity),
       min_amount: parseFloat(formData.min_amount),
       max_uses: formData.max_uses ? parseInt(formData.max_uses) : null,
+      company_id: currentCompany?.id,
     };
 
     if (editingPromotion) {

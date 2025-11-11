@@ -14,8 +14,10 @@ import { format } from "date-fns";
 import { es } from "date-fns/locale";
 import { usePermissions } from "@/hooks/usePermissions";
 import { sanitizeSearchQuery } from "@/lib/searchUtils";
+import { useCompany } from "@/contexts/CompanyContext";
 
 export default function DeliveryNotes() {
+  const { currentCompany } = useCompany();
   const [searchQuery, setSearchQuery] = useState("");
   const queryClient = useQueryClient();
   const { hasPermission } = usePermissions();
@@ -115,6 +117,7 @@ export default function DeliveryNotes() {
           installments: 1,
           notes: `Facturado desde remito ${deliveryNote.delivery_number}`,
           status: "completed",
+          company_id: currentCompany?.id,
         })
         .select()
         .single();

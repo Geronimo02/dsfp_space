@@ -16,8 +16,10 @@ import { ReceiptPDF } from "@/components/pos/ReceiptPDF";
 import { sanitizeSearchQuery } from "@/lib/searchUtils";
 import { useMutation, useQueryClient } from "@tanstack/react-query";
 import { toast } from "sonner";
+import { useCompany } from "@/contexts/CompanyContext";
 
 export default function Sales() {
+  const { currentCompany } = useCompany();
   const [searchQuery, setSearchQuery] = useState("");
   const [selectedSale, setSelectedSale] = useState<any>(null);
   const [isDetailOpen, setIsDetailOpen] = useState(false);
@@ -51,6 +53,7 @@ export default function Sales() {
           subtotal: sale.subtotal,
           total: sale.total,
           status: "pending",
+          company_id: currentCompany?.id,
         })
         .select()
         .single();

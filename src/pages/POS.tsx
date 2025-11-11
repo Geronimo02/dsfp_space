@@ -34,6 +34,7 @@ import { useQuery, useQueryClient, useMutation } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
 import { ReceiptPDF } from "@/components/pos/ReceiptPDF";
 import { format } from "date-fns";
+import { useCompany } from "@/contexts/CompanyContext";
 
 interface CartItem {
   product_id: string;
@@ -53,6 +54,7 @@ interface PaymentMethod {
 }
 
 export default function POS() {
+  const { currentCompany } = useCompany();
   const [searchQuery, setSearchQuery] = useState("");
   const [cart, setCart] = useState<CartItem[]>([]);
   const [paymentMethods, setPaymentMethods] = useState<PaymentMethod[]>([]);
@@ -314,6 +316,7 @@ export default function POS() {
           phone: newCustomerPhone.trim() || null,
           email: newCustomerEmail.trim() || null,
           document: newCustomerDocument.trim() || null,
+          company_id: currentCompany?.id,
         })
         .select()
         .single();
@@ -376,7 +379,8 @@ export default function POS() {
           payment_method: primaryMethod,
           installments: maxInstallments,
           installment_amount: maxInstallments > 1 ? total / maxInstallments : 0,
-          status: "completed"
+          status: "completed",
+          company_id: currentCompany?.id,
         })
         .select()
         .single();
@@ -466,7 +470,8 @@ export default function POS() {
               reference_type: 'sale',
               reference_id: sale.id,
               description: `Puntos canjeados en venta ${sale.sale_number}`,
-              user_id: user.id
+              user_id: user.id,
+              company_id: currentCompany?.id,
             });
         }
       }
@@ -506,6 +511,7 @@ export default function POS() {
                 category: "Venta",
                 description: `Venta ${sale.sale_number} - Productos: ${productDetails}`,
                 reference: sale.sale_number,
+                company_id: currentCompany?.id,
               });
           }
           

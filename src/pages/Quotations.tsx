@@ -38,6 +38,7 @@ import { format } from "date-fns";
 import { es } from "date-fns/locale";
 import { usePermissions } from "@/hooks/usePermissions";
 import { sanitizeSearchQuery } from "@/lib/searchUtils";
+import { useCompany } from "@/contexts/CompanyContext";
 
 interface QuotationItem {
   product_id?: string;
@@ -49,6 +50,7 @@ interface QuotationItem {
 }
 
 export default function Quotations() {
+  const { currentCompany } = useCompany();
   const [searchQuery, setSearchQuery] = useState("");
   const [dialogOpen, setDialogOpen] = useState(false);
   const [selectedCustomer, setSelectedCustomer] = useState("");
@@ -193,6 +195,7 @@ export default function Quotations() {
           exchange_rate: exchangeRate,
           delivery_status: "pending",
           total_delivered: 0,
+          company_id: currentCompany?.id,
         })
         .select()
         .single();
@@ -295,6 +298,7 @@ export default function Quotations() {
           installments: 1,
           notes: `Convertido desde presupuesto ${quotation.quotation_number}`,
           status: "completed",
+          company_id: currentCompany?.id,
         })
         .select()
         .single();
@@ -450,6 +454,7 @@ export default function Quotations() {
           subtotal,
           total: subtotal,
           status: "pending",
+          company_id: currentCompany?.id,
         })
         .select()
         .single();

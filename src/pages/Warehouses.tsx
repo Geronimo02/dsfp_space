@@ -14,6 +14,7 @@ import { toast } from "sonner";
 import { Building2, Plus, Pencil, Trash2, Package, ArrowLeftRight } from "lucide-react";
 import { Switch } from "@/components/ui/switch";
 import { useNavigate } from "react-router-dom";
+import { useCompany } from "@/contexts/CompanyContext";
 
 interface Warehouse {
   id: string;
@@ -27,6 +28,7 @@ interface Warehouse {
 }
 
 export default function Warehouses() {
+  const { currentCompany } = useCompany();
   const navigate = useNavigate();
   const queryClient = useQueryClient();
   const [dialogOpen, setDialogOpen] = useState(false);
@@ -57,7 +59,10 @@ export default function Warehouses() {
 
   const createWarehouse = useMutation({
     mutationFn: async (data: typeof formData) => {
-      const { error } = await supabase.from("warehouses").insert([data]);
+      const { error } = await supabase.from("warehouses").insert([{
+        ...data,
+        company_id: currentCompany?.id,
+      }]);
       if (error) throw error;
     },
     onSuccess: () => {

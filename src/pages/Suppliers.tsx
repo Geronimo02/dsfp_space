@@ -27,6 +27,7 @@ import { Badge } from "@/components/ui/badge";
 import { Plus, Search, Edit, TrendingUp, TrendingDown } from "lucide-react";
 import { toast } from "sonner";
 import { usePermissions } from "@/hooks/usePermissions";
+import { useCompany } from "@/contexts/CompanyContext";
 
 interface Supplier {
   id: string;
@@ -45,6 +46,7 @@ interface Supplier {
 }
 
 export default function Suppliers() {
+  const { currentCompany } = useCompany();
   const { hasPermission } = usePermissions();
   const canCreate = hasPermission('suppliers', 'create');
   const canEdit = hasPermission('suppliers', 'edit');
@@ -100,6 +102,7 @@ export default function Suppliers() {
         credit_limit: parseFloat(data.credit_limit),
         active: data.active,
         notes: data.notes || null,
+        company_id: currentCompany?.id,
       });
 
       if (error) throw error;

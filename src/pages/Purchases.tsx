@@ -15,6 +15,7 @@ import { Plus, Search, Eye, Trash2 } from "lucide-react";
 import { toast } from "sonner";
 import { sanitizeSearchQuery } from "@/lib/searchUtils";
 import { format } from "date-fns";
+import { useCompany } from "@/contexts/CompanyContext";
 
 interface PurchaseItem {
   product_id: string;
@@ -25,6 +26,7 @@ interface PurchaseItem {
 }
 
 const Purchases = () => {
+  const { currentCompany } = useCompany();
   const queryClient = useQueryClient();
   const [searchQuery, setSearchQuery] = useState("");
   const [isDialogOpen, setIsDialogOpen] = useState(false);
@@ -118,6 +120,7 @@ const Purchases = () => {
           total,
           notes,
           payment_status: "pending",
+          company_id: currentCompany?.id,
         })
         .select()
         .single();

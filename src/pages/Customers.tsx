@@ -19,6 +19,7 @@ import { format } from "date-fns";
 import { es } from "date-fns/locale";
 import { z } from "zod";
 import { usePermissions } from "@/hooks/usePermissions";
+import { useCompany } from "@/contexts/CompanyContext";
 
 const customerSchema = z.object({
   name: z.string().trim().min(1, "El nombre es requerido").max(200, "El nombre debe tener máximo 200 caracteres"),
@@ -36,6 +37,7 @@ const customerSchema = z.object({
 });
 
 export default function Customers() {
+  const { currentCompany } = useCompany();
   const { hasPermission } = usePermissions();
   const canCreate = hasPermission('customers', 'create');
   const canEdit = hasPermission('customers', 'edit');
@@ -359,6 +361,7 @@ export default function Customers() {
         address: validatedData.address || null,
         credit_limit: validatedData.credit_limit ?? 0,
         payment_terms: validatedData.payment_terms || null,
+        company_id: currentCompany?.id,
       };
 
       if (editingCustomer) {

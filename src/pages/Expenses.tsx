@@ -16,8 +16,10 @@ import { toast } from "sonner";
 import { format } from "date-fns";
 import { es } from "date-fns/locale";
 import { usePermissions } from "@/hooks/usePermissions";
+import { useCompany } from "@/contexts/CompanyContext";
 
 export default function Expenses() {
+  const { currentCompany } = useCompany();
   const [dialogOpen, setDialogOpen] = useState(false);
   const [formData, setFormData] = useState({
     category_id: "",
@@ -112,6 +114,7 @@ export default function Expenses() {
         user_id: user.id,
         category_id: values.category_id || null,
         supplier_id: values.supplier_id || null,
+        company_id: currentCompany?.id,
       });
 
       if (error) throw error;

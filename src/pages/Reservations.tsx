@@ -16,6 +16,7 @@ import { format } from "date-fns";
 import { es } from "date-fns/locale";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Textarea } from "@/components/ui/textarea";
+import { useCompany } from "@/contexts/CompanyContext";
 
 interface CartItem {
   product_id: string;
@@ -26,6 +27,7 @@ interface CartItem {
 }
 
 export default function Reservations() {
+  const { currentCompany } = useCompany();
   const [searchQuery, setSearchQuery] = useState("");
   const [isNewReservationOpen, setIsNewReservationOpen] = useState(false);
   const [isPaymentDialogOpen, setIsPaymentDialogOpen] = useState(false);
@@ -123,6 +125,7 @@ export default function Reservations() {
           remaining_amount: total,
           expiration_date: expirationDate || null,
           notes: notes || null,
+          company_id: currentCompany?.id,
         })
         .select()
         .single();

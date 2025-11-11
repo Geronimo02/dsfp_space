@@ -14,6 +14,7 @@ import { Badge } from "@/components/ui/badge";
 import { toast } from "sonner";
 import { ArrowLeftRight, Plus, Check, X, Package } from "lucide-react";
 import { format } from "date-fns";
+import { useCompany } from "@/contexts/CompanyContext";
 
 interface Warehouse {
   id: string;
@@ -47,6 +48,7 @@ interface Transfer {
 }
 
 export default function WarehouseTransfers() {
+  const { currentCompany } = useCompany();
   const queryClient = useQueryClient();
   const [dialogOpen, setDialogOpen] = useState(false);
   const [fromWarehouse, setFromWarehouse] = useState<string>("");
@@ -112,6 +114,7 @@ export default function WarehouseTransfers() {
           status: "pending",
           requested_by: user.id,
           notes,
+          company_id: currentCompany?.id,
         }])
         .select()
         .single();

@@ -19,6 +19,7 @@ import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, 
 import { usePermissions } from "@/hooks/usePermissions";
 import { Separator } from "@/components/ui/separator";
 import { Collapsible, CollapsibleContent, CollapsibleTrigger } from "@/components/ui/collapsible";
+import { useCompany } from "@/contexts/CompanyContext";
 
 const productSchema = z.object({
   name: z.string().trim().min(1, "El nombre es requerido").max(200, "El nombre debe tener máximo 200 caracteres"),
@@ -47,6 +48,7 @@ const productSchema = z.object({
 });
 
 export default function Products() {
+  const { currentCompany } = useCompany();
   const { hasPermission } = usePermissions();
   const canCreate = hasPermission('products', 'create');
   const canEdit = hasPermission('products', 'edit');
@@ -269,6 +271,7 @@ export default function Products() {
         batch_number: validatedData.batch_number || null,
         expiration_date: validatedData.expiration_date || null,
         last_restock_date: editingProduct ? undefined : new Date().toISOString(),
+        company_id: currentCompany?.id,
       };
 
       if (editingProduct) {
@@ -483,6 +486,7 @@ export default function Products() {
               stock: validatedData.stock,
               min_stock: validatedData.min_stock ?? 0,
               category: validatedData.category || null,
+              company_id: currentCompany?.id,
             };
 
             const { data: product, error } = await supabase

@@ -33,6 +33,7 @@ import { Badge } from "@/components/ui/badge";
 import { Plus, Search, Wrench } from "lucide-react";
 import { toast } from "sonner";
 import { format } from "date-fns";
+import { useCompany } from "@/contexts/CompanyContext";
 
 type ServiceStatus = "received" | "in_diagnosis" | "in_repair" | "ready" | "delivered";
 
@@ -77,6 +78,7 @@ const statusColors: Record<ServiceStatus, string> = {
 };
 
 export default function TechnicalServices() {
+  const { currentCompany } = useCompany();
   const [searchQuery, setSearchQuery] = useState("");
   const [dialogOpen, setDialogOpen] = useState(false);
   const [editingService, setEditingService] = useState<TechnicalService | null>(null);
@@ -154,6 +156,7 @@ export default function TechnicalServices() {
         total_cost: totalCost,
         notes: data.notes || null,
         user_id: user.user.id,
+        company_id: currentCompany?.id,
       });
 
       if (error) throw error;
