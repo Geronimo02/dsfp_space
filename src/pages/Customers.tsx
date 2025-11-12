@@ -65,9 +65,9 @@ export default function Customers() {
   const queryClient = useQueryClient();
 
   const { data: customers } = useQuery({
-    queryKey: ["customers", searchQuery],
+    queryKey: ["customers", searchQuery, currentCompany?.id],
     queryFn: async () => {
-      let query = supabase.from("customers").select("*").order("created_at", { ascending: false });
+      let query = supabase.from("customers").select("*").eq("company_id", currentCompany?.id).order("created_at", { ascending: false });
       
       if (searchQuery) {
         const sanitized = sanitizeSearchQuery(searchQuery);
@@ -83,7 +83,7 @@ export default function Customers() {
   });
 
   const { data: customerSales } = useQuery({
-    queryKey: ["customer-sales", selectedCustomer?.id],
+    queryKey: ["customer-sales", selectedCustomer?.id, currentCompany?.id],
     queryFn: async () => {
       if (!selectedCustomer?.id) return [];
       
@@ -93,6 +93,7 @@ export default function Customers() {
           *,
           sale_items(*)
         `)
+        .eq("company_id", currentCompany?.id)
         .eq("customer_id", selectedCustomer.id)
         .order("created_at", { ascending: false });
       

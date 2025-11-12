@@ -58,11 +58,12 @@ export default function Expenses() {
 
   // Fetch suppliers
   const { data: suppliers } = useQuery({
-    queryKey: ["suppliers-list"],
+    queryKey: ["suppliers-list", currentCompany?.id],
     queryFn: async () => {
       const { data, error } = await supabase
         .from("suppliers")
         .select("id, name")
+        .eq("company_id", currentCompany?.id)
         .eq("active", true)
         .order("name");
       if (error) throw error;
@@ -73,7 +74,7 @@ export default function Expenses() {
 
   // Fetch expenses
   const { data: expenses, isLoading } = useQuery({
-    queryKey: ["expenses"],
+    queryKey: ["expenses", currentCompany?.id],
     queryFn: async () => {
       const { data, error } = await supabase
         .from("expenses")
@@ -82,7 +83,8 @@ export default function Expenses() {
           expense_categories(name, color),
           suppliers(name)
         `)
-        .order("created_at", { ascending: false });
+        .eq("company_id", currentCompany?.id)
+        .order("expense_date", { ascending: false });
       if (error) throw error;
       return data;
     },

@@ -45,7 +45,7 @@ export default function Reservations() {
   const queryClient = useQueryClient();
 
   const { data: reservations } = useQuery({
-    queryKey: ["reservations", searchQuery],
+    queryKey: ["reservations", searchQuery, currentCompany?.id],
     queryFn: async () => {
       let query = supabase
         .from("reservations")
@@ -53,6 +53,7 @@ export default function Reservations() {
           *,
           reservation_items(*)
         `)
+        .eq("company_id", currentCompany?.id)
         .order("created_at", { ascending: false });
 
       if (searchQuery) {
@@ -66,11 +67,12 @@ export default function Reservations() {
   });
 
   const { data: customers } = useQuery({
-    queryKey: ["customers-list"],
+    queryKey: ["customers-list", currentCompany?.id],
     queryFn: async () => {
       const { data, error } = await supabase
         .from("customers")
         .select("id, name")
+        .eq("company_id", currentCompany?.id)
         .order("name");
       if (error) throw error;
       return data;
@@ -78,13 +80,28 @@ export default function Reservations() {
   });
 
   const { data: products } = useQuery({
-    queryKey: ["products-search", productSearch],
+    queryKey: ["products-for-reservation", currentCompany?.id],
+    queryFn: async () => {
+      const { data, error } = await supabase
+        .from("products")
+        .select("id, name, price, stock, sku")
+        .eq("company_id", currentCompany?.id)
+        .eq("active", true)
+        .order("name");
+      if (error) throw error;
+      return data;
+    },
+  });
+
+  const { data: productSearchResults } = useQuery({
+    queryKey: ["products-search", productSearch, currentCompany?.id],
     queryFn: async () => {
       if (!productSearch) return [];
       
       const { data, error } = await supabase
         .from("products")
         .select("*")
+        .eq("company_id", currentCompany?.id)
         .eq("active", true)
         .or(`name.ilike.%${productSearch}%,sku.ilike.%${productSearch}%,barcode.ilike.%${productSearch}%`)
         .limit(10);

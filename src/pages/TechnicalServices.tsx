@@ -100,11 +100,12 @@ export default function TechnicalServices() {
   const queryClient = useQueryClient();
 
   const { data: services = [] } = useQuery({
-    queryKey: ["technical-services", searchQuery],
+    queryKey: ["technical-services", searchQuery, currentCompany?.id],
     queryFn: async () => {
       let query = supabase
         .from("technical_services")
         .select("*, customers(name)")
+        .eq("company_id", currentCompany?.id)
         .order("created_at", { ascending: false });
 
       if (searchQuery) {
@@ -120,11 +121,12 @@ export default function TechnicalServices() {
   });
 
   const { data: customers = [] } = useQuery({
-    queryKey: ["customers-list"],
+    queryKey: ["customers-list", currentCompany?.id],
     queryFn: async () => {
       const { data, error } = await supabase
         .from("customers")
         .select("id, name")
+        .eq("company_id", currentCompany?.id)
         .order("name");
       if (error) throw error;
       return data;

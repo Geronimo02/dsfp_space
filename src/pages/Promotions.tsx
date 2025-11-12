@@ -49,11 +49,12 @@ export default function Promotions() {
   });
 
   const { data: promotions } = useQuery({
-    queryKey: ["promotions", searchQuery],
+    queryKey: ["promotions", searchQuery, currentCompany?.id],
     queryFn: async () => {
       let query = supabase
         .from("promotions")
         .select("*")
+        .eq("company_id", currentCompany?.id)
         .order("created_at", { ascending: false });
 
       if (searchQuery) {

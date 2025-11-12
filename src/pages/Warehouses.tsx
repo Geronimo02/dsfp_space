@@ -45,11 +45,12 @@ export default function Warehouses() {
   });
 
   const { data: warehouses, isLoading } = useQuery({
-    queryKey: ["warehouses"],
+    queryKey: ["warehouses", currentCompany?.id],
     queryFn: async () => {
       const { data, error } = await supabase
         .from("warehouses")
         .select("*")
+        .eq("company_id", currentCompany?.id)
         .order("is_main", { ascending: false })
         .order("name");
       if (error) throw error;

@@ -59,11 +59,12 @@ export default function WarehouseTransfers() {
   const [quantity, setQuantity] = useState<number>(1);
 
   const { data: warehouses } = useQuery({
-    queryKey: ["warehouses"],
+    queryKey: ["warehouses", currentCompany?.id],
     queryFn: async () => {
       const { data, error } = await supabase
         .from("warehouses")
         .select("id, name, code")
+        .eq("company_id", currentCompany?.id)
         .eq("active", true);
       if (error) throw error;
       return data as Warehouse[];
@@ -71,11 +72,12 @@ export default function WarehouseTransfers() {
   });
 
   const { data: products } = useQuery({
-    queryKey: ["products-for-transfer"],
+    queryKey: ["products-for-transfer", currentCompany?.id],
     queryFn: async () => {
       const { data, error } = await supabase
         .from("products")
         .select("id, name, sku")
+        .eq("company_id", currentCompany?.id)
         .eq("active", true);
       if (error) throw error;
       return data as Product[];
@@ -83,7 +85,7 @@ export default function WarehouseTransfers() {
   });
 
   const { data: transfers, isLoading } = useQuery({
-    queryKey: ["warehouse-transfers"],
+    queryKey: ["warehouse-transfers", currentCompany?.id],
     queryFn: async () => {
       const { data, error } = await supabase
         .from("warehouse_transfers")
@@ -92,6 +94,7 @@ export default function WarehouseTransfers() {
           from_warehouse:warehouses!warehouse_transfers_from_warehouse_id_fkey(name, code),
           to_warehouse:warehouses!warehouse_transfers_to_warehouse_id_fkey(name, code)
         `)
+        .eq("company_id", currentCompany?.id)
         .order("created_at", { ascending: false });
       if (error) throw error;
       return data as Transfer[];

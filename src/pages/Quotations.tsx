@@ -66,11 +66,12 @@ export default function Quotations() {
   const { hasPermission } = usePermissions();
 
   const { data: quotations, isLoading } = useQuery({
-    queryKey: ["quotations", searchQuery],
+    queryKey: ["quotations", searchQuery, currentCompany?.id],
     queryFn: async () => {
       let query = supabase
         .from("quotations")
         .select("*")
+        .eq("company_id", currentCompany?.id)
         .order("created_at", { ascending: false });
 
       if (searchQuery) {
@@ -87,11 +88,12 @@ export default function Quotations() {
   });
 
   const { data: customers } = useQuery({
-    queryKey: ["customers-list"],
+    queryKey: ["customers-list", currentCompany?.id],
     queryFn: async () => {
       const { data, error } = await supabase
         .from("customers")
         .select("id, name")
+        .eq("company_id", currentCompany?.id)
         .order("name");
       if (error) throw error;
       return data;
@@ -99,11 +101,12 @@ export default function Quotations() {
   });
 
   const { data: products } = useQuery({
-    queryKey: ["products-active"],
+    queryKey: ["products-active", currentCompany?.id],
     queryFn: async () => {
       const { data, error } = await supabase
         .from("products")
         .select("id, name, price")
+        .eq("company_id", currentCompany?.id)
         .eq("active", true)
         .order("name");
       if (error) throw error;

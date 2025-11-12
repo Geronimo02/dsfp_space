@@ -23,11 +23,12 @@ export default function DeliveryNotes() {
   const { hasPermission } = usePermissions();
 
   const { data: deliveryNotes, isLoading } = useQuery({
-    queryKey: ["delivery-notes", searchQuery],
+    queryKey: ["delivery-notes", searchQuery, currentCompany?.id],
     queryFn: async () => {
       let query = supabase
         .from("delivery_notes")
         .select("*")
+        .eq("company_id", currentCompany?.id)
         .order("created_at", { ascending: false });
 
       if (searchQuery) {

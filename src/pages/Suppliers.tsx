@@ -70,11 +70,12 @@ export default function Suppliers() {
   const queryClient = useQueryClient();
 
   const { data: suppliers = [] } = useQuery({
-    queryKey: ["suppliers", searchQuery],
+    queryKey: ["suppliers", searchQuery, currentCompany?.id],
     queryFn: async () => {
       let query = supabase
         .from("suppliers")
         .select("*")
+        .eq("company_id", currentCompany?.id)
         .order("name");
 
       if (searchQuery) {

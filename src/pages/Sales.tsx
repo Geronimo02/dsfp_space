@@ -82,7 +82,7 @@ export default function Sales() {
   });
 
   const { data: sales } = useQuery({
-    queryKey: ["sales", searchQuery],
+    queryKey: ["sales", searchQuery, currentCompany?.id],
     queryFn: async () => {
       let query = supabase
         .from("sales")
@@ -91,6 +91,7 @@ export default function Sales() {
           customer:customers(name, email, phone, document, address),
           sale_items(*)
         `)
+        .eq("company_id", currentCompany?.id)
         .order("created_at", { ascending: false });
       
       if (searchQuery) {

@@ -43,7 +43,7 @@ const Purchases = () => {
 
   // Fetch purchases
   const { data: purchases, isLoading } = useQuery({
-    queryKey: ["purchases", searchQuery],
+    queryKey: ["purchases", searchQuery, currentCompany?.id],
     queryFn: async () => {
       let query = supabase
         .from("purchases")
@@ -51,6 +51,7 @@ const Purchases = () => {
           *,
           suppliers(name)
         `)
+        .eq("company_id", currentCompany?.id)
         .order("purchase_date", { ascending: false });
 
       if (searchQuery) {
@@ -68,11 +69,12 @@ const Purchases = () => {
 
   // Fetch suppliers
   const { data: suppliers } = useQuery({
-    queryKey: ["suppliers"],
+    queryKey: ["suppliers", currentCompany?.id],
     queryFn: async () => {
       const { data, error } = await supabase
         .from("suppliers")
         .select("*")
+        .eq("company_id", currentCompany?.id)
         .eq("active", true)
         .order("name");
       if (error) throw error;
@@ -82,11 +84,12 @@ const Purchases = () => {
 
   // Fetch products
   const { data: products } = useQuery({
-    queryKey: ["products"],
+    queryKey: ["products", currentCompany?.id],
     queryFn: async () => {
       const { data, error } = await supabase
         .from("products")
         .select("*")
+        .eq("company_id", currentCompany?.id)
         .eq("active", true)
         .order("name");
       if (error) throw error;
