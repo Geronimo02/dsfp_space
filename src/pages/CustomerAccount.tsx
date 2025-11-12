@@ -11,17 +11,20 @@ import { Badge } from "@/components/ui/badge";
 import { format } from "date-fns";
 import { es } from "date-fns/locale";
 import { Separator } from "@/components/ui/separator";
+import { useCompany } from "@/contexts/CompanyContext";
 
 export default function CustomerAccount() {
+  const { currentCompany } = useCompany();
   const [searchQuery, setSearchQuery] = useState("");
   const [selectedCustomer, setSelectedCustomer] = useState<string | null>(null);
 
   const { data: customers } = useQuery({
-    queryKey: ["customers-with-balance"],
+    queryKey: ["customers-with-balance", currentCompany?.id],
     queryFn: async () => {
       const { data, error } = await supabase
         .from("customers")
         .select("*")
+        .eq("company_id", currentCompany?.id)
         .order("name");
       
       if (error) throw error;
@@ -39,6 +42,7 @@ export default function CustomerAccount() {
         supabase
           .from("sales")
           .select("*")
+          .eq("company_id", currentCompany?.id)
           .eq("customer_id", selectedCustomer)
           .order("created_at", { ascending: false }),
         supabase

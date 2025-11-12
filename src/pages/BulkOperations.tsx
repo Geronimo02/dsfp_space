@@ -18,8 +18,10 @@ import { toast } from "sonner";
 import { format } from "date-fns";
 import { es } from "date-fns/locale";
 import { usePermissions } from "@/hooks/usePermissions";
+import { useCompany } from "@/contexts/CompanyContext";
 
 export default function BulkOperations() {
+  const { currentCompany } = useCompany();
   const [dialogOpen, setDialogOpen] = useState(false);
   const [activeTab, setActiveTab] = useState("products");
   const [operationType, setOperationType] = useState<string>("update_prices");
@@ -57,9 +59,9 @@ export default function BulkOperations() {
 
   // Fetch customers for email/message operations
   const { data: customers } = useQuery({
-    queryKey: ["customers-bulk"],
+    queryKey: ["customers-bulk", currentCompany?.id],
     queryFn: async () => {
-      let query = supabase.from("customers").select("id, name, email, phone");
+      let query = supabase.from("customers").select("id, name, email, phone").eq("company_id", currentCompany?.id);
       
       if (filterType === "with_email") {
         query = query.not("email", "is", null);
@@ -86,6 +88,7 @@ export default function BulkOperations() {
         const { data: products, error: fetchError } = await supabase
           .from("products")
           .select("id, price")
+          .eq("company_id", currentCompany?.id)
           .eq("active", true);
 
         if (fetchError) throw fetchError;
@@ -109,6 +112,7 @@ export default function BulkOperations() {
         const { count, error } = await supabase
           .from("products")
           .update({ active: true })
+          .eq("company_id", currentCompany?.id)
           .eq("active", false);
 
         if (error) throw error;
@@ -117,6 +121,7 @@ export default function BulkOperations() {
         const { count, error } = await supabase
           .from("products")
           .update({ active: false })
+          .eq("company_id", currentCompany?.id)
           .eq("active", true)
           .lte("stock", 0);
 

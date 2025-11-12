@@ -7,19 +7,22 @@ import { LineChart, Line, BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, R
 import { format, subDays, startOfDay } from "date-fns";
 import { es } from "date-fns/locale";
 import { usePermissions } from "@/hooks/usePermissions";
+import { useCompany } from "@/contexts/CompanyContext";
 
 export default function Dashboard() {
+  const { currentCompany } = useCompany();
   const { hasPermission, loading } = usePermissions();
   const canViewSales = hasPermission("sales", "view");
   const canViewProducts = hasPermission("products", "view");
   const canViewCustomers = hasPermission("customers", "view");
 
   const { data: salesData } = useQuery({
-    queryKey: ["sales-stats"],
+    queryKey: ["sales-stats", currentCompany?.id],
     queryFn: async () => {
       const { data, error } = await supabase
         .from("sales")
         .select("total, created_at")
+        .eq("company_id", currentCompany?.id)
         .order("created_at", { ascending: false });
       
       if (error) throw error;
@@ -37,11 +40,12 @@ export default function Dashboard() {
   });
 
   const { data: productsCount } = useQuery({
-    queryKey: ["products-count"],
+    queryKey: ["products-count", currentCompany?.id],
     queryFn: async () => {
       const { count, error } = await supabase
         .from("products")
-        .select("*", { count: "exact", head: true });
+        .select("*", { count: "exact", head: true })
+        .eq("company_id", currentCompany?.id);
       
       if (error) throw error;
       return count || 0;
@@ -50,11 +54,12 @@ export default function Dashboard() {
   });
 
   const { data: customersCount } = useQuery({
-    queryKey: ["customers-count"],
+    queryKey: ["customers-count", currentCompany?.id],
     queryFn: async () => {
       const { count, error } = await supabase
         .from("customers")
-        .select("*", { count: "exact", head: true });
+        .select("*", { count: "exact", head: true })
+        .eq("company_id", currentCompany?.id);
       
       if (error) throw error;
       return count || 0;
@@ -63,11 +68,12 @@ export default function Dashboard() {
   });
 
   const { data: lowStockProducts } = useQuery({
-    queryKey: ["low-stock"],
+    queryKey: ["low-stock", currentCompany?.id],
     queryFn: async () => {
       const { count, error } = await supabase
         .from("products")
         .select("*", { count: "exact", head: true })
+        .eq("company_id", currentCompany?.id)
         .lte("stock", 10);
       
       if (error) throw error;
@@ -78,7 +84,7 @@ export default function Dashboard() {
 
   // Ventas de últimos 7 días
   const { data: salesChart } = useQuery({
-    queryKey: ["sales-chart"],
+    queryKey: ["sales-chart", currentCompany?.id],
     queryFn: async () => {
       const last7Days = Array.from({ length: 7 }, (_, i) => {
         const date = subDays(new Date(), 6 - i);
@@ -88,6 +94,7 @@ export default function Dashboard() {
       const { data, error } = await supabase
         .from("sales")
         .select("total, created_at")
+        .eq("company_id", currentCompany?.id)
         .gte("created_at", last7Days[0].toISOString());
 
       if (error) throw error;
@@ -111,11 +118,12 @@ export default function Dashboard() {
 
   // Top 5 productos más vendidos
   const { data: topProducts } = useQuery({
-    queryKey: ["top-products"],
+    queryKey: ["top-products", currentCompany?.id],
     queryFn: async () => {
       const { data, error } = await supabase
         .from("sale_items")
-        .select("product_name, quantity");
+        .select("product_name, quantity, sales!inner(company_id)")
+        .eq("sales.company_id", currentCompany?.id);
 
       if (error) throw error;
 
@@ -135,11 +143,12 @@ export default function Dashboard() {
 
   // Productos con stock crítico
   const { data: criticalStock } = useQuery({
-    queryKey: ["critical-stock-list"],
+    queryKey: ["critical-stock-list", currentCompany?.id],
     queryFn: async () => {
       const { data, error } = await supabase
         .from("products")
         .select("name, stock, min_stock")
+        .eq("company_id", currentCompany?.id)
         .lte("stock", 10)
         .order("stock", { ascending: true })
         .limit(5);

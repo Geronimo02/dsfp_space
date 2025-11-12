@@ -12,7 +12,10 @@ import { es } from "date-fns/locale";
 
 const COLORS = ['hsl(var(--chart-1))', 'hsl(var(--chart-2))', 'hsl(var(--chart-3))', 'hsl(var(--chart-4))', 'hsl(var(--chart-5))'];
 
+import { useCompany } from "@/contexts/CompanyContext";
+
 const Reports = () => {
+  const { currentCompany } = useCompany();
   const [dateRange, setDateRange] = useState("7");
 
   const getDateRange = () => {
@@ -25,12 +28,13 @@ const Reports = () => {
 
   // Ventas por día
   const { data: salesData } = useQuery({
-    queryKey: ["reports-sales", dateRange],
+    queryKey: ["reports-sales", dateRange, currentCompany?.id],
     queryFn: async () => {
       const { start, end } = getDateRange();
       const { data, error } = await supabase
         .from("sales")
         .select("created_at, total")
+        .eq("company_id", currentCompany?.id)
         .gte("created_at", start.toISOString())
         .lte("created_at", end.toISOString())
         .order("created_at");
@@ -54,12 +58,13 @@ const Reports = () => {
 
   // Métodos de pago
   const { data: paymentMethodsData } = useQuery({
-    queryKey: ["reports-payment-methods", dateRange],
+    queryKey: ["reports-payment-methods", dateRange, currentCompany?.id],
     queryFn: async () => {
       const { start, end } = getDateRange();
       const { data, error } = await supabase
         .from("sales")
         .select("payment_method, total")
+        .eq("company_id", currentCompany?.id)
         .gte("created_at", start.toISOString())
         .lte("created_at", end.toISOString());
 
@@ -80,7 +85,7 @@ const Reports = () => {
 
   // Productos más vendidos
   const { data: topProductsData } = useQuery({
-    queryKey: ["reports-top-products", dateRange],
+    queryKey: ["reports-top-products", dateRange, currentCompany?.id],
     queryFn: async () => {
       const { start, end } = getDateRange();
       const { data, error } = await supabase
@@ -90,8 +95,9 @@ const Reports = () => {
           quantity,
           subtotal,
           sale_id,
-          sales!inner(created_at)
+          sales!inner(created_at, company_id)
         `)
+        .eq("sales.company_id", currentCompany?.id)
         .gte("sales.created_at", start.toISOString())
         .lte("sales.created_at", end.toISOString());
 
@@ -115,7 +121,7 @@ const Reports = () => {
 
   // Resumen general
   const { data: summary } = useQuery({
-    queryKey: ["reports-summary", dateRange],
+    queryKey: ["reports-summary", dateRange, currentCompany?.id],
     queryFn: async () => {
       const { start, end } = getDateRange();
 
@@ -123,6 +129,7 @@ const Reports = () => {
       const { data: sales } = await supabase
         .from("sales")
         .select("total")
+        .eq("company_id", currentCompany?.id)
         .gte("created_at", start.toISOString())
         .lte("created_at", end.toISOString());
 
@@ -130,6 +137,7 @@ const Reports = () => {
       const { data: purchases } = await supabase
         .from("purchases")
         .select("total")
+        .eq("company_id", currentCompany?.id)
         .gte("created_at", start.toISOString())
         .lte("created_at", end.toISOString());
 
@@ -143,7 +151,8 @@ const Reports = () => {
       // Productos con stock bajo
       const { data: products } = await supabase
         .from("products")
-        .select("*");
+        .select("*")
+        .eq("company_id", currentCompany?.id);
       
       const lowStock = products?.filter(p => p.stock < (p.min_stock || 0)) || [];
 
@@ -165,12 +174,13 @@ const Reports = () => {
 
   // Compras por día
   const { data: purchasesData } = useQuery({
-    queryKey: ["reports-purchases", dateRange],
+    queryKey: ["reports-purchases", dateRange, currentCompany?.id],
     queryFn: async () => {
       const { start, end } = getDateRange();
       const { data, error } = await supabase
         .from("purchases")
         .select("created_at, total")
+        .eq("company_id", currentCompany?.id)
         .gte("created_at", start.toISOString())
         .lte("created_at", end.toISOString())
         .order("created_at");

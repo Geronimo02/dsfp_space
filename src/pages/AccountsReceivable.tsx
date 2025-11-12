@@ -15,8 +15,10 @@ import { sanitizeSearchQuery } from "@/lib/searchUtils";
 import { format } from "date-fns";
 import { es } from "date-fns/locale";
 import { toast } from "sonner";
+import { useCompany } from "@/contexts/CompanyContext";
 
 export default function AccountsReceivable() {
+  const { currentCompany } = useCompany();
   const [searchQuery, setSearchQuery] = useState("");
   const [selectedCustomer, setSelectedCustomer] = useState<any>(null);
   const [isPaymentDialogOpen, setIsPaymentDialogOpen] = useState(false);
@@ -29,11 +31,12 @@ export default function AccountsReceivable() {
 
   // Query para obtener clientes con saldo
   const { data: customers } = useQuery({
-    queryKey: ["customers-with-balance", searchQuery],
+    queryKey: ["customers-with-balance", searchQuery, currentCompany?.id],
     queryFn: async () => {
       let query = supabase
         .from("customers")
         .select("*")
+        .eq("company_id", currentCompany?.id)
         .gt("current_balance", 0)
         .order("current_balance", { ascending: false });
       

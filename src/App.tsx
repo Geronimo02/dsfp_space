@@ -2,10 +2,10 @@ import { Toaster } from "@/components/ui/toaster";
 import { Toaster as Sonner } from "@/components/ui/sonner";
 import { TooltipProvider } from "@/components/ui/tooltip";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
-import { BrowserRouter, Routes, Route, Navigate } from "react-router-dom";
+import { BrowserRouter, Routes, Route, Navigate, useNavigate } from "react-router-dom";
 import { useEffect, useState } from "react";
 import { supabase } from "@/integrations/supabase/client";
-import { CompanyProvider } from "@/contexts/CompanyContext";
+import { CompanyProvider, useCompany } from "@/contexts/CompanyContext";
 import { User, Session } from "@supabase/supabase-js";
 import Dashboard from "./pages/Dashboard";
 import Auth from "./pages/Auth";
@@ -39,6 +39,32 @@ import NotFound from "./pages/NotFound";
 
 const queryClient = new QueryClient();
 
+// Wrapper to check if user has a company
+function CompanyCheck({ children }: { children: React.ReactNode }) {
+  const { userCompanies, loading, currentCompany } = useCompany();
+  const [shouldRedirect, setShouldRedirect] = useState(false);
+
+  useEffect(() => {
+    if (!loading && userCompanies.length === 0) {
+      setShouldRedirect(true);
+    }
+  }, [loading, userCompanies]);
+
+  if (loading) {
+    return <div className="flex items-center justify-center min-h-screen">Cargando empresa...</div>;
+  }
+
+  if (shouldRedirect) {
+    return <Navigate to="/company-setup" replace />;
+  }
+
+  if (!currentCompany) {
+    return <div className="flex items-center justify-center min-h-screen">Sin empresa seleccionada...</div>;
+  }
+
+  return <>{children}</>;
+}
+
 function ProtectedRoute({ children }: { children: React.ReactNode }) {
   const [user, setUser] = useState<User | null>(null);
   const [session, setSession] = useState<Session | null>(null);
@@ -70,7 +96,7 @@ function ProtectedRoute({ children }: { children: React.ReactNode }) {
     return <Navigate to="/auth" />;
   }
 
-  return <>{children}</>;
+  return <CompanyCheck>{children}</CompanyCheck>;
 }
 
 const App = () => (

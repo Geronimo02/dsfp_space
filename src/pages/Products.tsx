@@ -90,9 +90,9 @@ export default function Products() {
   const queryClient = useQueryClient();
 
   const { data: products, isLoading } = useQuery({
-    queryKey: ["products", searchQuery],
+    queryKey: ["products", searchQuery, currentCompany?.id],
     queryFn: async () => {
-      let query = supabase.from("products").select("*").order("created_at", { ascending: false });
+      let query = supabase.from("products").select("*").eq("company_id", currentCompany?.id).order("created_at", { ascending: false });
       
       if (searchQuery) {
         const sanitized = sanitizeSearchQuery(searchQuery);
@@ -108,11 +108,12 @@ export default function Products() {
   });
 
   const { data: warehouses } = useQuery({
-    queryKey: ["warehouses"],
+    queryKey: ["warehouses", currentCompany?.id],
     queryFn: async () => {
       const { data, error } = await supabase
         .from("warehouses")
         .select("*")
+        .eq("company_id", currentCompany?.id)
         .eq("active", true)
         .order("is_main", { ascending: false });
       if (error) throw error;

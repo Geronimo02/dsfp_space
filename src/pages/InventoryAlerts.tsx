@@ -18,17 +18,20 @@ import { formatDistanceToNow } from "date-fns";
 import { es } from "date-fns/locale";
 import { useNavigate } from "react-router-dom";
 import { toast } from "sonner";
+import { useCompany } from "@/contexts/CompanyContext";
 
 export default function InventoryAlerts() {
+  const { currentCompany } = useCompany();
   const [searchQuery, setSearchQuery] = useState("");
   const navigate = useNavigate();
 
   const { data: lowStockProducts, isLoading: loadingLowStock } = useQuery({
-    queryKey: ["low-stock-products"],
+    queryKey: ["low-stock-products", currentCompany?.id],
     queryFn: async () => {
       const { data, error } = await supabase
         .from("products")
         .select("*")
+        .eq("company_id", currentCompany?.id)
         .eq("active", true)
         .order("stock", { ascending: true });
 
@@ -40,7 +43,7 @@ export default function InventoryAlerts() {
   });
 
   const { data: expiringProducts, isLoading: loadingExpiring } = useQuery({
-    queryKey: ["expiring-products"],
+    queryKey: ["expiring-products", currentCompany?.id],
     queryFn: async () => {
       const thirtyDaysFromNow = new Date();
       thirtyDaysFromNow.setDate(thirtyDaysFromNow.getDate() + 30);
@@ -48,6 +51,7 @@ export default function InventoryAlerts() {
       const { data, error } = await supabase
         .from("products")
         .select("*")
+        .eq("company_id", currentCompany?.id)
         .not("expiration_date", "is", null)
         .lte("expiration_date", thirtyDaysFromNow.toISOString())
         .gte("expiration_date", new Date().toISOString())
