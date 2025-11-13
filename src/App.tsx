@@ -65,6 +65,42 @@ function CompanyCheck({ children }: { children: React.ReactNode }) {
   return <>{children}</>;
 }
 
+// Protected route that only checks authentication (no company check)
+function AuthOnlyRoute({ children }: { children: React.ReactNode }) {
+  const [user, setUser] = useState<User | null>(null);
+  const [session, setSession] = useState<Session | null>(null);
+  const [loading, setLoading] = useState(true);
+
+  useEffect(() => {
+    const { data: { subscription } } = supabase.auth.onAuthStateChange(
+      (event, session) => {
+        setSession(session);
+        setUser(session?.user ?? null);
+        setLoading(false);
+      }
+    );
+
+    supabase.auth.getSession().then(({ data: { session } }) => {
+      setSession(session);
+      setUser(session?.user ?? null);
+      setLoading(false);
+    });
+
+    return () => subscription.unsubscribe();
+  }, []);
+
+  if (loading) {
+    return <div className="flex items-center justify-center min-h-screen">Cargando...</div>;
+  }
+
+  if (!user) {
+    return <Navigate to="/auth" />;
+  }
+
+  return <>{children}</>;
+}
+
+// Protected route with both authentication and company checks
 function ProtectedRoute({ children }: { children: React.ReactNode }) {
   const [user, setUser] = useState<User | null>(null);
   const [session, setSession] = useState<Session | null>(null);
@@ -108,7 +144,7 @@ const App = () => (
         <CompanyProvider>
           <Routes>
           <Route path="/auth" element={<Auth />} />
-          <Route path="/company-setup" element={<ProtectedRoute><CompanySetup /></ProtectedRoute>} />
+          <Route path="/company-setup" element={<AuthOnlyRoute><CompanySetup /></AuthOnlyRoute>} />
           <Route path="/" element={<ProtectedRoute><Dashboard /></ProtectedRoute>} />
           <Route path="/pos" element={<ProtectedRoute><POS /></ProtectedRoute>} />
           <Route path="/products" element={<ProtectedRoute><Products /></ProtectedRoute>} />
