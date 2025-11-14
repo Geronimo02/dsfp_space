@@ -29,32 +29,16 @@ export default function CompanySetup() {
       const { data: { user } } = await supabase.auth.getUser();
       if (!user) throw new Error("Usuario no autenticado");
 
-      // Create company
+      // Use the security definer function to create company with admin
       const { data: company, error: companyError } = await supabase
-        .from("companies")
-        .insert({
-          name: companyName,
-          tax_id: taxId || null,
-          phone: phone || null,
-          address: address || null,
-          active: true,
-        })
-        .select()
-        .single();
-
-      if (companyError) throw companyError;
-
-      // Add user as admin of the new company
-      const { error: companyUserError } = await supabase
-        .from("company_users")
-        .insert({
-          company_id: company.id,
-          user_id: user.id,
-          role: "admin",
-          active: true,
+        .rpc("create_company_with_admin" as any, {
+          company_name: companyName,
+          company_tax_id: taxId || null,
+          company_phone: phone || null,
+          company_address: address || null,
         });
 
-      if (companyUserError) throw companyUserError;
+      if (companyError) throw companyError;
 
       toast.success("Empresa creada exitosamente");
       
