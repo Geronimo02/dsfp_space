@@ -121,7 +121,7 @@ export default function Reservations() {
       if (!customer) throw new Error("Cliente no encontrado");
 
       const subtotal = cart.reduce((sum, item) => sum + item.subtotal, 0);
-      const { data: settings } = await supabase.from("company_settings").select("default_tax_rate").single();
+      const { data: settings } = await supabase.from("companies").select("default_tax_rate").single();
       const taxRate = settings?.default_tax_rate || 0;
       const tax = subtotal * (taxRate / 100);
       const total = subtotal + tax;

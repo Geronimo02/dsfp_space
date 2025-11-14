@@ -29,15 +29,15 @@ const getTicketConfig = async () => {
       };
     }
 
-    // Si no existe ticket_config, usar company_settings como fallback
+    // Si no existe ticket_config, usar companies como fallback
     const { data: companyData, error: companyError } = await supabase
-      .from('company_settings')
+      .from('companies')
       .select('*')
       .single();
       
     if (!companyError && companyData) {
       return {
-        company_name: companyData.company_name || 'Mi Empresa',
+        company_name: companyData.name || 'Mi Empresa',
         company_address: companyData.address || '',
         company_phone: companyData.phone || '',
         company_email: companyData.email || '',

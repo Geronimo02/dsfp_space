@@ -16,6 +16,8 @@ import { toast } from "sonner";
 import { z } from "zod";
 import { format } from "date-fns";
 
+import { CompanySettings } from "@/components/settings/CompanySettings";
+
 const settingsSchema = z.object({
   company_name: z.string().trim().min(1, "El nombre de la empresa es requerido").max(200, "El nombre debe tener máximo 200 caracteres"),
   email: z.string().trim().toLowerCase().max(255, "El email debe tener máximo 255 caracteres")
@@ -90,7 +92,7 @@ export default function Settings() {
     queryKey: ["company-settings"],
     queryFn: async () => {
       const { data, error } = await supabase
-        .from("company_settings")
+        .from("companies")
         .select("*")
         .single();
       
@@ -98,7 +100,7 @@ export default function Settings() {
       
       // Update form with loaded data
       setFormData({
-        company_name: data.company_name || "",
+        company_name: data.name || "",
         tax_id: data.tax_id || "",
         address: data.address || "",
         phone: data.phone || "",
@@ -135,9 +137,9 @@ export default function Settings() {
       if (!settings?.id) throw new Error("No settings found");
       
       const { error } = await supabase
-        .from("company_settings")
+        .from("companies")
         .update({
-          company_name: data.company_name,
+          name: data.company_name,
           tax_id: data.tax_id || null,
           address: data.address || null,
           phone: data.phone || null,
@@ -594,13 +596,19 @@ export default function Settings() {
           <p className="text-muted-foreground">Administra todos los ajustes globales del sistema</p>
         </div>
 
-        <Tabs defaultValue="general" className="w-full">
-          <TabsList className="grid w-full grid-cols-4">
+        <Tabs defaultValue="company" className="w-full">
+          <TabsList className="grid w-full grid-cols-5">
+            <TabsTrigger value="company">Empresa</TabsTrigger>
             <TabsTrigger value="general">General</TabsTrigger>
             <TabsTrigger value="ticket-design">Diseño de Tickets</TabsTrigger>
             <TabsTrigger value="security">Seguridad</TabsTrigger>
             <TabsTrigger value="integrations">Integraciones</TabsTrigger>
           </TabsList>
+
+          {/* Company */}
+          <TabsContent value="company">
+            <CompanySettings />
+          </TabsContent>
 
           {/* General */}
           <TabsContent value="general" className="space-y-6">

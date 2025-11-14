@@ -28,15 +28,15 @@ const getTicketConfig = async () => {
       };
     }
 
-    // Fallback a company_settings
+    // Fallback a companies table
     const { data: companyData } = await supabase
-      .from('company_settings')
+      .from('companies')
       .select('*')
       .single();
       
     if (companyData) {
       return {
-        company_name: companyData.company_name || 'Mi Empresa',
+        company_name: companyData.name || 'Mi Empresa',
         company_address: companyData.address || '',
         company_phone: companyData.phone || '',
         company_email: companyData.email || '',
