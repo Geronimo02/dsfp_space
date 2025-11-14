@@ -118,7 +118,7 @@ export default function Quotations() {
     queryKey: ["company-settings"],
     queryFn: async () => {
       const { data, error } = await supabase
-        .from("company_settings")
+        .from("companies")
         .select("*")
         .single();
       if (error) throw error;

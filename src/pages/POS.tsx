@@ -102,7 +102,7 @@ export default function POS() {
     queryKey: ["company-settings"],
     queryFn: async () => {
       const { data, error } = await supabase
-        .from("company_settings")
+        .from("companies")
         .select("*")
         .single();
       
@@ -756,7 +756,7 @@ ${lastSaleData.customer ? `👤 Cliente: ${lastSaleData.customer.name}` : '👤 
 
       try {
         const { data: ticketConfig, error } = await supabase
-          .from('company_settings')
+          .from('companies')
           .select('*')
           .single();
 
@@ -764,7 +764,7 @@ ${lastSaleData.customer ? `👤 Cliente: ${lastSaleData.customer.name}` : '👤 
           config = {
             paper_width: '80mm', // Valor fijo por defecto
             font_size: 'small', // Valor fijo por defecto
-            company_name: ticketConfig.company_name || 'Mi Empresa',
+            company_name: ticketConfig.name || 'Mi Empresa',
             company_address: ticketConfig.address || '',
             company_phone: ticketConfig.phone || '',
             footer_message: ticketConfig.receipt_footer || '¡Gracias por su compra!'
