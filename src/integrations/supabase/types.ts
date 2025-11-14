@@ -363,102 +363,6 @@ export type Database = {
         }
         Relationships: []
       }
-      company_settings: {
-        Row: {
-          address: string | null
-          backup_enabled: boolean | null
-          card_surcharge_rate: number | null
-          company_name: string
-          created_at: string
-          currency: string | null
-          default_tax_rate: number | null
-          email: string | null
-          id: string
-          last_backup_date: string | null
-          logo_url: string | null
-          low_stock_alert: boolean | null
-          loyalty_bronze_discount: number | null
-          loyalty_bronze_threshold: number | null
-          loyalty_currency_per_point: number | null
-          loyalty_enabled: boolean | null
-          loyalty_gold_discount: number | null
-          loyalty_gold_threshold: number | null
-          loyalty_points_per_currency: number | null
-          loyalty_silver_discount: number | null
-          loyalty_silver_threshold: number | null
-          phone: string | null
-          receipt_footer: string | null
-          receipt_format: string | null
-          receipt_printer_name: string | null
-          tax_id: string | null
-          updated_at: string
-          whatsapp_enabled: boolean | null
-          whatsapp_number: string | null
-        }
-        Insert: {
-          address?: string | null
-          backup_enabled?: boolean | null
-          card_surcharge_rate?: number | null
-          company_name: string
-          created_at?: string
-          currency?: string | null
-          default_tax_rate?: number | null
-          email?: string | null
-          id?: string
-          last_backup_date?: string | null
-          logo_url?: string | null
-          low_stock_alert?: boolean | null
-          loyalty_bronze_discount?: number | null
-          loyalty_bronze_threshold?: number | null
-          loyalty_currency_per_point?: number | null
-          loyalty_enabled?: boolean | null
-          loyalty_gold_discount?: number | null
-          loyalty_gold_threshold?: number | null
-          loyalty_points_per_currency?: number | null
-          loyalty_silver_discount?: number | null
-          loyalty_silver_threshold?: number | null
-          phone?: string | null
-          receipt_footer?: string | null
-          receipt_format?: string | null
-          receipt_printer_name?: string | null
-          tax_id?: string | null
-          updated_at?: string
-          whatsapp_enabled?: boolean | null
-          whatsapp_number?: string | null
-        }
-        Update: {
-          address?: string | null
-          backup_enabled?: boolean | null
-          card_surcharge_rate?: number | null
-          company_name?: string
-          created_at?: string
-          currency?: string | null
-          default_tax_rate?: number | null
-          email?: string | null
-          id?: string
-          last_backup_date?: string | null
-          logo_url?: string | null
-          low_stock_alert?: boolean | null
-          loyalty_bronze_discount?: number | null
-          loyalty_bronze_threshold?: number | null
-          loyalty_currency_per_point?: number | null
-          loyalty_enabled?: boolean | null
-          loyalty_gold_discount?: number | null
-          loyalty_gold_threshold?: number | null
-          loyalty_points_per_currency?: number | null
-          loyalty_silver_discount?: number | null
-          loyalty_silver_threshold?: number | null
-          phone?: string | null
-          receipt_footer?: string | null
-          receipt_format?: string | null
-          receipt_printer_name?: string | null
-          tax_id?: string | null
-          updated_at?: string
-          whatsapp_enabled?: boolean | null
-          whatsapp_number?: string | null
-        }
-        Relationships: []
-      }
       company_users: {
         Row: {
           active: boolean | null
@@ -795,6 +699,7 @@ export type Database = {
       }
       delivery_note_items: {
         Row: {
+          company_id: string | null
           created_at: string | null
           delivery_note_id: string
           id: string
@@ -806,6 +711,7 @@ export type Database = {
           unit_price: number
         }
         Insert: {
+          company_id?: string | null
           created_at?: string | null
           delivery_note_id: string
           id?: string
@@ -817,6 +723,7 @@ export type Database = {
           unit_price: number
         }
         Update: {
+          company_id?: string | null
           created_at?: string | null
           delivery_note_id?: string
           id?: string
@@ -828,6 +735,13 @@ export type Database = {
           unit_price?: number
         }
         Relationships: [
+          {
+            foreignKeyName: "delivery_note_items_company_id_fkey"
+            columns: ["company_id"]
+            isOneToOne: false
+            referencedRelation: "companies"
+            referencedColumns: ["id"]
+          },
           {
             foreignKeyName: "delivery_note_items_delivery_note_id_fkey"
             columns: ["delivery_note_id"]
@@ -1276,7 +1190,7 @@ export type Database = {
           barcode: string | null
           batch_number: string | null
           category: string | null
-          company_id: string | null
+          company_id: string
           cost: number | null
           created_at: string
           description: string | null
@@ -1298,7 +1212,7 @@ export type Database = {
           barcode?: string | null
           batch_number?: string | null
           category?: string | null
-          company_id?: string | null
+          company_id: string
           cost?: number | null
           created_at?: string
           description?: string | null
@@ -1320,7 +1234,7 @@ export type Database = {
           barcode?: string | null
           batch_number?: string | null
           category?: string | null
-          company_id?: string | null
+          company_id?: string
           cost?: number | null
           created_at?: string
           description?: string | null
@@ -1578,6 +1492,7 @@ export type Database = {
       }
       quotation_items: {
         Row: {
+          company_id: string | null
           created_at: string | null
           id: string
           product_id: string | null
@@ -1589,6 +1504,7 @@ export type Database = {
           unit_price: number
         }
         Insert: {
+          company_id?: string | null
           created_at?: string | null
           id?: string
           product_id?: string | null
@@ -1600,6 +1516,7 @@ export type Database = {
           unit_price: number
         }
         Update: {
+          company_id?: string | null
           created_at?: string | null
           id?: string
           product_id?: string | null
@@ -1611,6 +1528,13 @@ export type Database = {
           unit_price?: number
         }
         Relationships: [
+          {
+            foreignKeyName: "quotation_items_company_id_fkey"
+            columns: ["company_id"]
+            isOneToOne: false
+            referencedRelation: "companies"
+            referencedColumns: ["id"]
+          },
           {
             foreignKeyName: "quotation_items_quotation_id_fkey"
             columns: ["quotation_id"]
@@ -1705,6 +1629,7 @@ export type Database = {
       }
       reservation_items: {
         Row: {
+          company_id: string | null
           created_at: string | null
           id: string
           product_id: string | null
@@ -1715,6 +1640,7 @@ export type Database = {
           unit_price: number
         }
         Insert: {
+          company_id?: string | null
           created_at?: string | null
           id?: string
           product_id?: string | null
@@ -1725,6 +1651,7 @@ export type Database = {
           unit_price: number
         }
         Update: {
+          company_id?: string | null
           created_at?: string | null
           id?: string
           product_id?: string | null
@@ -1735,6 +1662,13 @@ export type Database = {
           unit_price?: number
         }
         Relationships: [
+          {
+            foreignKeyName: "reservation_items_company_id_fkey"
+            columns: ["company_id"]
+            isOneToOne: false
+            referencedRelation: "companies"
+            referencedColumns: ["id"]
+          },
           {
             foreignKeyName: "reservation_items_product_id_fkey"
             columns: ["product_id"]
@@ -1889,6 +1823,7 @@ export type Database = {
       }
       return_items: {
         Row: {
+          company_id: string | null
           created_at: string | null
           id: string
           product_id: string | null
@@ -1899,6 +1834,7 @@ export type Database = {
           unit_price: number
         }
         Insert: {
+          company_id?: string | null
           created_at?: string | null
           id?: string
           product_id?: string | null
@@ -1909,6 +1845,7 @@ export type Database = {
           unit_price: number
         }
         Update: {
+          company_id?: string | null
           created_at?: string | null
           id?: string
           product_id?: string | null
@@ -1919,6 +1856,13 @@ export type Database = {
           unit_price?: number
         }
         Relationships: [
+          {
+            foreignKeyName: "return_items_company_id_fkey"
+            columns: ["company_id"]
+            isOneToOne: false
+            referencedRelation: "companies"
+            referencedColumns: ["id"]
+          },
           {
             foreignKeyName: "return_items_product_id_fkey"
             columns: ["product_id"]
@@ -2062,6 +2006,7 @@ export type Database = {
       }
       sale_items: {
         Row: {
+          company_id: string | null
           created_at: string
           id: string
           product_id: string
@@ -2072,6 +2017,7 @@ export type Database = {
           unit_price: number
         }
         Insert: {
+          company_id?: string | null
           created_at?: string
           id?: string
           product_id: string
@@ -2082,6 +2028,7 @@ export type Database = {
           unit_price: number
         }
         Update: {
+          company_id?: string | null
           created_at?: string
           id?: string
           product_id?: string
@@ -2092,6 +2039,13 @@ export type Database = {
           unit_price?: number
         }
         Relationships: [
+          {
+            foreignKeyName: "sale_items_company_id_fkey"
+            columns: ["company_id"]
+            isOneToOne: false
+            referencedRelation: "companies"
+            referencedColumns: ["id"]
+          },
           {
             foreignKeyName: "sale_items_product_id_fkey"
             columns: ["product_id"]
@@ -2837,6 +2791,15 @@ export type Database = {
       }
       check_expiring_products: { Args: never; Returns: undefined }
       check_low_stock_alerts: { Args: never; Returns: undefined }
+      create_company_with_admin: {
+        Args: {
+          company_address?: string
+          company_name: string
+          company_phone?: string
+          company_tax_id?: string
+        }
+        Returns: Json
+      }
       create_customer_payment: {
         Args: {
           p_amount: number
@@ -2893,6 +2856,12 @@ export type Database = {
           applied_date: string
           id: string
           sale_id: string
+        }[]
+      }
+      get_user_companies: {
+        Args: { _user_id: string }
+        Returns: {
+          company_id: string
         }[]
       }
       get_user_company: { Args: { _user_id: string }; Returns: string }
