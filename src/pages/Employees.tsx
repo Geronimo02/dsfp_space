@@ -45,8 +45,24 @@ import { toast } from "sonner";
 import { UserPlus, Search, Users, Shield, UserCheck, Database, Trash2 } from "lucide-react";
 import { Label } from "@/components/ui/label";
 import { Checkbox } from "@/components/ui/checkbox";
+import { usePermissions } from "@/hooks/usePermissions";  // Ensure imported
 
+// Add local type definitions to avoid import conflicts
 type AppRole = "admin" | "manager" | "cashier" | "accountant" | "viewer" | "employee" | "warehouse" | "technician" | "auditor";
+
+type RolePermission = {
+  id: string;
+  role: AppRole;
+  module: string;
+  can_view: boolean | null;
+  can_create: boolean | null;
+  can_edit: boolean | null;
+  can_delete: boolean | null;
+  can_export: boolean | null;
+  company_id: string;
+  created_at: string | null;
+  updated_at: string | null;
+};
 
 interface Employee {
   id: string;
@@ -69,6 +85,7 @@ export default function Employees() {
   const [inviteLoading, setInviteLoading] = useState(false);
   const [isAdmin, setIsAdmin] = useState(false);
   const [resetLoading, setResetLoading] = useState(false);
+  const { hasPermission, currentCompany } = usePermissions();  // Now includes currentCompany
 
   const availableRoles: { value: AppRole; label: string; color: string; description: string }[] = [
     { 
@@ -327,6 +344,42 @@ export default function Employees() {
       toast.error("Error al resetear la base de datos: " + error.message);
     } finally {
       setResetLoading(false);
+    }
+  };
+
+  // Add state for permissions management
+  const [permissionsData, setPermissionsData] = useState<RolePermission[]>([]);  // Fixed type
+  const [editingPermissions, setEditingPermissions] = useState(false);
+
+  // Fetch permissions for the selected employee's roles in the current company
+  useEffect(() => {
+    if (selectedEmployee && currentCompany?.id) {
+      const fetchPermissions = async () => {
+        const { data } = await supabase
+          .from("role_permissions")
+          .select("*")
+          .in("role", selectedEmployee.roles || [])  // Assuming roles are fetched as app_role[]
+          .eq("company_id", currentCompany.id);
+        setPermissionsData(data || []);
+      };
+      fetchPermissions();
+    }
+  }, [selectedEmployee, currentCompany]);
+
+  // Function to update permissions
+  const updatePermission = async (role: AppRole, module: string, permission: keyof RolePermission, value: boolean) => {
+    if (!currentCompany?.id) return;
+    const { error } = await supabase
+      .from("role_permissions")
+      .update({ [permission]: value })
+      .eq("role", role)
+      .eq("module", module)
+      .eq("company_id", currentCompany.id);
+    if (!error) {
+      // Refresh data
+      setPermissionsData(prev => prev.map(p => 
+        p.role === role && p.module === module ? { ...p, [permission]: value } : p
+      ));
     }
   };
 
@@ -612,9 +665,10 @@ export default function Employees() {
       <Dialog open={dialogOpen} onOpenChange={setDialogOpen}>
         <DialogContent>
           <DialogHeader>
-            <DialogTitle>Gestionar Roles</DialogTitle>
+            <DialogTitle>Gestionar Roles y Permisos</DialogTitle>
           </DialogHeader>
           <div className="space-y-4">
+            {/* Existing role assignment */}
             <div>
               <Label className="text-sm font-medium">Usuario</Label>
               <p className="text-sm text-muted-foreground mt-1">
@@ -625,37 +679,51 @@ export default function Employees() {
               </p>
             </div>
 
+            {/* Roles section (existing) */}
             <div className="space-y-3">
               <Label className="text-sm font-medium">Roles asignados</Label>
               {availableRoles.map((role) => (
                 <div key={role.value} className="flex items-start space-x-3 p-3 rounded-lg border hover:bg-accent/50 transition-colors">
                   <Checkbox
-                    id={role.value}
-                    checked={selectedRoles.includes(role.value)}
+                    checked={selectedEmployee?.roles?.includes(role.value) || false}
                     onCheckedChange={(checked) => handleRoleChange(role.value, checked as boolean)}
-                    className="mt-1"
                   />
-                  <label
-                    htmlFor={role.value}
-                    className="flex-1 cursor-pointer"
-                  >
-                    <div className="flex items-center gap-2 mb-1">
-                      <Badge className={`${role.color} text-white`}>{role.label}</Badge>
-                    </div>
+                  <div className="flex-1">
+                    <Label className="text-sm font-medium">{role.label}</Label>
                     <p className="text-xs text-muted-foreground">{role.description}</p>
-                  </label>
+                  </div>
                 </div>
               ))}
             </div>
 
-            <div className="flex justify-end gap-2 pt-4">
-              <Button variant="outline" onClick={() => setDialogOpen(false)}>
-                Cancelar
-              </Button>
-              <Button onClick={handleUpdateRoles}>
-                Guardar Cambios
-              </Button>
-            </div>
+            {/* New: Permissions management */}
+            {hasPermission("employees", "edit") && (
+              <div className="space-y-3">
+                <div className="flex justify-between items-center">
+                  <Label className="text-sm font-medium">Permisos por Módulo</Label>
+                  <Button variant="outline" size="sm" onClick={() => setEditingPermissions(!editingPermissions)}>
+                    {editingPermissions ? "Cancelar" : "Editar Permisos"}
+                  </Button>
+                </div>
+                {permissionsData.map((perm) => (
+                  <div key={`${perm.role}-${perm.module}`} className="p-3 rounded-lg border">
+                    <Label className="text-sm font-medium">{perm.module} ({perm.role})</Label>
+                    <div className="flex space-x-2 mt-2">
+                      {["can_view", "can_create", "can_edit", "can_delete", "can_export"].map((p) => (
+                        <div key={p} className="flex items-center space-x-1">
+                          <Checkbox
+                            checked={perm[p as keyof RolePermission] as boolean}
+                            disabled={!editingPermissions}
+                            onCheckedChange={(checked) => updatePermission(perm.role, perm.module, p as keyof RolePermission, checked as boolean)}  // Fixed call
+                          />
+                          <Label className="text-xs">{p.replace("can_", "")}</Label>
+                        </div>
+                      ))}
+                    </div>
+                  </div>
+                ))}
+              </div>
+            )}
           </div>
         </DialogContent>
       </Dialog>

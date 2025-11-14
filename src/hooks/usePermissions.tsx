@@ -32,7 +32,7 @@ interface RolePermission {
   can_export: boolean;
 }
 
-export const usePermissions = () => {
+export function usePermissions() {
   const { currentCompany } = useCompany();
   
   const { data: user, isLoading: userLoading } = useQuery({
@@ -62,19 +62,20 @@ export const usePermissions = () => {
   });
 
   const { data: permissions, isLoading: permissionsLoading } = useQuery({
-    queryKey: ["role-permissions", userRoles],
+    queryKey: ["role-permissions", userRoles, currentCompany?.id],
     queryFn: async () => {
-      if (!userRoles || userRoles.length === 0) return [];
+      if (!userRoles || userRoles.length === 0 || !currentCompany?.id) return [];
       
       const { data, error } = await supabase
         .from("role_permissions")
         .select("*")
-        .in("role", userRoles);
+        .in("role", userRoles)
+        .eq("company_id", currentCompany.id);  // Added company filter
       
       if (error) throw error;
       return data as RolePermission[];
     },
-    enabled: !!userRoles && userRoles.length > 0,
+    enabled: !!userRoles && userRoles.length > 0 && !!currentCompany?.id,
   });
 
   const hasPermission = (module: Module, permission: Permission): boolean => {
@@ -112,7 +113,8 @@ export const usePermissions = () => {
     permissions,
     userRoles,
     hasPermission,
-    hasRole,
+    loading: userLoading || rolesLoading || permissionsLoading,  // Fixed to use actual loading states
+    currentCompany,
     isAdmin,
     isManager,
     isCashier,
@@ -121,6 +123,5 @@ export const usePermissions = () => {
     isWarehouse,
     isTechnician,
     isAuditor,
-    loading: userLoading || rolesLoading || permissionsLoading,
   };
 };

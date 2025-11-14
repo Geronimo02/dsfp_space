@@ -663,7 +663,7 @@ export type Database = {
           email?: string | null
           id?: string
           loyalty_points?: number | null
-          loyalty_tier?: string | null
+          loyalty_tier?: number | null
           name: string
           payment_terms?: string | null
           phone?: string | null
@@ -680,7 +680,7 @@ export type Database = {
           email?: string | null
           id?: string
           loyalty_points?: number | null
-          loyalty_tier?: string | null
+          loyalty_tier?: number | null
           name?: string
           payment_terms?: string | null
           phone?: string | null
@@ -1972,6 +1972,7 @@ export type Database = {
           can_edit: boolean | null
           can_export: boolean | null
           can_view: boolean | null
+          company_id: string  // Added for company scoping
           created_at: string | null
           id: string
           module: string
@@ -1984,6 +1985,7 @@ export type Database = {
           can_edit?: boolean | null
           can_export?: boolean | null
           can_view?: boolean | null
+          company_id: string  // Added
           created_at?: string | null
           id?: string
           module: string
@@ -1996,13 +1998,22 @@ export type Database = {
           can_edit?: boolean | null
           can_export?: boolean | null
           can_view?: boolean | null
+          company_id?: string  // Added
           created_at?: string | null
           id?: string
           module?: string
           role?: Database["public"]["Enums"]["app_role"]
           updated_at?: string | null
         }
-        Relationships: []
+        Relationships: [
+          {
+            foreignKeyName: "role_permissions_company_id_fkey"
+            columns: ["company_id"]
+            isOneToOne: false
+            referencedRelation: "companies"
+            referencedColumns: ["id"]
+          },
+        ]
       }
       sale_items: {
         Row: {
@@ -2600,7 +2611,7 @@ export type Database = {
           id?: string
           product_id: string
           product_name: string
-          quantity: number
+                   quantity: number
           transfer_id: string
         }
         Update: {
@@ -2934,7 +2945,7 @@ export type Tables<
   }
     ? keyof (DatabaseWithoutInternals[DefaultSchemaTableNameOrOptions["schema"]]["Tables"] &
         DatabaseWithoutInternals[DefaultSchemaTableNameOrOptions["schema"]]["Views"])
-    : never = never,
+    : never,
 > = DefaultSchemaTableNameOrOptions extends {
   schema: keyof DatabaseWithoutInternals
 }
