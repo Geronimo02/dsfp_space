@@ -213,6 +213,7 @@ export default function Quotations() {
         quantity: item.quantity,
         unit_price: item.unit_price,
         subtotal: item.subtotal,
+        company_id: currentCompany?.id,
       }));
 
       const { error: itemsError } = await supabase
@@ -316,6 +317,7 @@ export default function Quotations() {
         quantity: item.quantity,
         unit_price: item.unit_price,
         subtotal: item.subtotal,
+        company_id: currentCompany?.id,
       }));
 
       const { error: saleItemsError } = await supabase
@@ -475,6 +477,7 @@ export default function Quotations() {
           unit_price: item.unit_price,
           subtotal: item.unit_price * item.quantity_to_deliver,
           quotation_item_id: item.id,
+          company_id: currentCompany?.id,
         }));
 
       await supabase.from("delivery_note_items").insert(items);

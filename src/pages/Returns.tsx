@@ -17,6 +17,7 @@ import { sanitizeSearchQuery } from "@/lib/searchUtils";
 import { es } from "date-fns/locale";
 import { toast } from "sonner";
 import { Separator } from "@/components/ui/separator";
+import { useCompany } from "@/contexts/CompanyContext";
 
 export default function Returns() {
   const [searchQuery, setSearchQuery] = useState("");
@@ -24,12 +25,15 @@ export default function Returns() {
   const [isDetailOpen, setIsDetailOpen] = useState(false);
   const queryClient = useQueryClient();
 
+  const { currentCompany } = useCompany();
+  
   const { data: returns } = useQuery({
-    queryKey: ["returns", searchQuery],
+    queryKey: ["returns", searchQuery, currentCompany?.id],
     queryFn: async () => {
       let query = supabase
         .from("returns")
         .select("*")
+        .eq("company_id", currentCompany?.id)
         .order("created_at", { ascending: false });
 
       if (searchQuery) {

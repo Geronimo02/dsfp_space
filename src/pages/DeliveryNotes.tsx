@@ -134,6 +134,7 @@ export default function DeliveryNotes() {
         quantity: item.quantity,
         unit_price: item.unit_price,
         subtotal: item.subtotal,
+        company_id: currentCompany?.id,
       }));
 
       await supabase.from("sale_items").insert(saleItems);
