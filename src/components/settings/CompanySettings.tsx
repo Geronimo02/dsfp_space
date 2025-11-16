@@ -6,9 +6,9 @@ import { Button } from "@/components/ui/button";
 import { Textarea } from "@/components/ui/textarea";
 import { Switch } from "@/components/ui/switch";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
-import { Building2, Upload, Loader2, X } from "lucide-react";
+import { Building2, Upload, Loader2, X, DollarSign, Pencil, Check } from "lucide-react";
 import { useCompany } from "@/contexts/CompanyContext";
-import { useMutation, useQueryClient } from "@tanstack/react-query";
+import { useMutation, useQueryClient, useQuery } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
 import { toast } from "sonner";
 import { z } from "zod";
@@ -37,6 +37,16 @@ const companySchema = z.object({
   loyalty_bronze_discount: z.number().min(0).max(100),
   loyalty_silver_discount: z.number().min(0).max(100),
   loyalty_gold_discount: z.number().min(0).max(100),
+  // Nuevos campos fiscales AFIP
+  razon_social: z.string().optional(),
+  nombre_fantasia: z.string().optional(),
+  condicion_iva: z.string().optional(),
+  inicio_actividades: z.string().optional(),
+  certificado_afip_url: z.string().optional(),
+  max_discount_percentage: z.number().min(0).max(100).optional(),
+  max_installments: z.number().min(1).max(99).optional(),
+  require_customer_document: z.boolean().optional(),
+  autoprint_receipt: z.boolean().optional(),
 });
 
 export function CompanySettings() {
@@ -45,6 +55,25 @@ export function CompanySettings() {
   const [uploading, setUploading] = useState(false);
   const [logoFile, setLogoFile] = useState<File | null>(null);
   const [logoPreview, setLogoPreview] = useState<string | null>(null);
+  const [testingConnection, setTestingConnection] = useState(false);
+  const [editingCurrency, setEditingCurrency] = useState<string | null>(null);
+  const [editingRate, setEditingRate] = useState<string>("");
+
+  // Query para obtener tipos de cambio
+  const { data: exchangeRates = [], isLoading: loadingRates } = useQuery({
+    queryKey: ["exchange-rates", currentCompany?.id],
+    queryFn: async () => {
+      if (!currentCompany?.id) return [];
+      const { data, error } = await supabase
+        .from("exchange_rates")
+        .select("*")
+        .eq("company_id", currentCompany.id)
+        .order("currency");
+      if (error) throw error;
+      return data as Array<{ id: string; currency: string; rate: number; company_id: string }>;
+    },
+    enabled: !!currentCompany?.id,
+  });
 
   const [formData, setFormData] = useState({
     name: "",
@@ -70,6 +99,22 @@ export function CompanySettings() {
     loyalty_bronze_discount: 0,
     loyalty_silver_discount: 5,
     loyalty_gold_discount: 10,
+    // Nuevos campos fiscales
+    razon_social: "",
+    nombre_fantasia: "",
+    condicion_iva: "responsable_inscripto",
+    inicio_actividades: "",
+    certificado_afip_url: "",
+    max_discount_percentage: 10,
+    max_installments: 12,
+    require_customer_document: false,
+    autoprint_receipt: false,
+    // Nuevos campos AFIP
+    cuit: "",
+    afip_certificate: "",
+    afip_private_key: "",
+    afip_ambiente: "testing",
+    afip_enabled: false,
   });
 
   useEffect(() => {
@@ -99,6 +144,22 @@ export function CompanySettings() {
         loyalty_bronze_discount: Number(company.loyalty_bronze_discount) || 0,
         loyalty_silver_discount: Number(company.loyalty_silver_discount) || 5,
         loyalty_gold_discount: Number(company.loyalty_gold_discount) || 10,
+        // Nuevos campos fiscales
+        razon_social: company.razon_social || "",
+        nombre_fantasia: company.nombre_fantasia || "",
+        condicion_iva: company.condicion_iva || "responsable_inscripto",
+        inicio_actividades: company.inicio_actividades || "",
+        certificado_afip_url: company.certificado_afip_url || "",
+        max_discount_percentage: Number(company.max_discount_percentage) || 10,
+        max_installments: Number(company.max_installments) || 12,
+        require_customer_document: company.require_customer_document || false,
+        autoprint_receipt: company.autoprint_receipt || false,
+        // Campos AFIP
+        cuit: company.cuit || "",
+        afip_certificate: company.afip_certificate || "",
+        afip_private_key: company.afip_private_key || "",
+        afip_ambiente: company.afip_ambiente || "testing",
+        afip_enabled: company.afip_enabled || false,
       });
       setLogoPreview(company.logo_url || null);
     }
@@ -118,6 +179,98 @@ export function CompanySettings() {
       };
       reader.readAsDataURL(file);
     }
+  };
+
+  const handleCertificateUpload = (
+    e: React.ChangeEvent<HTMLInputElement>,
+    type: 'certificate' | 'privateKey'
+  ) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+
+    const reader = new FileReader();
+    reader.onload = (event) => {
+      const content = event.target?.result as string;
+      // Convert to base64
+      const base64 = btoa(content);
+      
+      if (type === 'certificate') {
+        setFormData({ ...formData, afip_certificate: base64 });
+        toast.success("Certificado cargado correctamente");
+      } else {
+        setFormData({ ...formData, afip_private_key: base64 });
+        toast.success("Clave privada cargada correctamente");
+      }
+    };
+    reader.onerror = () => {
+      toast.error("Error al leer el archivo");
+    };
+    reader.readAsText(file);
+  };
+
+  const handleTestAFIPConnection = async () => {
+    if (!currentCompany?.id) return;
+    
+    setTestingConnection(true);
+    try {
+      const { data, error } = await supabase.functions.invoke('afip-auth', {
+        body: {
+          companyId: currentCompany.id,
+          service: 'wsfe',
+          ambiente: formData.afip_ambiente,
+        },
+      });
+
+      if (error) throw error;
+
+      if (data && data.token) {
+        toast.success("✅ Conexión exitosa con AFIP");
+      } else {
+        toast.error("No se pudo obtener el token de AFIP");
+      }
+    } catch (error: any) {
+      console.error('Error testing AFIP connection:', error);
+      toast.error(error.message || "Error al conectar con AFIP");
+    } finally {
+      setTestingConnection(false);
+    }
+  };
+
+  const updateExchangeRateMutation = useMutation({
+    mutationFn: async ({ currency, rate }: { currency: string; rate: number }) => {
+      if (!currentCompany?.id) throw new Error("No hay empresa seleccionada");
+      
+      const { error } = await supabase
+        .from("exchange_rates")
+        .upsert({
+          currency,
+          rate,
+          company_id: currentCompany.id,
+          updated_at: new Date().toISOString(),
+        }, {
+          onConflict: "currency,company_id",
+        });
+
+      if (error) throw error;
+    },
+    onSuccess: () => {
+      toast.success("Tipo de cambio actualizado");
+      queryClient.invalidateQueries({ queryKey: ["exchange-rates"] });
+      setEditingCurrency(null);
+      setEditingRate("");
+    },
+    onError: (error: any) => {
+      toast.error(error.message || "Error al actualizar tipo de cambio");
+    },
+  });
+
+  const handleSaveExchangeRate = (currency: string) => {
+    const rate = parseFloat(editingRate);
+    if (isNaN(rate) || rate <= 0) {
+      toast.error("Ingrese un tipo de cambio válido");
+      return;
+    }
+    updateExchangeRateMutation.mutate({ currency, rate });
   };
 
   const uploadLogoMutation = useMutation({
@@ -184,7 +337,23 @@ export function CompanySettings() {
           loyalty_silver_discount: data.loyalty_silver_discount,
           loyalty_gold_discount: data.loyalty_gold_discount,
           logo_url: data.logo_url || currentCompany.logo_url,
-        })
+          // Nuevos campos fiscales
+          razon_social: data.razon_social || null,
+          nombre_fantasia: data.nombre_fantasia || null,
+          condicion_iva: data.condicion_iva || 'responsable_inscripto',
+          inicio_actividades: data.inicio_actividades || null,
+          certificado_afip_url: data.certificado_afip_url || null,
+          max_discount_percentage: data.max_discount_percentage || 10,
+          max_installments: data.max_installments || 12,
+          require_customer_document: data.require_customer_document || false,
+          autoprint_receipt: data.autoprint_receipt || false,
+          // Campos AFIP
+          cuit: data.cuit || null,
+          afip_certificate: data.afip_certificate || null,
+          afip_private_key: data.afip_private_key || null,
+          afip_ambiente: data.afip_ambiente || 'testing',
+          afip_enabled: data.afip_enabled || false,
+        } as any)
         .eq('id', currentCompany.id);
 
       if (error) throw error;
@@ -326,6 +495,394 @@ export function CompanySettings() {
               onChange={(e) => setFormData({ ...formData, address: e.target.value })}
               rows={2}
             />
+          </div>
+
+          {/* Currency and Exchange Rates */}
+          <div className="space-y-4 pt-4 border-t">
+            <div className="flex items-center gap-2">
+              <DollarSign className="h-5 w-5 text-primary" />
+              <h3 className="font-semibold text-lg">Moneda y Tipos de Cambio</h3>
+            </div>
+            
+            <div className="space-y-2">
+              <Label htmlFor="currency">Moneda Principal *</Label>
+              <Select
+                value={formData.currency}
+                onValueChange={(value) => setFormData({ ...formData, currency: value })}
+              >
+                <SelectTrigger id="currency">
+                  <SelectValue />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="ARS">🇦🇷 Peso Argentino (ARS)</SelectItem>
+                  <SelectItem value="USD">🇺🇸 Dólar Estadounidense (USD)</SelectItem>
+                  <SelectItem value="EUR">🇪🇺 Euro (EUR)</SelectItem>
+                  <SelectItem value="BRL">🇧🇷 Real Brasileño (BRL)</SelectItem>
+                  <SelectItem value="CLP">🇨🇱 Peso Chileno (CLP)</SelectItem>
+                  <SelectItem value="UYU">🇺🇾 Peso Uruguayo (UYU)</SelectItem>
+                  <SelectItem value="MXN">🇲🇽 Peso Mexicano (MXN)</SelectItem>
+                </SelectContent>
+              </Select>
+              <p className="text-xs text-muted-foreground">
+                Esta será la moneda predeterminada para todas las transacciones
+              </p>
+            </div>
+
+            <div className="space-y-3">
+              <Label>Tipos de Cambio Manuales</Label>
+              <p className="text-sm text-muted-foreground">
+                Configure los tipos de cambio para convertir otras monedas a {formData.currency}
+              </p>
+              
+              {loadingRates ? (
+                <div className="flex items-center justify-center py-4">
+                  <Loader2 className="h-6 w-6 animate-spin text-muted-foreground" />
+                </div>
+              ) : (
+                <div className="space-y-2">
+                  {["ARS", "USD", "EUR", "BRL", "CLP", "UYU", "MXN"]
+                    .filter(curr => curr !== formData.currency)
+                    .map((currency) => {
+                      const existingRate = exchangeRates.find(r => r.currency === currency);
+                      const isEditing = editingCurrency === currency;
+                      
+                      return (
+                        <div key={currency} className="flex items-center gap-2 p-3 border rounded-lg">
+                          <div className="flex-1">
+                            <span className="font-medium">{currency}</span>
+                            <span className="text-sm text-muted-foreground ml-2">
+                              → {formData.currency}
+                            </span>
+                          </div>
+                          
+                          {isEditing ? (
+                            <>
+                              <Input
+                                type="number"
+                                step="0.0001"
+                                placeholder="Ej: 1000.00"
+                                value={editingRate}
+                                onChange={(e) => setEditingRate(e.target.value)}
+                                className="w-32"
+                                autoFocus
+                              />
+                              <Button
+                                type="button"
+                                size="sm"
+                                onClick={() => handleSaveExchangeRate(currency)}
+                                disabled={updateExchangeRateMutation.isPending}
+                              >
+                                <Check className="h-4 w-4" />
+                              </Button>
+                              <Button
+                                type="button"
+                                size="sm"
+                                variant="ghost"
+                                onClick={() => {
+                                  setEditingCurrency(null);
+                                  setEditingRate("");
+                                }}
+                              >
+                                <X className="h-4 w-4" />
+                              </Button>
+                            </>
+                          ) : (
+                            <>
+                              <span className="font-mono text-sm">
+                                {existingRate ? existingRate.rate.toFixed(4) : "No configurado"}
+                              </span>
+                              <Button
+                                type="button"
+                                size="sm"
+                                variant="outline"
+                                onClick={() => {
+                                  setEditingCurrency(currency);
+                                  setEditingRate(existingRate ? String(existingRate.rate) : "");
+                                }}
+                              >
+                                <Pencil className="h-4 w-4" />
+                              </Button>
+                            </>
+                          )}
+                        </div>
+                      );
+                    })}
+                </div>
+              )}
+            </div>
+          </div>
+
+          {/* Fiscal Configuration AFIP */}
+          <div className="space-y-4 pt-4 border-t">
+            <h3 className="font-semibold text-lg">Configuración Fiscal (AFIP)</h3>
+            
+            <div className="grid grid-cols-2 gap-4">
+              <div className="space-y-2">
+                <Label htmlFor="razon_social">Razón Social</Label>
+                <Input
+                  id="razon_social"
+                  value={formData.razon_social}
+                  onChange={(e) => setFormData({ ...formData, razon_social: e.target.value })}
+                  placeholder="Nombre legal de la empresa"
+                />
+                <p className="text-xs text-muted-foreground">
+                  Nombre oficial registrado ante AFIP
+                </p>
+              </div>
+              <div className="space-y-2">
+                <Label htmlFor="nombre_fantasia">Nombre de Fantasía</Label>
+                <Input
+                  id="nombre_fantasia"
+                  value={formData.nombre_fantasia}
+                  onChange={(e) => setFormData({ ...formData, nombre_fantasia: e.target.value })}
+                  placeholder="Nombre comercial"
+                />
+                <p className="text-xs text-muted-foreground">
+                  Nombre comercial o marca
+                </p>
+              </div>
+            </div>
+
+            <div className="grid grid-cols-2 gap-4">
+              <div className="space-y-2">
+                <Label htmlFor="condicion_iva">Condición IVA</Label>
+                <Select
+                  value={formData.condicion_iva}
+                  onValueChange={(value) => setFormData({ ...formData, condicion_iva: value })}
+                >
+                  <SelectTrigger id="condicion_iva">
+                    <SelectValue />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="responsable_inscripto">Responsable Inscripto</SelectItem>
+                    <SelectItem value="monotributista">Monotributista</SelectItem>
+                    <SelectItem value="exento">Exento</SelectItem>
+                    <SelectItem value="consumidor_final">Consumidor Final</SelectItem>
+                  </SelectContent>
+                </Select>
+              </div>
+              <div className="space-y-2">
+                <Label htmlFor="inicio_actividades">Inicio de Actividades</Label>
+                <Input
+                  id="inicio_actividades"
+                  type="date"
+                  value={formData.inicio_actividades}
+                  onChange={(e) => setFormData({ ...formData, inicio_actividades: e.target.value })}
+                />
+              </div>
+            </div>
+
+            <div className="space-y-2">
+              <Label htmlFor="certificado_afip_url">Certificado AFIP (URL)</Label>
+              <Input
+                id="certificado_afip_url"
+                value={formData.certificado_afip_url}
+                onChange={(e) => setFormData({ ...formData, certificado_afip_url: e.target.value })}
+                placeholder="https://..."
+              />
+              <p className="text-xs text-muted-foreground">
+                URL del certificado digital para facturación electrónica
+              </p>
+            </div>
+          </div>
+
+          {/* AFIP Certificate Configuration */}
+          <div className="space-y-4 pt-4 border-t">
+            <h3 className="font-semibold text-lg">Certificado Digital AFIP</h3>
+            <p className="text-sm text-muted-foreground">
+              Configure su certificado digital para facturación electrónica. 
+              <a href="https://www.afip.gob.ar/ws/documentacion/certificados.asp" target="_blank" rel="noopener noreferrer" className="text-primary hover:underline ml-1">
+                ¿Cómo obtener mi certificado?
+              </a>
+            </p>
+
+            <div className="grid grid-cols-2 gap-4">
+              <div className="space-y-2">
+                <Label htmlFor="cuit">CUIT</Label>
+                <Input
+                  id="cuit"
+                  value={formData.cuit || ""}
+                  onChange={(e) => {
+                    const value = e.target.value.replace(/\D/g, '');
+                    if (value.length <= 11) {
+                      setFormData({ ...formData, cuit: value });
+                    }
+                  }}
+                  placeholder="20123456789"
+                  maxLength={11}
+                />
+                <p className="text-xs text-muted-foreground">
+                  11 dígitos sin guiones
+                </p>
+              </div>
+              <div className="space-y-2">
+                <Label htmlFor="afip_ambiente">Ambiente AFIP</Label>
+                <Select
+                  value={formData.afip_ambiente || "testing"}
+                  onValueChange={(value) => setFormData({ ...formData, afip_ambiente: value })}
+                >
+                  <SelectTrigger id="afip_ambiente">
+                    <SelectValue />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="testing">🧪 Homologación (Testing)</SelectItem>
+                    <SelectItem value="production">🔒 Producción</SelectItem>
+                  </SelectContent>
+                </Select>
+                <p className="text-xs text-muted-foreground">
+                  Use testing para pruebas
+                </p>
+              </div>
+            </div>
+
+            <div className="space-y-2">
+              <Label htmlFor="afip_certificate_file">Certificado (.crt)</Label>
+              <div className="flex gap-2">
+                <Input
+                  id="afip_certificate_file"
+                  type="file"
+                  accept=".crt,.pem"
+                  onChange={(e) => handleCertificateUpload(e, 'certificate')}
+                  className="flex-1"
+                />
+                {formData.afip_certificate && (
+                  <Button
+                    type="button"
+                    variant="outline"
+                    size="icon"
+                    onClick={() => setFormData({ ...formData, afip_certificate: "" })}
+                  >
+                    <X className="h-4 w-4" />
+                  </Button>
+                )}
+              </div>
+              {formData.afip_certificate && (
+                <p className="text-xs text-green-600 flex items-center gap-1">
+                  ✓ Certificado cargado
+                </p>
+              )}
+            </div>
+
+            <div className="space-y-2">
+              <Label htmlFor="afip_private_key_file">Clave Privada (.key)</Label>
+              <div className="flex gap-2">
+                <Input
+                  id="afip_private_key_file"
+                  type="file"
+                  accept=".key,.pem"
+                  onChange={(e) => handleCertificateUpload(e, 'privateKey')}
+                  className="flex-1"
+                />
+                {formData.afip_private_key && (
+                  <Button
+                    type="button"
+                    variant="outline"
+                    size="icon"
+                    onClick={() => setFormData({ ...formData, afip_private_key: "" })}
+                  >
+                    <X className="h-4 w-4" />
+                  </Button>
+                )}
+              </div>
+              {formData.afip_private_key && (
+                <p className="text-xs text-green-600 flex items-center gap-1">
+                  ✓ Clave privada cargada
+                </p>
+              )}
+              <p className="text-xs text-yellow-600">
+                ⚠️ La clave privada se almacenará encriptada
+              </p>
+            </div>
+
+            <div className="flex items-center justify-between p-4 bg-muted rounded-lg">
+              <div className="space-y-0.5">
+                <Label>Habilitar Facturación Electrónica AFIP</Label>
+                <p className="text-sm text-muted-foreground">
+                  Activar integración con AFIP para facturación legal
+                </p>
+              </div>
+              <Switch
+                checked={formData.afip_enabled || false}
+                onCheckedChange={(checked) => setFormData({ ...formData, afip_enabled: checked })}
+                disabled={!formData.cuit || !formData.afip_certificate || !formData.afip_private_key}
+              />
+            </div>
+
+            {formData.afip_enabled && (
+              <Button
+                type="button"
+                variant="outline"
+                onClick={handleTestAFIPConnection}
+                disabled={testingConnection}
+              >
+                {testingConnection ? (
+                  <>
+                    <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                    Probando conexión...
+                  </>
+                ) : (
+                  "Probar Conexión con AFIP"
+                )}
+              </Button>
+            )}
+          </div>
+
+          {/* POS Configuration */}
+          <div className="space-y-4 pt-4 border-t">
+            <h3 className="font-semibold text-lg">Parámetros de Punto de Venta</h3>
+            
+            <div className="grid grid-cols-2 gap-4">
+              <div className="space-y-2">
+                <Label htmlFor="max_discount">Descuento Máximo (%)</Label>
+                <Input
+                  id="max_discount"
+                  type="number"
+                  min="0"
+                  max="100"
+                  value={formData.max_discount_percentage}
+                  onChange={(e) => setFormData({ ...formData, max_discount_percentage: Number(e.target.value) })}
+                />
+              </div>
+              <div className="space-y-2">
+                <Label htmlFor="max_installments">Cuotas Máximas</Label>
+                <Input
+                  id="max_installments"
+                  type="number"
+                  min="1"
+                  max="99"
+                  value={formData.max_installments}
+                  onChange={(e) => setFormData({ ...formData, max_installments: Number(e.target.value) })}
+                />
+              </div>
+            </div>
+
+            <div className="space-y-4">
+              <div className="flex items-center justify-between">
+                <div className="space-y-0.5">
+                  <Label>Requerir documento del cliente</Label>
+                  <p className="text-sm text-muted-foreground">
+                    Solicitar DNI/CUIT obligatorio en ventas
+                  </p>
+                </div>
+                <Switch
+                  checked={formData.require_customer_document}
+                  onCheckedChange={(checked) => setFormData({ ...formData, require_customer_document: checked })}
+                />
+              </div>
+
+              <div className="flex items-center justify-between">
+                <div className="space-y-0.5">
+                  <Label>Impresión automática de tickets</Label>
+                  <p className="text-sm text-muted-foreground">
+                    Imprimir ticket automáticamente al finalizar venta
+                  </p>
+                </div>
+                <Switch
+                  checked={formData.autoprint_receipt}
+                  onCheckedChange={(checked) => setFormData({ ...formData, autoprint_receipt: checked })}
+                />
+              </div>
+            </div>
           </div>
 
           {/* Financial Settings */}

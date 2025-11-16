@@ -30,6 +30,7 @@ export default function CustomerAccount() {
       if (error) throw error;
       return data;
     },
+    enabled: !!currentCompany?.id,
   });
 
   const { data: customerDetails } = useQuery({
@@ -60,7 +61,7 @@ export default function CustomerAccount() {
         payments: payments.data || [],
       };
     },
-    enabled: !!selectedCustomer,
+    enabled: !!selectedCustomer && !!currentCompany?.id,
   });
 
   const { data: customerMovements } = useQuery({

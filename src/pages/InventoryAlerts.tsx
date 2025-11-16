@@ -40,6 +40,7 @@ export default function InventoryAlerts() {
       // Filter products where stock <= min_stock
       return data?.filter(p => p.stock <= p.min_stock && p.min_stock > 0) || [];
     },
+    enabled: !!currentCompany?.id,
   });
 
   const { data: expiringProducts, isLoading: loadingExpiring } = useQuery({
@@ -61,6 +62,7 @@ export default function InventoryAlerts() {
       if (error) throw error;
       return data;
     },
+    enabled: !!currentCompany?.id,
   });
 
   const { data: notifications, refetch: refetchNotifications } = useQuery({

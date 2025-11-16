@@ -69,7 +69,7 @@ export default function Expenses() {
       if (error) throw error;
       return data;
     },
-    enabled: canView,
+    enabled: canView && !!currentCompany?.id,
   });
 
   // Fetch expenses
@@ -88,7 +88,7 @@ export default function Expenses() {
       if (error) throw error;
       return data;
     },
-    enabled: canView,
+    enabled: canView && !!currentCompany?.id,
   });
 
   // Stats

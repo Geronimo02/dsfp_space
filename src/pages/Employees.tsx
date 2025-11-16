@@ -45,7 +45,8 @@ import { toast } from "sonner";
 import { UserPlus, Search, Users, Shield, UserCheck, Database, Trash2 } from "lucide-react";
 import { Label } from "@/components/ui/label";
 import { Checkbox } from "@/components/ui/checkbox";
-import { usePermissions } from "@/hooks/usePermissions";  // Ensure imported
+import { usePermissions } from "@/hooks/usePermissions";  // Existing permissions hook
+import { useCompany } from "@/contexts/CompanyContext"; // For currentCompanyRole and company id
 
 // Add local type definitions to avoid import conflicts
 type AppRole = "admin" | "manager" | "cashier" | "accountant" | "viewer" | "employee" | "warehouse" | "technician" | "auditor";
@@ -85,7 +86,24 @@ export default function Employees() {
   const [inviteLoading, setInviteLoading] = useState(false);
   const [isAdmin, setIsAdmin] = useState(false);
   const [resetLoading, setResetLoading] = useState(false);
-  const { hasPermission, currentCompany } = usePermissions();  // Now includes currentCompany
+  const { hasPermission, currentCompany } = usePermissions();
+  const { currentCompanyRole, refreshCompanies } = useCompany();
+
+  // Nueva gestión de miembros por empresa (company_users)
+  interface CompanyMember {
+    id: string;
+    user_id: string;
+    role: AppRole; // usaremos subset compatible con enum
+    active: boolean;
+    created_at: string;
+    full_name?: string | null;
+    isSelf?: boolean;
+  }
+  const [companyMembers, setCompanyMembers] = useState<CompanyMember[]>([]);
+  const [membersLoading, setMembersLoading] = useState(false);
+  const [updatingMemberId, setUpdatingMemberId] = useState<string | null>(null);
+  const [removingMemberId, setRemovingMemberId] = useState<string | null>(null);
+  const [confirmRemoveMember, setConfirmRemoveMember] = useState<CompanyMember | null>(null);
 
   const availableRoles: { value: AppRole; label: string; color: string; description: string }[] = [
     { 
@@ -147,7 +165,14 @@ export default function Employees() {
   useEffect(() => {
     fetchEmployees();
     checkAdminStatus();
+    // Cargar miembros de la empresa actual
+    fetchCompanyMembers();
   }, []);
+
+  useEffect(() => {
+    // Refrescar miembros cuando cambia empresa
+    fetchCompanyMembers();
+  }, [currentCompany?.id]);
 
   const checkAdminStatus = async () => {
     try {
@@ -208,6 +233,120 @@ export default function Employees() {
       toast.error("Error al cargar empleados: " + error.message);
     } finally {
       setLoading(false);
+    }
+  };
+
+  const fetchCompanyMembers = async () => {
+    if (!currentCompany?.id) return;
+    try {
+      setMembersLoading(true);
+      const { data: { user: currentUser } } = await supabase.auth.getUser();
+      if (!currentUser) return;
+
+      const { data, error } = await supabase
+        .from('company_users')
+        .select('id,user_id,role,active,created_at')
+        .eq('company_id', currentCompany.id)
+        .eq('active', true)
+        .order('created_at', { ascending: true });
+      if (error) throw error;
+
+      // Perfiles para nombres
+      const userIds = (data || []).map(d => d.user_id);
+      let profilesMap: Record<string, { full_name: string | null }> = {};
+      if (userIds.length > 0) {
+        const { data: profiles } = await supabase
+          .from('profiles')
+          .select('id, full_name')
+          .in('id', userIds);
+        profiles?.forEach(p => { profilesMap[p.id] = { full_name: p.full_name }; });
+      }
+
+      const members: CompanyMember[] = (data || []).map(m => ({
+        ...m,
+        full_name: profilesMap[m.user_id]?.full_name || null,
+        isSelf: m.user_id === currentUser.id,
+      }));
+      setCompanyMembers(members);
+    } catch (err: any) {
+      toast.error('Error al cargar miembros: ' + err.message);
+    } finally {
+      setMembersLoading(false);
+    }
+  };
+
+  const handleChangeMemberRole = async (member: CompanyMember, newRole: AppRole) => {
+    if (currentCompanyRole !== 'admin' && currentCompanyRole !== 'manager') {
+      toast.error('No tienes permiso para cambiar roles');
+      return;
+    }
+    // Prevenir quitar último admin
+    if (member.role === 'admin' && newRole !== 'admin') {
+      const admins = companyMembers.filter(m => m.role === 'admin');
+      if (admins.length <= 1) {
+        toast.error('No puedes eliminar el último administrador');
+        return;
+      }
+    }
+    try {
+      setUpdatingMemberId(member.id);
+      const { error } = await supabase
+        .from('company_users')
+        .update({ role: newRole })
+        .eq('id', member.id);
+      if (error) throw error;
+      toast.success('Rol actualizado');
+      await fetchCompanyMembers();
+      await refreshCompanies();
+    } catch (err: any) {
+      toast.error('Error al actualizar rol: ' + err.message);
+    } finally {
+      setUpdatingMemberId(null);
+    }
+  };
+
+  const requestRemoveMember = (member: CompanyMember) => {
+    setConfirmRemoveMember(member);
+  };
+
+  const handleRemoveMember = async () => {
+    if (!confirmRemoveMember) return;
+    const member = confirmRemoveMember;
+    if (currentCompanyRole !== 'admin') {
+      toast.error('Solo un administrador puede eliminar miembros');
+      return;
+    }
+    // Prevenir borrar último admin
+    if (member.role === 'admin') {
+      const admins = companyMembers.filter(m => m.role === 'admin');
+      if (admins.length <= 1) {
+        toast.error('No puedes eliminar el único administrador');
+        return;
+      }
+    }
+    // Prevenir auto-eliminación si es último admin
+    if (member.isSelf && member.role === 'admin') {
+      const admins = companyMembers.filter(m => m.role === 'admin');
+      if (admins.length <= 1) {
+        toast.error('No puedes eliminar tu propio acceso siendo el único admin');
+        return;
+      }
+    }
+    try {
+      setRemovingMemberId(member.id);
+      const { error } = await supabase
+        .from('company_users')
+        .delete()
+        .eq('id', member.id);
+      if (error) throw error;
+      toast.success('Miembro eliminado');
+      setConfirmRemoveMember(null);
+      await fetchCompanyMembers();
+      await refreshCompanies();
+    } catch (err: any) {
+      toast.error('Error al eliminar miembro: ' + err.message);
+    } finally {
+      setRemovingMemberId(null);
     }
   };
 
@@ -583,6 +722,76 @@ export default function Employees() {
 
         <Card>
           <CardHeader>
+            <CardTitle>Miembros de la empresa actual</CardTitle>
+            <p className="text-sm text-muted-foreground">Gestiona accesos específicos para {currentCompany?.name}</p>
+          </CardHeader>
+          <CardContent>
+            <Table>
+              <TableHeader>
+                <TableRow>
+                  <TableHead>Nombre</TableHead>
+                  <TableHead>Rol</TableHead>
+                  <TableHead>Creado</TableHead>
+                  <TableHead className="text-right">Acciones</TableHead>
+                </TableRow>
+              </TableHeader>
+              <TableBody>
+                {membersLoading ? (
+                  <TableRow><TableCell colSpan={4} className="text-center">Cargando miembros...</TableCell></TableRow>
+                ) : companyMembers.length === 0 ? (
+                  <TableRow><TableCell colSpan={4} className="text-center">Sin miembros</TableCell></TableRow>
+                ) : (
+                  companyMembers.map(m => {
+                    const roleInfo = availableRoles.find(r => r.value === m.role);
+                    return (
+                      <TableRow key={m.id}>
+                        <TableCell>
+                          <div className="space-y-0.5">
+                            <p className="font-medium">{m.full_name || 'Sin nombre'}</p>
+                            <p className="text-xs text-muted-foreground font-mono">{m.user_id.substring(0,8)}... {m.isSelf && '(tú)'}</p>
+                          </div>
+                        </TableCell>
+                        <TableCell>
+                          {(currentCompanyRole === 'admin' || currentCompanyRole === 'manager') ? (
+                            <Select
+                              value={m.role}
+                              onValueChange={(val) => handleChangeMemberRole(m, val as AppRole)}
+                              disabled={updatingMemberId === m.id}
+                            >
+                              <SelectTrigger className="w-[150px]" />
+                              <SelectContent>
+                                {availableRoles.filter(r => ['admin','manager','cashier','accountant','warehouse','technician','auditor','viewer','employee'].includes(r.value)).map(r => (
+                                  <SelectItem key={r.value} value={r.value}>{r.label}</SelectItem>
+                                ))}
+                              </SelectContent>
+                            </Select>
+                          ) : (
+                            <Badge className={`${roleInfo?.color} text-white`}>{roleInfo?.label || m.role}</Badge>
+                          )}
+                        </TableCell>
+                        <TableCell className="text-xs">{new Date(m.created_at).toLocaleDateString()}</TableCell>
+                        <TableCell className="text-right">
+                          {currentCompanyRole === 'admin' && !m.isSelf && (
+                            <Button
+                              variant="destructive"
+                              size="sm"
+                              onClick={() => requestRemoveMember(m)}
+                              disabled={removingMemberId === m.id}
+                            >
+                              <Trash2 className="h-4 w-4 mr-1" /> Eliminar
+                            </Button>
+                          )}
+                        </TableCell>
+                      </TableRow>
+                    );
+                  })
+                )}
+              </TableBody>
+            </Table>
+          </CardContent>
+        </Card>
+        <Card>
+          <CardHeader>
             <div className="flex items-center gap-4">
               <div className="relative flex-1">
                 <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 text-muted-foreground h-4 w-4" />
@@ -727,6 +936,24 @@ export default function Employees() {
           </div>
         </DialogContent>
       </Dialog>
+
+      {/* Confirmación eliminación */}
+      <AlertDialog open={!!confirmRemoveMember} onOpenChange={(open) => { if (!open) setConfirmRemoveMember(null); }}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>Eliminar acceso del usuario</AlertDialogTitle>
+            <AlertDialogDescription>
+              Esto sólo elimina el acceso a esta empresa. El usuario podrá seguir accediendo a otras empresas donde esté asignado. ¿Confirmas?
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel>Cancelar</AlertDialogCancel>
+            <AlertDialogAction onClick={handleRemoveMember} disabled={removingMemberId === confirmRemoveMember?.id} className="bg-destructive text-destructive-foreground hover:bg-destructive/90">
+              {removingMemberId === confirmRemoveMember?.id ? 'Eliminando...' : 'Eliminar'}
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
     </Layout>
   );
 }

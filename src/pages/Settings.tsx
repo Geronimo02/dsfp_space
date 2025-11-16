@@ -17,6 +17,7 @@ import { z } from "zod";
 import { format } from "date-fns";
 
 import { CompanySettings } from "@/components/settings/CompanySettings";
+import { PriceListsSettings } from "@/components/settings/PriceListsSettings";
 
 const settingsSchema = z.object({
   company_name: z.string().trim().min(1, "El nombre de la empresa es requerido").max(200, "El nombre debe tener máximo 200 caracteres"),
@@ -597,8 +598,9 @@ export default function Settings() {
         </div>
 
         <Tabs defaultValue="company" className="w-full">
-          <TabsList className="grid w-full grid-cols-5">
+          <TabsList className="grid w-full grid-cols-6">
             <TabsTrigger value="company">Empresa</TabsTrigger>
+            <TabsTrigger value="price-lists">Listas de Precios</TabsTrigger>
             <TabsTrigger value="general">General</TabsTrigger>
             <TabsTrigger value="ticket-design">Diseño de Tickets</TabsTrigger>
             <TabsTrigger value="security">Seguridad</TabsTrigger>
@@ -608,6 +610,24 @@ export default function Settings() {
           {/* Company */}
           <TabsContent value="company">
             <CompanySettings />
+          </TabsContent>
+
+          {/* Price Lists */}
+          <TabsContent value="price-lists">
+            <Card className="shadow-soft">
+              <CardHeader>
+                <CardTitle className="flex items-center gap-2">
+                  <DollarSign className="h-5 w-5 text-primary" />
+                  Listas de Precios
+                </CardTitle>
+                <CardDescription>
+                  Gestiona diferentes listas de precios para tus productos
+                </CardDescription>
+              </CardHeader>
+              <CardContent>
+                <PriceListsSettings />
+              </CardContent>
+            </Card>
           </TabsContent>
 
           {/* General */}

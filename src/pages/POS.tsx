@@ -33,6 +33,7 @@ import { toast } from "sonner";
 import { useQuery, useQueryClient, useMutation } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
 import { ReceiptPDF } from "@/components/pos/ReceiptPDF";
+import { InvoicePDF } from "@/components/pos/InvoicePDF";
 import { format } from "date-fns";
 import { useCompany } from "@/contexts/CompanyContext";
 
@@ -65,6 +66,7 @@ export default function POS() {
   const [loyaltyPointsToUse, setLoyaltyPointsToUse] = useState(0);
   const [selectedCustomer, setSelectedCustomer] = useState<any>(null);
   const [selectedWarehouse, setSelectedWarehouse] = useState<string>("");
+  const [selectedPOSAfipId, setSelectedPOSAfipId] = useState<string>("");
   const [createCustomerDialog, setCreateCustomerDialog] = useState(false);
   const [newCustomerName, setNewCustomerName] = useState("");
   const [newCustomerPhone, setNewCustomerPhone] = useState("");
@@ -81,9 +83,11 @@ export default function POS() {
   const searchInputRef = useRef<HTMLInputElement>(null);
 
   const { data: products, isLoading: isLoadingProducts } = useQuery({
-    queryKey: ["products", searchQuery],
+    queryKey: ["products", searchQuery, selectedCustomer?.price_list_id, currentCompany?.id],
     queryFn: async () => {
-      let query = supabase.from("products").select("*").eq("active", true);
+      if (!currentCompany?.id) return [];
+      
+      let query = supabase.from("products").select("*").eq("active", true).eq("company_id", currentCompany.id);
       
       if (searchQuery) {
         const sanitized = sanitizeSearchQuery(searchQuery);
@@ -92,10 +96,29 @@ export default function POS() {
         }
       }
       
-      const { data, error } = await query.limit(10);
+      const { data: productsData, error } = await query.limit(10);
       if (error) throw error;
-      return data;
+      
+      // If customer has a price list, fetch prices from that list
+      if (selectedCustomer?.price_list_id && productsData) {
+        const productIds = productsData.map((p: any) => p.id);
+        const { data: pricesData } = await supabase
+          .from("product_prices")
+          .select("product_id, price")
+          .eq("price_list_id", selectedCustomer.price_list_id)
+          .in("product_id", productIds);
+        
+        // Map prices to products
+        const pricesMap = new Map(pricesData?.map((p: any) => [p.product_id, p.price]) || []);
+        return productsData.map((product: any) => ({
+          ...product,
+          price: pricesMap.get(product.id) ?? product.price, // Use price list price or fallback to default
+        }));
+      }
+      
+      return productsData;
     },
+    enabled: !!currentCompany?.id,
   });
 
   const { data: companySettings } = useQuery({
@@ -110,6 +133,29 @@ export default function POS() {
       return data;
     },
   });
+
+  // AFIP POS points
+  const { data: posPoints } = useQuery({
+    queryKey: ["pos-afip", currentCompany?.id],
+    queryFn: async () => {
+      if (!currentCompany?.id) return [] as any[];
+      const { data, error } = await (supabase as any)
+        .from("pos_afip")
+        .select("id, punto_venta, descripcion, tipo_comprobante, active")
+        .eq("company_id", currentCompany.id)
+        .eq("active", true)
+        .order("punto_venta", { ascending: true });
+      if (error) throw error;
+      return data as any[];
+    },
+    enabled: !!currentCompany?.id,
+  });
+
+  useEffect(() => {
+    if (posPoints && posPoints.length > 0 && !selectedPOSAfipId) {
+      setSelectedPOSAfipId(posPoints[0].id);
+    }
+  }, [posPoints]);
 
   const { data: customers } = useQuery({
     queryKey: ["customers-pos"],
@@ -381,6 +427,10 @@ export default function POS() {
           installment_amount: maxInstallments > 1 ? total / maxInstallments : 0,
           status: "completed",
           company_id: currentCompany?.id,
+          // AFIP fields (optional)
+          pos_afip_id: selectedPOSAfipId || null,
+          tipo_comprobante: determineComprobante(companySettings, selectedCustomer) || 'TICKET',
+          condicion_iva_cliente: selectedCustomer?.condicion_iva || 'consumidor_final',
         })
         .select()
         .single();
@@ -568,6 +618,65 @@ export default function POS() {
       setShowReceiptOptions(false);
       setLastSaleData(null);
     }
+  };
+
+  const handlePrintInvoice = () => {
+    if (!lastSaleData) return;
+
+    // Determinar tipo de comprobante sugerido
+    const tipo = determineComprobante(companySettings, lastSaleData.customer);
+
+    // Obtener Punto de Venta seleccionado
+    const pvSel = (posPoints || []).find((p: any) => p.id === (lastSaleData.pos_afip_id || selectedPOSAfipId));
+    const puntoVenta = pvSel?.punto_venta || null;
+
+    // Datos de empresa
+    const comp = companySettings || {};
+
+    // Mapear items
+    const items = (lastSaleData.items || []).map((it: any) => ({
+      product_name: it.product_name || it.product?.name || "Producto",
+      quantity: Number(it.quantity) || 1,
+      unit_price: Number(it.unit_price) || 0,
+      subtotal: Number(it.subtotal != null ? it.subtotal : (Number(it.unit_price) || 0) * (Number(it.quantity) || 1)),
+    }));
+
+    InvoicePDF({
+      tipoComprobante: tipo.startsWith('FACTURA') ? tipo : 'FACTURA_B',
+      puntoVenta,
+      numeroComprobante: lastSaleData.numero_comprobante || null,
+      cae: lastSaleData.cae || null,
+      caeVencimiento: lastSaleData.fecha_vencimiento_cae || null,
+      fecha: lastSaleData.created_at,
+      company: {
+        razon_social: comp.razon_social || comp.name || undefined,
+        nombre_fantasia: comp.nombre_fantasia || undefined,
+        cuit: comp.cuit || undefined,
+        condicion_iva: comp.condicion_iva || undefined,
+        address: comp.address || undefined,
+        phone: comp.phone || undefined,
+      },
+      customer: lastSaleData.customer ? {
+        name: lastSaleData.customer.name,
+        condicion_iva: lastSaleData.customer.condicion_iva || undefined,
+        tipo_documento: lastSaleData.customer.tipo_documento || (lastSaleData.customer.document ? 'dni' : undefined),
+        numero_documento: lastSaleData.customer.numero_documento || lastSaleData.customer.document || undefined,
+      } : null,
+      items,
+      subtotal: Number(lastSaleData.subtotal) || 0,
+      discount: Number(lastSaleData.discount) || 0,
+      tax: Number(lastSaleData.tax) || 0,
+      tax_rate: Number(lastSaleData.tax_rate) || undefined,
+      total: Number(lastSaleData.total) || 0,
+      paymentMethods: (lastSaleData.paymentMethods || []).map((pm: any) => ({
+        method: pm.method,
+        amount: Number(pm.amount) || 0,
+        installments: pm.installments || 1,
+      })),
+    });
+
+    setShowReceiptOptions(false);
+    setLastSaleData(null);
   };
 
   const handleEmailReceipt = async () => {
@@ -891,6 +1000,26 @@ Impuestos: $${saleData.tax.toFixed(2)}
 
 ¡Gracias por su compra! 🙏
     `.trim();
+  };
+
+  // Determina el tipo de comprobante AFIP según condición IVA
+  const determineComprobante = (company: any, customer: any): string => {
+    const empresa = company?.condicion_iva || 'responsable_inscripto';
+    const cliente = customer?.condicion_iva || 'consumidor_final';
+
+    if (!company?.afip_enabled) return 'TICKET';
+
+    // Mapeo básico común en AR
+    if (empresa === 'responsable_inscripto') {
+      if (cliente === 'responsable_inscripto') return 'FACTURA_A';
+      if (cliente === 'consumidor_final' || cliente === 'monotributista' || cliente === 'exento') return 'FACTURA_B';
+    }
+
+    // Otros casos
+    if (empresa === 'monotributista') return 'FACTURA_C';
+    if (empresa === 'exento') return 'FACTURA_C';
+
+    return 'TICKET';
   };
 
   return (
@@ -1489,6 +1618,15 @@ Impuestos: $${saleData.tax.toFixed(2)}
                   {lastSaleData?.customer?.email && (
                     <span className="ml-2 text-xs opacity-75">({lastSaleData.customer.email})</span>
                   )}
+                </Button>
+
+                <Button
+                  onClick={handlePrintInvoice}
+                  variant="outline"
+                  className="h-12"
+                >
+                  <Printer className="mr-2 h-5 w-5" />
+                  Generar Factura PDF (CAE/QR pendiente)
                 </Button>
 
                 <Button

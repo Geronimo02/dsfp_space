@@ -25,6 +25,7 @@ interface CompanyUser {
 
 interface CompanyContextType {
   currentCompany: Company | null;
+  currentCompanyRole: CompanyUser['role'] | null;
   userCompanies: CompanyUser[];
   loading: boolean;
   switchCompany: (companyId: string) => void;
@@ -36,6 +37,7 @@ const CompanyContext = createContext<CompanyContextType | undefined>(undefined);
 export function CompanyProvider({ children }: { children: React.ReactNode }) {
   const [currentCompany, setCurrentCompany] = useState<Company | null>(null);
   const [userCompanies, setUserCompanies] = useState<CompanyUser[]>([]);
+  const [currentCompanyRole, setCurrentCompanyRole] = useState<CompanyUser['role'] | null>(null);
   const [loading, setLoading] = useState(true);
   const { toast } = useToast();
 
@@ -73,7 +75,8 @@ export function CompanyProvider({ children }: { children: React.ReactNode }) {
 
       if (error) throw error;
 
-      setUserCompanies(data as CompanyUser[]);
+  const companyUsers = data as CompanyUser[];
+  setUserCompanies(companyUsers);
 
       // Set current company from localStorage or first company
       const savedCompanyId = localStorage.getItem('currentCompanyId');
@@ -81,12 +84,15 @@ export function CompanyProvider({ children }: { children: React.ReactNode }) {
         const savedCompany = data?.find((cu) => cu.company_id === savedCompanyId);
         if (savedCompany) {
           setCurrentCompany(savedCompany.companies);
+          setCurrentCompanyRole(savedCompany.role);
         } else if (data && data.length > 0) {
           setCurrentCompany(data[0].companies);
+          setCurrentCompanyRole((data[0] as CompanyUser).role);
           localStorage.setItem('currentCompanyId', data[0].company_id);
         }
       } else if (data && data.length > 0) {
         setCurrentCompany(data[0].companies);
+        setCurrentCompanyRole((data[0] as CompanyUser).role);
         localStorage.setItem('currentCompanyId', data[0].company_id);
       }
     } catch (error) {
@@ -129,6 +135,7 @@ export function CompanyProvider({ children }: { children: React.ReactNode }) {
     const company = userCompanies.find((cu) => cu.company_id === companyId);
     if (company) {
       setCurrentCompany(company.companies);
+      setCurrentCompanyRole(company.role);
       localStorage.setItem('currentCompanyId', companyId);
       toast({
         title: 'Empresa cambiada',
@@ -147,6 +154,7 @@ export function CompanyProvider({ children }: { children: React.ReactNode }) {
     <CompanyContext.Provider
       value={{
         currentCompany,
+        currentCompanyRole,
         userCompanies,
         loading,
         switchCompany,

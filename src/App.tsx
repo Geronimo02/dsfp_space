@@ -35,6 +35,8 @@ import Warehouses from "./pages/Warehouses";
 import WarehouseStock from "./pages/WarehouseStock";
 import WarehouseTransfers from "./pages/WarehouseTransfers";
 import CompanySetup from "./pages/CompanySetup";
+import ResetPassword from "./pages/ResetPassword";
+import POSPoints from "./pages/POSPoints";
 import NotFound from "./pages/NotFound";
 
 const queryClient = new QueryClient();
@@ -144,6 +146,7 @@ const App = () => (
         <CompanyProvider>
           <Routes>
           <Route path="/auth" element={<Auth />} />
+          <Route path="/reset-password" element={<ResetPassword />} />
           <Route path="/company-setup" element={<AuthOnlyRoute><CompanySetup /></AuthOnlyRoute>} />
           <Route path="/" element={<ProtectedRoute><Dashboard /></ProtectedRoute>} />
           <Route path="/pos" element={<ProtectedRoute><POS /></ProtectedRoute>} />
@@ -170,6 +173,7 @@ const App = () => (
           <Route path="/warehouses" element={<ProtectedRoute><Warehouses /></ProtectedRoute>} />
           <Route path="/warehouse-stock" element={<ProtectedRoute><WarehouseStock /></ProtectedRoute>} />
           <Route path="/warehouse-transfers" element={<ProtectedRoute><WarehouseTransfers /></ProtectedRoute>} />
+          <Route path="/pos-points" element={<ProtectedRoute><POSPoints /></ProtectedRoute>} />
           <Route path="/settings" element={<ProtectedRoute><Settings /></ProtectedRoute>} />
           {/* ADD ALL CUSTOM ROUTES ABOVE THE CATCH-ALL "*" ROUTE */}
           <Route path="*" element={<NotFound />} />

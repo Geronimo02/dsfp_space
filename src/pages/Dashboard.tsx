@@ -36,7 +36,7 @@ export default function Dashboard() {
       
       return { total, today, count: data?.length || 0 };
     },
-    enabled: canViewSales,
+    enabled: canViewSales && !!currentCompany?.id,
   });
 
   const { data: productsCount } = useQuery({
@@ -50,7 +50,7 @@ export default function Dashboard() {
       if (error) throw error;
       return count || 0;
     },
-    enabled: canViewProducts,
+    enabled: canViewProducts && !!currentCompany?.id,
   });
 
   const { data: customersCount } = useQuery({
@@ -64,7 +64,7 @@ export default function Dashboard() {
       if (error) throw error;
       return count || 0;
     },
-    enabled: canViewCustomers,
+    enabled: canViewCustomers && !!currentCompany?.id,
   });
 
   const { data: lowStockProducts } = useQuery({
@@ -79,7 +79,7 @@ export default function Dashboard() {
       if (error) throw error;
       return count || 0;
     },
-    enabled: canViewProducts,
+    enabled: canViewProducts && !!currentCompany?.id,
   });
 
   // Ventas de últimos 7 días
@@ -113,7 +113,7 @@ export default function Dashboard() {
         };
       });
     },
-    enabled: canViewSales,
+    enabled: canViewSales && !!currentCompany?.id,
   });
 
   // Top 5 productos más vendidos
@@ -138,7 +138,7 @@ export default function Dashboard() {
         .sort((a, b) => b.vendidos - a.vendidos)
         .slice(0, 5);
     },
-    enabled: canViewSales && canViewProducts,
+    enabled: canViewSales && canViewProducts && !!currentCompany?.id,
   });
 
   // Productos con stock crítico
@@ -156,7 +156,7 @@ export default function Dashboard() {
       if (error) throw error;
       return data;
     },
-    enabled: canViewProducts,
+    enabled: canViewProducts && !!currentCompany?.id,
   });
 
   const stats = [

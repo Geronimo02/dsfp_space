@@ -83,6 +83,7 @@ const navigationSections = [
       { name: "Auditoría", href: "/audit-logs", icon: FileText },
       { name: "Logs de Acceso", href: "/access-logs", icon: Activity },
       { name: "Operaciones Masivas", href: "/bulk-operations", icon: Zap },
+      { name: "Puntos de Venta AFIP", href: "/pos-points", icon: Receipt },
       { name: "Configuración", href: "/settings", icon: Settings },
     ]
   }
@@ -137,6 +138,7 @@ export function Sidebar() {
       "/reservations": "sales",
       "/expenses": "expenses",
       "/bulk-operations": "bulk_operations",
+      "/pos-points": "pos_afip",
     };
 
     const module = routeToModule[href];

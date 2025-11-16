@@ -9,7 +9,7 @@ import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
 import { sanitizeSearchQuery } from "@/lib/searchUtils";
-import { Plus, Edit, Trash2, Search, Upload, Download, X, Package, ChevronDown, ChevronRight } from "lucide-react";
+import { Plus, Edit, Trash2, Search, Upload, Download, X, Package, ChevronDown, ChevronRight, DollarSign } from "lucide-react";
 import { toast } from "sonner";
 import { Badge } from "@/components/ui/badge";
 import { z } from "zod";
@@ -87,12 +87,17 @@ export default function Products() {
   const [isStockAdjustDialogOpen, setIsStockAdjustDialogOpen] = useState(false);
   const [adjustingProduct, setAdjustingProduct] = useState<any>(null);
   const [stockAdjustments, setStockAdjustments] = useState<Record<string, string>>({});
+  const [isPriceListDialogOpen, setIsPriceListDialogOpen] = useState(false);
+  const [priceListProduct, setPriceListProduct] = useState<any>(null);
+  const [priceListPrices, setPriceListPrices] = useState<Record<string, string>>({});
   const queryClient = useQueryClient();
 
   const { data: products, isLoading } = useQuery({
     queryKey: ["products", searchQuery, currentCompany?.id],
     queryFn: async () => {
-      let query = supabase.from("products").select("*").eq("company_id", currentCompany?.id).order("created_at", { ascending: false });
+      if (!currentCompany?.id) return [];
+      
+      let query = supabase.from("products").select("*").eq("company_id", currentCompany.id).order("created_at", { ascending: false });
       
       if (searchQuery) {
         const sanitized = sanitizeSearchQuery(searchQuery);
@@ -105,6 +110,7 @@ export default function Products() {
       if (error) throw error;
       return data;
     },
+    enabled: !!currentCompany?.id,
   });
 
   const { data: warehouses } = useQuery({
@@ -119,6 +125,26 @@ export default function Products() {
       if (error) throw error;
       return data;
     },
+    enabled: !!currentCompany?.id,
+  });
+
+  const { data: priceLists } = useQuery({
+    queryKey: ["price-lists", currentCompany?.id],
+    queryFn: async () => {
+      if (!currentCompany?.id) return [];
+      
+      const { data, error } = await supabase
+        .from("price_lists")
+        .select("id, name, is_default")
+        .eq("company_id", currentCompany.id)
+        .eq("is_active", true)
+        .order("is_default", { ascending: false })
+        .order("name");
+      
+      if (error) throw error;
+      return data;
+    },
+    enabled: !!currentCompany?.id,
   });
 
   // Fetch warehouse stock for expanded products
@@ -141,11 +167,31 @@ export default function Products() {
     enabled: expandedProducts.size > 0,
   });
 
+  // Fetch product prices for price list dialog
+  const { data: productPrices } = useQuery({
+    queryKey: ["product-prices", priceListProduct?.id],
+    queryFn: async () => {
+      if (!priceListProduct?.id) return [];
+      
+      const { data, error } = await supabase
+        .from("product_prices")
+        .select("*, price_lists(name)")
+        .eq("product_id", priceListProduct.id);
+      
+      if (error) throw error;
+      return data;
+    },
+    enabled: !!priceListProduct?.id,
+  });
+
   const createProductMutation = useMutation({
     mutationFn: async (data: any) => {
+      if (!currentCompany?.id) throw new Error('Empresa no seleccionada');
+      // Forzar company_id correcto
+      const payload = { ...data, company_id: currentCompany.id };
       const { data: product, error } = await supabase
         .from("products")
-        .insert(data)
+        .insert(payload)
         .select()
         .single();
       
@@ -158,6 +204,7 @@ export default function Products() {
           product_id: product.id,
           stock: stock || 0,
           min_stock: data.min_stock || 0,
+          company_id: currentCompany!.id,
         }));
         
         const { error: stockError } = await supabase
@@ -178,7 +225,13 @@ export default function Products() {
       setWarehouseStockData({});
     },
     onError: (error: any) => {
-      toast.error(error.message || "Error al crear producto");
+      const msg = error?.message || '';
+      if (msg.includes('row-level security') || msg.includes('RLS') || msg.includes('403')) {
+        toast.error("Acceso denegado por RLS. Verifica que estás asignado a esta empresa y que el producto se crea con company_id correcto.");
+        console.warn('RLS error creating product', { currentCompany, error });
+      } else {
+        toast.error(error.message || "Error al crear producto");
+      }
     },
   });
 
@@ -234,6 +287,10 @@ export default function Products() {
     e.preventDefault();
     
     try {
+      if (!currentCompany?.id) {
+        toast.error("No hay empresa seleccionada. Selecciona una empresa antes de crear productos.");
+        return;
+      }
       // Validate warehouse distribution if provided
       if (warehouseStockData["new"]) {
         const totalDistributed = Object.values(warehouseStockData["new"]).reduce((sum, val) => sum + (val || 0), 0);
@@ -272,7 +329,7 @@ export default function Products() {
         batch_number: validatedData.batch_number || null,
         expiration_date: validatedData.expiration_date || null,
         last_restock_date: editingProduct ? undefined : new Date().toISOString(),
-        company_id: currentCompany?.id,
+        company_id: currentCompany.id,
       };
 
       if (editingProduct) {
@@ -322,6 +379,61 @@ export default function Products() {
     setAdjustingProduct(product);
     setStockAdjustments({});
     setIsStockAdjustDialogOpen(true);
+  };
+
+  const handlePriceListEdit = (product: any) => {
+    setPriceListProduct(product);
+    setPriceListPrices({});
+    setIsPriceListDialogOpen(true);
+  };
+
+  const submitPriceListUpdates = async () => {
+    if (!priceListProduct) return;
+
+    try {
+      for (const [priceListId, priceValue] of Object.entries(priceListPrices)) {
+        if (!priceValue) continue;
+
+        const price = parseFloat(priceValue);
+        if (isNaN(price) || price < 0) {
+          toast.error("Precio inválido");
+          continue;
+        }
+
+        // Check if price already exists
+        const { data: existingPrice } = await supabase
+          .from("product_prices")
+          .select("id")
+          .eq("product_id", priceListProduct.id)
+          .eq("price_list_id", priceListId)
+          .single();
+
+        if (existingPrice) {
+          // Update existing price
+          await supabase
+            .from("product_prices")
+            .update({ price })
+            .eq("id", existingPrice.id);
+        } else {
+          // Insert new price
+          await supabase
+            .from("product_prices")
+            .insert({
+              product_id: priceListProduct.id,
+              price_list_id: priceListId,
+              price,
+            });
+        }
+      }
+
+      toast.success("Precios actualizados exitosamente");
+      queryClient.invalidateQueries({ queryKey: ["product-prices"] });
+      queryClient.invalidateQueries({ queryKey: ["products"] });
+      setIsPriceListDialogOpen(false);
+      setPriceListPrices({});
+    } catch (error: any) {
+      toast.error(error.message || "Error al actualizar precios");
+    }
   };
 
   const submitStockAdjustments = async () => {
@@ -517,7 +629,9 @@ export default function Products() {
               });
 
               if (warehouseStockEntries.length > 0) {
-                await supabase.from("warehouse_stock").insert(warehouseStockEntries);
+                // Añadir company_id a cada fila por RLS
+                const entriesWithCompany = warehouseStockEntries.map(e => ({ ...e, company_id: currentCompany!.id }));
+                await supabase.from("warehouse_stock").insert(entriesWithCompany);
               }
             }
 
@@ -1073,6 +1187,10 @@ export default function Products() {
                                 <Package className="h-4 w-4 mr-1" />
                                 Ajustar
                               </Button>
+                              <Button size="sm" variant="outline" onClick={() => handlePriceListEdit(product)}>
+                                <DollarSign className="h-4 w-4 mr-1" />
+                                Precios
+                              </Button>
                               <Button size="icon" variant="outline" onClick={() => handleEdit(product)}>
                                 <Edit className="h-4 w-4" />
                               </Button>
@@ -1160,6 +1278,74 @@ export default function Products() {
                 </Button>
                 <Button onClick={submitStockAdjustments}>
                   Aplicar Ajustes
+                </Button>
+              </div>
+            </div>
+          </DialogContent>
+        </Dialog>
+
+        {/* Diálogo de Precios por Lista */}
+        <Dialog open={isPriceListDialogOpen} onOpenChange={setIsPriceListDialogOpen}>
+          <DialogContent className="max-w-2xl">
+            <DialogHeader>
+              <DialogTitle>Precios por Lista - {priceListProduct?.name}</DialogTitle>
+              <DialogDescription>
+                Define precios específicos para cada lista de precios. El precio base del producto es ${priceListProduct?.price}
+              </DialogDescription>
+            </DialogHeader>
+            <div className="space-y-4">
+              <div className="border rounded-lg p-4 bg-muted/30">
+                <p className="text-sm font-medium mb-2">Precio Base (por defecto)</p>
+                <p className="text-2xl font-bold">${priceListProduct?.price}</p>
+              </div>
+
+              {priceLists && priceLists.length > 0 ? (
+                <div className="space-y-3">
+                  <Label className="text-base font-semibold">Precios por Lista</Label>
+                  {priceLists.map((priceList: any) => {
+                    const existingPrice = productPrices?.find((pp: any) => pp.price_list_id === priceList.id);
+                    return (
+                      <div key={priceList.id} className="space-y-2">
+                        <Label className="flex items-center gap-2">
+                          {priceList.name}
+                          {priceList.is_default && <Badge variant="secondary">Por defecto</Badge>}
+                          {existingPrice && (
+                            <span className="text-sm text-muted-foreground">
+                              (Actual: ${existingPrice.price})
+                            </span>
+                          )}
+                        </Label>
+                        <Input
+                          type="number"
+                          step="0.01"
+                          placeholder={existingPrice ? existingPrice.price : "Precio en esta lista"}
+                          value={priceListPrices[priceList.id] || ""}
+                          onChange={(e) => setPriceListPrices({
+                            ...priceListPrices,
+                            [priceList.id]: e.target.value
+                          })}
+                        />
+                      </div>
+                    );
+                  })}
+                </div>
+              ) : (
+                <div className="text-center py-6 text-muted-foreground">
+                  <DollarSign className="w-12 h-12 mx-auto mb-2 opacity-50" />
+                  <p>No hay listas de precios configuradas</p>
+                  <p className="text-sm">Crea listas de precios en Configuración</p>
+                </div>
+              )}
+
+              <div className="flex justify-end gap-2 pt-4">
+                <Button variant="outline" onClick={() => {
+                  setIsPriceListDialogOpen(false);
+                  setPriceListPrices({});
+                }}>
+                  Cancelar
+                </Button>
+                <Button onClick={submitPriceListUpdates}>
+                  Guardar Precios
                 </Button>
               </div>
             </div>

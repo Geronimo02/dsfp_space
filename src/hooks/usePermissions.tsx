@@ -20,7 +20,8 @@ export type Module =
   | "returns"
   | "credit_notes"
   | "expenses"
-  | "bulk_operations";
+  | "bulk_operations"
+  | "pos_afip";
 
 interface RolePermission {
   role: string;
@@ -79,6 +80,9 @@ export function usePermissions() {
   });
 
   const hasPermission = (module: Module, permission: Permission): boolean => {
+    // Admin fallback: if user has admin role, grant all permissions
+    if (hasRole("admin")) return true;
+
     if (!permissions || permissions.length === 0) return false;
 
     const modulePermissions = permissions.filter(p => p.module === module);

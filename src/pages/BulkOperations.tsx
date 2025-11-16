@@ -73,7 +73,7 @@ export default function BulkOperations() {
       if (error) throw error;
       return data;
     },
-    enabled: activeTab === "emails" || activeTab === "messages",
+    enabled: (activeTab === "emails" || activeTab === "messages") && !!currentCompany?.id,
   });
 
   const executeBulkMutation = useMutation({

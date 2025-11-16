@@ -1,10 +1,11 @@
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { useNavigate } from "react-router-dom";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Button } from "@/components/ui/button";
 import { supabase } from "@/integrations/supabase/client";
+import { useCompany } from "@/contexts/CompanyContext";
 import { toast } from "sonner";
 import { Building2, Loader2 } from "lucide-react";
 
@@ -15,6 +16,14 @@ export default function CompanySetup() {
   const [phone, setPhone] = useState("");
   const [address, setAddress] = useState("");
   const navigate = useNavigate();
+  const { userCompanies, loading: companyLoading } = useCompany();
+
+  // Si el usuario ya tiene empresas, redirigir al dashboard para evitar crear otra.
+  useEffect(() => {
+    if (!companyLoading && userCompanies.length > 0) {
+      navigate("/");
+    }
+  }, [companyLoading, userCompanies, navigate]);
 
   const handleCreateCompany = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -52,6 +61,14 @@ export default function CompanySetup() {
       setLoading(false);
     }
   };
+
+  if (companyLoading) {
+    return <div className="flex items-center justify-center min-h-screen">Verificando empresas...</div>;
+  }
+
+  if (userCompanies.length > 0) {
+    return <div className="flex items-center justify-center min-h-screen">Redirigiendo...</div>;
+  }
 
   return (
     <div className="min-h-screen flex items-center justify-center bg-gradient-to-br from-primary/10 via-background to-secondary/10 p-4">

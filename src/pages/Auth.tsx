@@ -28,6 +28,8 @@ export default function Auth() {
   const [password, setPassword] = useState("");
   const [fullName, setFullName] = useState("");
   const [showWelcomeModal, setShowWelcomeModal] = useState(false);
+  const [showForgotPassword, setShowForgotPassword] = useState(false);
+  const [resetEmail, setResetEmail] = useState("");
 
   useEffect(() => {
     const { data: { subscription } } = supabase.auth.onAuthStateChange((event, session) => {
@@ -115,6 +117,32 @@ export default function Auth() {
     navigate("/company-setup");
   };
 
+  const handleForgotPassword = async (e: React.FormEvent) => {
+    e.preventDefault();
+    setIsLoading(true);
+
+    try {
+      if (!resetEmail.trim()) {
+        toast.error("Por favor ingresa tu email");
+        return;
+      }
+
+      const { error } = await supabase.auth.resetPasswordForEmail(resetEmail, {
+        redirectTo: `${window.location.origin}/reset-password`,
+      });
+
+      if (error) throw error;
+
+      toast.success("¡Correo enviado! Revisa tu email para restablecer tu contraseña.");
+      setShowForgotPassword(false);
+      setResetEmail("");
+    } catch (error: any) {
+      toast.error(error.message || "Error al enviar correo de recuperación");
+    } finally {
+      setIsLoading(false);
+    }
+  };
+
   return (
     <>
       <AlertDialog open={showWelcomeModal} onOpenChange={setShowWelcomeModal}>
@@ -188,6 +216,16 @@ export default function Auth() {
                 <Button type="submit" className="w-full" disabled={isLoading}>
                   {isLoading ? "Iniciando sesión..." : "Iniciar Sesión"}
                 </Button>
+                <div className="text-center mt-2">
+                  <Button
+                    type="button"
+                    variant="link"
+                    className="text-sm text-muted-foreground"
+                    onClick={() => setShowForgotPassword(true)}
+                  >
+                    ¿Olvidaste tu contraseña?
+                  </Button>
+                </div>
               </form>
             </TabsContent>
             
@@ -235,6 +273,49 @@ export default function Auth() {
         </CardContent>
       </Card>
     </div>
+
+    {/* Forgot Password Dialog */}
+    <AlertDialog open={showForgotPassword} onOpenChange={setShowForgotPassword}>
+      <AlertDialogContent>
+        <AlertDialogHeader>
+          <AlertDialogTitle>Recuperar Contraseña</AlertDialogTitle>
+          <AlertDialogDescription>
+            Ingresa tu email y te enviaremos un enlace para restablecer tu contraseña.
+          </AlertDialogDescription>
+        </AlertDialogHeader>
+        <form onSubmit={handleForgotPassword}>
+          <div className="space-y-4 py-4">
+            <div className="space-y-2">
+              <Label htmlFor="reset-email">Email</Label>
+              <Input
+                id="reset-email"
+                type="email"
+                placeholder="tu@email.com"
+                value={resetEmail}
+                onChange={(e) => setResetEmail(e.target.value)}
+                required
+              />
+            </div>
+          </div>
+          <AlertDialogFooter>
+            <Button
+              type="button"
+              variant="outline"
+              onClick={() => {
+                setShowForgotPassword(false);
+                setResetEmail("");
+              }}
+              disabled={isLoading}
+            >
+              Cancelar
+            </Button>
+            <Button type="submit" disabled={isLoading}>
+              {isLoading ? "Enviando..." : "Enviar enlace"}
+            </Button>
+          </AlertDialogFooter>
+        </form>
+      </AlertDialogContent>
+    </AlertDialog>
     </>
   );
 }

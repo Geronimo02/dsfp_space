@@ -6,6 +6,7 @@ import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
 import { Label } from "@/components/ui/label";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog";
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
@@ -34,6 +35,7 @@ const customerSchema = z.object({
     .max(999999999.99, "El límite de crédito es demasiado alto")
     .optional(),
   payment_terms: z.string().max(100, "Los términos de pago deben tener máximo 100 caracteres").optional(),
+  price_list_id: z.string().uuid().optional().nullable(),
 });
 
 export default function Customers() {
@@ -55,6 +57,7 @@ export default function Customers() {
     address: "",
     credit_limit: "",
     payment_terms: "",
+    price_list_id: "",
   });
   const [isPaymentDialogOpen, setIsPaymentDialogOpen] = useState(false);
   const [paymentData, setPaymentData] = useState({
@@ -67,7 +70,9 @@ export default function Customers() {
   const { data: customers } = useQuery({
     queryKey: ["customers", searchQuery, currentCompany?.id],
     queryFn: async () => {
-      let query = supabase.from("customers").select("*").eq("company_id", currentCompany?.id).order("created_at", { ascending: false });
+      if (!currentCompany?.id) return [];
+      
+      let query = supabase.from("customers").select("*").eq("company_id", currentCompany.id).order("created_at", { ascending: false });
       
       if (searchQuery) {
         const sanitized = sanitizeSearchQuery(searchQuery);
@@ -80,6 +85,26 @@ export default function Customers() {
       if (error) throw error;
       return data;
     },
+    enabled: !!currentCompany?.id,
+  });
+
+  const { data: priceLists } = useQuery({
+    queryKey: ["price-lists", currentCompany?.id],
+    queryFn: async () => {
+      if (!currentCompany?.id) return [];
+      
+      const { data, error } = await supabase
+        .from("price_lists")
+        .select("id, name")
+        .eq("company_id", currentCompany.id)
+        .eq("is_active", true)
+        .order("is_default", { ascending: false })
+        .order("name");
+      
+      if (error) throw error;
+      return data;
+    },
+    enabled: !!currentCompany?.id,
   });
 
   const { data: customerSales } = useQuery({
@@ -337,6 +362,7 @@ export default function Customers() {
       address: "",
       credit_limit: "",
       payment_terms: "",
+      price_list_id: "",
     });
   };
 
@@ -352,6 +378,7 @@ export default function Customers() {
         address: formData.address || undefined,
         credit_limit: formData.credit_limit ? parseFloat(formData.credit_limit) : undefined,
         payment_terms: formData.payment_terms || undefined,
+        price_list_id: formData.price_list_id || null,
       });
 
       const customerData = {
@@ -362,6 +389,7 @@ export default function Customers() {
         address: validatedData.address || null,
         credit_limit: validatedData.credit_limit ?? 0,
         payment_terms: validatedData.payment_terms || null,
+        price_list_id: validatedData.price_list_id || null,
         company_id: currentCompany?.id,
       };
 
@@ -418,6 +446,7 @@ export default function Customers() {
       address: customer.address || "",
       credit_limit: customer.credit_limit?.toString() || "",
       payment_terms: customer.payment_terms || "",
+      price_list_id: customer.price_list_id || "",
     });
     setIsDialogOpen(true);
   };
@@ -519,6 +548,28 @@ export default function Customers() {
                     value={formData.payment_terms}
                     onChange={(e) => setFormData({ ...formData, payment_terms: e.target.value })}
                   />
+                </div>
+                <div className="space-y-2">
+                  <Label htmlFor="price_list_id">Lista de Precios</Label>
+                  <Select
+                    value={formData.price_list_id}
+                    onValueChange={(value) => setFormData({ ...formData, price_list_id: value })}
+                  >
+                    <SelectTrigger>
+                      <SelectValue placeholder="Usar precio por defecto" />
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="">Sin lista específica (predeterminada)</SelectItem>
+                      {priceLists?.map((list: any) => (
+                        <SelectItem key={list.id} value={list.id}>
+                          {list.name}
+                        </SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                  <p className="text-xs text-muted-foreground">
+                    Si no se asigna, se usará la lista de precios por defecto
+                  </p>
                 </div>
                 <div className="flex justify-end gap-2">
                   <Button type="button" variant="outline" onClick={() => setIsDialogOpen(false)}>

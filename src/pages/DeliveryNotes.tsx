@@ -42,6 +42,7 @@ export default function DeliveryNotes() {
       if (error) throw error;
       return data;
     },
+    enabled: !!currentCompany?.id,
   });
 
   const { data: companySettings } = useQuery({
