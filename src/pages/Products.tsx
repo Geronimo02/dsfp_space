@@ -1318,7 +1318,7 @@ export default function Products() {
                         <Input
                           type="number"
                           step="0.01"
-                          placeholder={existingPrice ? existingPrice.price : "Precio en esta lista"}
+                          placeholder={existingPrice ? String(existingPrice.price) : "Precio en esta lista"}
                           value={priceListPrices[priceList.id] || ""}
                           onChange={(e) => setPriceListPrices({
                             ...priceListPrices,
