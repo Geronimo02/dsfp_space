@@ -21,6 +21,7 @@ export default function CompanySetup() {
   // Si el usuario ya tiene empresas, redirigir al dashboard para evitar crear otra.
   useEffect(() => {
     if (!companyLoading && userCompanies.length > 0) {
+      toast.info("Ya tienes acceso a una empresa. Redirigiendo...");
       navigate("/");
     }
   }, [companyLoading, userCompanies, navigate]);
@@ -81,7 +82,13 @@ export default function CompanySetup() {
           </div>
           <CardTitle className="text-2xl">Configura tu empresa</CardTitle>
           <CardDescription>
-            Para comenzar a usar el sistema, necesitas crear tu empresa o esperar a que un administrador te invite a una existente.
+            Para comenzar a usar el sistema, necesitas crear tu primera empresa.
+            {userCompanies.length > 0 && (
+              <span className="block mt-2 text-yellow-600">
+                Ya tienes acceso a {userCompanies.length} empresa(s). Si necesitas crear otra empresa adicional, 
+                puedes hacerlo desde Configuración (puede tener cargo adicional según tu plan).
+              </span>
+            )}
           </CardDescription>
         </CardHeader>
         <CardContent>
@@ -133,9 +140,13 @@ export default function CompanySetup() {
             </Button>
           </form>
 
-          <div className="mt-6 text-center text-sm text-muted-foreground">
+          <div className="mt-6 text-center text-sm text-muted-foreground space-y-2">
             <p>
-              ¿Ya tienes una empresa? Pide a un administrador que te invite.
+              ¿Ya tienes una empresa? Pide a un administrador que te invite a través de Empleados.
+            </p>
+            <p className="text-xs">
+              Nota: Solo se permite una empresa por cuenta de forma gratuita. 
+              Empresas adicionales pueden requerir actualización de plan.
             </p>
           </div>
         </CardContent>

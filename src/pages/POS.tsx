@@ -631,7 +631,7 @@ export default function POS() {
     const puntoVenta = pvSel?.punto_venta || null;
 
     // Datos de empresa
-    const comp = companySettings || {};
+    const comp = currentCompany || companySettings || {};
 
     // Mapear items
     const items = (lastSaleData.items || []).map((it: any) => ({
@@ -649,12 +649,12 @@ export default function POS() {
       caeVencimiento: lastSaleData.fecha_vencimiento_cae || null,
       fecha: lastSaleData.created_at,
       company: {
-        razon_social: comp.razon_social || comp.name || undefined,
-        nombre_fantasia: comp.nombre_fantasia || undefined,
-        cuit: comp.cuit || undefined,
-        condicion_iva: comp.condicion_iva || undefined,
-        address: comp.address || undefined,
-        phone: comp.phone || undefined,
+        razon_social: (comp as any).razon_social || (comp as any).name || undefined,
+        nombre_fantasia: (comp as any).nombre_fantasia || undefined,
+        cuit: (comp as any).tax_id || undefined,
+        condicion_iva: (comp as any).condicion_iva || undefined,
+        address: (comp as any).address || undefined,
+        phone: (comp as any).phone || undefined,
       },
       customer: lastSaleData.customer ? {
         name: lastSaleData.customer.name,
