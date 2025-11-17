@@ -99,6 +99,8 @@ export function Sidebar() {
     if (error) {
       toast.error("Error al cerrar sesión");
     } else {
+      // Limpiar localStorage para evitar problemas con company_id al cambiar de usuario
+      localStorage.removeItem('currentCompanyId');
       navigate("/auth");
       toast.success("Sesión cerrada exitosamente");
     }

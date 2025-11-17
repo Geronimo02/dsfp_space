@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { Layout } from "@/components/layout/Layout";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
@@ -49,11 +49,19 @@ const productSchema = z.object({
 
 export default function Products() {
   const { currentCompany } = useCompany();
-  const { hasPermission } = usePermissions();
+  const { hasPermission, loading: permissionsLoading } = usePermissions();
   const canCreate = hasPermission('products', 'create');
   const canEdit = hasPermission('products', 'edit');
   const canDelete = hasPermission('products', 'delete');
   const canExport = hasPermission('products', 'export');
+
+  // Verificar que el usuario tenga acceso a la empresa actual
+  useEffect(() => {
+    if (!permissionsLoading && currentCompany && !hasPermission('products', 'view')) {
+      toast.error("No tienes acceso a los productos de esta empresa");
+      console.warn("Usuario sin acceso a empresa", { currentCompany });
+    }
+  }, [currentCompany, permissionsLoading, hasPermission]);
 
   const [searchQuery, setSearchQuery] = useState("");
   const [isDialogOpen, setIsDialogOpen] = useState(false);
@@ -187,6 +195,7 @@ export default function Products() {
   const createProductMutation = useMutation({
     mutationFn: async (data: any) => {
       if (!currentCompany?.id) throw new Error('Empresa no seleccionada');
+      if (!canCreate) throw new Error('No tienes permiso para crear productos en esta empresa');
       // Forzar company_id correcto
       const payload = { ...data, company_id: currentCompany.id };
       const { data: product, error } = await supabase
@@ -227,8 +236,15 @@ export default function Products() {
     onError: (error: any) => {
       const msg = error?.message || '';
       if (msg.includes('row-level security') || msg.includes('RLS') || msg.includes('403')) {
-        toast.error("Acceso denegado por RLS. Verifica que estás asignado a esta empresa y que el producto se crea con company_id correcto.");
-        console.warn('RLS error creating product', { currentCompany, error });
+        toast.error("No tienes permisos para crear productos en esta empresa. Verifica que seas admin o gerente.");
+        console.error('RLS error creating product', { 
+          currentCompany, 
+          canCreate, 
+          error,
+          mensaje: 'Posible causa: Usuario no tiene rol admin/manager en company_users para esta empresa'
+        });
+      } else if (msg.includes('No tienes permiso')) {
+        toast.error(msg);
       } else {
         toast.error(error.message || "Error al crear producto");
       }

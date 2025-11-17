@@ -85,10 +85,14 @@ export function CompanyProvider({ children }: { children: React.ReactNode }) {
         if (savedCompany) {
           setCurrentCompany(savedCompany.companies);
           setCurrentCompanyRole(savedCompany.role);
-        } else if (data && data.length > 0) {
-          setCurrentCompany(data[0].companies);
-          setCurrentCompanyRole((data[0] as CompanyUser).role);
-          localStorage.setItem('currentCompanyId', data[0].company_id);
+        } else {
+          // Empresa guardada no pertenece al usuario actual - limpiar y usar primera empresa
+          localStorage.removeItem('currentCompanyId');
+          if (data && data.length > 0) {
+            setCurrentCompany(data[0].companies);
+            setCurrentCompanyRole((data[0] as CompanyUser).role);
+            localStorage.setItem('currentCompanyId', data[0].company_id);
+          }
         }
       } else if (data && data.length > 0) {
         setCurrentCompany(data[0].companies);
@@ -141,8 +145,16 @@ export function CompanyProvider({ children }: { children: React.ReactNode }) {
         title: 'Empresa cambiada',
         description: `Ahora estás trabajando en ${company.companies.name}`,
       });
-      // Reload page to refresh all data
+      // Reload page to refresh all data and clear cache
       window.location.reload();
+    } else {
+      // Si la empresa no existe en la lista del usuario, limpiar localStorage
+      localStorage.removeItem('currentCompanyId');
+      toast({
+        title: 'Error',
+        description: 'No tienes acceso a esa empresa',
+        variant: 'destructive',
+      });
     }
   };
 
