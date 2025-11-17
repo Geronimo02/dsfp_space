@@ -32,15 +32,42 @@ export default function Auth() {
   const [resetEmail, setResetEmail] = useState("");
 
   useEffect(() => {
-    const { data: { subscription } } = supabase.auth.onAuthStateChange((event, session) => {
+    const checkSession = async () => {
+      const { data: { session } } = await supabase.auth.getSession();
       if (session) {
-        navigate("/");
+        // Check if user has companies
+        const { data: companies } = await supabase
+          .from('company_users')
+          .select('id')
+          .eq('user_id', session.user.id)
+          .eq('active', true);
+        
+        // Si tiene empresas, ir directo al dashboard
+        // Si no tiene, ir a crear empresa
+        if (companies && companies.length > 0) {
+          navigate("/");
+        } else {
+          navigate("/company-setup");
+        }
       }
-    });
+    };
 
-    supabase.auth.getSession().then(({ data: { session } }) => {
-      if (session) {
-        navigate("/");
+    checkSession();
+
+    const { data: { subscription } } = supabase.auth.onAuthStateChange(async (event, session) => {
+      if (session && event === 'SIGNED_IN') {
+        // Check if user has companies
+        const { data: companies } = await supabase
+          .from('company_users')
+          .select('id')
+          .eq('user_id', session.user.id)
+          .eq('active', true);
+        
+        if (companies && companies.length > 0) {
+          navigate("/");
+        } else {
+          navigate("/company-setup");
+        }
       }
     });
 
@@ -61,7 +88,8 @@ export default function Auth() {
 
       if (error) throw error;
       
-      toast.success("¡Bienvenido!");
+      // No need to toast or navigate here, auth state change will handle it
+      console.log("Login successful");
     } catch (error: any) {
       if (error instanceof z.ZodError) {
         toast.error(error.errors[0].message);
@@ -95,9 +123,22 @@ export default function Auth() {
 
       if (error) throw error;
       
-      // Si el usuario se creó exitosamente, mostrar modal de bienvenida
+      // Check if user already has companies (invited user)
       if (data.user) {
-        setShowWelcomeModal(true);
+        const { data: companies } = await supabase
+          .from('company_users')
+          .select('id')
+          .eq('user_id', data.user.id)
+          .eq('active', true);
+
+        if (companies && companies.length > 0) {
+          // Usuario invitado que ya tiene empresa asignada
+          toast.success("¡Bienvenido! Redirigiendo a tu empresa...");
+          navigate("/");
+        } else {
+          // Usuario nuevo sin empresa
+          setShowWelcomeModal(true);
+        }
       } else {
         toast.success("¡Cuenta creada! Revisa tu email para confirmar tu cuenta.");
       }
