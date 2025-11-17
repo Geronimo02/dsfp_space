@@ -1,4 +1,4 @@
-import { useState, useEffect } from "react";
+import React, { useState, useEffect } from "react";
 import { Layout } from "@/components/layout/Layout";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
@@ -143,13 +143,16 @@ export default function Products() {
       
       const { data, error } = await supabase
         .from("price_lists")
-        .select("id, name, is_default")
+        .select("id, name, is_default, company_id")
         .eq("company_id", currentCompany.id)
         .eq("is_active", true)
         .order("is_default", { ascending: false })
         .order("name");
       
-      if (error) throw error;
+      if (error) {
+        console.error('Error loading price lists:', error);
+        throw error;
+      }
       return data;
     },
     enabled: !!currentCompany?.id,
@@ -183,10 +186,13 @@ export default function Products() {
       
       const { data, error } = await supabase
         .from("product_prices")
-        .select("*, price_lists(name)")
+        .select("*, price_lists(name, company_id)")
         .eq("product_id", priceListProduct.id);
       
-      if (error) throw error;
+      if (error) {
+        console.error('Error loading product prices:', error);
+        throw error;
+      }
       return data;
     },
     enabled: !!priceListProduct?.id,
@@ -197,31 +203,6 @@ export default function Products() {
       if (!currentCompany?.id) throw new Error('Empresa no seleccionada');
       if (!canCreate) throw new Error('No tienes permiso para crear productos en esta empresa');
       
-      // Verificar que el usuario realmente tiene rol adecuado en esta empresa
-      const { data: { user } } = await supabase.auth.getUser();
-      if (!user) throw new Error('No autenticado');
-      
-      const { data: userCompanyCheck, error: checkError } = await supabase
-        .from('company_users')
-        .select('role, active')
-        .eq('user_id', user.id)
-        .eq('company_id', currentCompany.id)
-        .eq('active', true)
-        .maybeSingle();
-
-      if (checkError) {
-        console.error('Error verificando permisos de empresa:', checkError);
-        throw new Error('Error verificando permisos');
-      }
-
-      if (!userCompanyCheck) {
-        throw new Error(`No tienes acceso a la empresa ${currentCompany.name}. Por favor selecciona otra empresa o contacta al administrador.`);
-      }
-
-      if (!['admin', 'manager'].includes(userCompanyCheck.role)) {
-        throw new Error(`Tu rol (${userCompanyCheck.role}) no tiene permisos para crear productos. Necesitas ser admin o gerente.`);
-      }
-
       // Forzar company_id correcto
       const payload = { ...data, company_id: currentCompany.id };
       const { data: product, error } = await supabase
@@ -261,15 +242,10 @@ export default function Products() {
     },
     onError: (error: any) => {
       const msg = error?.message || '';
-      if (msg.includes('row-level security') || msg.includes('RLS') || msg.includes('403')) {
-        toast.error("No tienes permisos para crear productos en esta empresa. Verifica que seas admin o gerente.");
-        console.error('RLS error creating product', { 
-          currentCompany, 
-          canCreate, 
-          error,
-          mensaje: 'Posible causa: Usuario no tiene rol admin/manager en company_users para esta empresa'
-        });
-      } else if (msg.includes('No tienes permiso')) {
+      if (msg.includes('row-level security') || msg.includes('RLS') || msg.includes('policy')) {
+        toast.error("No tienes permisos para crear productos en esta empresa.");
+        console.error('RLS error creating product', { currentCompany, canCreate, error });
+      } else if (msg.includes('No tienes permiso') || msg.includes('Empresa no seleccionada')) {
         toast.error(msg);
       } else {
         toast.error(error.message || "Error al crear producto");
@@ -279,7 +255,15 @@ export default function Products() {
 
   const updateProductMutation = useMutation({
     mutationFn: async ({ id, data }: { id: string; data: any }) => {
-      const { error } = await supabase.from("products").update(data).eq("id", id);
+      if (!currentCompany?.id) throw new Error('Empresa no seleccionada');
+      if (!canEdit) throw new Error('No tienes permiso para editar productos en esta empresa');
+      
+      const { error } = await supabase
+        .from("products")
+        .update(data)
+        .eq("id", id)
+        .eq("company_id", currentCompany.id);
+      
       if (error) throw error;
     },
     onSuccess: () => {
@@ -290,13 +274,29 @@ export default function Products() {
       resetForm();
     },
     onError: (error: any) => {
-      toast.error(error.message || "Error al actualizar producto");
+      const msg = error?.message || '';
+      if (msg.includes('row-level security') || msg.includes('RLS') || msg.includes('policy')) {
+        toast.error("No tienes permisos para editar productos en esta empresa.");
+        console.error('RLS error updating product', { currentCompany, canEdit, error });
+      } else if (msg.includes('No tienes permiso') || msg.includes('Empresa no seleccionada')) {
+        toast.error(msg);
+      } else {
+        toast.error(error.message || "Error al actualizar producto");
+      }
     },
   });
 
   const deleteProductMutation = useMutation({
     mutationFn: async (id: string) => {
-      const { error } = await supabase.from("products").delete().eq("id", id);
+      if (!currentCompany?.id) throw new Error('Empresa no seleccionada');
+      if (!canDelete) throw new Error('No tienes permiso para eliminar productos en esta empresa');
+      
+      const { error } = await supabase
+        .from("products")
+        .delete()
+        .eq("id", id)
+        .eq("company_id", currentCompany.id);
+      
       if (error) throw error;
     },
     onSuccess: () => {
@@ -304,7 +304,15 @@ export default function Products() {
       queryClient.invalidateQueries({ queryKey: ["products"] });
     },
     onError: (error: any) => {
-      toast.error(error.message || "Error al eliminar producto");
+      const msg = error?.message || '';
+      if (msg.includes('row-level security') || msg.includes('RLS') || msg.includes('policy')) {
+        toast.error("No tienes permisos para eliminar productos en esta empresa.");
+        console.error('RLS error deleting product', { currentCompany, canDelete, error });
+      } else if (msg.includes('No tienes permiso') || msg.includes('Empresa no seleccionada')) {
+        toast.error(msg);
+      } else {
+        toast.error(error.message || "Error al eliminar producto");
+      }
     },
   });
 
@@ -1168,8 +1176,8 @@ export default function Products() {
                   const productWarehouseStock = getWarehouseStockForProduct(product.id);
                   
                   return (
-                    <>
-                      <TableRow key={product.id}>
+                    <React.Fragment key={product.id}>
+                      <TableRow>
                         <TableCell>
                           <Checkbox
                             checked={selectedProducts.has(product.id)}
@@ -1267,7 +1275,7 @@ export default function Products() {
                           </TableCell>
                         </TableRow>
                       )}
-                    </>
+                    </React.Fragment>
                   );
                 })}
               </TableBody>
