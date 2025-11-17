@@ -196,6 +196,32 @@ export default function Products() {
     mutationFn: async (data: any) => {
       if (!currentCompany?.id) throw new Error('Empresa no seleccionada');
       if (!canCreate) throw new Error('No tienes permiso para crear productos en esta empresa');
+      
+      // Verificar que el usuario realmente tiene rol adecuado en esta empresa
+      const { data: { user } } = await supabase.auth.getUser();
+      if (!user) throw new Error('No autenticado');
+      
+      const { data: userCompanyCheck, error: checkError } = await supabase
+        .from('company_users')
+        .select('role, active')
+        .eq('user_id', user.id)
+        .eq('company_id', currentCompany.id)
+        .eq('active', true)
+        .maybeSingle();
+
+      if (checkError) {
+        console.error('Error verificando permisos de empresa:', checkError);
+        throw new Error('Error verificando permisos');
+      }
+
+      if (!userCompanyCheck) {
+        throw new Error(`No tienes acceso a la empresa ${currentCompany.name}. Por favor selecciona otra empresa o contacta al administrador.`);
+      }
+
+      if (!['admin', 'manager'].includes(userCompanyCheck.role)) {
+        throw new Error(`Tu rol (${userCompanyCheck.role}) no tiene permisos para crear productos. Necesitas ser admin o gerente.`);
+      }
+
       // Forzar company_id correcto
       const payload = { ...data, company_id: currentCompany.id };
       const { data: product, error } = await supabase
