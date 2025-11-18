@@ -138,6 +138,7 @@ const Purchases = () => {
         quantity: item.quantity,
         unit_cost: item.unit_cost,
         subtotal: item.subtotal,
+        company_id: currentCompany?.id!
       }));
 
       const { error: itemsError } = await supabase
