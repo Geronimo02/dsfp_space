@@ -11,7 +11,8 @@ import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, 
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { Badge } from "@/components/ui/badge";
 import { toast } from "sonner";
-import { Building2, Plus, Pencil, Trash2, Package, ArrowLeftRight } from "lucide-react";
+import { Building2, Plus, Pencil, Trash2, Package, ArrowLeftRight, Info, MapPin, Phone, User, CheckCircle2, AlertCircle } from "lucide-react";
+import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip";
 import { Switch } from "@/components/ui/switch";
 import { useNavigate } from "react-router-dom";
 import { useCompany } from "@/contexts/CompanyContext";
@@ -174,80 +175,140 @@ export default function Warehouses() {
               Stock por Depósito
             </Button>
             <Dialog open={dialogOpen} onOpenChange={setDialogOpen}>
-              <DialogTrigger asChild>
-                <Button onClick={resetForm} className="hover:scale-105 transition-transform">
-                  <Plus className="mr-2 h-4 w-4" />
+              <TooltipProvider>
+                <Tooltip>
+                  <TooltipTrigger asChild>
+                    <DialogTrigger asChild>
+                      <Button onClick={resetForm} className="hover:scale-105 transition-transform gap-2">
+                        <Plus className="h-4 w-4" />
                   Nuevo Depósito
-                </Button>
-              </DialogTrigger>
-              <DialogContent className="max-w-md animate-scale-in">
+                      </Button>
+                    </DialogTrigger>
+                  </TooltipTrigger>
+                  <TooltipContent>Crear nuevo depósito</TooltipContent>
+                </Tooltip>
+              </TooltipProvider>
+              <DialogContent className="max-w-2xl max-h-[90vh] overflow-y-auto animate-scale-in">
                 <DialogHeader>
-                  <DialogTitle>
+                  <DialogTitle className="flex items-center gap-2">
+                    <Building2 className="h-5 w-5 text-primary" />
                     {selectedWarehouse ? "Editar Depósito" : "Nuevo Depósito"}
                   </DialogTitle>
                 </DialogHeader>
-                <div className="space-y-4">
-                  <div>
-                    <Label>Nombre *</Label>
-                    <Input
-                      value={formData.name}
-                      onChange={(e) => setFormData({ ...formData, name: e.target.value })}
-                      placeholder="Depósito Central"
-                    />
+                <div className="space-y-6">
+                  {/* Sección Información Básica */}
+                  <div className="space-y-4">
+                    <div className="flex items-center gap-2 pb-2 border-b">
+                      <div className="p-2 bg-primary/10 rounded-lg">
+                        <Info className="h-4 w-4 text-primary" />
+                      </div>
+                      <h3 className="text-sm font-semibold">Información Básica</h3>
+                    </div>
+                    <div className="grid grid-cols-2 gap-4">
+                      <div>
+                        <Label>Nombre *</Label>
+                        <Input
+                          value={formData.name}
+                          onChange={(e) => setFormData({ ...formData, name: e.target.value })}
+                          placeholder="Depósito Central"
+                        />
+                      </div>
+                      <div>
+                        <Label>Código *</Label>
+                        <Input
+                          value={formData.code}
+                          onChange={(e) => setFormData({ ...formData, code: e.target.value.toUpperCase() })}
+                          placeholder="DEP-01"
+                          disabled={!!selectedWarehouse}
+                        />
+                      </div>
+                    </div>
                   </div>
-                  <div>
-                    <Label>Código *</Label>
-                    <Input
-                      value={formData.code}
-                      onChange={(e) => setFormData({ ...formData, code: e.target.value.toUpperCase() })}
-                      placeholder="DEP-01"
-                      disabled={!!selectedWarehouse}
-                    />
+
+                  {/* Sección Ubicación y Contacto */}
+                  <div className="space-y-4">
+                    <div className="flex items-center gap-2 pb-2 border-b">
+                      <div className="p-2 bg-green-500/10 rounded-lg">
+                        <MapPin className="h-4 w-4 text-green-600 dark:text-green-500" />
+                      </div>
+                      <h3 className="text-sm font-semibold">Ubicación y Contacto</h3>
+                    </div>
+                    <div className="space-y-4">
+                      <div>
+                        <Label>Dirección</Label>
+                        <Input
+                          value={formData.address}
+                          onChange={(e) => setFormData({ ...formData, address: e.target.value })}
+                          placeholder="Calle 123"
+                        />
+                      </div>
+                      <div>
+                        <Label>Teléfono</Label>
+                        <Input
+                          value={formData.phone}
+                          onChange={(e) => setFormData({ ...formData, phone: e.target.value })}
+                          placeholder="+54 11 1234-5678"
+                        />
+                      </div>
+                    </div>
                   </div>
-                  <div>
-                    <Label>Dirección</Label>
-                    <Input
-                      value={formData.address}
-                      onChange={(e) => setFormData({ ...formData, address: e.target.value })}
-                      placeholder="Calle 123"
-                    />
+
+                  {/* Sección Gestión */}
+                  <div className="space-y-4">
+                    <div className="flex items-center gap-2 pb-2 border-b">
+                      <div className="p-2 bg-amber-500/10 rounded-lg">
+                        <User className="h-4 w-4 text-amber-600 dark:text-amber-500" />
+                      </div>
+                      <h3 className="text-sm font-semibold">Gestión</h3>
+                    </div>
+                    <div>
+                      <Label>Encargado</Label>
+                      <Input
+                        value={formData.manager_name}
+                        onChange={(e) => setFormData({ ...formData, manager_name: e.target.value })}
+                        placeholder="Juan Pérez"
+                      />
+                    </div>
+                    <div className="grid grid-cols-2 gap-4">
+                      <div className="flex items-center justify-between p-3 border rounded-lg">
+                        <div className="flex items-center gap-2">
+                          <Building2 className="h-4 w-4 text-muted-foreground" />
+                          <Label className="cursor-pointer">Depósito Principal</Label>
+                        </div>
+                        <Switch
+                          checked={formData.is_main}
+                          onCheckedChange={(checked) => setFormData({ ...formData, is_main: checked })}
+                        />
+                      </div>
+                      <div className="flex items-center justify-between p-3 border rounded-lg">
+                        <div className="flex items-center gap-2">
+                          <CheckCircle2 className="h-4 w-4 text-muted-foreground" />
+                          <Label className="cursor-pointer">Activo</Label>
+                        </div>
+                        <Switch
+                          checked={formData.active}
+                          onCheckedChange={(checked) => setFormData({ ...formData, active: checked })}
+                        />
+                      </div>
+                    </div>
                   </div>
-                  <div>
-                    <Label>Teléfono</Label>
-                    <Input
-                      value={formData.phone}
-                      onChange={(e) => setFormData({ ...formData, phone: e.target.value })}
-                      placeholder="+54 11 1234-5678"
-                    />
-                  </div>
-                  <div>
-                    <Label>Encargado</Label>
-                    <Input
-                      value={formData.manager_name}
-                      onChange={(e) => setFormData({ ...formData, manager_name: e.target.value })}
-                      placeholder="Juan Pérez"
-                    />
-                  </div>
-                  <div className="flex items-center justify-between">
-                    <Label>Depósito Principal</Label>
-                    <Switch
-                      checked={formData.is_main}
-                      onCheckedChange={(checked) => setFormData({ ...formData, is_main: checked })}
-                    />
-                  </div>
-                  <div className="flex items-center justify-between">
-                    <Label>Activo</Label>
-                    <Switch
-                      checked={formData.active}
-                      onCheckedChange={(checked) => setFormData({ ...formData, active: checked })}
-                    />
-                  </div>
-                  <div className="flex justify-end gap-2">
+
+                  <div className="flex justify-end gap-2 pt-4 border-t">
                     <Button variant="outline" onClick={() => setDialogOpen(false)}>
                       Cancelar
-                    </Button>
-                    <Button onClick={handleSubmit}>
-                      {selectedWarehouse ? "Actualizar" : "Crear"}
+                </Button>
+                    <Button onClick={handleSubmit} className="gap-2">
+                      {selectedWarehouse ? (
+                        <>
+                          <CheckCircle2 className="h-4 w-4" />
+                          Actualizar
+                        </>
+                      ) : (
+                        <>
+                          <Plus className="h-4 w-4" />
+                          Crear
+                        </>
+                      )}
                     </Button>
                   </div>
                 </div>
@@ -277,9 +338,12 @@ export default function Warehouses() {
                   <TableRow key={warehouse.id} className="animate-fade-in" style={{ animationDelay: `${index * 50}ms` }}>
                     <TableCell>
                       <div className="flex items-center gap-2">
-                        <code className="font-mono text-sm">{warehouse.code}</code>
+                          <code className="font-mono text-sm font-semibold text-primary">{warehouse.code}</code>
                         {warehouse.is_main && (
-                          <Badge variant="default" className="animate-pulse-subtle">Principal</Badge>
+                            <Badge variant="default" className="animate-pulse-subtle gap-1 bg-primary">
+                              <Building2 className="h-3 w-3" />
+                              Principal
+                            </Badge>
                         )}
                       </div>
                     </TableCell>
@@ -288,32 +352,63 @@ export default function Warehouses() {
                     <TableCell>{warehouse.manager_name || "-"}</TableCell>
                     <TableCell>{warehouse.phone || "-"}</TableCell>
                     <TableCell>
-                      <Badge variant={warehouse.active ? "default" : "secondary"}>
-                        {warehouse.active ? "Activo" : "Inactivo"}
+                        <Badge 
+                          variant={warehouse.active ? "default" : "secondary"}
+                          className={warehouse.active ? "gap-1 bg-green-500 hover:bg-green-600" : "gap-1"}
+                        >
+                          {warehouse.active ? (
+                            <>
+                              <CheckCircle2 className="h-3 w-3" />
+                              Activo
+                            </>
+                          ) : (
+                            <>
+                              <AlertCircle className="h-3 w-3" />
+                              Inactivo
+                            </>
+                          )}
                       </Badge>
                     </TableCell>
                     <TableCell>
                       <div className="flex gap-2">
-                        <Button
-                          variant="outline"
-                          size="sm"
-                          onClick={() => handleEdit(warehouse)}
-                          className="hover:scale-110 transition-transform"
-                        >
-                          <Pencil className="h-4 w-4" />
-                        </Button>
+                          <TooltipProvider>
+                            <Tooltip>
+                              <TooltipTrigger asChild>
+                                <Button
+                                  variant="outline"
+                                  size="sm"
+                                  onClick={(e) => {
+                                    e.stopPropagation();
+                                    handleEdit(warehouse);
+                                  }}
+                                  className="hover:scale-110 transition-transform"
+                                >
+                                  <Pencil className="h-4 w-4" />
+                                </Button>
+                              </TooltipTrigger>
+                              <TooltipContent>Editar depósito</TooltipContent>
+                            </Tooltip>
+                          </TooltipProvider>
                         {!warehouse.is_main && (
-                          <Button
-                            variant="destructive"
-                            size="sm"
-                            onClick={() => {
-                              setSelectedWarehouse(warehouse);
-                              setDeleteDialogOpen(true);
-                            }}
-                            className="hover:scale-110 transition-transform"
-                          >
-                            <Trash2 className="h-4 w-4" />
-                          </Button>
+                            <TooltipProvider>
+                              <Tooltip>
+                                <TooltipTrigger asChild>
+                                  <Button
+                                    variant="destructive"
+                                    size="sm"
+                                    onClick={(e) => {
+                                      e.stopPropagation();
+                                      setSelectedWarehouse(warehouse);
+                                      setDeleteDialogOpen(true);
+                                    }}
+                                    className="hover:scale-110 transition-transform"
+                                  >
+                                    <Trash2 className="h-4 w-4" />
+                                  </Button>
+                                </TooltipTrigger>
+                                <TooltipContent>Eliminar depósito</TooltipContent>
+                              </Tooltip>
+                            </TooltipProvider>
                         )}
                       </div>
                     </TableCell>

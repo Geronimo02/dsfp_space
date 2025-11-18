@@ -1,13 +1,14 @@
 import { useQuery } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
-import { DollarSign, Package, ShoppingCart, TrendingUp, Users, AlertTriangle } from "lucide-react";
+import { DollarSign, Package, ShoppingCart, TrendingUp, Users, AlertTriangle, BarChart3, Activity, ArrowUpRight } from "lucide-react";
 import { Layout } from "@/components/layout/Layout";
 import { LineChart, Line, BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, Legend } from "recharts";
 import { format, subDays, startOfDay } from "date-fns";
 import { es } from "date-fns/locale";
 import { usePermissions } from "@/hooks/usePermissions";
 import { useCompany } from "@/contexts/CompanyContext";
+import { Badge } from "@/components/ui/badge";
 
 export default function Dashboard() {
   const { currentCompany } = useCompany();
@@ -165,32 +166,40 @@ export default function Dashboard() {
       value: `$${salesData?.today.toFixed(2) || "0.00"}`,
       icon: DollarSign,
       description: "Ingresos del día actual",
-      color: "text-primary",
-      bgColor: "bg-primary/10",
+      color: "text-green-600 dark:text-green-500",
+      bgColor: "bg-green-500/10",
+      borderColor: "border-green-500/20",
+      trend: salesData?.today > 0 ? "+100%" : "0%",
     },
     canViewSales && {
       title: "Ventas Totales",
       value: salesData?.count || 0,
       icon: ShoppingCart,
       description: "Transacciones registradas",
-      color: "text-accent",
-      bgColor: "bg-accent/10",
+      color: "text-blue-600 dark:text-blue-500",
+      bgColor: "bg-blue-500/10",
+      borderColor: "border-blue-500/20",
+      trend: null,
     },
     canViewProducts && {
       title: "Productos",
       value: productsCount || 0,
       icon: Package,
       description: `${lowStockProducts || 0} con stock bajo`,
-      color: "text-success",
-      bgColor: "bg-success/10",
+      color: "text-purple-600 dark:text-purple-500",
+      bgColor: "bg-purple-500/10",
+      borderColor: "border-purple-500/20",
+      alert: lowStockProducts > 0,
     },
     canViewCustomers && {
       title: "Clientes",
       value: customersCount || 0,
       icon: Users,
       description: "Clientes registrados",
-      color: "text-muted-foreground",
-      bgColor: "bg-muted",
+      color: "text-orange-600 dark:text-orange-500",
+      bgColor: "bg-orange-500/10",
+      borderColor: "border-orange-500/20",
+      trend: null,
     },
   ].filter(Boolean);
 
@@ -231,19 +240,32 @@ export default function Dashboard() {
         {stats.length > 0 && (
           <div className="grid gap-6 md:grid-cols-2 lg:grid-cols-4">
             {stats.map((stat) => (
-              <Card key={stat.title} className="shadow-soft hover:shadow-medium transition-all overflow-hidden">
-                <div className={`h-1 w-full ${stat.bgColor}`} />
-                <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-3">
+              <Card key={stat.title} className={`shadow-soft hover:shadow-lg transition-all overflow-hidden border-l-4 ${stat.borderColor}`}>
+                <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
                   <CardTitle className="text-sm font-medium text-muted-foreground">
                     {stat.title}
                   </CardTitle>
-                  <div className={`p-2 rounded-lg ${stat.bgColor}`}>
+                  <div className={`p-2.5 rounded-lg ${stat.bgColor}`}>
                     <stat.icon className={`h-5 w-5 ${stat.color}`} />
                   </div>
                 </CardHeader>
-                <CardContent>
-                  <div className="text-3xl font-bold text-foreground">{stat.value}</div>
-                  <p className="text-xs text-muted-foreground mt-2">
+                <CardContent className="space-y-2">
+                  <div className="flex items-baseline gap-2">
+                    <div className="text-3xl font-bold text-foreground">{stat.value}</div>
+                    {stat.trend && (
+                      <Badge variant="outline" className="bg-green-500/10 text-green-700 dark:text-green-400 border-green-500/30 flex items-center gap-1">
+                        <ArrowUpRight className="h-3 w-3" />
+                        {stat.trend}
+                      </Badge>
+                    )}
+                    {stat.alert && (
+                      <Badge variant="outline" className="bg-red-500/10 text-red-700 dark:text-red-400 border-red-500/30 flex items-center gap-1">
+                        <AlertTriangle className="h-3 w-3" />
+                        Alerta
+                      </Badge>
+                    )}
+                  </div>
+                  <p className="text-xs text-muted-foreground">
                     {stat.description}
                   </p>
                 </CardContent>
@@ -254,26 +276,37 @@ export default function Dashboard() {
 
         {canViewSales && (
           <>
-            <Card className="shadow-soft">
+            <Card className="shadow-soft border-l-4 border-green-500/30">
               <CardHeader>
-                <CardTitle className="flex items-center gap-2">
-                  <TrendingUp className="h-5 w-5 text-primary" />
-                  Resumen de Ventas
-                </CardTitle>
+                <div className="flex items-center justify-between">
+                  <CardTitle className="flex items-center gap-2">
+                    <div className="p-2 bg-green-500/10 rounded-lg">
+                      <Activity className="h-5 w-5 text-green-600 dark:text-green-500" />
+                    </div>
+                    Resumen de Ventas
+                  </CardTitle>
+                  <Badge variant="outline" className="bg-green-500/10 text-green-700 dark:text-green-400 border-green-500/30">
+                    Últimos 30 días
+                  </Badge>
+                </div>
               </CardHeader>
               <CardContent>
-                <div className="space-y-4">
-                  <div className="flex justify-between items-center">
-                    <span className="text-muted-foreground">Total Acumulado</span>
-                    <span className="text-2xl font-bold text-primary">
-                      ${salesData?.total.toFixed(2) || "0.00"}
-                    </span>
+                <div className="grid grid-cols-2 gap-6">
+                  <div className="space-y-2">
+                    <span className="text-sm text-muted-foreground">Total Acumulado</span>
+                    <div className="flex items-baseline gap-2">
+                      <span className="text-3xl font-bold text-green-600 dark:text-green-500">
+                        ${salesData?.total.toFixed(2) || "0.00"}
+                      </span>
+                    </div>
                   </div>
-                  <div className="flex justify-between items-center">
-                    <span className="text-muted-foreground">Promedio por Venta</span>
-                    <span className="text-lg font-semibold">
-                      ${salesData?.count ? (salesData.total / salesData.count).toFixed(2) : "0.00"}
-                    </span>
+                  <div className="space-y-2">
+                    <span className="text-sm text-muted-foreground">Promedio por Venta</span>
+                    <div className="flex items-baseline gap-2">
+                      <span className="text-3xl font-bold text-blue-600 dark:text-blue-500">
+                        ${salesData?.count ? (salesData.total / salesData.count).toFixed(2) : "0.00"}
+                      </span>
+                    </div>
                   </div>
                 </div>
               </CardContent>
@@ -282,7 +315,9 @@ export default function Dashboard() {
             <Card className="shadow-soft">
               <CardHeader>
                 <CardTitle className="flex items-center gap-2">
-                  <TrendingUp className="h-5 w-5 text-primary" />
+                  <div className="p-2 bg-blue-500/10 rounded-lg">
+                    <BarChart3 className="h-5 w-5 text-blue-600 dark:text-blue-500" />
+                  </div>
                   Ventas de los Últimos 7 Días
                 </CardTitle>
               </CardHeader>
@@ -317,10 +352,12 @@ export default function Dashboard() {
 
         <div className="grid gap-6 lg:grid-cols-2">
           {canViewSales && canViewProducts && (
-            <Card className="shadow-soft">
+            <Card className="shadow-soft border-l-4 border-purple-500/30">
               <CardHeader>
                 <CardTitle className="flex items-center gap-2">
-                  <Package className="h-5 w-5 text-success" />
+                  <div className="p-2 bg-purple-500/10 rounded-lg">
+                    <Package className="h-5 w-5 text-purple-600 dark:text-purple-500" />
+                  </div>
                   Top 5 Productos Más Vendidos
                 </CardTitle>
               </CardHeader>
@@ -340,7 +377,7 @@ export default function Dashboard() {
                     />
                     <Bar 
                       dataKey="vendidos" 
-                      fill="hsl(var(--success))" 
+                      fill="rgb(147 51 234)" 
                       radius={[0, 8, 8, 0]}
                     />
                   </BarChart>
@@ -350,10 +387,12 @@ export default function Dashboard() {
           )}
 
           {canViewProducts && (
-            <Card className="shadow-soft border-l-4 border-warning">
+            <Card className="shadow-soft border-l-4 border-red-500/30">
               <CardHeader>
                 <CardTitle className="flex items-center gap-2">
-                  <AlertTriangle className="h-5 w-5 text-warning" />
+                  <div className="p-2 bg-red-500/10 rounded-lg">
+                    <AlertTriangle className="h-5 w-5 text-red-600 dark:text-red-500" />
+                  </div>
                   Alertas de Stock Bajo
                 </CardTitle>
               </CardHeader>

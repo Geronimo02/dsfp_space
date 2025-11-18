@@ -10,7 +10,8 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
-import { Plus, Edit, Search, Receipt, Eye, Printer, DollarSign, CreditCard } from "lucide-react";
+import { Plus, Edit, Search, Receipt, Eye, Printer, DollarSign, CreditCard, AlertCircle, CheckCircle2, Info, Wallet, TrendingUp, TrendingDown } from "lucide-react";
+import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip";
 import { ReceiptPDF } from "@/components/pos/ReceiptPDF";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { toast } from "sonner";
@@ -378,7 +379,7 @@ export default function Customers() {
         address: formData.address || undefined,
         credit_limit: formData.credit_limit ? parseFloat(formData.credit_limit) : undefined,
         payment_terms: formData.payment_terms || undefined,
-        price_list_id: formData.price_list_id || null,
+        price_list_id: (!formData.price_list_id || formData.price_list_id === 'default') ? null : formData.price_list_id,
       });
 
       const customerData = {
@@ -389,7 +390,7 @@ export default function Customers() {
         address: validatedData.address || null,
         credit_limit: validatedData.credit_limit ?? 0,
         payment_terms: validatedData.payment_terms || null,
-        price_list_id: validatedData.price_list_id || null,
+  price_list_id: validatedData.price_list_id || null,
         company_id: currentCompany?.id,
       };
 
@@ -456,6 +457,43 @@ export default function Customers() {
     setIsHistoryOpen(true);
   };
 
+  const getLoyaltyTierBadge = (tier: string | null) => {
+    if (tier === 'gold') {
+      return (
+        <Badge className="bg-yellow-500 hover:bg-yellow-600 text-white flex items-center gap-1">
+          <TrendingUp className="h-3 w-3" /> Gold
+        </Badge>
+      );
+    }
+    if (tier === 'silver') {
+      return (
+        <Badge className="bg-gray-400 hover:bg-gray-500 text-white flex items-center gap-1">
+          <TrendingUp className="h-3 w-3" /> Silver
+        </Badge>
+      );
+    }
+    return (
+      <Badge className="bg-amber-700/80 hover:bg-amber-800 text-white flex items-center gap-1">
+        <TrendingUp className="h-3 w-3" /> Bronze
+      </Badge>
+    );
+  };
+
+  const getBalanceBadge = (balance: number) => {
+    if (balance > 0) {
+      return (
+        <Badge className="bg-red-600 hover:bg-red-700 text-white flex items-center gap-1">
+          <AlertCircle className="h-3 w-3" /> ${balance.toFixed(2)}
+        </Badge>
+      );
+    }
+    return (
+      <Badge className="bg-green-600 hover:bg-green-700 text-white flex items-center gap-1">
+        <CheckCircle2 className="h-3 w-3" /> ${balance.toFixed(2)}
+      </Badge>
+    );
+  };
+
   const totalSpent = customerSales?.reduce((sum, sale) => sum + Number(sale.total), 0) || 0;
 
   const handlePrintReceipt = (sale: any) => {
@@ -477,111 +515,127 @@ export default function Customers() {
           </div>
           {canCreate && (
             <Dialog open={isDialogOpen} onOpenChange={setIsDialogOpen}>
-              <DialogTrigger asChild>
-                <Button onClick={() => { setEditingCustomer(null); resetForm(); }}>
-                  <Plus className="mr-2 h-4 w-4" />
-                  Nuevo Cliente
-                </Button>
-              </DialogTrigger>
-            <DialogContent className="max-w-lg">
-              <DialogHeader>
-                <DialogTitle>{editingCustomer ? "Editar Cliente" : "Nuevo Cliente"}</DialogTitle>
-              </DialogHeader>
-              <form onSubmit={handleSubmit} className="space-y-4">
-                <div className="space-y-2">
-                  <Label htmlFor="name">Nombre *</Label>
-                  <Input
-                    id="name"
-                    value={formData.name}
-                    onChange={(e) => setFormData({ ...formData, name: e.target.value })}
-                    required
-                  />
-                </div>
-                <div className="space-y-2">
-                  <Label htmlFor="email">Email</Label>
-                  <Input
-                    id="email"
-                    type="email"
-                    value={formData.email}
-                    onChange={(e) => setFormData({ ...formData, email: e.target.value })}
-                  />
-                </div>
-                <div className="space-y-2">
-                  <Label htmlFor="phone">Teléfono</Label>
-                  <Input
-                    id="phone"
-                    value={formData.phone}
-                    onChange={(e) => setFormData({ ...formData, phone: e.target.value })}
-                  />
-                </div>
-                <div className="space-y-2">
-                  <Label htmlFor="document">Documento</Label>
-                  <Input
-                    id="document"
-                    value={formData.document}
-                    onChange={(e) => setFormData({ ...formData, document: e.target.value })}
-                  />
-                </div>
-                <div className="space-y-2">
-                  <Label htmlFor="address">Dirección</Label>
-                  <Input
-                    id="address"
-                    value={formData.address}
-                    onChange={(e) => setFormData({ ...formData, address: e.target.value })}
-                  />
-                </div>
-                <div className="space-y-2">
-                  <Label htmlFor="credit_limit">Límite de Crédito</Label>
-                  <Input
-                    id="credit_limit"
-                    type="number"
-                    step="0.01"
-                    value={formData.credit_limit}
-                    onChange={(e) => setFormData({ ...formData, credit_limit: e.target.value })}
-                  />
-                </div>
-                <div className="space-y-2">
-                  <Label htmlFor="payment_terms">Condiciones de Pago</Label>
-                  <Input
-                    id="payment_terms"
-                    placeholder="Ej: 30 días"
-                    value={formData.payment_terms}
-                    onChange={(e) => setFormData({ ...formData, payment_terms: e.target.value })}
-                  />
-                </div>
-                <div className="space-y-2">
-                  <Label htmlFor="price_list_id">Lista de Precios</Label>
-                  <Select
-                    value={formData.price_list_id}
-                    onValueChange={(value) => setFormData({ ...formData, price_list_id: value })}
-                  >
-                    <SelectTrigger>
-                      <SelectValue placeholder="Usar precio por defecto" />
-                    </SelectTrigger>
-                    <SelectContent>
-                      <SelectItem value="">Sin lista específica (predeterminada)</SelectItem>
-                      {priceLists?.map((list: any) => (
-                        <SelectItem key={list.id} value={list.id}>
-                          {list.name}
-                        </SelectItem>
-                      ))}
-                    </SelectContent>
-                  </Select>
-                  <p className="text-xs text-muted-foreground">
-                    Si no se asigna, se usará la lista de precios por defecto
-                  </p>
-                </div>
-                <div className="flex justify-end gap-2">
-                  <Button type="button" variant="outline" onClick={() => setIsDialogOpen(false)}>
-                    Cancelar
-                  </Button>
-                  <Button type="submit">
-                    {editingCustomer ? "Actualizar" : "Crear"}
-                  </Button>
-                </div>
-              </form>
-            </DialogContent>
-          </Dialog>
+              <TooltipProvider>
+                <Tooltip>
+                  <TooltipTrigger asChild>
+                    <DialogTrigger asChild>
+                      <Button onClick={() => { setEditingCustomer(null); resetForm(); }} className="gap-2">
+                        <Plus className="h-4 w-4" />
+                        Nuevo Cliente
+                      </Button>
+                    </DialogTrigger>
+                  </TooltipTrigger>
+                  <TooltipContent>Crear un nuevo cliente</TooltipContent>
+                </Tooltip>
+              </TooltipProvider>
+              <DialogContent className="max-w-xl max-h-[90vh] overflow-y-auto">
+                <DialogHeader>
+                  <DialogTitle className="flex items-center gap-2">
+                    <DollarSign className="h-5 w-5 text-primary" />
+                    {editingCustomer ? "Editar Cliente" : "Nuevo Cliente"}
+                  </DialogTitle>
+                </DialogHeader>
+                <form onSubmit={handleSubmit} className="space-y-6">
+                  {/* Sección Información Básica */}
+                  <div className="space-y-4">
+                    <div className="flex items-center gap-2 pb-2 border-b">
+                      <div className="p-2 bg-primary/10 rounded-lg">
+                        <Info className="h-4 w-4 text-primary" />
+                      </div>
+                      <h3 className="text-sm font-semibold">Información Básica</h3>
+                    </div>
+                    <div className="grid grid-cols-2 gap-4">
+                      <div className="space-y-2">
+                        <Label htmlFor="name">Nombre *</Label>
+                        <Input id="name" value={formData.name} onChange={(e) => setFormData({ ...formData, name: e.target.value })} required />
+                      </div>
+                      <div className="space-y-2">
+                        <Label htmlFor="email">Email</Label>
+                        <Input id="email" type="email" value={formData.email} onChange={(e) => setFormData({ ...formData, email: e.target.value })} />
+                      </div>
+                      <div className="space-y-2">
+                        <Label htmlFor="phone">Teléfono</Label>
+                        <Input id="phone" value={formData.phone} onChange={(e) => setFormData({ ...formData, phone: e.target.value })} />
+                      </div>
+                      <div className="space-y-2">
+                        <Label htmlFor="document">Documento</Label>
+                        <Input id="document" value={formData.document} onChange={(e) => setFormData({ ...formData, document: e.target.value })} />
+                      </div>
+                    </div>
+                  </div>
+
+                  {/* Sección Dirección y Condiciones */}
+                  <div className="space-y-4">
+                    <div className="flex items-center gap-2 pb-2 border-b">
+                      <div className="p-2 bg-green-500/10 rounded-lg">
+                        <DollarSign className="h-4 w-4 text-green-600 dark:text-green-500" />
+                      </div>
+                      <h3 className="text-sm font-semibold">Dirección y Condiciones</h3>
+                    </div>
+                    <div className="grid grid-cols-2 gap-4">
+                      <div className="space-y-2 col-span-2">
+                        <Label htmlFor="address">Dirección</Label>
+                        <Input id="address" value={formData.address} onChange={(e) => setFormData({ ...formData, address: e.target.value })} />
+                      </div>
+                      <div className="space-y-2">
+                        <Label htmlFor="payment_terms">Condiciones de Pago</Label>
+                        <Input id="payment_terms" placeholder="Ej: 30 días" value={formData.payment_terms} onChange={(e) => setFormData({ ...formData, payment_terms: e.target.value })} />
+                      </div>
+                      <div className="space-y-2">
+                        <Label htmlFor="price_list_id">Lista de Precios</Label>
+                        <Select value={formData.price_list_id} onValueChange={(value) => setFormData({ ...formData, price_list_id: value })}>
+                          <SelectTrigger>
+                            <SelectValue placeholder="Usar precio por defecto" />
+                          </SelectTrigger>
+                          <SelectContent>
+                            <SelectItem value="default">Predeterminada</SelectItem>
+                            {priceLists?.map((list: any) => (
+                              <SelectItem key={list.id} value={list.id}>{list.name}</SelectItem>
+                            ))}
+                          </SelectContent>
+                        </Select>
+                        <p className="text-xs text-muted-foreground">Si no se asigna, se usará la lista por defecto</p>
+                      </div>
+                    </div>
+                  </div>
+
+                  {/* Sección Crédito */}
+                  <div className="space-y-4">
+                    <div className="flex items-center gap-2 pb-2 border-b">
+                      <div className="p-2 bg-blue-500/10 rounded-lg">
+                        <CreditCard className="h-4 w-4 text-blue-600 dark:text-blue-500" />
+                      </div>
+                      <h3 className="text-sm font-semibold">Crédito</h3>
+                    </div>
+                    <div className="grid grid-cols-2 gap-4">
+                      <div className="space-y-2">
+                        <Label htmlFor="credit_limit">Límite de Crédito</Label>
+                        <Input id="credit_limit" type="number" step="0.01" value={formData.credit_limit} onChange={(e) => setFormData({ ...formData, credit_limit: e.target.value })} />
+                      </div>
+                      <div className="space-y-2">
+                        <Label>Estado</Label>
+                        {getBalanceBadge(Number(formData.credit_limit || 0) ? 0 : 0)}
+                      </div>
+                    </div>
+                  </div>
+
+                  <div className="flex justify-end gap-2 pt-4 border-t">
+                    <Button type="button" variant="outline" onClick={() => setIsDialogOpen(false)}>Cancelar</Button>
+                    <Button type="submit" className="gap-2">
+                      {editingCustomer ? (
+                        <>
+                          <CheckCircle2 className="h-4 w-4" /> Actualizar
+                        </>
+                      ) : (
+                        <>
+                          <Plus className="h-4 w-4" /> Crear Cliente
+                        </>
+                      )}
+                    </Button>
+                  </div>
+                </form>
+              </DialogContent>
+            </Dialog>
           )}
         </div>
 
@@ -618,48 +672,58 @@ export default function Customers() {
                     <TableCell>{customer.email || "-"}</TableCell>
                     <TableCell>{customer.phone || "-"}</TableCell>
                     <TableCell>
-                      <Badge variant="secondary">
+                      <Badge variant="outline" className="bg-purple-500/10 text-purple-700 dark:text-purple-400 border-purple-500/30 font-medium">
                         {customer.loyalty_points || 0} pts
                       </Badge>
                     </TableCell>
                     <TableCell>
-                      <Badge variant={
-                        customer.loyalty_tier === 'gold' ? 'default' : 
-                        customer.loyalty_tier === 'silver' ? 'secondary' : 
-                        'outline'
-                      }>
-                        {customer.loyalty_tier === 'gold' ? '🏆 Gold' : 
-                         customer.loyalty_tier === 'silver' ? '🥈 Silver' : 
-                         '🥉 Bronze'}
-                      </Badge>
+                      {getLoyaltyTierBadge(customer.loyalty_tier)}
                     </TableCell>
                     <TableCell>
-                      <Badge variant={Number(customer.current_balance) > 0 ? "destructive" : "default"}>
-                        ${Number(customer.current_balance || 0).toFixed(2)}
-                      </Badge>
+                      {getBalanceBadge(Number(customer.current_balance || 0))}
                     </TableCell>
                     <TableCell>${Number(customer.credit_limit || 0).toFixed(2)}</TableCell>
-                    <TableCell className="text-right space-x-2">
-                      {Number(customer.current_balance) > 0 && (
-                        <Button 
-                          size="icon" 
-                          variant="outline"
-                          onClick={() => {
-                            setSelectedCustomer(customer);
-                            setIsPaymentDialogOpen(true);
-                          }}
-                        >
-                          <DollarSign className="h-4 w-4" />
-                        </Button>
-                      )}
-                      <Button size="icon" variant="outline" onClick={() => handleViewHistory(customer)}>
-                        <Eye className="h-4 w-4" />
-                      </Button>
-                      {canEdit && (
-                        <Button size="icon" variant="outline" onClick={() => handleEdit(customer)}>
-                          <Edit className="h-4 w-4" />
-                        </Button>
-                      )}
+                    <TableCell className="text-right">
+                      <div className="flex justify-end gap-1">
+                        {Number(customer.current_balance) > 0 && (
+                          <TooltipProvider>
+                            <Tooltip>
+                              <TooltipTrigger asChild>
+                                <Button 
+                                  size="icon" 
+                                  variant="ghost"
+                                  onClick={(e) => { e.stopPropagation(); setSelectedCustomer(customer); setIsPaymentDialogOpen(true); }}
+                                >
+                                  <DollarSign className="h-4 w-4" />
+                                </Button>
+                              </TooltipTrigger>
+                              <TooltipContent>Registrar pago</TooltipContent>
+                            </Tooltip>
+                          </TooltipProvider>
+                        )}
+                        <TooltipProvider>
+                          <Tooltip>
+                            <TooltipTrigger asChild>
+                              <Button size="icon" variant="ghost" onClick={(e) => { e.stopPropagation(); handleViewHistory(customer); }}>
+                                <Eye className="h-4 w-4" />
+                              </Button>
+                            </TooltipTrigger>
+                            <TooltipContent>Ver cuenta corriente</TooltipContent>
+                          </Tooltip>
+                        </TooltipProvider>
+                        {canEdit && (
+                          <TooltipProvider>
+                            <Tooltip>
+                              <TooltipTrigger asChild>
+                                <Button size="icon" variant="ghost" onClick={(e) => { e.stopPropagation(); handleEdit(customer); }}>
+                                  <Edit className="h-4 w-4" />
+                                </Button>
+                              </TooltipTrigger>
+                              <TooltipContent>Editar cliente</TooltipContent>
+                            </Tooltip>
+                          </TooltipProvider>
+                        )}
+                      </div>
                     </TableCell>
                   </TableRow>
                 ))}

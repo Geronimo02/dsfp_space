@@ -9,9 +9,10 @@ import { Label } from "@/components/ui/label";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Textarea } from "@/components/ui/textarea";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog";
+import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { Badge } from "@/components/ui/badge";
-import { Plus, DollarSign, TrendingUp, FileText, AlertCircle } from "lucide-react";
+import { Plus, DollarSign, TrendingUp, FileText, AlertCircle, CheckCircle2, Info, Wallet, CreditCard, Banknote } from "lucide-react";
 import { toast } from "sonner";
 import { format } from "date-fns";
 import { es } from "date-fns/locale";
@@ -183,30 +184,54 @@ export default function Expenses() {
           </div>
           {canCreate && (
             <Dialog open={dialogOpen} onOpenChange={setDialogOpen}>
-              <DialogTrigger asChild>
-                <Button>
-                  <Plus className="mr-2 h-4 w-4" />
-                  Nuevo Gasto
-                </Button>
-              </DialogTrigger>
+              <TooltipProvider>
+                <Tooltip>
+                  <TooltipTrigger asChild>
+                    <DialogTrigger asChild>
+                      <Button className="gap-2">
+                        <Plus className="h-4 w-4" />
+                        Nuevo Gasto
+                      </Button>
+                    </DialogTrigger>
+                  </TooltipTrigger>
+                  <TooltipContent>Registrar nuevo gasto</TooltipContent>
+                </Tooltip>
+              </TooltipProvider>
               <DialogContent className="max-w-2xl max-h-[90vh] overflow-y-auto">
                 <DialogHeader>
-                  <DialogTitle>Registrar Nuevo Gasto</DialogTitle>
+                  <DialogTitle className="flex items-center gap-2">
+                    <DollarSign className="h-5 w-5 text-primary" />
+                    Registrar Nuevo Gasto
+                  </DialogTitle>
                 </DialogHeader>
-                <form onSubmit={handleSubmit} className="space-y-4">
-                  <div className="grid grid-cols-2 gap-4">
-                    <div>
-                      <Label htmlFor="category">Categoría</Label>
-                      <Select value={formData.category_id} onValueChange={(value) => setFormData({ ...formData, category_id: value })}>
-                        <SelectTrigger>
-                          <SelectValue placeholder="Selecciona categoría" />
-                        </SelectTrigger>
-                        <SelectContent>
-                          {categories?.map((cat) => (
-                            <SelectItem key={cat.id} value={cat.id}>{cat.name}</SelectItem>
-                          ))}
-                        </SelectContent>
-                      </Select>
+                <form onSubmit={handleSubmit} className="space-y-6">
+                  {/* Información básica */}
+                  <div className="space-y-4">
+                    <div className="flex items-center gap-2 pb-2 border-b">
+                      <div className="p-2 bg-primary/10 rounded-lg">
+                        <Info className="h-4 w-4 text-primary" />
+                      </div>
+                      <h3 className="text-sm font-semibold">Información Básica</h3>
+                    </div>
+                    <div className="grid grid-cols-2 gap-4">
+                      <div>
+                        <Label htmlFor="description">Descripción *</Label>
+                        <Input
+                          id="description"
+                          value={formData.description}
+                          onChange={(e) => setFormData({ ...formData, description: e.target.value })}
+                          required
+                        />
+                      </div>
+                      <div>
+                        <Label htmlFor="expense_date">Fecha</Label>
+                        <Input
+                          id="expense_date"
+                          type="date"
+                          value={formData.expense_date}
+                          onChange={(e) => setFormData({ ...formData, expense_date: e.target.value })}
+                        />
+                      </div>
                     </div>
                     <div>
                       <Label htmlFor="amount">Monto *</Label>
@@ -214,6 +239,7 @@ export default function Expenses() {
                         id="amount"
                         type="number"
                         step="0.01"
+                        placeholder="0.00"
                         value={formData.amount}
                         onChange={(e) => setFormData({ ...formData, amount: e.target.value })}
                         required
@@ -221,82 +247,114 @@ export default function Expenses() {
                     </div>
                   </div>
 
-                  <div>
-                    <Label htmlFor="description">Descripción *</Label>
-                    <Input
-                      id="description"
-                      value={formData.description}
-                      onChange={(e) => setFormData({ ...formData, description: e.target.value })}
-                      required
-                    />
-                  </div>
-
-                  <div className="grid grid-cols-2 gap-4">
-                    <div>
-                      <Label htmlFor="expense_date">Fecha</Label>
-                      <Input
-                        id="expense_date"
-                        type="date"
-                        value={formData.expense_date}
-                        onChange={(e) => setFormData({ ...formData, expense_date: e.target.value })}
-                      />
+                  {/* Categoría y Proveedor */}
+                  <div className="space-y-4">
+                    <div className="flex items-center gap-2 pb-2 border-b">
+                      <div className="p-2 bg-green-500/10 rounded-lg">
+                        <FileText className="h-4 w-4 text-green-600 dark:text-green-500" />
+                      </div>
+                      <h3 className="text-sm font-semibold">Categoría y Proveedor</h3>
                     </div>
-                    <div>
-                      <Label htmlFor="payment_method">Método de Pago</Label>
-                      <Select value={formData.payment_method} onValueChange={(value) => setFormData({ ...formData, payment_method: value })}>
-                        <SelectTrigger>
-                          <SelectValue />
-                        </SelectTrigger>
-                        <SelectContent>
-                          <SelectItem value="cash">Efectivo</SelectItem>
-                          <SelectItem value="card">Tarjeta</SelectItem>
-                          <SelectItem value="transfer">Transferencia</SelectItem>
-                          <SelectItem value="check">Cheque</SelectItem>
-                        </SelectContent>
-                      </Select>
-                    </div>
-                  </div>
-
-                  <div className="grid grid-cols-2 gap-4">
-                    <div>
-                      <Label htmlFor="supplier">Proveedor</Label>
-                      <Select value={formData.supplier_id} onValueChange={(value) => setFormData({ ...formData, supplier_id: value })}>
-                        <SelectTrigger>
-                          <SelectValue placeholder="Opcional" />
-                        </SelectTrigger>
-                        <SelectContent>
-                          {suppliers?.map((sup) => (
-                            <SelectItem key={sup.id} value={sup.id}>{sup.name}</SelectItem>
-                          ))}
-                        </SelectContent>
-                      </Select>
-                    </div>
-                    <div>
-                      <Label htmlFor="reference_number">Nº Referencia</Label>
-                      <Input
-                        id="reference_number"
-                        value={formData.reference_number}
-                        onChange={(e) => setFormData({ ...formData, reference_number: e.target.value })}
-                        placeholder="Opcional"
-                      />
+                    <div className="grid grid-cols-2 gap-4">
+                      <div>
+                        <Label htmlFor="category">Categoría</Label>
+                        <Select value={formData.category_id} onValueChange={(value) => setFormData({ ...formData, category_id: value })}>
+                          <SelectTrigger>
+                            <SelectValue placeholder="Selecciona categoría" />
+                          </SelectTrigger>
+                          <SelectContent>
+                            {categories?.map((cat) => (
+                              <SelectItem key={cat.id} value={cat.id}>{cat.name}</SelectItem>
+                            ))}
+                          </SelectContent>
+                        </Select>
+                      </div>
+                      <div>
+                        <Label htmlFor="supplier">Proveedor</Label>
+                        <Select value={formData.supplier_id} onValueChange={(value) => setFormData({ ...formData, supplier_id: value })}>
+                          <SelectTrigger>
+                            <SelectValue placeholder="Opcional" />
+                          </SelectTrigger>
+                          <SelectContent>
+                            {suppliers?.map((sup) => (
+                              <SelectItem key={sup.id} value={sup.id}>{sup.name}</SelectItem>
+                            ))}
+                          </SelectContent>
+                        </Select>
+                      </div>
                     </div>
                   </div>
 
-                  <div>
-                    <Label htmlFor="notes">Notas</Label>
+                  {/* Pago y Referencia */}
+                  <div className="space-y-4">
+                    <div className="flex items-center gap-2 pb-2 border-b">
+                      <div className="p-2 bg-amber-500/10 rounded-lg">
+                        <Wallet className="h-4 w-4 text-amber-600 dark:text-amber-500" />
+                      </div>
+                      <h3 className="text-sm font-semibold">Pago y Referencia</h3>
+                    </div>
+                    <div className="grid grid-cols-2 gap-4">
+                      <div>
+                        <Label htmlFor="payment_method">Método de Pago</Label>
+                        <Select value={formData.payment_method} onValueChange={(value) => setFormData({ ...formData, payment_method: value })}>
+                          <SelectTrigger>
+                            <SelectValue placeholder="Selecciona método" />
+                          </SelectTrigger>
+                          <SelectContent>
+                            <SelectItem value="cash">Efectivo</SelectItem>
+                            <SelectItem value="card">Tarjeta</SelectItem>
+                            <SelectItem value="transfer">Transferencia</SelectItem>
+                            <SelectItem value="check">Cheque</SelectItem>
+                          </SelectContent>
+                        </Select>
+                      </div>
+                      <div>
+                        <Label htmlFor="reference_number">Nº Referencia</Label>
+                        <Input
+                          id="reference_number"
+                          value={formData.reference_number}
+                          onChange={(e) => setFormData({ ...formData, reference_number: e.target.value })}
+                          placeholder="Opcional"
+                        />
+                      </div>
+                    </div>
+                  </div>
+
+                  {/* Notas */}
+                  <div className="space-y-4">
+                    <div className="flex items-center gap-2 pb-2 border-b">
+                      <div className="p-2 bg-blue-500/10 rounded-lg">
+                        <Info className="h-4 w-4 text-blue-600 dark:text-blue-500" />
+                      </div>
+                      <h3 className="text-sm font-semibold">Notas</h3>
+                    </div>
                     <Textarea
                       id="notes"
                       value={formData.notes}
                       onChange={(e) => setFormData({ ...formData, notes: e.target.value })}
                       rows={3}
+                      placeholder="Notas internas..."
                     />
+                  </div>
+
+                  {/* Resumen */}
+                  <div className="bg-muted/30 border rounded-lg p-4 space-y-2">
+                    <div className="flex items-center gap-2 mb-2">
+                      <DollarSign className="h-4 w-4 text-primary" />
+                      <h3 className="text-sm font-semibold">Resumen</h3>
+                    </div>
+                    <div className="flex justify-between text-lg font-bold">
+                      <span>Monto:</span>
+                      <span className="text-red-600 dark:text-red-400">${Number(formData.amount || 0).toFixed(2)}</span>
+                    </div>
                   </div>
 
                   <div className="flex justify-end gap-2">
                     <Button type="button" variant="outline" onClick={() => setDialogOpen(false)}>
                       Cancelar
                     </Button>
-                    <Button type="submit" disabled={createExpenseMutation.isPending}>
+                    <Button type="submit" disabled={createExpenseMutation.isPending} className="gap-2">
+                      <CheckCircle2 className="h-4 w-4" />
                       {createExpenseMutation.isPending ? "Guardando..." : "Guardar Gasto"}
                     </Button>
                   </div>
@@ -360,6 +418,7 @@ export default function Expenses() {
                     <TableHead>Método Pago</TableHead>
                     <TableHead>Monto</TableHead>
                     <TableHead>Estado</TableHead>
+                    <TableHead className="text-right">Acciones</TableHead>
                   </TableRow>
                 </TableHeader>
                 <TableBody>
@@ -376,16 +435,30 @@ export default function Expenses() {
                       </TableCell>
                       <TableCell>{expense.description}</TableCell>
                       <TableCell>{expense.suppliers?.name || "-"}</TableCell>
-                      <TableCell className="capitalize">{expense.payment_method}</TableCell>
-                      <TableCell className="font-bold">${Number(expense.amount).toFixed(2)}</TableCell>
+                      <TableCell className="capitalize">
+                        <Badge className={
+                          expense.payment_method === "cash" ? "bg-green-500" :
+                          expense.payment_method === "card" ? "bg-blue-600" :
+                          expense.payment_method === "transfer" ? "bg-purple-600" :
+                          "bg-amber-600"
+                        }>
+                          {expense.payment_method}
+                        </Badge>
+                      </TableCell>
+                      <TableCell className="font-bold text-red-600 dark:text-red-400">${Number(expense.amount).toFixed(2)}</TableCell>
                       <TableCell>
-                        <Badge variant={
-                          expense.status === "approved" ? "default" :
-                          expense.status === "rejected" ? "destructive" : "secondary"
+                        <Badge className={
+                          expense.status === "approved" ? "bg-green-600" :
+                          expense.status === "rejected" ? "bg-red-600" : "bg-yellow-500"
                         }>
                           {expense.status === "approved" ? "Aprobado" :
                            expense.status === "rejected" ? "Rechazado" : "Pendiente"}
                         </Badge>
+                      </TableCell>
+                      <TableCell className="text-right">
+                        <div className="flex items-center justify-end gap-2">
+                          {/* Placeholder para futuras acciones: ver/editar/eliminar */}
+                        </div>
                       </TableCell>
                     </TableRow>
                   ))}

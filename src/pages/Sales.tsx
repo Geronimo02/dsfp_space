@@ -6,7 +6,8 @@ import { Button } from "@/components/ui/button";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { useQuery } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
-import { Search, Receipt, Eye, Printer, Truck } from "lucide-react";
+import { Search, Receipt, Eye, Printer, Truck, AlertCircle, CheckCircle2, Info, CreditCard, Wallet } from "lucide-react";
+import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip";
 import { Badge } from "@/components/ui/badge";
 import { format } from "date-fns";
 import { es } from "date-fns/locale";
@@ -146,8 +147,52 @@ export default function Sales() {
       cash: "Efectivo",
       card: "Tarjeta",
       transfer: "Transferencia",
+      credit: "Crédito",
     };
     return labels[method] || method;
+  };
+
+  const getPaymentBadgeClasses = (method: string) => {
+    switch (method) {
+      case "cash": return "bg-green-500/15 text-green-700 dark:text-green-400 border-green-500/30";
+      case "card": return "bg-blue-500/15 text-blue-700 dark:text-blue-400 border-blue-500/30";
+      case "transfer": return "bg-purple-500/15 text-purple-700 dark:text-purple-400 border-purple-500/30";
+      case "credit": return "bg-orange-500/15 text-orange-700 dark:text-orange-400 border-orange-500/30";
+      default: return "bg-muted text-muted-foreground";
+    }
+  };
+
+  const getStatusBadge = (status: string) => {
+    if (status === "completed") {
+      return (
+        <Badge className="bg-green-600 hover:bg-green-700 text-white flex items-center gap-1">
+          <CheckCircle2 className="h-3 w-3" />
+          Completada
+        </Badge>
+      );
+    }
+    if (status === "pending") {
+      return (
+        <Badge className="bg-yellow-500 hover:bg-yellow-600 text-white flex items-center gap-1">
+          <AlertCircle className="h-3 w-3" />
+          Pendiente
+        </Badge>
+      );
+    }
+    if (status === "canceled") {
+      return (
+        <Badge className="bg-red-600 hover:bg-red-700 text-white flex items-center gap-1">
+          <AlertCircle className="h-3 w-3" />
+          Cancelada
+        </Badge>
+      );
+    }
+    return (
+      <Badge variant="secondary" className="flex items-center gap-1">
+        <Info className="h-3 w-3" />
+        {status}
+      </Badge>
+    );
   };
 
   const handleViewDetails = (sale: any) => {
@@ -208,7 +253,11 @@ export default function Sales() {
                     </TableCell>
                     <TableCell>{sale.customer?.name || "Cliente general"}</TableCell>
                     <TableCell>
-                      <Badge variant="outline">
+                      <Badge variant="outline" className={`flex items-center gap-1 font-medium ${getPaymentBadgeClasses(sale.payment_method)} whitespace-nowrap`}>
+                        {sale.payment_method === 'cash' && <Wallet className="h-3 w-3" />}
+                        {sale.payment_method === 'card' && <CreditCard className="h-3 w-3" />}
+                        {sale.payment_method === 'transfer' && <Truck className="h-3 w-3" />}
+                        {sale.payment_method === 'credit' && <AlertCircle className="h-3 w-3" />}
                         {getPaymentMethodLabel(sale.payment_method)}
                       </Badge>
                     </TableCell>
@@ -216,33 +265,54 @@ export default function Sales() {
                       ${Number(sale.total).toFixed(2)}
                     </TableCell>
                     <TableCell>
-                      <Badge className="bg-success">
-                        {sale.status === "completed" ? "Completada" : sale.status}
-                      </Badge>
+                      {getStatusBadge(sale.status)}
                     </TableCell>
-                    <TableCell className="text-right space-x-2">
-                      <Button 
-                        size="icon" 
-                        variant="outline"
-                        onClick={() => handleViewDetails(sale)}
-                      >
-                        <Eye className="h-4 w-4" />
-                      </Button>
-                      <Button 
-                        size="icon" 
-                        variant="outline"
-                        onClick={() => handlePrintReceipt(sale)}
-                      >
-                        <Printer className="h-4 w-4" />
-                      </Button>
-                      <Button 
-                        size="icon" 
-                        variant="outline"
-                        onClick={() => createDeliveryNoteMutation.mutate(sale.id)}
-                        disabled={createDeliveryNoteMutation.isPending}
-                      >
-                        <Truck className="h-4 w-4" />
-                      </Button>
+                    <TableCell className="text-right">
+                      <div className="flex justify-end gap-1">
+                        <TooltipProvider>
+                          <Tooltip>
+                            <TooltipTrigger asChild>
+                              <Button 
+                                size="icon" 
+                                variant="ghost"
+                                onClick={(e) => { e.stopPropagation(); handleViewDetails(sale); }}
+                              >
+                                <Eye className="h-4 w-4" />
+                              </Button>
+                            </TooltipTrigger>
+                            <TooltipContent>Ver detalle</TooltipContent>
+                          </Tooltip>
+                        </TooltipProvider>
+                        <TooltipProvider>
+                          <Tooltip>
+                            <TooltipTrigger asChild>
+                              <Button 
+                                size="icon" 
+                                variant="ghost"
+                                onClick={(e) => { e.stopPropagation(); handlePrintReceipt(sale); }}
+                              >
+                                <Printer className="h-4 w-4" />
+                              </Button>
+                            </TooltipTrigger>
+                            <TooltipContent>Imprimir ticket</TooltipContent>
+                          </Tooltip>
+                        </TooltipProvider>
+                        <TooltipProvider>
+                          <Tooltip>
+                            <TooltipTrigger asChild>
+                              <Button 
+                                size="icon" 
+                                variant="ghost"
+                                onClick={(e) => { e.stopPropagation(); createDeliveryNoteMutation.mutate(sale.id); }}
+                                disabled={createDeliveryNoteMutation.isPending}
+                              >
+                                <Truck className="h-4 w-4" />
+                              </Button>
+                            </TooltipTrigger>
+                            <TooltipContent>Generar remito</TooltipContent>
+                          </Tooltip>
+                        </TooltipProvider>
+                      </div>
                     </TableCell>
                   </TableRow>
                 ))}

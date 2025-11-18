@@ -9,7 +9,7 @@ import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
 import { sanitizeSearchQuery } from "@/lib/searchUtils";
-import { Plus, Edit, Trash2, Search, Upload, Download, X, Package, ChevronDown, ChevronRight, DollarSign } from "lucide-react";
+import { Plus, Edit, Trash2, Search, Upload, Download, X, Package, ChevronDown, ChevronRight, DollarSign, AlertCircle, CheckCircle2, Info, Image as ImageIcon } from "lucide-react";
 import { toast } from "sonner";
 import { Badge } from "@/components/ui/badge";
 import { z } from "zod";
@@ -20,6 +20,8 @@ import { usePermissions } from "@/hooks/usePermissions";
 import { Separator } from "@/components/ui/separator";
 import { Collapsible, CollapsibleContent, CollapsibleTrigger } from "@/components/ui/collapsible";
 import { useCompany } from "@/contexts/CompanyContext";
+import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip";
+import { compressImage, isValidImage, formatFileSize } from "@/lib/imageUtils";
 
 const productSchema = z.object({
   name: z.string().trim().min(1, "El nombre es requerido").max(200, "El nombre debe tener máximo 200 caracteres"),
@@ -79,6 +81,9 @@ export default function Products() {
     batch_number: "",
     expiration_date: "",
   });
+  const [imageFile, setImageFile] = useState<File | null>(null);
+  const [imagePreview, setImagePreview] = useState<string>("");
+  const [uploadingImage, setUploadingImage] = useState(false);
   const [selectedProducts, setSelectedProducts] = useState<Set<string>>(new Set());
   const [isImportDialogOpen, setIsImportDialogOpen] = useState(false);
   const [importFile, setImportFile] = useState<File | null>(null);
@@ -198,6 +203,40 @@ export default function Products() {
     enabled: !!priceListProduct?.id,
   });
 
+  const uploadProductImage = async (file: File, productId: string): Promise<string> => {
+    const { data: { user } } = await supabase.auth.getUser();
+    if (!user) throw new Error('Usuario no autenticado');
+    
+    // Compress image before upload
+    const compressedBlob = await compressImage(file, {
+      maxWidth: 800,
+      maxHeight: 800,
+      quality: 0.7,
+      outputFormat: 'image/webp'
+    });
+    
+    // Generate unique filename
+    const fileExt = 'webp';
+    const fileName = `${user.id}/${productId}_${Date.now()}.${fileExt}`;
+    
+    // Upload to Supabase Storage
+    const { error: uploadError } = await supabase.storage
+      .from('product-images')
+      .upload(fileName, compressedBlob, {
+        contentType: 'image/webp',
+        upsert: true
+      });
+    
+    if (uploadError) throw uploadError;
+    
+    // Get public URL
+    const { data: { publicUrl } } = supabase.storage
+      .from('product-images')
+      .getPublicUrl(fileName);
+    
+    return publicUrl;
+  };
+
   const createProductMutation = useMutation({
     mutationFn: async (data: any) => {
       if (!currentCompany?.id) throw new Error('Empresa no seleccionada');
@@ -212,6 +251,28 @@ export default function Products() {
         .single();
       
       if (error) throw error;
+      
+      // Upload image if provided
+      if (imageFile) {
+        try {
+          setUploadingImage(true);
+          const imageUrl = await uploadProductImage(imageFile, product.id);
+          
+          // Update product with image URL
+          const { error: updateError } = await supabase
+            .from("products")
+            .update({ image_url: imageUrl })
+            .eq("id", product.id);
+          
+          if (updateError) throw updateError;
+          product.image_url = imageUrl;
+        } catch (imgError) {
+          console.error('Error uploading image:', imgError);
+          toast.error('Producto creado pero falló la subida de imagen');
+        } finally {
+          setUploadingImage(false);
+        }
+      }
       
       // Create warehouse stock entries if distribution was configured
       if (warehouses && warehouseStockData["new"] && Object.keys(warehouseStockData["new"]).length > 0) {
@@ -257,6 +318,20 @@ export default function Products() {
     mutationFn: async ({ id, data }: { id: string; data: any }) => {
       if (!currentCompany?.id) throw new Error('Empresa no seleccionada');
       if (!canEdit) throw new Error('No tienes permiso para editar productos en esta empresa');
+      
+      // Upload new image if provided
+      if (imageFile) {
+        try {
+          setUploadingImage(true);
+          const imageUrl = await uploadProductImage(imageFile, id);
+          data.image_url = imageUrl;
+        } catch (imgError) {
+          console.error('Error uploading image:', imgError);
+          toast.error('Error al subir la imagen');
+        } finally {
+          setUploadingImage(false);
+        }
+      }
       
       const { error } = await supabase
         .from("products")
@@ -331,6 +406,8 @@ export default function Products() {
       expiration_date: "",
     });
     setEditingProduct(null);
+    setImageFile(null);
+    setImagePreview("");
   };
 
   const handleSubmit = (e: React.FormEvent) => {
@@ -412,7 +489,38 @@ export default function Products() {
       batch_number: product.batch_number || "",
       expiration_date: product.expiration_date || "",
     });
+    setImagePreview(product.image_url || "");
+    setImageFile(null);
     setIsDialogOpen(true);
+  };
+  
+  const handleImageSelect = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+    
+    if (!isValidImage(file)) {
+      toast.error('Por favor selecciona una imagen válida (JPG, PNG o WebP)');
+      return;
+    }
+    
+    if (file.size > 5 * 1024 * 1024) {
+      toast.error('La imagen debe ser menor a 5MB');
+      return;
+    }
+    
+    setImageFile(file);
+    
+    // Generate preview
+    const reader = new FileReader();
+    reader.onload = (e) => {
+      setImagePreview(e.target?.result as string);
+    };
+    reader.readAsDataURL(file);
+  };
+  
+  const removeImage = () => {
+    setImageFile(null);
+    setImagePreview("");
   };
 
   const toggleProductExpand = (productId: string) => {
@@ -844,19 +952,48 @@ export default function Products() {
           {canCreate && (
             <Dialog open={isDialogOpen} onOpenChange={setIsDialogOpen}>
               <DialogTrigger asChild>
-                <Button onClick={() => { setEditingProduct(null); resetForm(); }}>
-                  <Plus className="mr-2 h-4 w-4" />
-                  Nuevo Producto
-                </Button>
+                <TooltipProvider>
+                  <Tooltip>
+                    <TooltipTrigger asChild>
+                      <Button onClick={() => { setEditingProduct(null); resetForm(); }} size="default" className="gap-2">
+                        <Plus className="h-4 w-4" />
+                        Agregar Producto
+                      </Button>
+                    </TooltipTrigger>
+                    <TooltipContent>
+                      <p>Crear un nuevo producto en el inventario</p>
+                    </TooltipContent>
+                  </Tooltip>
+                </TooltipProvider>
               </DialogTrigger>
             <DialogContent className="max-w-3xl max-h-[90vh] overflow-y-auto">
               <DialogHeader>
-                <DialogTitle>{editingProduct ? "Editar Producto" : "Nuevo Producto"}</DialogTitle>
+                <DialogTitle className="flex items-center gap-2">
+                  <Package className="h-5 w-5" />
+                  {editingProduct ? "Editar Producto" : "Agregar Nuevo Producto"}
+                </DialogTitle>
+                <DialogDescription>
+                  {editingProduct 
+                    ? "Modifica los detalles del producto existente" 
+                    : "Completa la información básica del producto. Los campos con * son obligatorios"}
+                </DialogDescription>
               </DialogHeader>
-              <form onSubmit={handleSubmit} className="space-y-4">
-                <div className="grid grid-cols-2 gap-4">
-                  <div className="space-y-2">
-                    <Label htmlFor="name">Nombre *</Label>
+              <form onSubmit={handleSubmit} className="space-y-6">
+                {/* Información Básica */}
+                <div className="space-y-4">
+                  <div className="flex items-center gap-2 pb-2 border-b">
+                    <div className="p-2 bg-primary/10 rounded-lg">
+                      <Info className="h-4 w-4 text-primary" />
+                    </div>
+                    <h3 className="text-sm font-semibold">
+                      Información Básica
+                    </h3>
+                  </div>
+                  <div className="grid grid-cols-2 gap-4">
+                    <div className="space-y-2">
+                      <Label htmlFor="name" className="flex items-center gap-1">
+                        Nombre del Producto <span className="text-destructive">*</span>
+                      </Label>
                     <Input
                       id="name"
                       value={formData.name}
@@ -870,6 +1007,7 @@ export default function Products() {
                       id="category"
                       value={formData.category}
                       onChange={(e) => setFormData({ ...formData, category: e.target.value })}
+                      placeholder="Ej: Electrónica, Alimentos, etc."
                     />
                   </div>
                   <div className="space-y-2">
@@ -878,18 +1016,75 @@ export default function Products() {
                       id="barcode"
                       value={formData.barcode}
                       onChange={(e) => setFormData({ ...formData, barcode: e.target.value })}
+                      placeholder="Escanea o ingresa manualmente"
                     />
                   </div>
                   <div className="space-y-2">
-                    <Label htmlFor="sku">SKU</Label>
+                    <Label htmlFor="sku">SKU (Código Interno)</Label>
                     <Input
                       id="sku"
                       value={formData.sku}
                       onChange={(e) => setFormData({ ...formData, sku: e.target.value })}
+                      placeholder="Código único del producto"
                     />
                   </div>
+                  </div>
+                  
+                  {/* Imagen del Producto */}
                   <div className="space-y-2">
-                    <Label htmlFor="price">Precio *</Label>
+                    <Label className="flex items-center gap-2">
+                      <ImageIcon className="h-4 w-4" />
+                      Imagen del Producto
+                    </Label>
+                    <div className="flex items-center gap-4">
+                      {imagePreview && (
+                        <div className="relative w-24 h-24 border rounded-lg overflow-hidden">
+                          <img 
+                            src={imagePreview} 
+                            alt="Preview" 
+                            className="w-full h-full object-cover"
+                          />
+                          <Button
+                            type="button"
+                            variant="destructive"
+                            size="icon"
+                            className="absolute top-1 right-1 h-6 w-6"
+                            onClick={removeImage}
+                          >
+                            <X className="h-4 w-4" />
+                          </Button>
+                        </div>
+                      )}
+                      <div className="flex-1">
+                        <Input
+                          type="file"
+                          accept="image/jpeg,image/jpg,image/png,image/webp"
+                          onChange={handleImageSelect}
+                          className="cursor-pointer"
+                        />
+                        <p className="text-xs text-muted-foreground mt-1">
+                          Formatos: JPG, PNG, WebP. Máx: 5MB. Se optimizará automáticamente.
+                        </p>
+                      </div>
+                    </div>
+                  </div>
+                </div>
+
+                {/* Precios y Stock */}
+                <div className="space-y-4">
+                  <div className="flex items-center gap-2 pb-2 border-b">
+                    <div className="p-2 bg-green-500/10 rounded-lg">
+                      <DollarSign className="h-4 w-4 text-green-600 dark:text-green-500" />
+                    </div>
+                    <h3 className="text-sm font-semibold">
+                      Precios y Stock
+                    </h3>
+                  </div>
+                  <div className="grid grid-cols-2 gap-4">
+                  <div className="space-y-2">
+                    <Label htmlFor="price" className="flex items-center gap-1">
+                      Precio de Venta <span className="text-destructive">*</span>
+                    </Label>
                     <Input
                       id="price"
                       type="number"
@@ -897,37 +1092,57 @@ export default function Products() {
                       value={formData.price}
                       onChange={(e) => setFormData({ ...formData, price: e.target.value })}
                       required
+                      placeholder="0.00"
                     />
                   </div>
                   <div className="space-y-2">
-                    <Label htmlFor="cost">Costo</Label>
+                    <Label htmlFor="cost">Costo (Opcional)</Label>
                     <Input
                       id="cost"
                       type="number"
                       step="0.01"
                       value={formData.cost}
                       onChange={(e) => setFormData({ ...formData, cost: e.target.value })}
+                      placeholder="0.00"
                     />
                   </div>
                   <div className="space-y-2">
-                    <Label htmlFor="stock">Stock Total *</Label>
+                    <Label htmlFor="stock" className="flex items-center gap-1">
+                      Cantidad en Stock <span className="text-destructive">*</span>
+                    </Label>
                     <Input
                       id="stock"
                       type="number"
                       value={formData.stock}
                       onChange={(e) => setFormData({ ...formData, stock: e.target.value })}
                       required
+                      placeholder="0"
                     />
                   </div>
                   <div className="space-y-2">
-                    <Label htmlFor="min_stock">Stock Mínimo</Label>
+                    <Label htmlFor="min_stock">Stock Mínimo (Alerta)</Label>
                     <Input
                       id="min_stock"
                       type="number"
                       value={formData.min_stock}
                       onChange={(e) => setFormData({ ...formData, min_stock: e.target.value })}
+                      placeholder="0"
                     />
                   </div>
+                  </div>
+                </div>
+
+                {/* Información Adicional */}
+                <div className="space-y-4">
+                  <div className="flex items-center gap-2 pb-2 border-b">
+                    <div className="p-2 bg-blue-500/10 rounded-lg">
+                      <Package className="h-4 w-4 text-blue-600 dark:text-blue-500" />
+                    </div>
+                    <h3 className="text-sm font-semibold">
+                      Información Adicional <span className="text-xs text-muted-foreground font-normal">(Opcional)</span>
+                    </h3>
+                  </div>
+                  <div className="grid grid-cols-2 gap-4">
                   <div className="space-y-2">
                     <Label htmlFor="location">Ubicación/Almacén</Label>
                     <Input
@@ -954,6 +1169,7 @@ export default function Products() {
                       value={formData.expiration_date}
                       onChange={(e) => setFormData({ ...formData, expiration_date: e.target.value })}
                     />
+                  </div>
                   </div>
                 </div>
 
@@ -1007,12 +1223,22 @@ export default function Products() {
                   </>
                 )}
 
-                <div className="flex justify-end gap-2">
+                <div className="flex justify-end gap-2 pt-4 border-t">
                   <Button type="button" variant="outline" onClick={() => setIsDialogOpen(false)}>
                     Cancelar
                   </Button>
-                  <Button type="submit">
-                    {editingProduct ? "Actualizar" : "Crear"}
+                  <Button type="submit" className="gap-2">
+                    {editingProduct ? (
+                      <>
+                        <CheckCircle2 className="h-4 w-4" />
+                        Actualizar Producto
+                      </>
+                    ) : (
+                      <>
+                        <Plus className="h-4 w-4" />
+                        Crear Producto
+                      </>
+                    )}
                   </Button>
                 </div>
               </form>
@@ -1155,7 +1381,7 @@ export default function Products() {
             <Table>
               <TableHeader>
                 <TableRow>
-                  <TableHead className="w-12">
+                  <TableHead className="w-12" onClick={(e) => e.stopPropagation()}>
                     <Checkbox
                       checked={products && products.length > 0 && selectedProducts.size === products.length}
                       onCheckedChange={handleSelectAll}
@@ -1178,7 +1404,7 @@ export default function Products() {
                   return (
                     <React.Fragment key={product.id}>
                       <TableRow>
-                        <TableCell>
+                        <TableCell onClick={(e) => e.stopPropagation()}>
                           <Checkbox
                             checked={selectedProducts.has(product.id)}
                             onCheckedChange={(checked) => handleSelectProduct(product.id, checked as boolean)}
@@ -1189,7 +1415,7 @@ export default function Products() {
                             variant="ghost"
                             size="icon"
                             className="h-6 w-6"
-                            onClick={() => toggleProductExpand(product.id)}
+                            onClick={(e) => { e.stopPropagation(); toggleProductExpand(product.id); }}
                           >
                             {isExpanded ? (
                               <ChevronDown className="h-4 w-4" />
@@ -1198,12 +1424,41 @@ export default function Products() {
                             )}
                           </Button>
                         </TableCell>
-                        <TableCell className="font-medium">{product.name}</TableCell>
-                        <TableCell>{product.category || "-"}</TableCell>
-                        <TableCell>${Number(product.price).toFixed(2)}</TableCell>
+                        <TableCell>
+                          <div className="flex items-center gap-3">
+                            {product.image_url ? (
+                              <img 
+                                src={product.image_url} 
+                                alt={product.name}
+                                className="w-10 h-10 object-cover rounded border"
+                              />
+                            ) : (
+                              <div className="w-10 h-10 bg-muted rounded border flex items-center justify-center">
+                                <Package className="h-5 w-5 text-muted-foreground" />
+                              </div>
+                            )}
+                            <span className="font-medium">{product.name}</span>
+                          </div>
+                        </TableCell>
+                        <TableCell>
+                          <span className="text-muted-foreground">{product.category || "—"}</span>
+                        </TableCell>
+                        <TableCell>
+                          <span className="font-semibold text-green-600 dark:text-green-500">
+                            ${Number(product.price).toFixed(2)}
+                          </span>
+                        </TableCell>
                         <TableCell>
                           <div className="flex items-center gap-2">
-                            <span className="font-medium">{product.stock}</span>
+                            <span className={`font-semibold ${
+                              product.stock <= (product.min_stock || 0) 
+                                ? 'text-red-600 dark:text-red-500' 
+                                : product.stock <= (product.min_stock || 0) * 1.5
+                                ? 'text-yellow-600 dark:text-yellow-500'
+                                : 'text-green-600 dark:text-green-500'
+                            }`}>
+                              {product.stock}
+                            </span>
                             {productWarehouseStock.length > 0 && (
                               <div className="flex gap-1">
                                 {productWarehouseStock.slice(0, 3).map((ws: any) => (
@@ -1225,32 +1480,74 @@ export default function Products() {
                           </div>
                         </TableCell>
                         <TableCell>
-                          <Badge variant={getStockBadgeColor(product.stock, product.min_stock || 0)}>
-                            {product.stock <= (product.min_stock || 0) ? "Stock Bajo" : 
-                             product.stock <= (product.min_stock || 0) * 1.5 ? "Stock Medio" : "En Stock"}
-                          </Badge>
+                          {product.stock <= (product.min_stock || 0) ? (
+                            <Badge variant="destructive" className="flex items-center gap-1 w-fit">
+                              <AlertCircle className="h-3 w-3" />
+                              Stock Bajo
+                            </Badge>
+                          ) : product.stock <= (product.min_stock || 0) * 1.5 ? (
+                            <Badge variant="secondary" className="flex items-center gap-1 w-fit">
+                              <Info className="h-3 w-3" />
+                              Stock Medio
+                            </Badge>
+                          ) : (
+                            <Badge variant="default" className="flex items-center gap-1 w-fit bg-green-600 hover:bg-green-700">
+                              <CheckCircle2 className="h-3 w-3" />
+                              Disponible
+                            </Badge>
+                          )}
                         </TableCell>
-                        <TableCell className="text-right space-x-2">
+                        <TableCell className="text-right">
+                          <div className="flex justify-end gap-1">
                           {canEdit && (
                             <>
-                              <Button size="sm" variant="outline" onClick={() => handleStockAdjust(product)}>
-                                <Package className="h-4 w-4 mr-1" />
-                                Ajustar
-                              </Button>
-                              <Button size="sm" variant="outline" onClick={() => handlePriceListEdit(product)}>
-                                <DollarSign className="h-4 w-4 mr-1" />
-                                Precios
-                              </Button>
-                              <Button size="icon" variant="outline" onClick={() => handleEdit(product)}>
-                                <Edit className="h-4 w-4" />
-                              </Button>
+                              <TooltipProvider>
+                                <Tooltip>
+                                  <TooltipTrigger asChild>
+                                    <Button size="sm" variant="ghost" onClick={(e) => { e.stopPropagation(); handleStockAdjust(product); }}>
+                                      <Package className="h-4 w-4" />
+                                    </Button>
+                                  </TooltipTrigger>
+                                  <TooltipContent>Ajustar stock</TooltipContent>
+                                </Tooltip>
+                              </TooltipProvider>
+                              
+                              <TooltipProvider>
+                                <Tooltip>
+                                  <TooltipTrigger asChild>
+                                    <Button size="sm" variant="ghost" onClick={(e) => { e.stopPropagation(); handlePriceListEdit(product); }}>
+                                      <DollarSign className="h-4 w-4" />
+                                    </Button>
+                                  </TooltipTrigger>
+                                  <TooltipContent>Listas de precios</TooltipContent>
+                                </Tooltip>
+                              </TooltipProvider>
+                              
+                              <TooltipProvider>
+                                <Tooltip>
+                                  <TooltipTrigger asChild>
+                                    <Button size="sm" variant="ghost" onClick={(e) => { e.stopPropagation(); handleEdit(product); }}>
+                                      <Edit className="h-4 w-4" />
+                                    </Button>
+                                  </TooltipTrigger>
+                                  <TooltipContent>Editar producto</TooltipContent>
+                                </Tooltip>
+                              </TooltipProvider>
                             </>
                           )}
                           {canDelete && (
-                            <Button size="icon" variant="outline" className="text-destructive" onClick={() => deleteProductMutation.mutate(product.id)}>
-                              <Trash2 className="h-4 w-4" />
-                            </Button>
+                            <TooltipProvider>
+                              <Tooltip>
+                                <TooltipTrigger asChild>
+                                  <Button size="sm" variant="ghost" className="text-destructive hover:text-destructive hover:bg-destructive/10" onClick={(e) => { e.stopPropagation(); deleteProductMutation.mutate(product.id); }}>
+                                    <Trash2 className="h-4 w-4" />
+                                  </Button>
+                                </TooltipTrigger>
+                                <TooltipContent>Eliminar producto</TooltipContent>
+                              </Tooltip>
+                            </TooltipProvider>
                           )}
+                          </div>
                         </TableCell>
                       </TableRow>
                       {isExpanded && productWarehouseStock.length > 0 && (

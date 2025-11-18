@@ -11,7 +11,8 @@ import { Label } from "@/components/ui/label";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Textarea } from "@/components/ui/textarea";
 import { Badge } from "@/components/ui/badge";
-import { Plus, Search, Eye, Trash2 } from "lucide-react";
+import { Plus, Search, Eye, Trash2, ShoppingCart, Package, DollarSign, AlertCircle, CheckCircle2, Info, TrendingUp } from "lucide-react";
+import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip";
 import { toast } from "sonner";
 import { sanitizeSearchQuery } from "@/lib/searchUtils";
 import { format } from "date-fns";
@@ -233,14 +234,35 @@ const Purchases = () => {
   const { subtotal, tax, total } = calculateTotal();
 
   const getPaymentStatusBadge = (status: string) => {
-    const statusConfig: Record<string, { label: string; variant: "default" | "secondary" | "destructive" | "outline" }> = {
-      pending: { label: "Pendiente", variant: "secondary" },
-      partial: { label: "Parcial", variant: "outline" },
-      paid: { label: "Pagado", variant: "default" },
+    const statusConfig: Record<string, { label: string; variant: "default" | "secondary" | "destructive" | "outline"; icon: any; className: string }> = {
+      pending: { 
+        label: "Pendiente", 
+        variant: "secondary",
+        icon: AlertCircle,
+        className: "gap-1"
+      },
+      partial: { 
+        label: "Parcial", 
+        variant: "outline",
+        icon: TrendingUp,
+        className: "gap-1 border-amber-500 text-amber-700 dark:text-amber-400"
+      },
+      paid: { 
+        label: "Pagado", 
+        variant: "default",
+        icon: CheckCircle2,
+        className: "gap-1 bg-green-500 hover:bg-green-600"
+      },
     };
 
     const config = statusConfig[status] || statusConfig.pending;
-    return <Badge variant={config.variant}>{config.label}</Badge>;
+    const Icon = config.icon;
+    return (
+      <Badge variant={config.variant} className={config.className}>
+        <Icon className="h-3 w-3" />
+        {config.label}
+      </Badge>
+    );
   };
 
   return (
@@ -256,19 +278,37 @@ const Purchases = () => {
             <CardTitle className="flex items-center justify-between">
               <span>Lista de Compras</span>
               <Dialog open={isDialogOpen} onOpenChange={setIsDialogOpen}>
-                <DialogTrigger asChild>
-                  <Button>
-                    <Plus className="mr-2 h-4 w-4" />
-                    Nueva Compra
-                  </Button>
-                </DialogTrigger>
+                <TooltipProvider>
+                  <Tooltip>
+                    <TooltipTrigger asChild>
+                      <DialogTrigger asChild>
+                        <Button className="gap-2">
+                          <Plus className="h-4 w-4" />
+                          Nueva Compra
+                        </Button>
+                      </DialogTrigger>
+                    </TooltipTrigger>
+                    <TooltipContent>Registrar nueva compra</TooltipContent>
+                  </Tooltip>
+                </TooltipProvider>
                 <DialogContent className="max-w-4xl max-h-[90vh] overflow-y-auto">
                   <DialogHeader>
-                    <DialogTitle>Nueva Compra</DialogTitle>
+                    <DialogTitle className="flex items-center gap-2">
+                      <ShoppingCart className="h-5 w-5 text-primary" />
+                      Nueva Compra
+                    </DialogTitle>
                   </DialogHeader>
-                  <div className="space-y-4">
-                    <div>
-                      <Label>Proveedor</Label>
+                  <div className="space-y-6">
+                    {/* Sección Proveedor */}
+                    <div className="space-y-4">
+                      <div className="flex items-center gap-2 pb-2 border-b">
+                        <div className="p-2 bg-primary/10 rounded-lg">
+                          <Info className="h-4 w-4 text-primary" />
+                        </div>
+                        <h3 className="text-sm font-semibold">Proveedor</h3>
+                      </div>
+                      <div>
+                        <Label>Proveedor *</Label>
                       <Select value={supplierId} onValueChange={setSupplierId}>
                         <SelectTrigger>
                           <SelectValue placeholder="Selecciona un proveedor" />
@@ -281,10 +321,17 @@ const Purchases = () => {
                           ))}
                         </SelectContent>
                       </Select>
+                      </div>
                     </div>
 
-                    <div className="border rounded-lg p-4 space-y-4">
-                      <h3 className="font-semibold">Agregar Productos</h3>
+                    {/* Sección Productos */}
+                    <div className="space-y-4">
+                      <div className="flex items-center gap-2 pb-2 border-b">
+                        <div className="p-2 bg-green-500/10 rounded-lg">
+                          <Package className="h-4 w-4 text-green-600 dark:text-green-500" />
+                        </div>
+                        <h3 className="text-sm font-semibold">Agregar Productos</h3>
+                      </div>
                       <div className="grid grid-cols-4 gap-4">
                         <div>
                           <Label>Producto</Label>
@@ -306,6 +353,7 @@ const Purchases = () => {
                           <Input
                             type="number"
                             min="1"
+                             placeholder="1"
                             value={currentQuantity}
                             onChange={(e) => setCurrentQuantity(parseInt(e.target.value) || 1)}
                           />
@@ -316,12 +364,13 @@ const Purchases = () => {
                             type="number"
                             min="0"
                             step="0.01"
+                             placeholder="0.00"
                             value={currentCost}
                             onChange={(e) => setCurrentCost(parseFloat(e.target.value) || 0)}
                           />
                         </div>
                         <div className="flex items-end">
-                          <Button onClick={addItem} className="w-full">
+                            <Button onClick={addItem} className="w-full gap-2">
                             <Plus className="mr-2 h-4 w-4" />
                             Agregar
                           </Button>
@@ -329,7 +378,8 @@ const Purchases = () => {
                       </div>
 
                       {purchaseItems.length > 0 && (
-                        <Table>
+                          <div className="border rounded-lg">
+                            <Table>
                           <TableHeader>
                             <TableRow>
                               <TableHead>Producto</TableHead>
@@ -343,32 +393,49 @@ const Purchases = () => {
                             {purchaseItems.map((item, index) => (
                               <TableRow key={index}>
                                 <TableCell>{item.product_name}</TableCell>
-                                <TableCell>{item.quantity}</TableCell>
-                                <TableCell>${item.unit_cost.toFixed(2)}</TableCell>
-                                <TableCell>${item.subtotal.toFixed(2)}</TableCell>
+                                  <TableCell className="font-medium">{item.quantity}</TableCell>
+                                  <TableCell className="text-blue-600 dark:text-blue-400">${item.unit_cost.toFixed(2)}</TableCell>
+                                  <TableCell className="font-semibold text-green-600 dark:text-green-400">${item.subtotal.toFixed(2)}</TableCell>
                                 <TableCell>
-                                  <Button
-                                    variant="ghost"
-                                    size="sm"
-                                    onClick={() => removeItem(index)}
-                                  >
-                                    <Trash2 className="h-4 w-4" />
-                                  </Button>
+                                    <TooltipProvider>
+                                      <Tooltip>
+                                        <TooltipTrigger asChild>
+                                          <Button
+                                            variant="ghost"
+                                            size="sm"
+                                            onClick={() => removeItem(index)}
+                                          >
+                                            <Trash2 className="h-4 w-4" />
+                                          </Button>
+                                        </TooltipTrigger>
+                                        <TooltipContent>Eliminar producto</TooltipContent>
+                                      </Tooltip>
+                                    </TooltipProvider>
                                 </TableCell>
                               </TableRow>
                             ))}
                           </TableBody>
                         </Table>
+                          </div>
                       )}
                     </div>
 
-                    <div className="grid grid-cols-2 gap-4">
+                      {/* Sección Impuestos y Notas */}
+                      <div className="space-y-4">
+                        <div className="flex items-center gap-2 pb-2 border-b">
+                          <div className="p-2 bg-amber-500/10 rounded-lg">
+                            <DollarSign className="h-4 w-4 text-amber-600 dark:text-amber-500" />
+                          </div>
+                          <h3 className="text-sm font-semibold">Impuestos y Notas</h3>
+                        </div>
+                        <div className="grid grid-cols-2 gap-4">
                       <div>
                         <Label>% Impuesto</Label>
                         <Input
                           type="number"
                           min="0"
                           step="0.01"
+                           placeholder="0"
                           value={taxRate}
                           onChange={(e) => setTaxRate(parseFloat(e.target.value) || 0)}
                         />
@@ -379,30 +446,38 @@ const Purchases = () => {
                           value={notes}
                           onChange={(e) => setNotes(e.target.value)}
                           placeholder="Notas adicionales..."
+                           rows={3}
                         />
                       </div>
+                        </div>
                     </div>
 
-                    <div className="border-t pt-4 space-y-2">
-                      <div className="flex justify-between">
+                      {/* Resumen de Totales */}
+                      <div className="bg-muted/30 border rounded-lg p-4 space-y-2">
+                        <div className="flex items-center gap-2 mb-3">
+                          <TrendingUp className="h-4 w-4 text-primary" />
+                          <h3 className="text-sm font-semibold">Resumen</h3>
+                        </div>
+                        <div className="flex justify-between text-sm">
                         <span>Subtotal:</span>
-                        <span className="font-semibold">${subtotal.toFixed(2)}</span>
+                          <span className="font-medium text-muted-foreground">${subtotal.toFixed(2)}</span>
                       </div>
-                      <div className="flex justify-between">
+                        <div className="flex justify-between text-sm">
                         <span>Impuesto ({taxRate}%):</span>
-                        <span className="font-semibold">${tax.toFixed(2)}</span>
+                          <span className="font-medium text-amber-600 dark:text-amber-500">${tax.toFixed(2)}</span>
                       </div>
-                      <div className="flex justify-between text-lg font-bold">
+                        <div className="flex justify-between text-lg font-bold pt-2 border-t">
                         <span>Total:</span>
-                        <span>${total.toFixed(2)}</span>
+                          <span className="text-green-600 dark:text-green-400">${total.toFixed(2)}</span>
                       </div>
                     </div>
 
                     <Button
                       onClick={() => createPurchaseMutation.mutate()}
                       disabled={!supplierId || purchaseItems.length === 0}
-                      className="w-full"
+                        className="w-full gap-2"
                     >
+                        <CheckCircle2 className="h-4 w-4" />
                       Registrar Compra
                     </Button>
                   </div>
@@ -432,18 +507,19 @@ const Purchases = () => {
                   <TableHead>Total</TableHead>
                   <TableHead>Estado Pago</TableHead>
                   <TableHead>Registrado por</TableHead>
+                    <TableHead className="text-right">Acciones</TableHead>
                 </TableRow>
               </TableHeader>
               <TableBody>
                 {isLoading ? (
                   <TableRow>
-                    <TableCell colSpan={6} className="text-center">
+                      <TableCell colSpan={7} className="text-center">
                       Cargando...
                     </TableCell>
                   </TableRow>
                 ) : purchases?.length === 0 ? (
                   <TableRow>
-                    <TableCell colSpan={6} className="text-center">
+                      <TableCell colSpan={7} className="text-center">
                       No hay compras registradas
                     </TableCell>
                   </TableRow>
@@ -453,9 +529,30 @@ const Purchases = () => {
                       <TableCell className="font-medium">{purchase.purchase_number}</TableCell>
                       <TableCell>{format(new Date(purchase.purchase_date), "dd/MM/yyyy")}</TableCell>
                       <TableCell>{purchase.suppliers?.name || "N/A"}</TableCell>
-                      <TableCell>${purchase.total.toFixed(2)}</TableCell>
+                        <TableCell className="font-semibold text-green-600 dark:text-green-400">${purchase.total.toFixed(2)}</TableCell>
                       <TableCell>{getPaymentStatusBadge(purchase.payment_status)}</TableCell>
                       <TableCell>Usuario</TableCell>
+                        <TableCell className="text-right">
+                          <div className="flex items-center justify-end gap-2">
+                            <TooltipProvider>
+                              <Tooltip>
+                                <TooltipTrigger asChild>
+                                  <Button
+                                    variant="ghost"
+                                    size="sm"
+                                    onClick={(e) => {
+                                      e.stopPropagation();
+                                      // Ver detalle logic here
+                                    }}
+                                  >
+                                    <Eye className="h-4 w-4" />
+                                  </Button>
+                                </TooltipTrigger>
+                                <TooltipContent>Ver detalle</TooltipContent>
+                              </Tooltip>
+                            </TooltipProvider>
+                          </div>
+                        </TableCell>
                     </TableRow>
                   ))
                 )}

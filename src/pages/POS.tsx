@@ -1085,12 +1085,27 @@ Impuestos: $${saleData.tax.toFixed(2)}
                     onClick={() => addToCart(product)}
                   >
                     <CardHeader className="pb-2">
-                      <CardTitle className="text-sm font-medium truncate">
-                        {product.name}
-                      </CardTitle>
-                      <CardDescription className="text-xs">
-                        Código: {product.sku || product.barcode || "N/A"}
-                      </CardDescription>
+                      <div className="flex items-center gap-3">
+                        {product.image_url ? (
+                          <img 
+                            src={product.image_url} 
+                            alt={product.name}
+                            className="w-12 h-12 object-cover rounded border"
+                          />
+                        ) : (
+                          <div className="w-12 h-12 bg-muted rounded border flex items-center justify-center">
+                            <Package className="h-6 w-6 text-muted-foreground" />
+                          </div>
+                        )}
+                        <div>
+                          <CardTitle className="text-sm font-medium truncate">
+                            {product.name}
+                          </CardTitle>
+                          <CardDescription className="text-xs">
+                            Código: {product.sku || product.barcode || "N/A"}
+                          </CardDescription>
+                        </div>
+                      </div>
                     </CardHeader>
                     <CardContent className="pt-2">
                       <div className="flex items-center justify-center">

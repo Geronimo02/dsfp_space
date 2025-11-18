@@ -24,7 +24,8 @@ import {
 } from "@/components/ui/dialog";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
-import { Plus, Search, Edit, TrendingUp, TrendingDown } from "lucide-react";
+import { Plus, Search, Edit, TrendingUp, TrendingDown, AlertCircle, CheckCircle2, Info, Wallet, Building2, CreditCard as CreditCardIcon } from "lucide-react";
+import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip";
 import { toast } from "sonner";
 import { usePermissions } from "@/hooks/usePermissions";
 import { useCompany } from "@/contexts/CompanyContext";
@@ -209,20 +210,36 @@ export default function Suppliers() {
           </div>
           {canCreate && (
             <Dialog open={dialogOpen} onOpenChange={setDialogOpen}>
-              <DialogTrigger asChild>
-                <Button onClick={resetForm}>
-                  <Plus className="mr-2 h-4 w-4" />
-                  Nuevo Proveedor
-                </Button>
-              </DialogTrigger>
-            <DialogContent className="max-w-2xl max-h-[90vh] overflow-y-auto">
-              <DialogHeader>
-                <DialogTitle>
-                  {editingSupplier ? "Editar Proveedor" : "Nuevo Proveedor"}
-                </DialogTitle>
-              </DialogHeader>
-              <form onSubmit={handleSubmit} className="space-y-4">
-                <div className="grid grid-cols-2 gap-4">
+              <TooltipProvider>
+                <Tooltip>
+                  <TooltipTrigger asChild>
+                    <DialogTrigger asChild>
+                      <Button onClick={resetForm} className="gap-2">
+                        <Plus className="h-4 w-4" />
+                        Nuevo Proveedor
+                      </Button>
+                    </DialogTrigger>
+                  </TooltipTrigger>
+                  <TooltipContent>Crear proveedor</TooltipContent>
+                </Tooltip>
+              </TooltipProvider>
+              <DialogContent className="max-w-3xl max-h-[90vh] overflow-y-auto">
+                <DialogHeader>
+                  <DialogTitle className="flex items-center gap-2">
+                    <Building2 className="h-5 w-5 text-primary" />
+                    {editingSupplier ? "Editar Proveedor" : "Nuevo Proveedor"}
+                  </DialogTitle>
+                </DialogHeader>
+                <form onSubmit={handleSubmit} className="space-y-6">
+                {/* Sección Identidad */}
+                <div className="space-y-4">
+                  <div className="flex items-center gap-2 pb-2 border-b">
+                    <div className="p-2 bg-primary/10 rounded-lg">
+                      <Info className="h-4 w-4 text-primary" />
+                    </div>
+                    <h3 className="text-sm font-semibold">Identidad</h3>
+                  </div>
+                  <div className="grid grid-cols-2 gap-4">
                   <div className="space-y-2">
                     <Label htmlFor="name">Nombre del Proveedor *</Label>
                     <Input
@@ -243,9 +260,18 @@ export default function Suppliers() {
                       }
                     />
                   </div>
+                  </div>
                 </div>
 
-                <div className="grid grid-cols-2 gap-4">
+                {/* Sección Contacto */}
+                <div className="space-y-4">
+                  <div className="flex items-center gap-2 pb-2 border-b">
+                    <div className="p-2 bg-green-500/10 rounded-lg">
+                      <Wallet className="h-4 w-4 text-green-600 dark:text-green-500" />
+                    </div>
+                    <h3 className="text-sm font-semibold">Contacto</h3>
+                  </div>
+                  <div className="grid grid-cols-2 gap-4">
                   <div className="space-y-2">
                     <Label htmlFor="email">Email</Label>
                     <Input
@@ -264,18 +290,26 @@ export default function Suppliers() {
                       onChange={(e) => setFormData({ ...formData, phone: e.target.value })}
                     />
                   </div>
+                  </div>
+                  <div className="space-y-2 col-span-2">
+                    <Label htmlFor="address">Dirección</Label>
+                    <Textarea
+                      id="address"
+                      value={formData.address}
+                      onChange={(e) => setFormData({ ...formData, address: e.target.value })}
+                    />
+                  </div>
                 </div>
 
-                <div className="space-y-2">
-                  <Label htmlFor="address">Dirección</Label>
-                  <Textarea
-                    id="address"
-                    value={formData.address}
-                    onChange={(e) => setFormData({ ...formData, address: e.target.value })}
-                  />
-                </div>
-
-                <div className="grid grid-cols-2 gap-4">
+                {/* Sección Fiscal y Pago */}
+                <div className="space-y-4">
+                  <div className="flex items-center gap-2 pb-2 border-b">
+                    <div className="p-2 bg-blue-500/10 rounded-lg">
+                      <TrendingUp className="h-4 w-4 text-blue-600 dark:text-blue-500" />
+                    </div>
+                    <h3 className="text-sm font-semibold">Fiscal y Condiciones</h3>
+                  </div>
+                  <div className="grid grid-cols-2 gap-4">
                   <div className="space-y-2">
                     <Label htmlFor="tax_id">RUC/DNI</Label>
                     <Input
@@ -296,31 +330,56 @@ export default function Suppliers() {
                       }
                     />
                   </div>
+                  </div>
                 </div>
 
-                <div className="space-y-2">
-                  <Label htmlFor="credit_limit">Límite de Crédito</Label>
-                  <Input
-                    id="credit_limit"
-                    type="number"
-                    step="0.01"
-                    value={formData.credit_limit}
-                    onChange={(e) =>
-                      setFormData({ ...formData, credit_limit: e.target.value })
-                    }
-                  />
+                {/* Sección Crédito */}
+                <div className="space-y-4">
+                  <div className="flex items-center gap-2 pb-2 border-b">
+                    <div className="p-2 bg-purple-500/10 rounded-lg">
+                      <CreditCardIcon className="h-4 w-4 text-purple-600 dark:text-purple-500" />
+                    </div>
+                    <h3 className="text-sm font-semibold">Crédito</h3>
+                  </div>
+                  <div className="grid grid-cols-2 gap-4">
+                    <div className="space-y-2">
+                      <Label htmlFor="credit_limit">Límite de Crédito</Label>
+                      <Input
+                        id="credit_limit"
+                        type="number"
+                        step="0.01"
+                        value={formData.credit_limit}
+                        onChange={(e) => setFormData({ ...formData, credit_limit: e.target.value })}
+                      />
+                    </div>
+                    <div className="space-y-2">
+                      <Label>Estado</Label>
+                      <Badge variant="outline" className="bg-muted font-medium">
+                        {parseFloat(formData.credit_limit || '0') > 0 ? 'Con crédito' : 'Sin crédito'}
+                      </Badge>
+                    </div>
+                  </div>
                 </div>
 
-                <div className="space-y-2">
-                  <Label htmlFor="notes">Notas</Label>
-                  <Textarea
-                    id="notes"
-                    value={formData.notes}
-                    onChange={(e) => setFormData({ ...formData, notes: e.target.value })}
-                  />
+                {/* Sección Extra */}
+                <div className="space-y-4">
+                  <div className="flex items-center gap-2 pb-2 border-b">
+                    <div className="p-2 bg-amber-500/10 rounded-lg">
+                      <Info className="h-4 w-4 text-amber-600 dark:text-amber-500" />
+                    </div>
+                    <h3 className="text-sm font-semibold">Notas</h3>
+                  </div>
+                  <div className="space-y-2">
+                    <Label htmlFor="notes">Notas</Label>
+                    <Textarea
+                      id="notes"
+                      value={formData.notes}
+                      onChange={(e) => setFormData({ ...formData, notes: e.target.value })}
+                    />
+                  </div>
                 </div>
 
-                <div className="flex items-center space-x-2">
+                <div className="flex items-center space-x-2 pt-2 border-t">
                   <Switch
                     id="active"
                     checked={formData.active}
@@ -331,19 +390,20 @@ export default function Suppliers() {
                   <Label htmlFor="active">Proveedor Activo</Label>
                 </div>
 
-                <div className="flex justify-end gap-2">
-                  <Button
-                    type="button"
-                    variant="outline"
-                    onClick={() => {
-                      setDialogOpen(false);
-                      resetForm();
-                    }}
-                  >
+                <div className="flex justify-end gap-2 pt-4">
+                  <Button type="button" variant="outline" onClick={() => { setDialogOpen(false); resetForm(); }}>
                     Cancelar
                   </Button>
-                  <Button type="submit">
-                    {editingSupplier ? "Actualizar" : "Crear"} Proveedor
+                  <Button type="submit" className="gap-2">
+                    {editingSupplier ? (
+                      <>
+                        <CheckCircle2 className="h-4 w-4" /> Actualizar
+                      </>
+                    ) : (
+                      <>
+                        <Plus className="h-4 w-4" /> Crear Proveedor
+                      </>
+                    )}
                   </Button>
                 </div>
               </form>
@@ -458,16 +518,25 @@ export default function Suppliers() {
                             {supplier.active ? "Activo" : "Inactivo"}
                           </Badge>
                         </TableCell>
-                        <TableCell>
-                          {canEdit && (
-                            <Button
-                              variant="outline"
-                              size="sm"
-                              onClick={() => handleEdit(supplier)}
-                            >
-                              <Edit className="h-4 w-4" />
-                            </Button>
-                          )}
+                        <TableCell className="text-right">
+                          <div className="flex justify-end gap-1">
+                            {canEdit && (
+                              <TooltipProvider>
+                                <Tooltip>
+                                  <TooltipTrigger asChild>
+                                    <Button
+                                      variant="ghost"
+                                      size="icon"
+                                      onClick={(e) => { e.stopPropagation(); handleEdit(supplier); }}
+                                    >
+                                      <Edit className="h-4 w-4" />
+                                    </Button>
+                                  </TooltipTrigger>
+                                  <TooltipContent>Editar proveedor</TooltipContent>
+                                </Tooltip>
+                              </TooltipProvider>
+                            )}
+                          </div>
                         </TableCell>
                       </TableRow>
                     );
