@@ -35,39 +35,15 @@ export default function Auth() {
     const checkSession = async () => {
       const { data: { session } } = await supabase.auth.getSession();
       if (session) {
-        // Check if user has companies
-        const { data: companies } = await supabase
-          .from('company_users')
-          .select('id')
-          .eq('user_id', session.user.id)
-          .eq('active', true);
-        
-        // Si tiene empresas, ir directo al dashboard
-        // Si no tiene, ir a crear empresa
-        if (companies && companies.length > 0) {
-          navigate("/");
-        } else {
-          navigate("/company-setup");
-        }
+        navigate("/");
       }
     };
 
     checkSession();
 
-    const { data: { subscription } } = supabase.auth.onAuthStateChange(async (event, session) => {
+    const { data: { subscription } } = supabase.auth.onAuthStateChange((event, session) => {
       if (session && event === 'SIGNED_IN') {
-        // Check if user has companies
-        const { data: companies } = await supabase
-          .from('company_users')
-          .select('id')
-          .eq('user_id', session.user.id)
-          .eq('active', true);
-        
-        if (companies && companies.length > 0) {
-          navigate("/");
-        } else {
-          navigate("/company-setup");
-        }
+        navigate("/");
       }
     });
 
@@ -123,22 +99,8 @@ export default function Auth() {
 
       if (error) throw error;
       
-      // Check if user already has companies (invited user)
       if (data.user) {
-        const { data: companies } = await supabase
-          .from('company_users')
-          .select('id')
-          .eq('user_id', data.user.id)
-          .eq('active', true);
-
-        if (companies && companies.length > 0) {
-          // Usuario invitado que ya tiene empresa asignada
-          toast.success("¡Bienvenido! Redirigiendo a tu empresa...");
-          navigate("/");
-        } else {
-          // Usuario nuevo sin empresa
-          setShowWelcomeModal(true);
-        }
+        setShowWelcomeModal(true);
       } else {
         toast.success("¡Cuenta creada! Revisa tu email para confirmar tu cuenta.");
       }

@@ -446,7 +446,8 @@ export default function POS() {
           product_name: item.product_name,
           quantity: item.quantity,
           unit_price: item.unit_price,
-          subtotal: item.subtotal
+          subtotal: item.subtotal,
+          company_id: currentCompany?.id!
         })));
 
       if (itemsError) throw itemsError;
@@ -459,7 +460,8 @@ export default function POS() {
           payment_method: payment.method,
           amount: payment.amount,
           card_surcharge: payment.surcharge,
-          installments: payment.installments || 1
+          installments: payment.installments || 1,
+          company_id: currentCompany?.id!
         })));
 
       if (paymentsError) throw paymentsError;

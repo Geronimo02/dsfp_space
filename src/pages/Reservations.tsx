@@ -189,6 +189,7 @@ export default function Reservations() {
         amount: parseFloat(data.amount),
         notes: data.notes || null,
         user_id: user.id,
+        company_id: currentCompany?.id!
       });
 
       if (error) throw error;
