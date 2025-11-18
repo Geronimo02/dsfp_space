@@ -42,8 +42,7 @@ export default function Auth() {
     checkSession();
 
     const { data: { subscription } } = supabase.auth.onAuthStateChange((event, session) => {
-      // Don't navigate on SIGNED_IN as handleLogin handles it
-      if (session && event !== 'SIGNED_IN' && event !== 'INITIAL_SESSION') {
+      if (session) {
         navigate("/");
       }
     });
@@ -58,25 +57,21 @@ export default function Auth() {
     try {
       authSchema.parse({ email, password });
       
-      const { error, data } = await supabase.auth.signInWithPassword({
+      const { error } = await supabase.auth.signInWithPassword({
         email,
         password,
       });
 
       if (error) throw error;
       
-      // Wait a bit for session to be fully established
-      if (data.session) {
-        setTimeout(() => {
-          navigate("/");
-        }, 500);
-      }
+      // Auth state change will handle navigation
     } catch (error: any) {
       if (error instanceof z.ZodError) {
         toast.error(error.errors[0].message);
       } else {
         toast.error(error.message || "Error al iniciar sesión");
       }
+    } finally {
       setIsLoading(false);
     }
   };
