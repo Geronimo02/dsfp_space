@@ -41,8 +41,10 @@ export default function Auth() {
 
     checkSession();
 
-    const { data: { subscription } } = supabase.auth.onAuthStateChange((event, session) => {
-      if (session) {
+    const { data: { subscription } } = supabase.auth.onAuthStateChange(async (event, session) => {
+      // Only redirect to home if user is already logged in and comes back to auth page
+      // Don't redirect on fresh login to avoid race condition with CompanyContext
+      if (session && (event === 'TOKEN_REFRESHED' || event === 'INITIAL_SESSION')) {
         navigate("/");
       }
     });
@@ -64,7 +66,11 @@ export default function Auth() {
 
       if (error) throw error;
       
-      // Auth state change will handle navigation
+      // Give CompanyContext time to load user companies before navigating
+      toast.success("Sesión iniciada correctamente");
+      setTimeout(() => {
+        navigate("/");
+      }, 800);
     } catch (error: any) {
       if (error instanceof z.ZodError) {
         toast.error(error.errors[0].message);
