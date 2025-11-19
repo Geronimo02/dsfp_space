@@ -24,11 +24,15 @@ import {
 } from "@/components/ui/dialog";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
-import { Plus, Search, Edit, TrendingUp, TrendingDown, AlertCircle, CheckCircle2, Info, Wallet, Building2, CreditCard as CreditCardIcon } from "lucide-react";
+
+import { Plus, Search, Edit, TrendingUp, TrendingDown, AlertCircle, CheckCircle2, Info, Wallet, Building2, CreditCard as CreditCardIcon, History, DollarSign } from "lucide-react";
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip";
+
 import { toast } from "sonner";
 import { usePermissions } from "@/hooks/usePermissions";
 import { useCompany } from "@/contexts/CompanyContext";
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
+import { format } from "date-fns";
 
 interface Supplier {
   id: string;
@@ -55,6 +59,9 @@ export default function Suppliers() {
   const [searchQuery, setSearchQuery] = useState("");
   const [dialogOpen, setDialogOpen] = useState(false);
   const [editingSupplier, setEditingSupplier] = useState<Supplier | null>(null);
+  const [paymentDialogOpen, setPaymentDialogOpen] = useState(false);
+  const [historyDialogOpen, setHistoryDialogOpen] = useState(false);
+  const [selectedSupplier, setSelectedSupplier] = useState<Supplier | null>(null);
   const [formData, setFormData] = useState({
     name: "",
     contact_name: "",
@@ -65,6 +72,11 @@ export default function Suppliers() {
     payment_terms: "",
     credit_limit: "0",
     active: true,
+    notes: "",
+  });
+  const [paymentFormData, setPaymentFormData] = useState({
+    amount: "",
+    payment_method: "cash",
     notes: "",
   });
 
@@ -89,6 +101,23 @@ export default function Suppliers() {
       if (error) throw error;
       return data as Supplier[];
     },
+  });
+
+  const { data: supplierPayments = [] } = useQuery({
+    queryKey: ["supplier-payments", selectedSupplier?.id],
+    queryFn: async () => {
+      if (!selectedSupplier?.id) return [];
+      
+      const { data, error } = await supabase
+        .from("supplier_payments")
+        .select("*")
+        .eq("supplier_id", selectedSupplier.id)
+        .order("payment_date", { ascending: false });
+
+      if (error) throw error;
+      return data;
+    },
+    enabled: !!selectedSupplier?.id,
   });
 
   const createSupplierMutation = useMutation({
@@ -117,6 +146,51 @@ export default function Suppliers() {
     },
     onError: (error) => {
       toast.error("Error al crear el proveedor: " + error.message);
+    },
+  });
+
+  const createPaymentMutation = useMutation({
+    mutationFn: async () => {
+      if (!selectedSupplier) throw new Error("No supplier selected");
+      
+      const { data: { user } } = await supabase.auth.getUser();
+      if (!user) throw new Error("No user found");
+
+      const amount = parseFloat(paymentFormData.amount);
+      
+      // Insert payment
+      const { error: paymentError } = await supabase
+        .from("supplier_payments")
+        .insert({
+          supplier_id: selectedSupplier.id,
+          user_id: user.id,
+          amount: amount,
+          payment_method: paymentFormData.payment_method,
+          notes: paymentFormData.notes || null,
+          company_id: currentCompany?.id,
+        });
+
+      if (paymentError) throw paymentError;
+
+      // Update supplier balance
+      const newBalance = selectedSupplier.current_balance - amount;
+      const { error: balanceError } = await supabase
+        .from("suppliers")
+        .update({ current_balance: newBalance })
+        .eq("id", selectedSupplier.id);
+
+      if (balanceError) throw balanceError;
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["suppliers"] });
+      queryClient.invalidateQueries({ queryKey: ["supplier-payments"] });
+      toast.success("Pago registrado exitosamente");
+      setPaymentDialogOpen(false);
+      setPaymentFormData({ amount: "", payment_method: "cash", notes: "" });
+      setSelectedSupplier(null);
+    },
+    onError: (error) => {
+      toast.error("Error al registrar el pago: " + error.message);
     },
   });
 
@@ -198,6 +272,21 @@ export default function Suppliers() {
     if (balance > creditLimit) return { color: "bg-red-500", text: "Excedido" };
     if (balance > creditLimit * 0.8) return { color: "bg-yellow-500", text: "Alto" };
     return { color: "bg-blue-500", text: "Normal" };
+  };
+
+  const handlePayment = (supplier: Supplier) => {
+    setSelectedSupplier(supplier);
+    setPaymentDialogOpen(true);
+  };
+
+  const handleHistory = (supplier: Supplier) => {
+    setSelectedSupplier(supplier);
+    setHistoryDialogOpen(true);
+  };
+
+  const handlePaymentSubmit = (e: React.FormEvent) => {
+    e.preventDefault();
+    createPaymentMutation.mutate();
   };
 
   return (
@@ -519,20 +608,51 @@ export default function Suppliers() {
                           </Badge>
                         </TableCell>
                         <TableCell className="text-right">
-                          <div className="flex justify-end gap-1">
+                          <div className="flex justify-end gap-2">
+                            <TooltipProvider>
+                              <Tooltip>
+                                <TooltipTrigger asChild>
+                                  <Button
+                                    variant="outline"
+                                    size="sm"
+                                    onClick={() => handleHistory(supplier)}
+                                    title="Ver historial de pagos"
+                                  >
+                                    <History className="h-4 w-4" />
+                                  </Button>
+                                </TooltipTrigger>
+                                <TooltipContent>Historial</TooltipContent>
+                              </Tooltip>
+                            </TooltipProvider>
+                            <TooltipProvider>
+                              <Tooltip>
+                                <TooltipTrigger asChild>
+                                  <Button
+                                    variant="outline"
+                                    size="sm"
+                                    onClick={(e) => { e.stopPropagation(); handlePayment(supplier); }}
+                                    title="Registrar pago"
+                                  >
+                                    <DollarSign className="h-4 w-4" />
+                                  </Button>
+                                </TooltipTrigger>
+                                <TooltipContent>Registrar pago</TooltipContent>
+                              </Tooltip>
+                            </TooltipProvider>
                             {canEdit && (
                               <TooltipProvider>
                                 <Tooltip>
                                   <TooltipTrigger asChild>
                                     <Button
-                                      variant="ghost"
-                                      size="icon"
-                                      onClick={(e) => { e.stopPropagation(); handleEdit(supplier); }}
+                                      variant="outline"
+                                      size="sm"
+                                      onClick={() => handleEdit(supplier)}
+                                      title="Editar proveedor"
                                     >
                                       <Edit className="h-4 w-4" />
                                     </Button>
                                   </TooltipTrigger>
-                                  <TooltipContent>Editar proveedor</TooltipContent>
+                                  <TooltipContent>Editar</TooltipContent>
                                 </Tooltip>
                               </TooltipProvider>
                             )}
@@ -553,6 +673,157 @@ export default function Suppliers() {
             </div>
           </CardContent>
         </Card>
+
+        {/* Payment Dialog */}
+        <Dialog open={paymentDialogOpen} onOpenChange={setPaymentDialogOpen}>
+          <DialogContent>
+            <DialogHeader>
+              <DialogTitle>Registrar Pago a Proveedor</DialogTitle>
+            </DialogHeader>
+            <form onSubmit={handlePaymentSubmit} className="space-y-4">
+              <div className="space-y-2">
+                <Label>Proveedor</Label>
+                <Input value={selectedSupplier?.name || ""} disabled />
+              </div>
+
+              <div className="space-y-2">
+                <Label>Balance Actual</Label>
+                <Input 
+                  value={`$${selectedSupplier?.current_balance.toFixed(2) || "0.00"}`} 
+                  disabled 
+                />
+              </div>
+
+              <div className="space-y-2">
+                <Label htmlFor="payment_amount">Monto del Pago *</Label>
+                <Input
+                  id="payment_amount"
+                  type="number"
+                  step="0.01"
+                  min="0.01"
+                  max={selectedSupplier?.current_balance || 0}
+                  value={paymentFormData.amount}
+                  onChange={(e) =>
+                    setPaymentFormData({ ...paymentFormData, amount: e.target.value })
+                  }
+                  required
+                />
+              </div>
+
+              <div className="space-y-2">
+                <Label htmlFor="payment_payment_method">Método de Pago *</Label>
+                <Select
+                  value={paymentFormData.payment_method}
+                  onValueChange={(value) =>
+                    setPaymentFormData({ ...paymentFormData, payment_method: value })
+                  }
+                >
+                  <SelectTrigger id="payment_payment_method">
+                    <SelectValue />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="cash">Efectivo</SelectItem>
+                    <SelectItem value="transfer">Transferencia</SelectItem>
+                    <SelectItem value="check">Cheque</SelectItem>
+                    <SelectItem value="card">Tarjeta</SelectItem>
+                  </SelectContent>
+                </Select>
+              </div>
+
+              <div className="space-y-2">
+                <Label htmlFor="payment_notes">Notas</Label>
+                <Textarea
+                  id="payment_notes"
+                  value={paymentFormData.notes}
+                  onChange={(e) =>
+                    setPaymentFormData({ ...paymentFormData, notes: e.target.value })
+                  }
+                  placeholder="Notas adicionales sobre el pago..."
+                />
+              </div>
+
+              <div className="flex justify-end gap-2">
+                <Button
+                  type="button"
+                  variant="outline"
+                  onClick={() => {
+                    setPaymentDialogOpen(false);
+                    setPaymentFormData({ amount: "", payment_method: "cash", notes: "" });
+                    setSelectedSupplier(null);
+                  }}
+                >
+                  Cancelar
+                </Button>
+                <Button type="submit">Registrar Pago</Button>
+              </div>
+            </form>
+          </DialogContent>
+        </Dialog>
+
+        {/* Payment History Dialog */}
+        <Dialog open={historyDialogOpen} onOpenChange={setHistoryDialogOpen}>
+          <DialogContent className="max-w-3xl max-h-[80vh] overflow-y-auto">
+            <DialogHeader>
+              <DialogTitle>Historial de Pagos - {selectedSupplier?.name}</DialogTitle>
+            </DialogHeader>
+            <div className="space-y-4">
+              <div className="grid grid-cols-2 gap-4 p-4 bg-muted rounded-lg">
+                <div>
+                  <p className="text-sm text-muted-foreground">Balance Actual</p>
+                  <p className="text-2xl font-bold">
+                    ${selectedSupplier?.current_balance.toFixed(2) || "0.00"}
+                  </p>
+                </div>
+                <div>
+                  <p className="text-sm text-muted-foreground">Total Pagado</p>
+                  <p className="text-2xl font-bold">
+                    ${supplierPayments.reduce((sum, p) => sum + Number(p.amount), 0).toFixed(2)}
+                  </p>
+                </div>
+              </div>
+
+              <div className="rounded-md border">
+                <Table>
+                  <TableHeader>
+                    <TableRow>
+                      <TableHead>Fecha</TableHead>
+                      <TableHead>Método</TableHead>
+                      <TableHead>Monto</TableHead>
+                      <TableHead>Notas</TableHead>
+                    </TableRow>
+                  </TableHeader>
+                  <TableBody>
+                    {supplierPayments.length === 0 ? (
+                      <TableRow>
+                        <TableCell colSpan={4} className="text-center text-muted-foreground">
+                          No hay pagos registrados
+                        </TableCell>
+                      </TableRow>
+                    ) : (
+                      supplierPayments.map((payment) => (
+                        <TableRow key={payment.id}>
+                          <TableCell>
+                            {format(new Date(payment.payment_date), "dd/MM/yyyy HH:mm")}
+                          </TableCell>
+                          <TableCell className="capitalize">
+                            {payment.payment_method === "cash" && "Efectivo"}
+                            {payment.payment_method === "transfer" && "Transferencia"}
+                            {payment.payment_method === "check" && "Cheque"}
+                            {payment.payment_method === "card" && "Tarjeta"}
+                          </TableCell>
+                          <TableCell className="font-medium">
+                            ${Number(payment.amount).toFixed(2)}
+                          </TableCell>
+                          <TableCell>{payment.notes || "-"}</TableCell>
+                        </TableRow>
+                      ))
+                    )}
+                  </TableBody>
+                </Table>
+              </div>
+            </div>
+          </DialogContent>
+        </Dialog>
       </div>
     </Layout>
   );

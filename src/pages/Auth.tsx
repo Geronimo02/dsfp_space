@@ -35,39 +35,17 @@ export default function Auth() {
     const checkSession = async () => {
       const { data: { session } } = await supabase.auth.getSession();
       if (session) {
-        // Check if user has companies
-        const { data: companies } = await supabase
-          .from('company_users')
-          .select('id')
-          .eq('user_id', session.user.id)
-          .eq('active', true);
-        
-        // Si tiene empresas, ir directo al dashboard
-        // Si no tiene, ir a crear empresa
-        if (companies && companies.length > 0) {
-          navigate("/");
-        } else {
-          navigate("/company-setup");
-        }
+        navigate("/");
       }
     };
 
     checkSession();
 
     const { data: { subscription } } = supabase.auth.onAuthStateChange(async (event, session) => {
-      if (session && event === 'SIGNED_IN') {
-        // Check if user has companies
-        const { data: companies } = await supabase
-          .from('company_users')
-          .select('id')
-          .eq('user_id', session.user.id)
-          .eq('active', true);
-        
-        if (companies && companies.length > 0) {
-          navigate("/");
-        } else {
-          navigate("/company-setup");
-        }
+      // Only redirect to home if user is already logged in and comes back to auth page
+      // Don't redirect on fresh login to avoid race condition with CompanyContext
+      if (session && (event === 'TOKEN_REFRESHED' || event === 'INITIAL_SESSION')) {
+        navigate("/");
       }
     });
 
@@ -88,8 +66,11 @@ export default function Auth() {
 
       if (error) throw error;
       
-      // No need to toast or navigate here, auth state change will handle it
-      console.log("Login successful");
+      // Give CompanyContext time to load user companies before navigating
+      toast.success("Sesión iniciada correctamente");
+      setTimeout(() => {
+        navigate("/");
+      }, 800);
     } catch (error: any) {
       if (error instanceof z.ZodError) {
         toast.error(error.errors[0].message);
@@ -123,22 +104,8 @@ export default function Auth() {
 
       if (error) throw error;
       
-      // Check if user already has companies (invited user)
       if (data.user) {
-        const { data: companies } = await supabase
-          .from('company_users')
-          .select('id')
-          .eq('user_id', data.user.id)
-          .eq('active', true);
-
-        if (companies && companies.length > 0) {
-          // Usuario invitado que ya tiene empresa asignada
-          toast.success("¡Bienvenido! Redirigiendo a tu empresa...");
-          navigate("/");
-        } else {
-          // Usuario nuevo sin empresa
-          setShowWelcomeModal(true);
-        }
+        setShowWelcomeModal(true);
       } else {
         toast.success("¡Cuenta creada! Revisa tu email para confirmar tu cuenta.");
       }

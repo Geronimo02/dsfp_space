@@ -132,6 +132,7 @@ export default function WarehouseTransfers() {
             product_id: item.product_id,
             product_name: item.product_name,
             quantity: item.quantity,
+            company_id: currentCompany?.id!
           }))
         );
 
