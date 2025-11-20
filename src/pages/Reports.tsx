@@ -119,6 +119,54 @@ const Reports = () => {
     },
   });
 
+  // Ventas por cliente
+  const { data: salesByCustomer } = useQuery({
+    queryKey: ["reports-sales-by-customer", dateRange, currentCompany?.id],
+    queryFn: async () => {
+      const { start, end } = getDateRange();
+      const { data, error } = await supabase
+        .from("sales")
+        .select(`
+          total,
+          customer_id,
+          customers (name)
+        `)
+        .eq("company_id", currentCompany?.id)
+        .gte("created_at", start.toISOString())
+        .lte("created_at", end.toISOString());
+
+      if (error) throw error;
+
+      const grouped = data.reduce((acc: any, sale: any) => {
+        const customerName = sale.customers?.name || "Sin cliente";
+        if (!acc[customerName]) {
+          acc[customerName] = { name: customerName, total: 0, count: 0 };
+        }
+        acc[customerName].total += Number(sale.total);
+        acc[customerName].count += 1;
+        return acc;
+      }, {});
+
+      return Object.values(grouped).sort((a: any, b: any) => b.total - a.total);
+    },
+  });
+
+  // Saldos de clientes
+  const { data: customerBalances } = useQuery({
+    queryKey: ["reports-customer-balances", currentCompany?.id],
+    queryFn: async () => {
+      const { data, error } = await supabase
+        .from("customers")
+        .select("name, current_balance, credit_limit")
+        .eq("company_id", currentCompany?.id)
+        .gt("current_balance", 0)
+        .order("current_balance", { ascending: false });
+
+      if (error) throw error;
+      return data;
+    },
+  });
+
   // Resumen general
   const { data: summary } = useQuery({
     queryKey: ["reports-summary", dateRange, currentCompany?.id],
@@ -269,11 +317,13 @@ const Reports = () => {
 
         {/* Gráficos */}
         <Tabs defaultValue="sales" className="space-y-4">
-          <TabsList>
+          <TabsList className="grid w-full grid-cols-6">
             <TabsTrigger value="sales">Ventas</TabsTrigger>
-            <TabsTrigger value="purchases">Compras</TabsTrigger>
+            <TabsTrigger value="customers">Por Cliente</TabsTrigger>
             <TabsTrigger value="products">Productos</TabsTrigger>
-            <TabsTrigger value="payments">Métodos de Pago</TabsTrigger>
+            <TabsTrigger value="balances">Saldos</TabsTrigger>
+            <TabsTrigger value="purchases">Compras</TabsTrigger>
+            <TabsTrigger value="payments">Pagos</TabsTrigger>
           </TabsList>
 
           <TabsContent value="sales" className="space-y-4">
@@ -333,6 +383,74 @@ const Reports = () => {
                     <Bar dataKey="revenue" fill="hsl(var(--chart-4))" name="Ingresos ($)" />
                   </BarChart>
                 </ResponsiveContainer>
+              </CardContent>
+            </Card>
+          </TabsContent>
+
+          <TabsContent value="customers" className="space-y-4">
+            <Card>
+              <CardHeader>
+                <CardTitle>Ventas por Cliente</CardTitle>
+              </CardHeader>
+              <CardContent>
+                <div className="overflow-auto max-h-[500px]">
+                  <table className="w-full">
+                    <thead className="bg-muted sticky top-0">
+                      <tr>
+                        <th className="text-left p-2 font-semibold">Cliente</th>
+                        <th className="text-right p-2 font-semibold">Cantidad</th>
+                        <th className="text-right p-2 font-semibold">Total</th>
+                      </tr>
+                    </thead>
+                    <tbody>
+                      {salesByCustomer?.map((item: any, idx: number) => (
+                        <tr key={idx} className="border-b hover:bg-muted/50">
+                          <td className="p-2">{item.name}</td>
+                          <td className="text-right p-2">{item.count}</td>
+                          <td className="text-right p-2">${item.total.toLocaleString()}</td>
+                        </tr>
+                      ))}
+                    </tbody>
+                  </table>
+                </div>
+              </CardContent>
+            </Card>
+          </TabsContent>
+
+          <TabsContent value="balances" className="space-y-4">
+            <Card>
+              <CardHeader>
+                <CardTitle>Saldos de Clientes</CardTitle>
+              </CardHeader>
+              <CardContent>
+                <div className="overflow-auto max-h-[500px]">
+                  <table className="w-full">
+                    <thead className="bg-muted sticky top-0">
+                      <tr>
+                        <th className="text-left p-2 font-semibold">Cliente</th>
+                        <th className="text-right p-2 font-semibold">Saldo</th>
+                        <th className="text-right p-2 font-semibold">Límite</th>
+                        <th className="text-right p-2 font-semibold">Disponible</th>
+                      </tr>
+                    </thead>
+                    <tbody>
+                      {customerBalances?.map((customer: any, idx: number) => (
+                        <tr key={idx} className="border-b hover:bg-muted/50">
+                          <td className="p-2">{customer.name}</td>
+                          <td className="text-right p-2 text-destructive">
+                            ${customer.current_balance.toLocaleString()}
+                          </td>
+                          <td className="text-right p-2">
+                            ${(customer.credit_limit || 0).toLocaleString()}
+                          </td>
+                          <td className="text-right p-2">
+                            ${((customer.credit_limit || 0) - customer.current_balance).toLocaleString()}
+                          </td>
+                        </tr>
+                      ))}
+                    </tbody>
+                  </table>
+                </div>
               </CardContent>
             </Card>
           </TabsContent>
