@@ -32,6 +32,22 @@ Deno.serve(async (req) => {
       throw expiringError;
     }
 
+    console.log('Checking inactive customers...');
+    const { error: inactiveCustomersError } = await supabaseClient.rpc('check_inactive_customers');
+    
+    if (inactiveCustomersError) {
+      console.error('Error checking inactive customers:', inactiveCustomersError);
+      throw inactiveCustomersError;
+    }
+
+    console.log('Checking overdue invoices...');
+    const { error: overdueInvoicesError } = await supabaseClient.rpc('check_overdue_invoices');
+    
+    if (overdueInvoicesError) {
+      console.error('Error checking overdue invoices:', overdueInvoicesError);
+      throw overdueInvoicesError;
+    }
+
     return new Response(
       JSON.stringify({ 
         success: true, 
