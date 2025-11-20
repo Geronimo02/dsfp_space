@@ -82,6 +82,14 @@ export function NotificationCenter() {
                 markAsRead(notification.id);
                 if (notification.type === "low_stock" || notification.type === "expiring_product") {
                   navigate("/inventory-alerts");
+                } else if (notification.type === "inactive_customer") {
+                  const data = notification.data as any;
+                  const customerId = data?.customer_id;
+                  if (customerId) {
+                    navigate(`/customer-account/${customerId}`);
+                  }
+                } else if (notification.type === "overdue_invoice") {
+                  navigate("/accounts-receivable");
                 }
               }}
             >

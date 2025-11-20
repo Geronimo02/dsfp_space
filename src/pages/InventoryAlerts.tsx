@@ -105,7 +105,13 @@ export default function InventoryAlerts() {
       const { error: expiringError } = await supabase.rpc("check_expiring_products");
       if (expiringError) throw expiringError;
 
-      toast.success("Alertas generadas exitosamente");
+      const { error: inactiveCustomersError } = await supabase.rpc("check_inactive_customers");
+      if (inactiveCustomersError) throw inactiveCustomersError;
+
+      const { error: overdueInvoicesError } = await supabase.rpc("check_overdue_invoices");
+      if (overdueInvoicesError) throw overdueInvoicesError;
+
+      toast.success("Todas las alertas generadas exitosamente");
       refetchNotifications();
     } catch (error) {
       console.error("Error checking alerts:", error);

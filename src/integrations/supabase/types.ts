@@ -3160,7 +3160,9 @@ export type Database = {
         Returns: undefined
       }
       check_expiring_products: { Args: never; Returns: undefined }
+      check_inactive_customers: { Args: never; Returns: undefined }
       check_low_stock_alerts: { Args: never; Returns: undefined }
+      check_overdue_invoices: { Args: never; Returns: undefined }
       create_company_with_admin: {
         Args: {
           company_address?: string
