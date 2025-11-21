@@ -2,6 +2,7 @@ import { ReactNode, useMemo } from "react";
 import { Sidebar } from "./Sidebar";
 import { NotificationCenter } from "../NotificationCenter";
 import { CompanySelector } from "../CompanySelector";
+import { GlobalSearch } from "../GlobalSearch";
 import { useCompany } from "@/contexts/CompanyContext";
 import { Badge } from "@/components/ui/badge";
 
@@ -41,7 +42,10 @@ export function Layout({ children }: LayoutProps) {
                 </Badge>
               )}
             </div>
-            <NotificationCenter />
+            <div className="flex items-center gap-4">
+              <GlobalSearch />
+              <NotificationCenter />
+            </div>
           </div>
         </div>
         <div className="container mx-auto p-8">
