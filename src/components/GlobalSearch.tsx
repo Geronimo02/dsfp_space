@@ -13,6 +13,7 @@ import { useQuery } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
 import { useCompany } from "@/contexts/CompanyContext";
 import { Button } from "@/components/ui/button";
+import { sanitizeSearchQuery } from "@/lib/searchUtils";
 
 export function GlobalSearch() {
   const [open, setOpen] = useState(false);
@@ -37,11 +38,13 @@ export function GlobalSearch() {
     queryKey: ["search-products", search, currentCompany?.id],
     queryFn: async () => {
       if (!search || search.length < 2) return [];
+      const sanitized = sanitizeSearchQuery(search);
+      if (!sanitized) return [];
       const { data, error } = await supabase
         .from("products")
         .select("id, name, sku, barcode")
         .eq("company_id", currentCompany?.id)
-        .or(`name.ilike.%${search}%,sku.ilike.%${search}%,barcode.ilike.%${search}%`)
+        .or(`name.ilike.%${sanitized}%,sku.ilike.%${sanitized}%,barcode.ilike.%${sanitized}%`)
         .limit(5);
       
       if (error) throw error;
@@ -55,11 +58,13 @@ export function GlobalSearch() {
     queryKey: ["search-customers", search, currentCompany?.id],
     queryFn: async () => {
       if (!search || search.length < 2) return [];
+      const sanitized = sanitizeSearchQuery(search);
+      if (!sanitized) return [];
       const { data, error } = await supabase
         .from("customers")
         .select("id, name, document")
         .eq("company_id", currentCompany?.id)
-        .or(`name.ilike.%${search}%,document.ilike.%${search}%`)
+        .or(`name.ilike.%${sanitized}%,document.ilike.%${sanitized}%`)
         .limit(5);
       
       if (error) throw error;
@@ -73,11 +78,13 @@ export function GlobalSearch() {
     queryKey: ["search-sales", search, currentCompany?.id],
     queryFn: async () => {
       if (!search || search.length < 2) return [];
+      const sanitized = sanitizeSearchQuery(search);
+      if (!sanitized) return [];
       const { data, error } = await supabase
         .from("sales")
         .select("id, sale_number, total, customers(name)")
         .eq("company_id", currentCompany?.id)
-        .ilike("sale_number", `%${search}%`)
+        .ilike("sale_number", `%${sanitized}%`)
         .limit(5);
       
       if (error) throw error;
@@ -96,11 +103,13 @@ export function GlobalSearch() {
     queryKey: ["search-quotations", search, currentCompany?.id],
     queryFn: async () => {
       if (!search || search.length < 2) return [];
+      const sanitized = sanitizeSearchQuery(search);
+      if (!sanitized) return [];
       const { data, error } = await supabase
         .from("quotations")
         .select("id, quotation_number, customer_name, total")
         .eq("company_id", currentCompany?.id)
-        .ilike("quotation_number", `%${search}%`)
+        .ilike("quotation_number", `%${sanitized}%`)
         .limit(5);
       
       if (error) throw error;
@@ -114,11 +123,13 @@ export function GlobalSearch() {
     queryKey: ["search-delivery-notes", search, currentCompany?.id],
     queryFn: async () => {
       if (!search || search.length < 2) return [];
+      const sanitized = sanitizeSearchQuery(search);
+      if (!sanitized) return [];
       const { data, error } = await supabase
         .from("delivery_notes")
         .select("id, delivery_number, customer_name, total")
         .eq("company_id", currentCompany?.id)
-        .ilike("delivery_number", `%${search}%`)
+        .ilike("delivery_number", `%${sanitized}%`)
         .limit(5);
       
       if (error) throw error;
