@@ -27,7 +27,8 @@ import {
   Building2,
   ArrowLeftRight,
   Bell,
-  CreditCard as CheckIcon
+  CreditCard as CheckIcon,
+  Smartphone
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { supabase } from "@/integrations/supabase/client";
@@ -41,6 +42,7 @@ const navigationSections = [
     title: "General",
     items: [
       { name: "Dashboard", href: "/", icon: LayoutDashboard },
+      { name: "Modo Móvil", href: "/mobile", icon: Smartphone },
       { name: "Punto de Venta", href: "/pos", icon: ShoppingCart },
     ]
   },

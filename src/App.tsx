@@ -39,6 +39,7 @@ import ResetPassword from "./pages/ResetPassword";
 import POSPoints from "./pages/POSPoints";
 import NotificationSettings from "./pages/NotificationSettings";
 import Checks from "./pages/Checks";
+import Mobile from "./pages/Mobile";
 import NotFound from "./pages/NotFound";
 
 const queryClient = new QueryClient();
@@ -151,6 +152,7 @@ const App = () => (
           <Route path="/reset-password" element={<ResetPassword />} />
           <Route path="/company-setup" element={<AuthOnlyRoute><CompanySetup /></AuthOnlyRoute>} />
           <Route path="/" element={<ProtectedRoute><Dashboard /></ProtectedRoute>} />
+          <Route path="/mobile" element={<ProtectedRoute><Mobile /></ProtectedRoute>} />
           <Route path="/pos" element={<ProtectedRoute><POS /></ProtectedRoute>} />
           <Route path="/products" element={<ProtectedRoute><Products /></ProtectedRoute>} />
           <Route path="/suppliers" element={<ProtectedRoute><Suppliers /></ProtectedRoute>} />
