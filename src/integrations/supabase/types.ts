@@ -264,6 +264,86 @@ export type Database = {
           },
         ]
       }
+      checks: {
+        Row: {
+          amount: number
+          bank_name: string
+          check_number: string
+          company_id: string | null
+          created_at: string | null
+          customer_id: string | null
+          due_date: string
+          id: string
+          issue_date: string
+          notes: string | null
+          status: string | null
+          supplier_id: string | null
+          type: string
+          updated_at: string | null
+        }
+        Insert: {
+          amount: number
+          bank_name: string
+          check_number: string
+          company_id?: string | null
+          created_at?: string | null
+          customer_id?: string | null
+          due_date: string
+          id?: string
+          issue_date: string
+          notes?: string | null
+          status?: string | null
+          supplier_id?: string | null
+          type: string
+          updated_at?: string | null
+        }
+        Update: {
+          amount?: number
+          bank_name?: string
+          check_number?: string
+          company_id?: string | null
+          created_at?: string | null
+          customer_id?: string | null
+          due_date?: string
+          id?: string
+          issue_date?: string
+          notes?: string | null
+          status?: string | null
+          supplier_id?: string | null
+          type?: string
+          updated_at?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "checks_company_id_fkey"
+            columns: ["company_id"]
+            isOneToOne: false
+            referencedRelation: "companies"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "checks_customer_id_fkey"
+            columns: ["customer_id"]
+            isOneToOne: false
+            referencedRelation: "customer_pos_view"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "checks_customer_id_fkey"
+            columns: ["customer_id"]
+            isOneToOne: false
+            referencedRelation: "customers"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "checks_supplier_id_fkey"
+            columns: ["supplier_id"]
+            isOneToOne: false
+            referencedRelation: "suppliers"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       companies: {
         Row: {
           active: boolean | null
@@ -3159,6 +3239,7 @@ export type Database = {
         }
         Returns: undefined
       }
+      check_expiring_checks: { Args: never; Returns: undefined }
       check_expiring_products: { Args: never; Returns: undefined }
       check_inactive_customers: { Args: never; Returns: undefined }
       check_low_stock_alerts: { Args: never; Returns: undefined }

@@ -48,6 +48,14 @@ Deno.serve(async (req) => {
       throw overdueInvoicesError;
     }
 
+    console.log('Checking expiring checks...');
+    const { error: expiringChecksError } = await supabaseClient.rpc('check_expiring_checks');
+    
+    if (expiringChecksError) {
+      console.error('Error checking expiring checks:', expiringChecksError);
+      throw expiringChecksError;
+    }
+
     return new Response(
       JSON.stringify({ 
         success: true, 

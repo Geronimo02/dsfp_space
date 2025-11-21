@@ -111,6 +111,9 @@ export default function InventoryAlerts() {
       const { error: overdueInvoicesError } = await supabase.rpc("check_overdue_invoices");
       if (overdueInvoicesError) throw overdueInvoicesError;
 
+      const { error: expiringChecksError } = await supabase.rpc("check_expiring_checks");
+      if (expiringChecksError) throw expiringChecksError;
+
       toast.success("Todas las alertas generadas exitosamente");
       refetchNotifications();
     } catch (error) {
