@@ -56,6 +56,57 @@ Deno.serve(async (req) => {
       throw expiringChecksError;
     }
 
+    // Send email notifications for new notifications
+    console.log('Sending email notifications...');
+    try {
+      // Get recent notifications that haven't been emailed yet
+      const { data: recentNotifications } = await supabaseClient
+        .from('notifications')
+        .select('*')
+        .gte('created_at', new Date(Date.now() - 5 * 60 * 1000).toISOString()) // Last 5 minutes
+        .order('created_at', { ascending: false });
+
+      if (recentNotifications && recentNotifications.length > 0) {
+        // Group notifications by type and company
+        const notificationGroups = recentNotifications.reduce((acc: any, notif: any) => {
+          const key = `${notif.company_id}-${notif.type}`;
+          if (!acc[key]) {
+            acc[key] = [];
+          }
+          acc[key].push(notif);
+          return acc;
+        }, {} as Record<string, any[]>);
+
+        // Send one email per group
+        for (const [key, notifications] of Object.entries(notificationGroups)) {
+          const firstNotif = (notifications as any[])[0];
+          const emailBody = {
+            companyId: firstNotif.company_id,
+            notificationType: firstNotif.type,
+            title: firstNotif.title,
+            message: (notifications as any[]).length > 1 
+              ? `${(notifications as any[]).length} nuevas alertas de este tipo`
+              : firstNotif.message,
+            data: (notifications as any[]).length > 1
+              ? { count: (notifications as any[]).length, notifications: (notifications as any[]).map((n: any) => ({ title: n.title, message: n.message })) }
+              : firstNotif.data
+          };
+
+          await fetch(`${Deno.env.get('SUPABASE_URL')}/functions/v1/send-alert-email`, {
+            method: 'POST',
+            headers: {
+              'Content-Type': 'application/json',
+              'Authorization': `Bearer ${Deno.env.get('SUPABASE_ANON_KEY')}`
+            },
+            body: JSON.stringify(emailBody)
+          }).catch(err => console.error('Error sending email:', err));
+        }
+      }
+    } catch (emailError) {
+      console.error('Error sending email notifications:', emailError);
+      // Don't throw, we don't want to fail the whole job if emails fail
+    }
+
     return new Response(
       JSON.stringify({ 
         success: true, 
