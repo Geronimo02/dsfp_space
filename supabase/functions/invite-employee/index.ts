@@ -81,27 +81,60 @@ serve(async (req) => {
     }
 
     // Check if user already exists
-    const { data: existingUser } = await supabaseAdmin.auth.admin.listUsers();
-    const userExists = existingUser.users.find(u => u.email === email);
+    const { data: { users }, error: listError } = await supabaseAdmin.auth.admin.listUsers();
+    const existingUser = users?.find(u => u.email === email);
 
-    // Invite user with company metadata
-    const { data, error } = await supabaseAdmin.auth.admin.inviteUserByEmail(email, {
-      data: {
-        full_name: full_name || "",
-        invited_to_company: companyId,
-        assigned_role: role,
-      },
-      redirectTo: `${req.headers.get("origin") || "https://pjcfncnydhxrlnaowbae.supabase.co"}/`,
-    });
+    let userId: string;
 
-    if (error) throw error;
+    if (existingUser) {
+      // User already exists - just add to company
+      userId = existingUser.id;
+      
+      // Check if already in company
+      const { data: existingCompanyUser } = await supabaseAdmin
+        .from("company_users")
+        .select("id")
+        .eq("user_id", userId)
+        .eq("company_id", companyId)
+        .single();
 
-    // If user was successfully invited, create company_users entry
-    if (data.user) {
+      if (existingCompanyUser) {
+        throw new Error("El usuario ya pertenece a esta empresa");
+      }
+
+      // Add user to company
       const { error: companyUserError } = await supabaseAdmin
         .from("company_users")
         .insert({
-          user_id: data.user.id,
+          user_id: userId,
+          company_id: companyId,
+          role: role,
+          active: true,
+        });
+
+      if (companyUserError) throw companyUserError;
+
+    } else {
+      // User doesn't exist - invite them
+      const { data, error } = await supabaseAdmin.auth.admin.inviteUserByEmail(email, {
+        data: {
+          full_name: full_name || "",
+          invited_to_company: companyId,
+          assigned_role: role,
+        },
+        redirectTo: `${req.headers.get("origin") || "https://pjcfncnydhxrlnaowbae.supabase.co"}/`,
+      });
+
+      if (error) throw error;
+      if (!data.user) throw new Error("No se pudo crear el usuario");
+
+      userId = data.user.id;
+
+      // Create company_users entry for new user
+      const { error: companyUserError } = await supabaseAdmin
+        .from("company_users")
+        .insert({
+          user_id: userId,
           company_id: companyId,
           role: role,
           active: true,
@@ -109,11 +142,15 @@ serve(async (req) => {
 
       if (companyUserError) {
         console.error("Error creating company_users entry:", companyUserError);
-        // Don't throw error here - user is already invited, we'll handle this in trigger
+        throw companyUserError;
       }
     }
 
-    return new Response(JSON.stringify({ success: true, user: data.user }), {
+    return new Response(JSON.stringify({ 
+      success: true, 
+      user_id: userId,
+      message: existingUser ? "Usuario agregado a la empresa" : "Invitación enviada por email"
+    }), {
       headers: { ...corsHeaders, "Content-Type": "application/json" },
       status: 200,
     });
