@@ -1351,6 +1351,68 @@ export type Database = {
           },
         ]
       }
+      notification_preferences: {
+        Row: {
+          company_id: string | null
+          created_at: string | null
+          daily_summary: boolean | null
+          email_enabled: boolean | null
+          expiring_checks: boolean | null
+          expiring_products: boolean | null
+          id: string
+          inactive_customers: boolean | null
+          low_stock: boolean | null
+          overdue_invoices: boolean | null
+          updated_at: string | null
+          user_id: string | null
+          weekly_summary: boolean | null
+          whatsapp_enabled: boolean | null
+          whatsapp_number: string | null
+        }
+        Insert: {
+          company_id?: string | null
+          created_at?: string | null
+          daily_summary?: boolean | null
+          email_enabled?: boolean | null
+          expiring_checks?: boolean | null
+          expiring_products?: boolean | null
+          id?: string
+          inactive_customers?: boolean | null
+          low_stock?: boolean | null
+          overdue_invoices?: boolean | null
+          updated_at?: string | null
+          user_id?: string | null
+          weekly_summary?: boolean | null
+          whatsapp_enabled?: boolean | null
+          whatsapp_number?: string | null
+        }
+        Update: {
+          company_id?: string | null
+          created_at?: string | null
+          daily_summary?: boolean | null
+          email_enabled?: boolean | null
+          expiring_checks?: boolean | null
+          expiring_products?: boolean | null
+          id?: string
+          inactive_customers?: boolean | null
+          low_stock?: boolean | null
+          overdue_invoices?: boolean | null
+          updated_at?: string | null
+          user_id?: string | null
+          weekly_summary?: boolean | null
+          whatsapp_enabled?: boolean | null
+          whatsapp_number?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "notification_preferences_company_id_fkey"
+            columns: ["company_id"]
+            isOneToOne: false
+            referencedRelation: "companies"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       notifications: {
         Row: {
           company_id: string | null
@@ -1611,21 +1673,45 @@ export type Database = {
           created_at: string
           full_name: string | null
           id: string
+          notification_email: boolean | null
+          notification_expiring_checks: boolean | null
+          notification_expiring_products: boolean | null
+          notification_inactive_customers: boolean | null
+          notification_low_stock: boolean | null
+          notification_overdue_invoices: boolean | null
+          notification_whatsapp: boolean | null
           updated_at: string
+          whatsapp_number: string | null
         }
         Insert: {
           avatar_url?: string | null
           created_at?: string
           full_name?: string | null
           id: string
+          notification_email?: boolean | null
+          notification_expiring_checks?: boolean | null
+          notification_expiring_products?: boolean | null
+          notification_inactive_customers?: boolean | null
+          notification_low_stock?: boolean | null
+          notification_overdue_invoices?: boolean | null
+          notification_whatsapp?: boolean | null
           updated_at?: string
+          whatsapp_number?: string | null
         }
         Update: {
           avatar_url?: string | null
           created_at?: string
           full_name?: string | null
           id?: string
+          notification_email?: boolean | null
+          notification_expiring_checks?: boolean | null
+          notification_expiring_products?: boolean | null
+          notification_inactive_customers?: boolean | null
+          notification_low_stock?: boolean | null
+          notification_overdue_invoices?: boolean | null
+          notification_whatsapp?: boolean | null
           updated_at?: string
+          whatsapp_number?: string | null
         }
         Relationships: []
       }
@@ -3326,6 +3412,21 @@ export type Database = {
         }[]
       }
       get_user_company: { Args: { _user_id: string }; Returns: string }
+      get_users_to_notify: {
+        Args: {
+          _company_id: string
+          _notification_type: string
+          _roles?: Database["public"]["Enums"]["app_role"][]
+        }
+        Returns: {
+          email: string
+          email_enabled: boolean
+          full_name: string
+          user_id: string
+          whatsapp_enabled: boolean
+          whatsapp_number: string
+        }[]
+      }
       has_permission:
         | {
             Args: {
