@@ -19,13 +19,14 @@ export const searchQuerySchema = z
  * @returns Sanitized string safe for SQL pattern matching
  */
 export const sanitizeSearchQuery = (input: string): string => {
-  // Validate input first
-  const validation = searchQuerySchema.safeParse(input);
-  if (!validation.success) {
+  // Trim whitespace and limit length
+  const trimmed = input.trim().slice(0, 100);
+  
+  if (!trimmed) {
     return "";
   }
 
   // Escape special SQL pattern characters: %, _, \
   // These have special meaning in LIKE/ILIKE patterns
-  return input.replace(/[%_\\]/g, "\\$&").trim();
+  return trimmed.replace(/[%_\\]/g, "\\$&");
 };
