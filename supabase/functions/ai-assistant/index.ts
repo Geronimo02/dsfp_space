@@ -89,7 +89,7 @@ ${context || 'No se proporcionó contexto del reporte'}`;
 
     console.log('Enviando consulta a OpenAI:', { type, query });
 
-    // Llamar a OpenAI
+    // Llamar a OpenAI con GPT-5 mini
     const response = await fetch('https://api.openai.com/v1/chat/completions', {
       method: 'POST',
       headers: {
@@ -97,13 +97,12 @@ ${context || 'No se proporcionó contexto del reporte'}`;
         'Content-Type': 'application/json',
       },
       body: JSON.stringify({
-        model: 'gpt-4o-mini',
+        model: 'gpt-5-mini-2025-08-07',
         messages: [
           { role: 'system', content: systemPrompt },
           { role: 'user', content: `${dataContext}\n\nConsulta del usuario: ${query}` }
         ],
-        temperature: 0.7,
-        max_tokens: 1000,
+        max_completion_tokens: 1000,
       }),
     });
 
