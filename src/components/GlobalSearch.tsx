@@ -109,7 +109,7 @@ export function GlobalSearch() {
         .from("quotations")
         .select("id, quotation_number, customer_name, total")
         .eq("company_id", currentCompany?.id)
-        .ilike("quotation_number", `%${sanitized}%`)
+        .or(`quotation_number.ilike.%${sanitized}%,customer_name.ilike.%${sanitized}%`)
         .limit(5);
       
       if (error) throw error;
@@ -129,7 +129,7 @@ export function GlobalSearch() {
         .from("delivery_notes")
         .select("id, delivery_number, customer_name, total")
         .eq("company_id", currentCompany?.id)
-        .ilike("delivery_number", `%${sanitized}%`)
+        .or(`delivery_number.ilike.%${sanitized}%,customer_name.ilike.%${sanitized}%`)
         .limit(5);
       
       if (error) throw error;
