@@ -25,7 +25,9 @@ import {
   DollarSign,
   Zap,
   Building2,
-  ArrowLeftRight
+  ArrowLeftRight,
+  Bell,
+  CreditCard as CheckIcon
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { supabase } from "@/integrations/supabase/client";
@@ -72,6 +74,7 @@ const navigationSections = [
       { name: "Servicios Técnicos", href: "/technical-services", icon: Wrench },
       { name: "Promociones", href: "/promotions", icon: Tag },
       { name: "Gestión de Caja", href: "/cash-register", icon: Wallet },
+      { name: "Cheques", href: "/checks", icon: CheckIcon },
       { name: "Gastos", href: "/expenses", icon: DollarSign },
       { name: "Usuarios", href: "/employees", icon: UserCog },
     ]
@@ -84,6 +87,7 @@ const navigationSections = [
       { name: "Logs de Acceso", href: "/access-logs", icon: Activity },
       { name: "Operaciones Masivas", href: "/bulk-operations", icon: Zap },
       { name: "Puntos de Venta AFIP", href: "/pos-points", icon: Receipt },
+      { name: "Notificaciones", href: "/notification-settings", icon: Bell },
       { name: "Configuración", href: "/settings", icon: Settings },
     ]
   }
@@ -132,6 +136,7 @@ export function Sidebar() {
       "/employees": "employees",
       "/settings": "settings",
       "/cash-register": "cash_register",
+      "/checks": "cash_register",
       "/technical-services": "technical_services",
       "/quotations": "quotations",
       "/delivery-notes": "delivery_notes",
@@ -141,6 +146,7 @@ export function Sidebar() {
       "/expenses": "expenses",
       "/bulk-operations": "bulk_operations",
       "/pos-points": "pos_afip",
+      "/notification-settings": "settings",
     };
 
     const module = routeToModule[href];
