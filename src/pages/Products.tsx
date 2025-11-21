@@ -59,15 +59,32 @@ export default function Products() {
 
   // Verificar que el usuario tenga acceso a la empresa actual
   useEffect(() => {
+    console.log('Permissions check:', { 
+      permissionsLoading, 
+      currentCompany: currentCompany?.id,
+      canCreate,
+      canEdit,
+      canDelete,
+      canExport 
+    });
+    
     if (!permissionsLoading && currentCompany && !hasPermission('products', 'view')) {
       toast.error("No tienes acceso a los productos de esta empresa");
       console.warn("Usuario sin acceso a empresa", { currentCompany });
     }
-  }, [currentCompany, permissionsLoading, hasPermission]);
+  }, [currentCompany, permissionsLoading, hasPermission, canCreate, canEdit, canDelete, canExport]);
 
   const [searchQuery, setSearchQuery] = useState("");
   const [isDialogOpen, setIsDialogOpen] = useState(false);
   const [editingProduct, setEditingProduct] = useState<any>(null);
+  
+  // Reset form when dialog opens for new product
+  useEffect(() => {
+    if (isDialogOpen && !editingProduct) {
+      console.log('Dialog opened for new product, resetting form');
+      resetForm();
+    }
+  }, [isDialogOpen, editingProduct]);
   const [formData, setFormData] = useState({
     name: "",
     barcode: "",
@@ -397,6 +414,7 @@ export default function Products() {
   });
 
   const resetForm = () => {
+    console.log('Resetting form');
     setFormData({
       name: "",
       barcode: "",
@@ -990,19 +1008,10 @@ export default function Products() {
           {canCreate && (
             <Dialog open={isDialogOpen} onOpenChange={setIsDialogOpen}>
               <DialogTrigger asChild>
-                <TooltipProvider>
-                  <Tooltip>
-                    <TooltipTrigger asChild>
-                      <Button onClick={() => { setEditingProduct(null); resetForm(); }} size="default" className="gap-2">
-                        <Plus className="h-4 w-4" />
-                        Agregar Producto
-                      </Button>
-                    </TooltipTrigger>
-                    <TooltipContent>
-                      <p>Crear un nuevo producto en el inventario</p>
-                    </TooltipContent>
-                  </Tooltip>
-                </TooltipProvider>
+                <Button size="default" className="gap-2">
+                  <Plus className="h-4 w-4" />
+                  Agregar Producto
+                </Button>
               </DialogTrigger>
             <DialogContent className="max-w-3xl max-h-[90vh] overflow-y-auto">
               <DialogHeader>
