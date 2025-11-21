@@ -90,6 +90,8 @@ export function NotificationCenter() {
                   }
                 } else if (notification.type === "overdue_invoice") {
                   navigate("/accounts-receivable");
+                } else if (notification.type === "expiring_check") {
+                  navigate("/checks");
                 }
               }}
             >
