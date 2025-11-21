@@ -1,10 +1,10 @@
 import { useQuery } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
-import { DollarSign, Package, ShoppingCart, TrendingUp, Users, AlertTriangle, BarChart3, Activity, ArrowUpRight } from "lucide-react";
+import { DollarSign, Package, ShoppingCart, TrendingUp, Users, AlertTriangle, BarChart3, Activity, ArrowUpRight, ArrowDownRight, TrendingDown, Calendar } from "lucide-react";
 import { Layout } from "@/components/layout/Layout";
 import { LineChart, Line, BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, Legend } from "recharts";
-import { format, subDays, startOfDay } from "date-fns";
+import { format, subDays, startOfDay, startOfMonth, endOfMonth, subMonths } from "date-fns";
 import { es } from "date-fns/locale";
 import { usePermissions } from "@/hooks/usePermissions";
 import { useCompany } from "@/contexts/CompanyContext";
@@ -16,6 +16,184 @@ export default function Dashboard() {
   const canViewSales = hasPermission("sales", "view");
   const canViewProducts = hasPermission("products", "view");
   const canViewCustomers = hasPermission("customers", "view");
+
+  // Ventas del mes actual vs mes pasado
+  const { data: monthlyComparison } = useQuery({
+    queryKey: ["monthly-comparison", currentCompany?.id],
+    queryFn: async () => {
+      const currentMonthStart = startOfMonth(new Date());
+      const currentMonthEnd = endOfMonth(new Date());
+      const lastMonthStart = startOfMonth(subMonths(new Date(), 1));
+      const lastMonthEnd = endOfMonth(subMonths(new Date(), 1));
+
+      const { data: currentMonth, error: currentError } = await supabase
+        .from("sales")
+        .select("total, sale_items(quantity, unit_price, subtotal)")
+        .eq("company_id", currentCompany?.id)
+        .gte("created_at", currentMonthStart.toISOString())
+        .lte("created_at", currentMonthEnd.toISOString());
+
+      const { data: lastMonth, error: lastError } = await supabase
+        .from("sales")
+        .select("total")
+        .eq("company_id", currentCompany?.id)
+        .gte("created_at", lastMonthStart.toISOString())
+        .lte("created_at", lastMonthEnd.toISOString());
+
+      if (currentError || lastError) throw currentError || lastError;
+
+      const currentTotal = currentMonth?.reduce((acc, sale) => acc + Number(sale.total), 0) || 0;
+      const lastTotal = lastMonth?.reduce((acc, sale) => acc + Number(sale.total), 0) || 0;
+      
+      // Calcular costos para margen bruto
+      let totalCost = 0;
+      currentMonth?.forEach(sale => {
+        sale.sale_items?.forEach((item: any) => {
+          // Estimamos el costo como 60% del precio de venta si no está disponible
+          totalCost += Number(item.subtotal) * 0.6;
+        });
+      });
+      
+      const grossMargin = currentTotal - totalCost;
+      const marginPercentage = currentTotal > 0 ? (grossMargin / currentTotal) * 100 : 0;
+
+      const percentageChange = lastTotal > 0 
+        ? ((currentTotal - lastTotal) / lastTotal) * 100 
+        : 100;
+
+      return {
+        currentMonth: currentTotal,
+        lastMonth: lastTotal,
+        percentageChange,
+        grossMargin,
+        marginPercentage,
+        isPositive: percentageChange >= 0
+      };
+    },
+    enabled: canViewSales && !!currentCompany?.id,
+  });
+
+  // Top 5 productos por rentabilidad
+  const { data: topProfitableProducts } = useQuery({
+    queryKey: ["top-profitable-products", currentCompany?.id],
+    queryFn: async () => {
+      const currentMonthStart = startOfMonth(new Date());
+      
+      const { data: saleItems, error } = await supabase
+        .from("sale_items")
+        .select(`
+          product_id,
+          product_name,
+          quantity,
+          unit_price,
+          subtotal,
+          sales!inner(created_at, company_id)
+        `)
+        .eq("sales.company_id", currentCompany?.id)
+        .gte("sales.created_at", currentMonthStart.toISOString());
+
+      if (error) throw error;
+
+      const productMap = new Map<string, { name: string; revenue: number; quantity: number }>();
+      
+      saleItems?.forEach((item: any) => {
+        const existing = productMap.get(item.product_id) || { name: item.product_name, revenue: 0, quantity: 0 };
+        productMap.set(item.product_id, {
+          name: item.product_name,
+          revenue: existing.revenue + Number(item.subtotal),
+          quantity: existing.quantity + item.quantity
+        });
+      });
+
+      return Array.from(productMap.values())
+        .map(p => ({ 
+          producto: p.name, 
+          rentabilidad: p.revenue,
+          unidades: p.quantity 
+        }))
+        .sort((a, b) => b.rentabilidad - a.rentabilidad)
+        .slice(0, 5);
+    },
+    enabled: canViewSales && canViewProducts && !!currentCompany?.id,
+  });
+
+  // Top 5 clientes que más compran
+  const { data: topCustomers } = useQuery({
+    queryKey: ["top-customers", currentCompany?.id],
+    queryFn: async () => {
+      const currentMonthStart = startOfMonth(new Date());
+      
+      const { data, error } = await supabase
+        .from("sales")
+        .select("customer_id, total, customers(name)")
+        .eq("company_id", currentCompany?.id)
+        .gte("created_at", currentMonthStart.toISOString())
+        .not("customer_id", "is", null);
+
+      if (error) throw error;
+
+      const customerMap = new Map<string, { name: string; total: number; count: number }>();
+      
+      data?.forEach((sale: any) => {
+        const customerId = sale.customer_id;
+        const customerName = sale.customers?.name || "Sin nombre";
+        const existing = customerMap.get(customerId) || { name: customerName, total: 0, count: 0 };
+        customerMap.set(customerId, {
+          name: customerName,
+          total: existing.total + Number(sale.total),
+          count: existing.count + 1
+        });
+      });
+
+      return Array.from(customerMap.values())
+        .map(c => ({ 
+          cliente: c.name, 
+          total: c.total,
+          compras: c.count
+        }))
+        .sort((a, b) => b.total - a.total)
+        .slice(0, 5);
+    },
+    enabled: canViewSales && canViewCustomers && !!currentCompany?.id,
+  });
+
+  // Facturas vencidas y por cobrar
+  const { data: receivables } = useQuery({
+    queryKey: ["receivables", currentCompany?.id],
+    queryFn: async () => {
+      const { data, error } = await supabase
+        .from("customer_account_movements")
+        .select("debit_amount, status, due_date")
+        .eq("company_id", currentCompany?.id)
+        .eq("movement_type", "sale")
+        .in("status", ["pending", "partial"]);
+
+      if (error) throw error;
+
+      const today = new Date();
+      let overdue = 0;
+      let total = 0;
+
+      data?.forEach(movement => {
+        const amount = Number(movement.debit_amount);
+        total += amount;
+        
+        if (movement.due_date && new Date(movement.due_date) < today) {
+          overdue += amount;
+        }
+      });
+
+      const overduePercentage = total > 0 ? (overdue / total) * 100 : 0;
+
+      return {
+        overdue,
+        total,
+        overduePercentage,
+        overdueCount: data?.filter(m => m.due_date && new Date(m.due_date) < new Date()).length || 0
+      };
+    },
+    enabled: canViewSales && !!currentCompany?.id,
+  });
 
   const { data: salesData } = useQuery({
     queryKey: ["sales-stats", currentCompany?.id],
@@ -83,7 +261,6 @@ export default function Dashboard() {
     enabled: canViewProducts && !!currentCompany?.id,
   });
 
-  // Ventas de últimos 7 días
   const { data: salesChart } = useQuery({
     queryKey: ["sales-chart", currentCompany?.id],
     queryFn: async () => {
@@ -117,32 +294,6 @@ export default function Dashboard() {
     enabled: canViewSales && !!currentCompany?.id,
   });
 
-  // Top 5 productos más vendidos
-  const { data: topProducts } = useQuery({
-    queryKey: ["top-products", currentCompany?.id],
-    queryFn: async () => {
-      const { data, error } = await supabase
-        .from("sale_items")
-        .select("product_name, quantity, sales!inner(company_id)")
-        .eq("sales.company_id", currentCompany?.id);
-
-      if (error) throw error;
-
-      const productMap = new Map<string, number>();
-      data?.forEach(item => {
-        const current = productMap.get(item.product_name) || 0;
-        productMap.set(item.product_name, current + item.quantity);
-      });
-
-      return Array.from(productMap.entries())
-        .map(([name, quantity]) => ({ producto: name, vendidos: quantity }))
-        .sort((a, b) => b.vendidos - a.vendidos)
-        .slice(0, 5);
-    },
-    enabled: canViewSales && canViewProducts && !!currentCompany?.id,
-  });
-
-  // Productos con stock crítico
   const { data: criticalStock } = useQuery({
     queryKey: ["critical-stock-list", currentCompany?.id],
     queryFn: async () => {
@@ -159,49 +310,6 @@ export default function Dashboard() {
     },
     enabled: canViewProducts && !!currentCompany?.id,
   });
-
-  const stats = [
-    canViewSales && {
-      title: "Ventas de Hoy",
-      value: `$${salesData?.today.toFixed(2) || "0.00"}`,
-      icon: DollarSign,
-      description: "Ingresos del día actual",
-      color: "text-green-600 dark:text-green-500",
-      bgColor: "bg-green-500/10",
-      borderColor: "border-green-500/20",
-      trend: salesData?.today > 0 ? "+100%" : "0%",
-    },
-    canViewSales && {
-      title: "Ventas Totales",
-      value: salesData?.count || 0,
-      icon: ShoppingCart,
-      description: "Transacciones registradas",
-      color: "text-blue-600 dark:text-blue-500",
-      bgColor: "bg-blue-500/10",
-      borderColor: "border-blue-500/20",
-      trend: null,
-    },
-    canViewProducts && {
-      title: "Productos",
-      value: productsCount || 0,
-      icon: Package,
-      description: `${lowStockProducts || 0} con stock bajo`,
-      color: "text-purple-600 dark:text-purple-500",
-      bgColor: "bg-purple-500/10",
-      borderColor: "border-purple-500/20",
-      alert: lowStockProducts > 0,
-    },
-    canViewCustomers && {
-      title: "Clientes",
-      value: customersCount || 0,
-      icon: Users,
-      description: "Clientes registrados",
-      color: "text-orange-600 dark:text-orange-500",
-      bgColor: "bg-orange-500/10",
-      borderColor: "border-orange-500/20",
-      trend: null,
-    },
-  ].filter(Boolean);
 
   if (loading) {
     return (
@@ -233,199 +341,272 @@ export default function Dashboard() {
     <Layout>
       <div className="space-y-8">
         <div>
-          <h1 className="text-3xl font-bold text-foreground">Dashboard</h1>
-          <p className="text-muted-foreground">Vista general del negocio</p>
+          <h1 className="text-3xl font-bold text-foreground">Salud del Negocio</h1>
+          <p className="text-muted-foreground">KPIs y métricas clave para tomar decisiones</p>
         </div>
 
-        {stats.length > 0 && (
-          <div className="grid gap-6 md:grid-cols-2 lg:grid-cols-4">
-            {stats.map((stat) => (
-              <Card key={stat.title} className={`shadow-soft hover:shadow-lg transition-all overflow-hidden border-l-4 ${stat.borderColor}`}>
-                <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-                  <CardTitle className="text-sm font-medium text-muted-foreground">
-                    {stat.title}
-                  </CardTitle>
-                  <div className={`p-2.5 rounded-lg ${stat.bgColor}`}>
-                    <stat.icon className={`h-5 w-5 ${stat.color}`} />
-                  </div>
-                </CardHeader>
-                <CardContent className="space-y-2">
-                  <div className="flex items-baseline gap-2">
-                    <div className="text-3xl font-bold text-foreground">{stat.value}</div>
-                    {stat.trend && (
-                      <Badge variant="outline" className="bg-green-500/10 text-green-700 dark:text-green-400 border-green-500/30 flex items-center gap-1">
-                        <ArrowUpRight className="h-3 w-3" />
-                        {stat.trend}
-                      </Badge>
-                    )}
-                    {stat.alert && (
-                      <Badge variant="outline" className="bg-red-500/10 text-red-700 dark:text-red-400 border-red-500/30 flex items-center gap-1">
-                        <AlertTriangle className="h-3 w-3" />
-                        Alerta
-                      </Badge>
-                    )}
-                  </div>
-                  <p className="text-xs text-muted-foreground">
-                    {stat.description}
-                  </p>
-                </CardContent>
-              </Card>
-            ))}
-          </div>
-        )}
-
         {canViewSales && (
-          <>
-            <Card className="shadow-soft border-l-4 border-green-500/30">
-              <CardHeader>
-                <div className="flex items-center justify-between">
-                  <CardTitle className="flex items-center gap-2">
-                    <div className="p-2 bg-green-500/10 rounded-lg">
-                      <Activity className="h-5 w-5 text-green-600 dark:text-green-500" />
-                    </div>
-                    Resumen de Ventas
-                  </CardTitle>
+          <div className="grid gap-6 md:grid-cols-2 lg:grid-cols-4">
+            <Card className="shadow-soft hover:shadow-lg transition-all overflow-hidden border-l-4 border-blue-500/30">
+              <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+                <CardTitle className="text-sm font-medium text-muted-foreground">
+                  Ventas del Mes
+                </CardTitle>
+                <div className="p-2.5 rounded-lg bg-blue-500/10">
+                  <Calendar className="h-5 w-5 text-blue-600 dark:text-blue-500" />
+                </div>
+              </CardHeader>
+              <CardContent className="space-y-2">
+                <div className="flex items-baseline gap-2">
+                  <div className="text-3xl font-bold text-foreground">
+                    ${monthlyComparison?.currentMonth.toFixed(0) || "0"}
+                  </div>
+                  {monthlyComparison && (
+                    <Badge 
+                      variant="outline" 
+                      className={`${
+                        monthlyComparison.isPositive 
+                          ? "bg-green-500/10 text-green-700 dark:text-green-400 border-green-500/30" 
+                          : "bg-red-500/10 text-red-700 dark:text-red-400 border-red-500/30"
+                      } flex items-center gap-1`}
+                    >
+                      {monthlyComparison.isPositive ? (
+                        <ArrowUpRight className="h-3 w-3" />
+                      ) : (
+                        <ArrowDownRight className="h-3 w-3" />
+                      )}
+                      {Math.abs(monthlyComparison.percentageChange).toFixed(1)}%
+                    </Badge>
+                  )}
+                </div>
+                <p className="text-xs text-muted-foreground">
+                  vs mes pasado: ${monthlyComparison?.lastMonth.toFixed(0) || "0"}
+                </p>
+              </CardContent>
+            </Card>
+
+            <Card className="shadow-soft hover:shadow-lg transition-all overflow-hidden border-l-4 border-green-500/30">
+              <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+                <CardTitle className="text-sm font-medium text-muted-foreground">
+                  Margen Bruto
+                </CardTitle>
+                <div className="p-2.5 rounded-lg bg-green-500/10">
+                  <TrendingUp className="h-5 w-5 text-green-600 dark:text-green-500" />
+                </div>
+              </CardHeader>
+              <CardContent className="space-y-2">
+                <div className="flex items-baseline gap-2">
+                  <div className="text-3xl font-bold text-foreground">
+                    ${monthlyComparison?.grossMargin.toFixed(0) || "0"}
+                  </div>
                   <Badge variant="outline" className="bg-green-500/10 text-green-700 dark:text-green-400 border-green-500/30">
-                    Últimos 30 días
+                    {monthlyComparison?.marginPercentage.toFixed(1)}%
                   </Badge>
                 </div>
-              </CardHeader>
-              <CardContent>
-                <div className="grid grid-cols-2 gap-6">
-                  <div className="space-y-2">
-                    <span className="text-sm text-muted-foreground">Total Acumulado</span>
-                    <div className="flex items-baseline gap-2">
-                      <span className="text-3xl font-bold text-green-600 dark:text-green-500">
-                        ${salesData?.total.toFixed(2) || "0.00"}
-                      </span>
-                    </div>
-                  </div>
-                  <div className="space-y-2">
-                    <span className="text-sm text-muted-foreground">Promedio por Venta</span>
-                    <div className="flex items-baseline gap-2">
-                      <span className="text-3xl font-bold text-blue-600 dark:text-blue-500">
-                        ${salesData?.count ? (salesData.total / salesData.count).toFixed(2) : "0.00"}
-                      </span>
-                    </div>
-                  </div>
-                </div>
+                <p className="text-xs text-muted-foreground">
+                  Rentabilidad del mes
+                </p>
               </CardContent>
             </Card>
 
-            <Card className="shadow-soft">
-              <CardHeader>
-                <CardTitle className="flex items-center gap-2">
-                  <div className="p-2 bg-blue-500/10 rounded-lg">
-                    <BarChart3 className="h-5 w-5 text-blue-600 dark:text-blue-500" />
-                  </div>
-                  Ventas de los Últimos 7 Días
+            <Card className="shadow-soft hover:shadow-lg transition-all overflow-hidden border-l-4 border-orange-500/30">
+              <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+                <CardTitle className="text-sm font-medium text-muted-foreground">
+                  Por Cobrar
                 </CardTitle>
+                <div className="p-2.5 rounded-lg bg-orange-500/10">
+                  <DollarSign className="h-5 w-5 text-orange-600 dark:text-orange-500" />
+                </div>
               </CardHeader>
-              <CardContent>
-                <ResponsiveContainer width="100%" height={300}>
-                  <LineChart data={salesChart}>
-                    <CartesianGrid strokeDasharray="3 3" className="stroke-muted" />
-                    <XAxis dataKey="date" className="text-sm" />
-                    <YAxis className="text-sm" />
-                    <Tooltip 
-                      contentStyle={{ 
-                        backgroundColor: 'hsl(var(--card))', 
-                        border: '1px solid hsl(var(--border))',
-                        borderRadius: '8px'
-                      }}
-                      formatter={(value: number) => [`$${value.toFixed(2)}`, 'Ventas']}
-                    />
-                    <Line 
-                      type="monotone" 
-                      dataKey="ventas" 
-                      stroke="hsl(var(--primary))" 
-                      strokeWidth={2}
-                      dot={{ fill: 'hsl(var(--primary))', r: 4 }}
-                      activeDot={{ r: 6 }}
-                    />
-                  </LineChart>
-                </ResponsiveContainer>
+              <CardContent className="space-y-2">
+                <div className="flex items-baseline gap-2">
+                  <div className="text-3xl font-bold text-foreground">
+                    ${receivables?.total.toFixed(0) || "0"}
+                  </div>
+                  {receivables && receivables.overduePercentage > 0 && (
+                    <Badge variant="outline" className="bg-red-500/10 text-red-700 dark:text-red-400 border-red-500/30">
+                      {receivables.overduePercentage.toFixed(0)}% vencido
+                    </Badge>
+                  )}
+                </div>
+                <p className="text-xs text-muted-foreground">
+                  Vencidas: ${receivables?.overdue.toFixed(0) || "0"} ({receivables?.overdueCount || 0} facturas)
+                </p>
               </CardContent>
             </Card>
-          </>
+
+            <Card className="shadow-soft hover:shadow-lg transition-all overflow-hidden border-l-4 border-purple-500/30">
+              <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+                <CardTitle className="text-sm font-medium text-muted-foreground">
+                  Ventas de Hoy
+                </CardTitle>
+                <div className="p-2.5 rounded-lg bg-purple-500/10">
+                  <Activity className="h-5 w-5 text-purple-600 dark:text-purple-500" />
+                </div>
+              </CardHeader>
+              <CardContent className="space-y-2">
+                <div className="flex items-baseline gap-2">
+                  <div className="text-3xl font-bold text-foreground">
+                    ${salesData?.today.toFixed(0) || "0"}
+                  </div>
+                </div>
+                <p className="text-xs text-muted-foreground">
+                  Ingresos del día actual
+                </p>
+              </CardContent>
+            </Card>
+          </div>
         )}
 
         <div className="grid gap-6 lg:grid-cols-2">
           {canViewSales && canViewProducts && (
-            <Card className="shadow-soft border-l-4 border-purple-500/30">
-              <CardHeader>
-                <CardTitle className="flex items-center gap-2">
-                  <div className="p-2 bg-purple-500/10 rounded-lg">
-                    <Package className="h-5 w-5 text-purple-600 dark:text-purple-500" />
-                  </div>
-                  Top 5 Productos Más Vendidos
-                </CardTitle>
-              </CardHeader>
-              <CardContent>
-                <ResponsiveContainer width="100%" height={300}>
-                  <BarChart data={topProducts} layout="vertical">
-                    <CartesianGrid strokeDasharray="3 3" className="stroke-muted" />
-                    <XAxis type="number" className="text-sm" />
-                    <YAxis dataKey="producto" type="category" width={100} className="text-xs" />
-                    <Tooltip 
-                      contentStyle={{ 
-                        backgroundColor: 'hsl(var(--card))', 
-                        border: '1px solid hsl(var(--border))',
-                        borderRadius: '8px'
-                      }}
-                      formatter={(value: number) => [value, 'Unidades']}
-                    />
-                    <Bar 
-                      dataKey="vendidos" 
-                      fill="rgb(147 51 234)" 
-                      radius={[0, 8, 8, 0]}
-                    />
-                  </BarChart>
-                </ResponsiveContainer>
-              </CardContent>
-            </Card>
-          )}
+            <>
+              <Card className="shadow-soft border-l-4 border-purple-500/30">
+                <CardHeader>
+                  <CardTitle className="flex items-center gap-2">
+                    <div className="p-2 bg-purple-500/10 rounded-lg">
+                      <TrendingUp className="h-5 w-5 text-purple-600 dark:text-purple-500" />
+                    </div>
+                    Top 5 Productos por Rentabilidad
+                  </CardTitle>
+                </CardHeader>
+                <CardContent>
+                  <ResponsiveContainer width="100%" height={300}>
+                    <BarChart data={topProfitableProducts} layout="vertical">
+                      <CartesianGrid strokeDasharray="3 3" className="stroke-muted" />
+                      <XAxis type="number" className="text-sm" />
+                      <YAxis dataKey="producto" type="category" width={100} className="text-xs" />
+                      <Tooltip 
+                        contentStyle={{ 
+                          backgroundColor: 'hsl(var(--card))', 
+                          border: '1px solid hsl(var(--border))',
+                          borderRadius: '8px'
+                        }}
+                        formatter={(value: number) => [`$${value.toFixed(2)}`, 'Rentabilidad']}
+                      />
+                      <Bar 
+                        dataKey="rentabilidad" 
+                        fill="rgb(147 51 234)" 
+                        radius={[0, 8, 8, 0]}
+                      />
+                    </BarChart>
+                  </ResponsiveContainer>
+                </CardContent>
+              </Card>
 
-          {canViewProducts && (
-            <Card className="shadow-soft border-l-4 border-red-500/30">
-              <CardHeader>
-                <CardTitle className="flex items-center gap-2">
-                  <div className="p-2 bg-red-500/10 rounded-lg">
-                    <AlertTriangle className="h-5 w-5 text-red-600 dark:text-red-500" />
-                  </div>
-                  Alertas de Stock Bajo
-                </CardTitle>
-              </CardHeader>
-              <CardContent>
-                <div className="space-y-3">
-                  {criticalStock?.length === 0 ? (
-                    <p className="text-sm text-muted-foreground text-center py-8">
-                      ✅ No hay productos con stock crítico
-                    </p>
-                  ) : (
-                    criticalStock?.map((product, index) => (
-                      <div 
-                        key={index}
-                        className="flex items-center justify-between p-3 rounded-lg bg-warning/5 border border-warning/20"
-                      >
-                        <div className="flex-1">
-                          <p className="font-medium text-sm text-foreground">{product.name}</p>
-                          <p className="text-xs text-muted-foreground">
-                            Stock mínimo: {product.min_stock}
-                          </p>
-                        </div>
-                        <div className="text-right">
-                          <p className="text-2xl font-bold text-warning">{product.stock}</p>
-                          <p className="text-xs text-muted-foreground">unidades</p>
-                        </div>
-                      </div>
-                    ))
-                  )}
-                </div>
-              </CardContent>
-            </Card>
+              <Card className="shadow-soft border-l-4 border-blue-500/30">
+                <CardHeader>
+                  <CardTitle className="flex items-center gap-2">
+                    <div className="p-2 bg-blue-500/10 rounded-lg">
+                      <Users className="h-5 w-5 text-blue-600 dark:text-blue-500" />
+                    </div>
+                    Top 5 Clientes del Mes
+                  </CardTitle>
+                </CardHeader>
+                <CardContent>
+                  <ResponsiveContainer width="100%" height={300}>
+                    <BarChart data={topCustomers} layout="vertical">
+                      <CartesianGrid strokeDasharray="3 3" className="stroke-muted" />
+                      <XAxis type="number" className="text-sm" />
+                      <YAxis dataKey="cliente" type="category" width={100} className="text-xs" />
+                      <Tooltip 
+                        contentStyle={{ 
+                          backgroundColor: 'hsl(var(--card))', 
+                          border: '1px solid hsl(var(--border))',
+                          borderRadius: '8px'
+                        }}
+                        formatter={(value: number) => [`$${value.toFixed(2)}`, 'Total Comprado']}
+                      />
+                      <Bar 
+                        dataKey="total" 
+                        fill="rgb(59 130 246)" 
+                        radius={[0, 8, 8, 0]}
+                      />
+                    </BarChart>
+                  </ResponsiveContainer>
+                </CardContent>
+              </Card>
+            </>
           )}
         </div>
+
+        {canViewSales && (
+          <Card className="shadow-soft">
+            <CardHeader>
+              <CardTitle className="flex items-center gap-2">
+                <div className="p-2 bg-blue-500/10 rounded-lg">
+                  <BarChart3 className="h-5 w-5 text-blue-600 dark:text-blue-500" />
+                </div>
+                Ventas de los Últimos 7 Días
+              </CardTitle>
+            </CardHeader>
+            <CardContent>
+              <ResponsiveContainer width="100%" height={300}>
+                <LineChart data={salesChart}>
+                  <CartesianGrid strokeDasharray="3 3" className="stroke-muted" />
+                  <XAxis dataKey="date" className="text-sm" />
+                  <YAxis className="text-sm" />
+                  <Tooltip 
+                    contentStyle={{ 
+                      backgroundColor: 'hsl(var(--card))', 
+                      border: '1px solid hsl(var(--border))',
+                      borderRadius: '8px'
+                    }}
+                    formatter={(value: number) => [`$${value.toFixed(2)}`, 'Ventas']}
+                  />
+                  <Line 
+                    type="monotone" 
+                    dataKey="ventas" 
+                    stroke="hsl(var(--primary))" 
+                    strokeWidth={2}
+                    dot={{ fill: 'hsl(var(--primary))', r: 4 }}
+                    activeDot={{ r: 6 }}
+                  />
+                </LineChart>
+              </ResponsiveContainer>
+            </CardContent>
+          </Card>
+        )}
+
+        {canViewProducts && (
+          <Card className="shadow-soft border-l-4 border-red-500/30">
+            <CardHeader>
+              <CardTitle className="flex items-center gap-2">
+                <div className="p-2 bg-red-500/10 rounded-lg">
+                  <AlertTriangle className="h-5 w-5 text-red-600 dark:text-red-500" />
+                </div>
+                Alertas de Stock Bajo
+              </CardTitle>
+            </CardHeader>
+            <CardContent>
+              <div className="space-y-3">
+                {criticalStock?.length === 0 ? (
+                  <p className="text-sm text-muted-foreground text-center py-8">
+                    ✅ No hay productos con stock crítico
+                  </p>
+                ) : (
+                  criticalStock?.map((product, index) => (
+                    <div 
+                      key={index}
+                      className="flex items-center justify-between p-3 rounded-lg bg-warning/5 border border-warning/20"
+                    >
+                      <div className="flex-1">
+                        <p className="font-medium text-sm text-foreground">{product.name}</p>
+                        <p className="text-xs text-muted-foreground">
+                          Stock mínimo: {product.min_stock}
+                        </p>
+                      </div>
+                      <div className="text-right">
+                        <p className="text-2xl font-bold text-warning">{product.stock}</p>
+                        <p className="text-xs text-muted-foreground">unidades</p>
+                      </div>
+                    </div>
+                  ))
+                )}
+              </div>
+            </CardContent>
+          </Card>
+        )}
       </div>
     </Layout>
   );
