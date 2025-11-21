@@ -6,7 +6,8 @@ import { Button } from "@/components/ui/button";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { useQuery } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
-import { Search, Receipt, Eye, Printer, Truck, AlertCircle, CheckCircle2, Info, CreditCard, Wallet } from "lucide-react";
+import { Search, Receipt, Eye, Printer, Truck, AlertCircle, CheckCircle2, Info, CreditCard, Wallet, User, FileText, RotateCcw } from "lucide-react";
+import { useNavigate } from "react-router-dom";
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip";
 import { Badge } from "@/components/ui/badge";
 import { format } from "date-fns";
@@ -21,6 +22,7 @@ import { useCompany } from "@/contexts/CompanyContext";
 
 export default function Sales() {
   const { currentCompany } = useCompany();
+  const navigate = useNavigate();
   const [searchQuery, setSearchQuery] = useState("");
   const [selectedSale, setSelectedSale] = useState<any>(null);
   const [isDetailOpen, setIsDetailOpen] = useState(false);
@@ -283,6 +285,38 @@ export default function Sales() {
                             <TooltipContent>Ver detalle</TooltipContent>
                           </Tooltip>
                         </TooltipProvider>
+                        {sale.customer_id && (
+                          <>
+                            <TooltipProvider>
+                              <Tooltip>
+                                <TooltipTrigger asChild>
+                                  <Button 
+                                    size="icon" 
+                                    variant="ghost"
+                                    onClick={(e) => { e.stopPropagation(); navigate(`/customers?id=${sale.customer_id}`); }}
+                                  >
+                                    <User className="h-4 w-4" />
+                                  </Button>
+                                </TooltipTrigger>
+                                <TooltipContent>Ver cliente</TooltipContent>
+                              </Tooltip>
+                            </TooltipProvider>
+                            <TooltipProvider>
+                              <Tooltip>
+                                <TooltipTrigger asChild>
+                                  <Button 
+                                    size="icon" 
+                                    variant="ghost"
+                                    onClick={(e) => { e.stopPropagation(); navigate(`/customer-account?customer=${sale.customer_id}`); }}
+                                  >
+                                    <FileText className="h-4 w-4" />
+                                  </Button>
+                                </TooltipTrigger>
+                                <TooltipContent>Ver cuenta corriente</TooltipContent>
+                              </Tooltip>
+                            </TooltipProvider>
+                          </>
+                        )}
                         <TooltipProvider>
                           <Tooltip>
                             <TooltipTrigger asChild>
@@ -468,9 +502,31 @@ export default function Sales() {
                   </Card>
                 )}
 
-                <div className="flex justify-end gap-2">
-                  <Button variant="outline" onClick={() => setIsDetailOpen(false)}>
-                    Cerrar
+                <div className="flex justify-end gap-2 flex-wrap">
+                  {saleDetails.customer_id && (
+                    <>
+                      <Button 
+                        variant="outline" 
+                        onClick={() => navigate(`/customers?id=${saleDetails.customer_id}`)}
+                      >
+                        <User className="mr-2 h-4 w-4" />
+                        Ver Cliente
+                      </Button>
+                      <Button 
+                        variant="outline" 
+                        onClick={() => navigate(`/customer-account?customer=${saleDetails.customer_id}`)}
+                      >
+                        <FileText className="mr-2 h-4 w-4" />
+                        Cuenta Corriente
+                      </Button>
+                    </>
+                  )}
+                  <Button 
+                    variant="outline" 
+                    onClick={() => navigate(`/returns?sale=${saleDetails.id}`)}
+                  >
+                    <RotateCcw className="mr-2 h-4 w-4" />
+                    Crear Nota de Crédito
                   </Button>
                   <Button 
                     variant="outline" 
@@ -486,6 +542,9 @@ export default function Sales() {
                   <Button onClick={() => handlePrintReceipt(saleDetails)}>
                     <Printer className="mr-2 h-4 w-4" />
                     Imprimir Ticket
+                  </Button>
+                  <Button variant="outline" onClick={() => setIsDetailOpen(false)}>
+                    Cerrar
                   </Button>
                 </div>
               </div>
