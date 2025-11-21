@@ -52,9 +52,11 @@ export default function CompanySetup() {
 
       toast.success("Empresa creada exitosamente");
       
-      // Redirect to home
-      navigate("/");
-      window.location.reload(); // Reload to refresh company context
+      // Wait a bit for company_users to be created, then redirect
+      setTimeout(() => {
+        navigate("/");
+        window.location.reload();
+      }, 500);
     } catch (error: any) {
       console.error("Error creating company:", error);
       toast.error(error.message || "Error al crear la empresa");

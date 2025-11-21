@@ -66,11 +66,8 @@ export default function Auth() {
 
       if (error) throw error;
       
-      // Give CompanyContext time to load user companies before navigating
       toast.success("Sesión iniciada correctamente");
-      setTimeout(() => {
-        navigate("/");
-      }, 800);
+      navigate("/");
     } catch (error: any) {
       if (error instanceof z.ZodError) {
         toast.error(error.errors[0].message);
@@ -105,22 +102,18 @@ export default function Auth() {
       if (error) throw error;
       
       if (data.user) {
-        // Check if user already has a company assigned (invited employee)
-        const { data: companyUsers } = await supabase
-          .from('company_users')
-          .select('company_id')
-          .eq('user_id', data.user.id)
-          .eq('active', true)
-          .limit(1);
-
-        if (companyUsers && companyUsers.length > 0) {
-          // User is an invited employee, go directly to dashboard
-          toast.success("¡Cuenta creada! Redirigiendo a tu empresa...");
+        // Check user metadata to see if they were invited to a company
+        const invitedToCompany = data.user.user_metadata?.invited_to_company;
+        
+        if (invitedToCompany) {
+          // User was invited - they should already have company_users entry
+          // Let CompanyContext handle loading, just redirect
+          toast.success("¡Cuenta confirmada! Redirigiendo...");
           setTimeout(() => {
             navigate("/");
-          }, 1500);
+          }, 1000);
         } else {
-          // New user without company, show welcome modal
+          // New user not invited - needs to create company
           setShowWelcomeModal(true);
         }
       } else {
