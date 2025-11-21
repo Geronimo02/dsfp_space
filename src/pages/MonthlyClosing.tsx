@@ -14,6 +14,7 @@ import { Check, Calendar as CalendarIcon, Download, FileText, ShoppingCart, Rece
 import { format, startOfMonth, endOfMonth } from "date-fns";
 import { es } from "date-fns/locale";
 import { cn } from "@/lib/utils";
+import { toast } from "sonner";
 
 type Step = {
   id: number;
@@ -64,6 +65,176 @@ const MonthlyClosing = () => {
     },
     enabled: !!currentCompany?.id,
   });
+
+  const { data: expensesData } = useQuery({
+    queryKey: ["monthly-expenses", currentCompany?.id, monthStart, monthEnd],
+    queryFn: async () => {
+      const { data, error } = await supabase
+        .from("expenses")
+        .select("*")
+        .eq("company_id", currentCompany?.id)
+        .gte("created_at", monthStart.toISOString())
+        .lte("created_at", monthEnd.toISOString());
+      
+      if (error) throw error;
+      return data;
+    },
+    enabled: !!currentCompany?.id,
+  });
+
+  const { data: cashMovementsData } = useQuery({
+    queryKey: ["monthly-cash", currentCompany?.id, monthStart, monthEnd],
+    queryFn: async () => {
+      const { data, error } = await supabase
+        .from("cash_movements")
+        .select("*")
+        .eq("company_id", currentCompany?.id)
+        .gte("created_at", monthStart.toISOString())
+        .lte("created_at", monthEnd.toISOString());
+      
+      if (error) throw error;
+      return data;
+    },
+    enabled: !!currentCompany?.id,
+  });
+
+  const downloadCSV = (filename: string, data: string) => {
+    const blob = new Blob([data], { type: "text/csv;charset=utf-8;" });
+    const link = document.createElement("a");
+    link.href = URL.createObjectURL(blob);
+    link.download = filename;
+    link.click();
+  };
+
+  const downloadIVASales = () => {
+    if (!salesData) return;
+    
+    const csv = [
+      ["Fecha", "Número", "Cliente", "Subtotal", "IVA", "Total"].join(","),
+      ...salesData.map(sale => [
+        format(new Date(sale.created_at), "dd/MM/yyyy"),
+        sale.sale_number,
+        sale.customer_id,
+        sale.subtotal.toFixed(2),
+        (sale.tax || 0).toFixed(2),
+        sale.total.toFixed(2)
+      ].join(","))
+    ].join("\n");
+    
+    downloadCSV(`libro-iva-ventas-${format(selectedMonth, "yyyy-MM")}.csv`, csv);
+    toast.success("Libro IVA Ventas descargado");
+  };
+
+  const downloadIVAPurchases = () => {
+    if (!purchasesData) return;
+    
+    const csv = [
+      ["Fecha", "Número", "Proveedor", "Subtotal", "IVA", "Total"].join(","),
+      ...purchasesData.map(purchase => [
+        format(new Date(purchase.created_at), "dd/MM/yyyy"),
+        purchase.purchase_number,
+        purchase.supplier_id,
+        purchase.subtotal.toFixed(2),
+        (purchase.tax || 0).toFixed(2),
+        purchase.total.toFixed(2)
+      ].join(","))
+    ].join("\n");
+    
+    downloadCSV(`libro-iva-compras-${format(selectedMonth, "yyyy-MM")}.csv`, csv);
+    toast.success("Libro IVA Compras descargado");
+  };
+
+  const downloadMonthlySummary = () => {
+    const csv = [
+      ["Concepto", "Cantidad", "Monto"].join(","),
+      ["Ventas", salesData?.length || 0, totalSales.toFixed(2)].join(","),
+      ["Compras", purchasesData?.length || 0, totalPurchases.toFixed(2)].join(","),
+      ["IVA Débito Fiscal", "", salesTax.toFixed(2)].join(","),
+      ["IVA Crédito Fiscal", "", purchasesTax.toFixed(2)].join(","),
+      ["IVA a Pagar", "", (salesTax - purchasesTax).toFixed(2)].join(",")
+    ].join("\n");
+    
+    downloadCSV(`resumen-mensual-${format(selectedMonth, "yyyy-MM")}.csv`, csv);
+    toast.success("Resumen mensual descargado");
+  };
+
+  const downloadSalesDetail = () => {
+    if (!salesData) return;
+    
+    const csv = [
+      ["Fecha", "Número", "Cliente", "Items", "Subtotal", "IVA", "Total", "Método Pago"].join(","),
+      ...salesData.map(sale => [
+        format(new Date(sale.created_at), "dd/MM/yyyy"),
+        sale.sale_number,
+        sale.customer_id,
+        sale.sale_items?.length || 0,
+        sale.subtotal.toFixed(2),
+        (sale.tax || 0).toFixed(2),
+        sale.total.toFixed(2),
+        sale.payment_method
+      ].join(","))
+    ].join("\n");
+    
+    downloadCSV(`detalle-ventas-${format(selectedMonth, "yyyy-MM")}.csv`, csv);
+    toast.success("Detalle de ventas descargado");
+  };
+
+  const downloadPurchasesDetail = () => {
+    if (!purchasesData) return;
+    
+    const csv = [
+      ["Fecha", "Número", "Proveedor", "Items", "Subtotal", "IVA", "Total"].join(","),
+      ...purchasesData.map(purchase => [
+        format(new Date(purchase.created_at), "dd/MM/yyyy"),
+        purchase.purchase_number,
+        purchase.supplier_id,
+        purchase.purchase_items?.length || 0,
+        purchase.subtotal.toFixed(2),
+        (purchase.tax || 0).toFixed(2),
+        purchase.total.toFixed(2)
+      ].join(","))
+    ].join("\n");
+    
+    downloadCSV(`detalle-compras-${format(selectedMonth, "yyyy-MM")}.csv`, csv);
+    toast.success("Detalle de compras descargado");
+  };
+
+  const downloadCashMovements = () => {
+    if (!cashMovementsData) return;
+    
+    const csv = [
+      ["Fecha", "Tipo", "Categoría", "Descripción", "Monto"].join(","),
+      ...cashMovementsData.map(movement => [
+        format(new Date(movement.created_at), "dd/MM/yyyy"),
+        movement.type,
+        movement.category,
+        movement.description || "",
+        movement.amount.toFixed(2)
+      ].join(","))
+    ].join("\n");
+    
+    downloadCSV(`movimientos-caja-${format(selectedMonth, "yyyy-MM")}.csv`, csv);
+    toast.success("Movimientos de caja descargados");
+  };
+
+  const downloadExpenses = () => {
+    if (!expensesData) return;
+    
+    const csv = [
+      ["Fecha", "Número", "Descripción", "Categoría", "Monto", "Método Pago"].join(","),
+      ...expensesData.map(expense => [
+        format(new Date(expense.created_at), "dd/MM/yyyy"),
+        expense.expense_number,
+        expense.description,
+        expense.category_id || "",
+        expense.amount.toFixed(2),
+        expense.payment_method
+      ].join(","))
+    ].join("\n");
+    
+    downloadCSV(`gastos-${format(selectedMonth, "yyyy-MM")}.csv`, csv);
+    toast.success("Gastos descargados");
+  };
 
   const toggleStep = (stepId: number) => {
     setCompletedSteps((prev) => {
@@ -223,11 +394,11 @@ const MonthlyClosing = () => {
           </div>
 
           <div className="flex items-center justify-between pt-4">
-            <Button variant="outline">
+            <Button variant="outline" onClick={downloadIVASales}>
               <Download className="h-4 w-4 mr-2" />
               Descargar Libro IVA Ventas
             </Button>
-            <Button variant="outline">
+            <Button variant="outline" onClick={downloadIVAPurchases}>
               <Download className="h-4 w-4 mr-2" />
               Descargar Libro IVA Compras
             </Button>
@@ -266,27 +437,27 @@ const MonthlyClosing = () => {
       </CardHeader>
       <CardContent className="space-y-4">
         <div className="space-y-2">
-          <Button variant="outline" className="w-full justify-start">
+          <Button variant="outline" className="w-full justify-start" onClick={downloadMonthlySummary}>
             <Download className="h-4 w-4 mr-2" />
             Resumen Mensual Completo
           </Button>
-          <Button variant="outline" className="w-full justify-start">
+          <Button variant="outline" className="w-full justify-start" onClick={downloadSalesDetail}>
             <Download className="h-4 w-4 mr-2" />
             Detalle de Ventas
           </Button>
-          <Button variant="outline" className="w-full justify-start">
+          <Button variant="outline" className="w-full justify-start" onClick={downloadPurchasesDetail}>
             <Download className="h-4 w-4 mr-2" />
             Detalle de Compras
           </Button>
-          <Button variant="outline" className="w-full justify-start">
+          <Button variant="outline" className="w-full justify-start" onClick={downloadCashMovements}>
             <Download className="h-4 w-4 mr-2" />
             Movimientos de Caja
           </Button>
-          <Button variant="outline" className="w-full justify-start">
+          <Button variant="outline" className="w-full justify-start" onClick={downloadSalesDetail}>
             <Download className="h-4 w-4 mr-2" />
             Cuentas Corrientes Clientes
           </Button>
-          <Button variant="outline" className="w-full justify-start">
+          <Button variant="outline" className="w-full justify-start" onClick={downloadExpenses}>
             <Download className="h-4 w-4 mr-2" />
             Gastos del Período
           </Button>
