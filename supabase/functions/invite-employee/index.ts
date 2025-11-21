@@ -4,6 +4,7 @@ import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
 // Restrict CORS to specific domains for security
 const ALLOWED_ORIGINS = [
   "https://5670e5fc-c3f6-4b61-9f11-214ae88eb9ef.lovableproject.com",
+  "https://preview--dsfp-space.lovable.app",
   "http://localhost:5173"
 ];
 
