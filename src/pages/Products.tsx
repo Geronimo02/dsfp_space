@@ -418,11 +418,25 @@ export default function Products() {
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
     
+    console.log('=== SUBMIT INICIADO ===');
+    console.log('formData:', formData);
+    console.log('currentCompany:', currentCompany);
+    console.log('imageFile:', imageFile);
+    
     try {
       if (!currentCompany?.id) {
+        console.error('No hay empresa seleccionada');
         toast.error("No hay empresa seleccionada. Selecciona una empresa antes de crear productos.");
         return;
       }
+      
+      // Validate required fields
+      if (!formData.name || !formData.price || !formData.stock) {
+        console.error('Faltan campos requeridos:', { name: formData.name, price: formData.price, stock: formData.stock });
+        toast.error("Por favor completa todos los campos requeridos: Nombre, Precio y Stock");
+        return;
+      }
+      
       // Validate warehouse distribution if provided
       if (warehouseStockData["new"]) {
         const totalDistributed = Object.values(warehouseStockData["new"]).reduce((sum, val) => sum + (val || 0), 0);
@@ -434,6 +448,7 @@ export default function Products() {
         }
       }
 
+      console.log('Validando con Zod...');
       const validatedData = productSchema.parse({
         name: formData.name,
         price: parseFloat(formData.price),
@@ -447,6 +462,8 @@ export default function Products() {
         batch_number: formData.batch_number || undefined,
         expiration_date: formData.expiration_date || undefined,
       });
+      
+      console.log('Validación exitosa:', validatedData);
 
       const productData = {
         name: validatedData.name,
@@ -464,14 +481,17 @@ export default function Products() {
         company_id: currentCompany.id,
       };
 
+      console.log('Ejecutando mutación con:', productData);
       if (editingProduct) {
         updateProductMutation.mutate({ id: editingProduct.id, data: productData });
       } else {
         createProductMutation.mutate(productData);
       }
     } catch (error) {
+      console.error('Error en handleSubmit:', error);
       if (error instanceof z.ZodError) {
         const firstError = error.errors[0];
+        console.error('Error de validación Zod:', firstError);
         toast.error(firstError.message);
       } else {
         toast.error("Error al validar el producto");
