@@ -39,6 +39,7 @@ import ResetPassword from "./pages/ResetPassword";
 import POSPoints from "./pages/POSPoints";
 import NotificationSettings from "./pages/NotificationSettings";
 import Checks from "./pages/Checks";
+import MonthlyClosing from "./pages/MonthlyClosing";
 import NotFound from "./pages/NotFound";
 
 const queryClient = new QueryClient();
@@ -176,11 +177,12 @@ const App = () => (
           <Route path="/warehouse-stock" element={<ProtectedRoute><WarehouseStock /></ProtectedRoute>} />
           <Route path="/warehouse-transfers" element={<ProtectedRoute><WarehouseTransfers /></ProtectedRoute>} />
           <Route path="/pos-points" element={<ProtectedRoute><POSPoints /></ProtectedRoute>} />
-          <Route path="/notification-settings" element={<ProtectedRoute><NotificationSettings /></ProtectedRoute>} />
-          <Route path="/checks" element={<ProtectedRoute><Checks /></ProtectedRoute>} />
-          <Route path="/settings" element={<ProtectedRoute><Settings /></ProtectedRoute>} />
-          {/* ADD ALL CUSTOM ROUTES ABOVE THE CATCH-ALL "*" ROUTE */}
-          <Route path="*" element={<NotFound />} />
+           <Route path="/notification-settings" element={<ProtectedRoute><NotificationSettings /></ProtectedRoute>} />
+           <Route path="/checks" element={<ProtectedRoute><Checks /></ProtectedRoute>} />
+           <Route path="/monthly-closing" element={<ProtectedRoute><MonthlyClosing /></ProtectedRoute>} />
+           <Route path="/settings" element={<ProtectedRoute><Settings /></ProtectedRoute>} />
+           {/* ADD ALL CUSTOM ROUTES ABOVE THE CATCH-ALL "*" ROUTE */}
+           <Route path="*" element={<NotFound />} />
         </Routes>
         </CompanyProvider>
       </BrowserRouter>

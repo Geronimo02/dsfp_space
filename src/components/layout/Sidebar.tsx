@@ -27,7 +27,8 @@ import {
   Building2,
   ArrowLeftRight,
   Bell,
-  CreditCard as CheckIcon
+  CreditCard as CheckIcon,
+  CheckCircle
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { supabase } from "@/integrations/supabase/client";
@@ -93,6 +94,7 @@ const navigationSections = [
     title: "Reportes & Admin",
     items: [
       { name: "Reportes", href: "/reports", icon: BarChart3 },
+      { name: "Cierre Mensual", href: "/monthly-closing", icon: CheckCircle },
       { name: "Auditoría", href: "/audit-logs", icon: FileText },
       { name: "Logs de Acceso", href: "/access-logs", icon: Activity },
       { name: "Operaciones Masivas", href: "/bulk-operations", icon: Zap },
@@ -158,6 +160,7 @@ export function Sidebar() {
       "/bulk-operations": "bulk_operations",
       "/pos-points": "pos_afip",
       "/notification-settings": "settings",
+      "/monthly-closing": "reports",
     };
 
     const module = routeToModule[href];
