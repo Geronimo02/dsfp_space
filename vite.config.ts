@@ -38,7 +38,7 @@ export default defineConfig(({ mode }) => ({
             purpose: 'any maskable'
           }
         ],
-        start_url: '/mobile',
+        start_url: '/',
         scope: '/'
       },
       workbox: {

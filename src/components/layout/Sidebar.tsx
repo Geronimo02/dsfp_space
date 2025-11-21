@@ -1,4 +1,4 @@
-import { Link, useLocation } from "react-router-dom";
+import { useLocation, useNavigate } from "react-router-dom";
 import { cn } from "@/lib/utils";
 import { 
   LayoutDashboard, 
@@ -27,22 +27,30 @@ import {
   Building2,
   ArrowLeftRight,
   Bell,
-  CreditCard as CheckIcon,
-  Smartphone
+  CreditCard as CheckIcon
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { supabase } from "@/integrations/supabase/client";
-import { useNavigate } from "react-router-dom";
 import { toast } from "sonner";
-import { Separator } from "@/components/ui/separator";
 import { usePermissions } from "@/hooks/usePermissions";
+import { NavLink } from "@/components/NavLink";
+import {
+  Sidebar as SidebarUI,
+  SidebarContent,
+  SidebarGroup,
+  SidebarGroupContent,
+  SidebarGroupLabel,
+  SidebarMenu,
+  SidebarMenuButton,
+  SidebarMenuItem,
+  useSidebar,
+} from "@/components/ui/sidebar";
 
 const navigationSections = [
   {
     title: "General",
     items: [
       { name: "Dashboard", href: "/", icon: LayoutDashboard },
-      { name: "Modo Móvil", href: "/mobile", icon: Smartphone },
       { name: "Punto de Venta", href: "/pos", icon: ShoppingCart },
     ]
   },
@@ -99,6 +107,7 @@ export function Sidebar() {
   const location = useLocation();
   const navigate = useNavigate();
   const { hasPermission, isAdmin, loading } = usePermissions();
+  const { state } = useSidebar();
 
   const handleLogout = async () => {
     const { error } = await supabase.auth.signOut();
@@ -164,90 +173,91 @@ export function Sidebar() {
 
   if (loading) {
     return (
-      <div className="flex h-screen w-64 flex-col bg-sidebar border-r border-sidebar-border">
-        <div className="flex h-16 items-center gap-2 px-6 border-b border-sidebar-border">
-          <div className="w-8 h-8 rounded-lg bg-primary flex items-center justify-center">
-            <ShoppingCart className="w-5 h-5 text-primary-foreground" />
+      <SidebarUI collapsible="icon">
+        <SidebarContent>
+          <div className="flex items-center gap-2 px-4 py-4">
+            <div className="w-8 h-8 rounded-lg bg-primary flex items-center justify-center">
+              <ShoppingCart className="w-5 h-5 text-primary-foreground" />
+            </div>
+            {state !== "collapsed" && (
+              <div className="flex flex-col">
+                <span className="text-sm font-bold">RetailSnap</span>
+                <span className="text-xs text-muted-foreground">Cargando...</span>
+              </div>
+            )}
           </div>
-          <div className="flex flex-col">
-            <span className="text-sm font-bold text-sidebar-foreground">RetailSnap</span>
-            <span className="text-xs text-muted-foreground">Sistema POS</span>
-          </div>
-        </div>
-      </div>
+        </SidebarContent>
+      </SidebarUI>
     );
   }
 
   return (
-    <div className="flex h-screen w-64 flex-col bg-sidebar border-r border-sidebar-border">
-      <div className="flex h-16 items-center gap-2 px-6 border-b border-sidebar-border">
-        <div className="w-8 h-8 rounded-lg bg-primary flex items-center justify-center">
-          <ShoppingCart className="w-5 h-5 text-primary-foreground" />
+    <SidebarUI collapsible="icon">
+      <SidebarContent>
+        <div className="flex items-center gap-2 px-4 py-4 border-b">
+          <div className="w-8 h-8 rounded-lg bg-primary flex items-center justify-center shrink-0">
+            <ShoppingCart className="w-5 h-5 text-primary-foreground" />
+          </div>
+          {state !== "collapsed" && (
+            <div className="flex flex-col">
+              <span className="text-sm font-bold">RetailSnap</span>
+              <span className="text-xs text-muted-foreground">Sistema POS</span>
+            </div>
+          )}
         </div>
-        <div className="flex flex-col">
-          <span className="text-sm font-bold text-sidebar-foreground">RetailSnap</span>
-          <span className="text-xs text-muted-foreground">Sistema POS</span>
-        </div>
-      </div>
 
-      <nav className="flex-1 overflow-y-auto p-4 space-y-6 sidebar-scroll">
-        {!hasAnyVisibleItems && !loading && (
-          <div className="p-4 bg-destructive/10 border border-destructive/20 rounded-lg">
-            <p className="text-sm text-destructive font-medium mb-2">Sin permisos asignados</p>
+        {!hasAnyVisibleItems && !loading && state !== "collapsed" && (
+          <div className="p-4 m-4 bg-destructive/10 border border-destructive/20 rounded-lg">
+            <p className="text-sm text-destructive font-medium mb-2">Sin permisos</p>
             <p className="text-xs text-muted-foreground">
-              Contacta al administrador para que te asigne permisos y puedas acceder a las funcionalidades del sistema.
+              Contacta al administrador.
             </p>
           </div>
         )}
-        
-        {navigationSections.map((section, index) => {
+
+        {navigationSections.map((section) => {
           const visibleItems = section.items.filter(item => canViewMenuItem(item.href));
-          
           if (visibleItems.length === 0) return null;
 
           return (
-            <div key={section.title}>
-              {index > 0 && <Separator className="mb-4 bg-sidebar-border" />}
-              <div className="mb-2 px-3">
-                <h3 className="text-xs font-semibold text-sidebar-foreground/50 uppercase tracking-wider">
-                  {section.title}
-                </h3>
-              </div>
-              <div className="space-y-1">
-                {visibleItems.map((item) => {
-                  const isActive = location.pathname === item.href;
-                  return (
-                    <Link
-                      key={item.name}
-                      to={item.href}
-                      className={cn(
-                        "flex items-center gap-3 rounded-lg px-3 py-2.5 text-sm font-medium transition-all",
-                        isActive
-                          ? "bg-sidebar-accent text-sidebar-accent-foreground shadow-sm"
-                          : "text-sidebar-foreground/70 hover:bg-sidebar-accent/50 hover:text-sidebar-foreground"
-                      )}
-                    >
-                      <item.icon className="h-4 w-4" />
-                      <span className="text-sm">{item.name}</span>
-                    </Link>
-                  );
-                })}
-              </div>
-            </div>
+            <SidebarGroup key={section.title}>
+              {state !== "collapsed" && (
+                <SidebarGroupLabel>{section.title}</SidebarGroupLabel>
+              )}
+              <SidebarGroupContent>
+                <SidebarMenu>
+                  {visibleItems.map((item) => (
+                    <SidebarMenuItem key={item.name}>
+                      <SidebarMenuButton asChild>
+                        <NavLink 
+                          to={item.href}
+                          end={item.href === "/"}
+                          className="hover:bg-sidebar-accent"
+                          activeClassName="bg-sidebar-accent text-sidebar-accent-foreground font-medium"
+                        >
+                          <item.icon className="h-4 w-4" />
+                          {state !== "collapsed" && <span>{item.name}</span>}
+                        </NavLink>
+                      </SidebarMenuButton>
+                    </SidebarMenuItem>
+                  ))}
+                </SidebarMenu>
+              </SidebarGroupContent>
+            </SidebarGroup>
           );
         })}
-      </nav>
 
-      <div className="p-4 border-t border-sidebar-border">
-        <Button
-          variant="ghost"
-          className="w-full justify-start gap-3 text-sidebar-foreground/70 hover:text-sidebar-foreground hover:bg-sidebar-accent/50"
-          onClick={handleLogout}
-        >
-          <LogOut className="h-5 w-5" />
-          Cerrar Sesión
-        </Button>
-      </div>
-    </div>
+        <div className="mt-auto border-t p-2">
+          <Button
+            variant="ghost"
+            className="w-full justify-start"
+            onClick={handleLogout}
+          >
+            <LogOut className="h-4 w-4" />
+            {state !== "collapsed" && <span className="ml-2">Cerrar Sesión</span>}
+          </Button>
+        </div>
+      </SidebarContent>
+    </SidebarUI>
   );
 }
