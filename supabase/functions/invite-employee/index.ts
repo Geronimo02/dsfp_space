@@ -115,20 +115,35 @@ serve(async (req) => {
       if (companyUserError) throw companyUserError;
 
     } else {
-      // User doesn't exist - invite them
-      const { data, error } = await supabaseAdmin.auth.admin.inviteUserByEmail(email, {
-        data: {
+      // User doesn't exist - create them directly with auto-confirm
+      const tempPassword = crypto.randomUUID();
+      
+      const { data, error } = await supabaseAdmin.auth.admin.createUser({
+        email: email,
+        password: tempPassword,
+        email_confirm: true, // Auto-confirm email
+        user_metadata: {
           full_name: full_name || "",
           invited_to_company: companyId,
           assigned_role: role,
         },
-        redirectTo: `${req.headers.get("origin") || "https://pjcfncnydhxrlnaowbae.supabase.co"}/`,
       });
 
       if (error) throw error;
       if (!data.user) throw new Error("No se pudo crear el usuario");
 
       userId = data.user.id;
+      
+      // Send password reset email so user can set their password
+      const { error: resetError } = await supabaseAdmin.auth.admin.generateLink({
+        type: 'recovery',
+        email: email,
+        options: {
+          redirectTo: `${req.headers.get("origin") || "https://5670e5fc-c3f6-4b61-9f11-214ae88eb9ef.lovableproject.com"}/reset-password`,
+        }
+      });
+      
+      if (resetError) console.error("Error sending password reset:", resetError);
 
       // Create company_users entry for new user
       const { error: companyUserError } = await supabaseAdmin
@@ -149,7 +164,7 @@ serve(async (req) => {
     return new Response(JSON.stringify({ 
       success: true, 
       user_id: userId,
-      message: existingUser ? "Usuario agregado a la empresa" : "Invitación enviada por email"
+      message: existingUser ? "Usuario agregado a la empresa" : "Usuario invitado. Se le ha enviado un email para configurar su contraseña"
     }), {
       headers: { ...corsHeaders, "Content-Type": "application/json" },
       status: 200,
