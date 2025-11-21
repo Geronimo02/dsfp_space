@@ -28,7 +28,8 @@ import {
   ArrowLeftRight,
   Bell,
   CreditCard as CheckIcon,
-  CheckCircle
+  CheckCircle,
+  Sparkles
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { supabase } from "@/integrations/supabase/client";
@@ -95,6 +96,7 @@ const navigationSections = [
     items: [
       { name: "Reportes", href: "/reports", icon: BarChart3 },
       { name: "Cierre Mensual", href: "/monthly-closing", icon: CheckCircle },
+      { name: "Asistente IA", href: "/ai-assistant", icon: Sparkles },
       { name: "Auditoría", href: "/audit-logs", icon: FileText },
       { name: "Logs de Acceso", href: "/access-logs", icon: Activity },
       { name: "Operaciones Masivas", href: "/bulk-operations", icon: Zap },
@@ -161,6 +163,7 @@ export function Sidebar() {
       "/pos-points": "pos_afip",
       "/notification-settings": "settings",
       "/monthly-closing": "reports",
+      "/ai-assistant": "reports",
     };
 
     const module = routeToModule[href];
