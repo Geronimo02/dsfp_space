@@ -3,6 +3,7 @@ import { Sidebar } from "./Sidebar";
 import { NotificationCenter } from "../NotificationCenter";
 import { CompanySelector } from "../CompanySelector";
 import { GlobalSearch } from "../GlobalSearch";
+import { AIAssistantFloating } from "../AIAssistantFloating";
 import { useCompany } from "@/contexts/CompanyContext";
 import { Badge } from "@/components/ui/badge";
 import { SidebarProvider, SidebarTrigger } from "@/components/ui/sidebar";
@@ -59,6 +60,9 @@ export function Layout({ children }: LayoutProps) {
           </div>
         </main>
       </div>
+      
+      {/* Asistente IA flotante disponible en todas las páginas */}
+      <AIAssistantFloating />
     </SidebarProvider>
   );
 }
