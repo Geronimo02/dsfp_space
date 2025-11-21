@@ -49,33 +49,69 @@ serve(async (req) => {
       throw new Error("Unauthorized");
     }
 
-    // Check if user has admin role
-    const { data: roles } = await supabaseAdmin
-      .from("user_roles")
-      .select("role")
-      .eq("user_id", user.id);
+    // Get company_id from company_users table
+    const { data: companyUser } = await supabaseAdmin
+      .from("company_users")
+      .select("company_id, role")
+      .eq("user_id", user.id)
+      .eq("active", true)
+      .single();
 
-    const isAdmin = roles?.some((r) => r.role === "admin");
-    if (!isAdmin) {
-      throw new Error("Only admins can invite employees");
+    if (!companyUser || !companyUser.company_id) {
+      throw new Error("User is not associated with any company");
     }
 
-    // Get email from request
-    const { email, full_name } = await req.json();
+    const companyId = companyUser.company_id;
+
+    // Check if user has admin or manager role in this company
+    const isAdmin = companyUser.role === "admin" || companyUser.role === "manager";
+    if (!isAdmin) {
+      throw new Error("Only admins and managers can invite employees");
+    }
+
+    // Get email and role from request
+    const { email, full_name, role } = await req.json();
 
     if (!email) {
       throw new Error("Email is required");
     }
 
-    // Invite user
+    if (!role) {
+      throw new Error("Role is required");
+    }
+
+    // Check if user already exists
+    const { data: existingUser } = await supabaseAdmin.auth.admin.listUsers();
+    const userExists = existingUser.users.find(u => u.email === email);
+
+    // Invite user with company metadata
     const { data, error } = await supabaseAdmin.auth.admin.inviteUserByEmail(email, {
       data: {
         full_name: full_name || "",
+        invited_to_company: companyId,
+        assigned_role: role,
       },
-      redirectTo: `${req.headers.get("origin") || "https://pjcfncnydhxrlnaowbae.supabase.co"}/auth/callback`,
+      redirectTo: `${req.headers.get("origin") || "https://pjcfncnydhxrlnaowbae.supabase.co"}/`,
     });
 
     if (error) throw error;
+
+    // If user was successfully invited, create company_users entry
+    if (data.user) {
+      const { error: companyUserError } = await supabaseAdmin
+        .from("company_users")
+        .insert({
+          user_id: data.user.id,
+          company_id: companyId,
+          role: role,
+          active: true,
+        });
+
+      if (companyUserError) {
+        console.error("Error creating company_users entry:", companyUserError);
+        // Don't throw error here - user is already invited, we'll handle this in trigger
+      }
+    }
 
     return new Response(JSON.stringify({ success: true, user: data.user }), {
       headers: { ...corsHeaders, "Content-Type": "application/json" },

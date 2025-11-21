@@ -83,6 +83,7 @@ export default function Employees() {
   const [selectedRoles, setSelectedRoles] = useState<AppRole[]>([]);
   const [inviteEmail, setInviteEmail] = useState("");
   const [inviteName, setInviteName] = useState("");
+  const [inviteRole, setInviteRole] = useState<AppRole>("employee");
   const [inviteLoading, setInviteLoading] = useState(false);
   const [isAdmin, setIsAdmin] = useState(false);
   const [resetLoading, setResetLoading] = useState(false);
@@ -429,6 +430,7 @@ export default function Employees() {
           body: JSON.stringify({
             email: inviteEmail,
             full_name: inviteName,
+            role: inviteRole,
           }),
         }
       );
@@ -443,7 +445,9 @@ export default function Employees() {
       setInviteDialogOpen(false);
       setInviteEmail("");
       setInviteName("");
+      setInviteRole("employee");
       fetchEmployees();
+      fetchCompanyMembers();
     } catch (error: any) {
       toast.error("Error al invitar empleado: " + error.message);
     } finally {
@@ -561,7 +565,7 @@ export default function Employees() {
                     <DialogHeader>
                       <DialogTitle>Invitar Nuevo Empleado</DialogTitle>
                       <DialogDescription>
-                        Envía una invitación por correo electrónico. El nuevo usuario recibirá un rol de "Empleado" por defecto.
+                        Envía una invitación por correo. El empleado será asignado automáticamente a tu empresa.
                       </DialogDescription>
                     </DialogHeader>
                     <div className="space-y-4">
@@ -583,6 +587,27 @@ export default function Employees() {
                           value={inviteEmail}
                           onChange={(e) => setInviteEmail(e.target.value)}
                         />
+                      </div>
+                      <div>
+                        <Label htmlFor="role">Rol *</Label>
+                        <Select value={inviteRole} onValueChange={(val) => setInviteRole(val as AppRole)}>
+                          <SelectTrigger>
+                            <SelectValue />
+                          </SelectTrigger>
+                          <SelectContent>
+                            {availableRoles.map((role) => (
+                              <SelectItem key={role.value} value={role.value}>
+                                <div className="flex items-center gap-2">
+                                  <div className={`w-2 h-2 rounded-full ${role.color}`} />
+                                  <span>{role.label}</span>
+                                </div>
+                              </SelectItem>
+                            ))}
+                          </SelectContent>
+                        </Select>
+                        <p className="text-xs text-muted-foreground mt-1">
+                          {availableRoles.find(r => r.value === inviteRole)?.description}
+                        </p>
                       </div>
                     </div>
                     <DialogFooter>

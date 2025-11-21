@@ -105,7 +105,24 @@ export default function Auth() {
       if (error) throw error;
       
       if (data.user) {
-        setShowWelcomeModal(true);
+        // Check if user already has a company assigned (invited employee)
+        const { data: companyUsers } = await supabase
+          .from('company_users')
+          .select('company_id')
+          .eq('user_id', data.user.id)
+          .eq('active', true)
+          .limit(1);
+
+        if (companyUsers && companyUsers.length > 0) {
+          // User is an invited employee, go directly to dashboard
+          toast.success("¡Cuenta creada! Redirigiendo a tu empresa...");
+          setTimeout(() => {
+            navigate("/");
+          }, 1500);
+        } else {
+          // New user without company, show welcome modal
+          setShowWelcomeModal(true);
+        }
       } else {
         toast.success("¡Cuenta creada! Revisa tu email para confirmar tu cuenta.");
       }
