@@ -10,7 +10,8 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
-import { Plus, Edit, Search, Receipt, Eye, Printer, DollarSign, CreditCard, AlertCircle, CheckCircle2, Info, Wallet, TrendingUp, TrendingDown } from "lucide-react";
+import { Plus, Edit, Search, Receipt, Eye, Printer, DollarSign, CreditCard, AlertCircle, CheckCircle2, Info, Wallet, TrendingUp, TrendingDown, FileText, Truck } from "lucide-react";
+import { useNavigate } from "react-router-dom";
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip";
 import { ReceiptPDF } from "@/components/pos/ReceiptPDF";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
@@ -40,6 +41,7 @@ const customerSchema = z.object({
 });
 
 export default function Customers() {
+  const navigate = useNavigate();
   const { currentCompany } = useCompany();
   const { hasPermission } = usePermissions();
   const canCreate = hasPermission('customers', 'create');
@@ -685,6 +687,23 @@ export default function Customers() {
                     <TableCell>${Number(customer.credit_limit || 0).toFixed(2)}</TableCell>
                     <TableCell className="text-right">
                       <div className="flex justify-end gap-1">
+                        <TooltipProvider>
+                          <Tooltip>
+                            <TooltipTrigger asChild>
+                              <Button 
+                                size="icon" 
+                                variant="ghost"
+                                onClick={(e) => { 
+                                  e.stopPropagation(); 
+                                  navigate(`/quotations?customer=${customer.id}`); 
+                                }}
+                              >
+                                <FileText className="h-4 w-4" />
+                              </Button>
+                            </TooltipTrigger>
+                            <TooltipContent>Nuevo presupuesto</TooltipContent>
+                          </Tooltip>
+                        </TooltipProvider>
                         {Number(customer.current_balance) > 0 && (
                           <TooltipProvider>
                             <Tooltip>
@@ -735,9 +754,34 @@ export default function Customers() {
         <Dialog open={isHistoryOpen} onOpenChange={setIsHistoryOpen}>
           <DialogContent className="max-w-4xl max-h-[90vh] overflow-y-auto">
             <DialogHeader>
-              <DialogTitle className="flex items-center gap-2">
-                <Receipt className="h-5 w-5 text-primary" />
-                Cuenta Corriente - {selectedCustomer?.name}
+              <DialogTitle className="flex items-center justify-between">
+                <div className="flex items-center gap-2">
+                  <Receipt className="h-5 w-5 text-primary" />
+                  Cuenta Corriente - {selectedCustomer?.name}
+                </div>
+                <div className="flex gap-2">
+                  <Button 
+                    size="sm" 
+                    variant="outline"
+                    onClick={() => {
+                      setIsHistoryOpen(false);
+                      navigate(`/delivery-notes?customer=${selectedCustomer?.id}`);
+                    }}
+                  >
+                    <Truck className="h-4 w-4 mr-2" />
+                    Ver entregas pendientes
+                  </Button>
+                  <Button 
+                    size="sm"
+                    onClick={() => {
+                      setIsHistoryOpen(false);
+                      navigate(`/quotations?customer=${selectedCustomer?.id}`);
+                    }}
+                  >
+                    <FileText className="h-4 w-4 mr-2" />
+                    Nuevo presupuesto
+                  </Button>
+                </div>
               </DialogTitle>
             </DialogHeader>
             <div className="space-y-4">
