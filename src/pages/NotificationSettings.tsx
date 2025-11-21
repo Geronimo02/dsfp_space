@@ -2,6 +2,7 @@ import { useState } from "react";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
 import { useCompany } from "@/contexts/CompanyContext";
+import { Layout } from "@/components/layout/Layout";
 import { Card } from "@/components/ui/card";
 import { Label } from "@/components/ui/label";
 import { Switch } from "@/components/ui/switch";
@@ -83,13 +84,14 @@ export default function NotificationSettings() {
   }
 
   return (
-    <div className="container mx-auto p-6 space-y-6">
-      <div>
-        <h1 className="text-3xl font-bold">Configuración de Notificaciones</h1>
-        <p className="text-muted-foreground">
-          Personaliza cómo y cuándo recibir alertas del sistema
-        </p>
-      </div>
+    <Layout>
+      <div className="container mx-auto p-6 space-y-6">
+        <div>
+          <h1 className="text-3xl font-bold">Configuración de Notificaciones</h1>
+          <p className="text-muted-foreground">
+            Personaliza cómo y cuándo recibir alertas del sistema
+          </p>
+        </div>
 
       <Card className="p-6 space-y-6">
         <div className="space-y-4">
@@ -290,5 +292,6 @@ export default function NotificationSettings() {
         </div>
       </Card>
     </div>
+    </Layout>
   );
 }

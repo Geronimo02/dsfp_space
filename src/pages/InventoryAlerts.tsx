@@ -1,6 +1,7 @@
 import { useState } from "react";
 import { useQuery } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
+import { Layout } from "@/components/layout/Layout";
 import { Card } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
@@ -133,14 +134,15 @@ export default function InventoryAlerts() {
   );
 
   return (
-    <div className="container mx-auto p-6 space-y-6">
-      <div className="flex justify-between items-center">
-        <div>
-          <h1 className="text-3xl font-bold">Alertas de Inventario</h1>
-          <p className="text-muted-foreground">
-            Monitoreo de stock bajo y productos próximos a vencer
-          </p>
-        </div>
+    <Layout>
+      <div className="container mx-auto p-6 space-y-6">
+        <div className="flex justify-between items-center">
+          <div>
+            <h1 className="text-3xl font-bold">Alertas de Inventario</h1>
+            <p className="text-muted-foreground">
+              Monitoreo de stock bajo y productos próximos a vencer
+            </p>
+          </div>
         <Button onClick={checkAlerts}>
           Generar Alertas
         </Button>
@@ -337,5 +339,6 @@ export default function InventoryAlerts() {
         </TabsContent>
       </Tabs>
     </div>
+    </Layout>
   );
 }

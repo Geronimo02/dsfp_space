@@ -2,6 +2,7 @@ import { useState } from "react";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
 import { useCompany } from "@/contexts/CompanyContext";
+import { Layout } from "@/components/layout/Layout";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -167,14 +168,15 @@ export default function Checks() {
   };
 
   return (
-    <div className="container mx-auto p-6 space-y-6">
-      <div className="flex justify-between items-center">
-        <div>
-          <h1 className="text-3xl font-bold">Gestión de Cheques</h1>
-          <p className="text-muted-foreground">
-            Administra los cheques recibidos y emitidos
-          </p>
-        </div>
+    <Layout>
+      <div className="container mx-auto p-6 space-y-6">
+        <div className="flex justify-between items-center">
+          <div>
+            <h1 className="text-3xl font-bold">Gestión de Cheques</h1>
+            <p className="text-muted-foreground">
+              Administra los cheques recibidos y emitidos
+            </p>
+          </div>
         <Dialog open={isDialogOpen} onOpenChange={setIsDialogOpen}>
           <DialogTrigger asChild>
             <Button>
@@ -372,5 +374,6 @@ export default function Checks() {
         </Table>
       </Card>
     </div>
+    </Layout>
   );
 }
