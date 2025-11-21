@@ -84,6 +84,7 @@ export default function Products() {
   const [imageFile, setImageFile] = useState<File | null>(null);
   const [imagePreview, setImagePreview] = useState<string>("");
   const [uploadingImage, setUploadingImage] = useState(false);
+  const [compressingImage, setCompressingImage] = useState(false);
   const [selectedProducts, setSelectedProducts] = useState<Set<string>>(new Set());
   const [isImportDialogOpen, setIsImportDialogOpen] = useState(false);
   const [importFile, setImportFile] = useState<File | null>(null);
@@ -207,13 +208,17 @@ export default function Products() {
     const { data: { user } } = await supabase.auth.getUser();
     if (!user) throw new Error('Usuario no autenticado');
     
-    // Compress image before upload
+    // Compress image before upload (optimized for faster loading)
     const compressedBlob = await compressImage(file, {
-      maxWidth: 800,
-      maxHeight: 800,
-      quality: 0.7,
+      maxWidth: 600,
+      maxHeight: 600,
+      quality: 0.65,
       outputFormat: 'image/webp'
     });
+    
+    const originalSize = formatFileSize(file.size);
+    const compressedSize = formatFileSize(compressedBlob.size);
+    console.log(`Imagen comprimida: ${originalSize} → ${compressedSize}`);
     
     // Generate unique filename
     const fileExt = 'webp';
@@ -494,7 +499,7 @@ export default function Products() {
     setIsDialogOpen(true);
   };
   
-  const handleImageSelect = (e: React.ChangeEvent<HTMLInputElement>) => {
+  const handleImageSelect = async (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
     if (!file) return;
     
@@ -503,24 +508,37 @@ export default function Products() {
       return;
     }
     
-    if (file.size > 5 * 1024 * 1024) {
-      toast.error('La imagen debe ser menor a 5MB');
+    if (file.size > 10 * 1024 * 1024) {
+      toast.error('La imagen debe ser menor a 10MB');
       return;
     }
     
-    setImageFile(file);
+    setCompressingImage(true);
     
-    // Generate preview
-    const reader = new FileReader();
-    reader.onload = (e) => {
-      setImagePreview(e.target?.result as string);
-    };
-    reader.readAsDataURL(file);
+    try {
+      // Show preview of original image immediately
+      const reader = new FileReader();
+      reader.onload = (e) => {
+        setImagePreview(e.target?.result as string);
+      };
+      reader.readAsDataURL(file);
+      
+      setImageFile(file);
+      toast.success(`Imagen cargada (${formatFileSize(file.size)}). Se comprimirá al guardar.`);
+    } catch (error) {
+      console.error('Error loading image:', error);
+      toast.error('Error al cargar la imagen');
+    } finally {
+      setCompressingImage(false);
+    }
   };
   
   const removeImage = () => {
     setImageFile(null);
     setImagePreview("");
+    // Reset file input
+    const fileInput = document.querySelector('input[type="file"]') as HTMLInputElement;
+    if (fileInput) fileInput.value = '';
   };
 
   const toggleProductExpand = (productId: string) => {
@@ -1061,9 +1079,16 @@ export default function Products() {
                           accept="image/jpeg,image/jpg,image/png,image/webp"
                           onChange={handleImageSelect}
                           className="cursor-pointer"
+                          disabled={compressingImage || uploadingImage}
                         />
                         <p className="text-xs text-muted-foreground mt-1">
-                          Formatos: JPG, PNG, WebP. Máx: 5MB. Se optimizará automáticamente.
+                          {compressingImage ? (
+                            <span className="text-primary">⏳ Procesando imagen...</span>
+                          ) : uploadingImage ? (
+                            <span className="text-primary">⏳ Subiendo imagen...</span>
+                          ) : (
+                            <>Formatos: JPG, PNG, WebP. Máx: 10MB. Se comprimirá automáticamente.</>
+                          )}
                         </p>
                       </div>
                     </div>
@@ -1224,11 +1249,25 @@ export default function Products() {
                 )}
 
                 <div className="flex justify-end gap-2 pt-4 border-t">
-                  <Button type="button" variant="outline" onClick={() => setIsDialogOpen(false)}>
+                  <Button 
+                    type="button" 
+                    variant="outline" 
+                    onClick={() => setIsDialogOpen(false)}
+                    disabled={uploadingImage || compressingImage}
+                  >
                     Cancelar
                   </Button>
-                  <Button type="submit" className="gap-2">
-                    {editingProduct ? (
+                  <Button 
+                    type="submit" 
+                    className="gap-2"
+                    disabled={uploadingImage || compressingImage}
+                  >
+                    {uploadingImage ? (
+                      <>
+                        <div className="h-4 w-4 animate-spin rounded-full border-2 border-current border-t-transparent" />
+                        Subiendo imagen...
+                      </>
+                    ) : editingProduct ? (
                       <>
                         <CheckCircle2 className="h-4 w-4" />
                         Actualizar Producto
