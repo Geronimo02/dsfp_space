@@ -104,6 +104,123 @@ export type Database = {
         }
         Relationships: []
       }
+      bank_accounts: {
+        Row: {
+          account_number: string
+          account_type: string
+          active: boolean | null
+          balance: number
+          bank_name: string
+          company_id: string | null
+          created_at: string | null
+          currency: string
+          id: string
+          updated_at: string | null
+        }
+        Insert: {
+          account_number: string
+          account_type?: string
+          active?: boolean | null
+          balance?: number
+          bank_name: string
+          company_id?: string | null
+          created_at?: string | null
+          currency?: string
+          id?: string
+          updated_at?: string | null
+        }
+        Update: {
+          account_number?: string
+          account_type?: string
+          active?: boolean | null
+          balance?: number
+          bank_name?: string
+          company_id?: string | null
+          created_at?: string | null
+          currency?: string
+          id?: string
+          updated_at?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "bank_accounts_company_id_fkey"
+            columns: ["company_id"]
+            isOneToOne: false
+            referencedRelation: "companies"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      bank_movements: {
+        Row: {
+          amount: number
+          bank_account_id: string
+          company_id: string | null
+          created_at: string | null
+          description: string | null
+          destination_account_id: string | null
+          id: string
+          movement_date: string
+          movement_type: string
+          reconciled: boolean | null
+          reconciliation_date: string | null
+          reference: string | null
+          user_id: string
+        }
+        Insert: {
+          amount: number
+          bank_account_id: string
+          company_id?: string | null
+          created_at?: string | null
+          description?: string | null
+          destination_account_id?: string | null
+          id?: string
+          movement_date?: string
+          movement_type: string
+          reconciled?: boolean | null
+          reconciliation_date?: string | null
+          reference?: string | null
+          user_id: string
+        }
+        Update: {
+          amount?: number
+          bank_account_id?: string
+          company_id?: string | null
+          created_at?: string | null
+          description?: string | null
+          destination_account_id?: string | null
+          id?: string
+          movement_date?: string
+          movement_type?: string
+          reconciled?: boolean | null
+          reconciliation_date?: string | null
+          reference?: string | null
+          user_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "bank_movements_bank_account_id_fkey"
+            columns: ["bank_account_id"]
+            isOneToOne: false
+            referencedRelation: "bank_accounts"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "bank_movements_company_id_fkey"
+            columns: ["company_id"]
+            isOneToOne: false
+            referencedRelation: "companies"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "bank_movements_destination_account_id_fkey"
+            columns: ["destination_account_id"]
+            isOneToOne: false
+            referencedRelation: "bank_accounts"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       bulk_operations: {
         Row: {
           company_id: string | null
@@ -150,6 +267,78 @@ export type Database = {
             columns: ["company_id"]
             isOneToOne: false
             referencedRelation: "companies"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      card_movements: {
+        Row: {
+          accreditation_date: string
+          accredited_at: string | null
+          batch_number: string | null
+          card_brand: string
+          card_type: string
+          commission_amount: number
+          commission_percentage: number
+          company_id: string | null
+          created_at: string | null
+          gross_amount: number
+          id: string
+          installments: number | null
+          net_amount: number
+          sale_date: string
+          sale_id: string | null
+          status: string | null
+        }
+        Insert: {
+          accreditation_date: string
+          accredited_at?: string | null
+          batch_number?: string | null
+          card_brand: string
+          card_type: string
+          commission_amount: number
+          commission_percentage: number
+          company_id?: string | null
+          created_at?: string | null
+          gross_amount: number
+          id?: string
+          installments?: number | null
+          net_amount: number
+          sale_date: string
+          sale_id?: string | null
+          status?: string | null
+        }
+        Update: {
+          accreditation_date?: string
+          accredited_at?: string | null
+          batch_number?: string | null
+          card_brand?: string
+          card_type?: string
+          commission_amount?: number
+          commission_percentage?: number
+          company_id?: string | null
+          created_at?: string | null
+          gross_amount?: number
+          id?: string
+          installments?: number | null
+          net_amount?: number
+          sale_date?: string
+          sale_id?: string | null
+          status?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "card_movements_company_id_fkey"
+            columns: ["company_id"]
+            isOneToOne: false
+            referencedRelation: "companies"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "card_movements_sale_id_fkey"
+            columns: ["sale_id"]
+            isOneToOne: false
+            referencedRelation: "sales"
             referencedColumns: ["id"]
           },
         ]
@@ -2550,6 +2739,100 @@ export type Database = {
             columns: ["customer_id"]
             isOneToOne: false
             referencedRelation: "customers"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      retentions: {
+        Row: {
+          amount: number
+          certificate_number: string | null
+          company_id: string | null
+          created_at: string | null
+          customer_id: string | null
+          description: string | null
+          id: string
+          jurisdiction: string | null
+          percentage: number
+          purchase_id: string | null
+          retention_date: string
+          retention_type: string
+          sale_id: string | null
+          supplier_id: string | null
+        }
+        Insert: {
+          amount: number
+          certificate_number?: string | null
+          company_id?: string | null
+          created_at?: string | null
+          customer_id?: string | null
+          description?: string | null
+          id?: string
+          jurisdiction?: string | null
+          percentage: number
+          purchase_id?: string | null
+          retention_date: string
+          retention_type: string
+          sale_id?: string | null
+          supplier_id?: string | null
+        }
+        Update: {
+          amount?: number
+          certificate_number?: string | null
+          company_id?: string | null
+          created_at?: string | null
+          customer_id?: string | null
+          description?: string | null
+          id?: string
+          jurisdiction?: string | null
+          percentage?: number
+          purchase_id?: string | null
+          retention_date?: string
+          retention_type?: string
+          sale_id?: string | null
+          supplier_id?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "retentions_company_id_fkey"
+            columns: ["company_id"]
+            isOneToOne: false
+            referencedRelation: "companies"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "retentions_customer_id_fkey"
+            columns: ["customer_id"]
+            isOneToOne: false
+            referencedRelation: "customer_pos_view"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "retentions_customer_id_fkey"
+            columns: ["customer_id"]
+            isOneToOne: false
+            referencedRelation: "customers"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "retentions_purchase_id_fkey"
+            columns: ["purchase_id"]
+            isOneToOne: false
+            referencedRelation: "purchases"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "retentions_sale_id_fkey"
+            columns: ["sale_id"]
+            isOneToOne: false
+            referencedRelation: "sales"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "retentions_supplier_id_fkey"
+            columns: ["supplier_id"]
+            isOneToOne: false
+            referencedRelation: "suppliers"
             referencedColumns: ["id"]
           },
         ]

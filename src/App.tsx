@@ -44,6 +44,10 @@ import AccountantReports from "./pages/AccountantReports";
 import AIAssistantPage from "./pages/AIAssistantPage";
 import Commissions from "./pages/Commissions";
 import StockReservations from "./pages/StockReservations";
+import BankAccounts from "./pages/BankAccounts";
+import BankMovements from "./pages/BankMovements";
+import CardMovements from "./pages/CardMovements";
+import Retentions from "./pages/Retentions";
 import NotFound from "./pages/NotFound";
 
 const queryClient = new QueryClient();
@@ -187,6 +191,10 @@ const App = () => (
            <Route path="/monthly-closing" element={<ProtectedRoute><MonthlyClosing /></ProtectedRoute>} />
            <Route path="/accountant-reports" element={<ProtectedRoute><AccountantReports /></ProtectedRoute>} />
            <Route path="/commissions" element={<ProtectedRoute><Commissions /></ProtectedRoute>} />
+           <Route path="/bank-accounts" element={<ProtectedRoute><BankAccounts /></ProtectedRoute>} />
+           <Route path="/bank-movements" element={<ProtectedRoute><BankMovements /></ProtectedRoute>} />
+           <Route path="/card-movements" element={<ProtectedRoute><CardMovements /></ProtectedRoute>} />
+           <Route path="/retentions" element={<ProtectedRoute><Retentions /></ProtectedRoute>} />
            <Route path="/ai-assistant" element={<ProtectedRoute><AIAssistantPage /></ProtectedRoute>} />
            <Route path="/settings" element={<ProtectedRoute><Settings /></ProtectedRoute>} />
            {/* ADD ALL CUSTOM ROUTES ABOVE THE CATCH-ALL "*" ROUTE */}

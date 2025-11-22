@@ -31,7 +31,10 @@ import {
   CheckCircle,
   BookOpen,
   Sparkles,
-  TrendingUp
+  TrendingUp,
+  Landmark,
+  TrendingDown,
+  FileBarChart
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { supabase } from "@/integrations/supabase/client";
@@ -93,6 +96,15 @@ const navigationSections = [
       { name: "Gastos", href: "/expenses", icon: DollarSign },
       { name: "Comisiones", href: "/commissions", icon: TrendingUp },
       { name: "Usuarios", href: "/employees", icon: UserCog },
+    ]
+  },
+  {
+    title: "Tesorería",
+    items: [
+      { name: "Cuentas Bancarias", href: "/bank-accounts", icon: Landmark },
+      { name: "Movimientos Bancarios", href: "/bank-movements", icon: TrendingDown },
+      { name: "Movimientos de Tarjetas", href: "/card-movements", icon: CreditCard },
+      { name: "Retenciones", href: "/retentions", icon: FileBarChart },
     ]
   },
   {
