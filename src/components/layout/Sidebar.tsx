@@ -30,7 +30,8 @@ import {
   CreditCard as CheckIcon,
   CheckCircle,
   BookOpen,
-  Sparkles
+  Sparkles,
+  TrendingUp
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { supabase } from "@/integrations/supabase/client";
@@ -89,6 +90,7 @@ const navigationSections = [
       { name: "Gestión de Caja", href: "/cash-register", icon: Wallet },
       { name: "Cheques", href: "/checks", icon: CheckIcon },
       { name: "Gastos", href: "/expenses", icon: DollarSign },
+      { name: "Comisiones", href: "/commissions", icon: TrendingUp },
       { name: "Usuarios", href: "/employees", icon: UserCog },
     ]
   },
@@ -161,10 +163,12 @@ export function Sidebar() {
       "/returns": "returns",
       "/reservations": "sales",
       "/expenses": "expenses",
+      "/commissions": "sales",
       "/bulk-operations": "bulk_operations",
       "/pos-points": "pos_afip",
       "/notification-settings": "settings",
       "/monthly-closing": "reports",
+      "/accountant-reports": "reports",
       "/ai-assistant": "reports",
     };
 
