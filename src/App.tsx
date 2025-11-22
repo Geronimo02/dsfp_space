@@ -40,6 +40,7 @@ import POSPoints from "./pages/POSPoints";
 import NotificationSettings from "./pages/NotificationSettings";
 import Checks from "./pages/Checks";
 import MonthlyClosing from "./pages/MonthlyClosing";
+import AccountantReports from "./pages/AccountantReports";
 import AIAssistantPage from "./pages/AIAssistantPage";
 import NotFound from "./pages/NotFound";
 
@@ -181,6 +182,7 @@ const App = () => (
            <Route path="/notification-settings" element={<ProtectedRoute><NotificationSettings /></ProtectedRoute>} />
            <Route path="/checks" element={<ProtectedRoute><Checks /></ProtectedRoute>} />
            <Route path="/monthly-closing" element={<ProtectedRoute><MonthlyClosing /></ProtectedRoute>} />
+           <Route path="/accountant-reports" element={<ProtectedRoute><AccountantReports /></ProtectedRoute>} />
            <Route path="/ai-assistant" element={<ProtectedRoute><AIAssistantPage /></ProtectedRoute>} />
            <Route path="/settings" element={<ProtectedRoute><Settings /></ProtectedRoute>} />
            {/* ADD ALL CUSTOM ROUTES ABOVE THE CATCH-ALL "*" ROUTE */}
