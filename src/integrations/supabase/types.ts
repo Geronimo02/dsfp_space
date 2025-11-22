@@ -1057,6 +1057,85 @@ export type Database = {
           },
         ]
       }
+      exchange_rate_history: {
+        Row: {
+          changed_at: string | null
+          company_id: string
+          currency: string
+          id: string
+          new_rate: number
+          old_rate: number | null
+          source: string
+        }
+        Insert: {
+          changed_at?: string | null
+          company_id: string
+          currency: string
+          id?: string
+          new_rate: number
+          old_rate?: number | null
+          source: string
+        }
+        Update: {
+          changed_at?: string | null
+          company_id?: string
+          currency?: string
+          id?: string
+          new_rate?: number
+          old_rate?: number | null
+          source?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "exchange_rate_history_company_id_fkey"
+            columns: ["company_id"]
+            isOneToOne: false
+            referencedRelation: "companies"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      exchange_rate_settings: {
+        Row: {
+          auto_update: boolean | null
+          company_id: string
+          created_at: string | null
+          id: string
+          last_update: string | null
+          source: string | null
+          update_frequency: string | null
+          updated_at: string | null
+        }
+        Insert: {
+          auto_update?: boolean | null
+          company_id: string
+          created_at?: string | null
+          id?: string
+          last_update?: string | null
+          source?: string | null
+          update_frequency?: string | null
+          updated_at?: string | null
+        }
+        Update: {
+          auto_update?: boolean | null
+          company_id?: string
+          created_at?: string | null
+          id?: string
+          last_update?: string | null
+          source?: string | null
+          update_frequency?: string | null
+          updated_at?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "exchange_rate_settings_company_id_fkey"
+            columns: ["company_id"]
+            isOneToOne: true
+            referencedRelation: "companies"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       exchange_rates: {
         Row: {
           company_id: string | null
