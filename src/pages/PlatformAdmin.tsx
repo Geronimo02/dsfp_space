@@ -1,14 +1,12 @@
 import { useState } from "react";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
-import { Layout } from "@/components/layout/Layout";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Switch } from "@/components/ui/switch";
-import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { toast } from "sonner";
-import { Building2, Users, DollarSign, TrendingUp } from "lucide-react";
+import { Building2, Users, DollarSign, TrendingUp, LogOut, ShoppingCart } from "lucide-react";
 import { usePlatformAdmin } from "@/hooks/usePlatformAdmin";
 import { useNavigate } from "react-router-dom";
 
@@ -113,16 +111,24 @@ export default function PlatformAdmin() {
     );
   };
 
+  const handleLogout = async () => {
+    const { error } = await supabase.auth.signOut();
+    if (error) {
+      toast.error("Error al cerrar sesión");
+    } else {
+      navigate("/auth");
+      toast.success("Sesión cerrada exitosamente");
+    }
+  };
+
   if (adminLoading || isLoading) {
     return (
-      <Layout>
-        <div className="flex items-center justify-center h-screen">
-          <div className="text-center">
-            <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-primary mx-auto"></div>
-            <p className="mt-4 text-muted-foreground">Cargando panel administrativo...</p>
-          </div>
+      <div className="flex items-center justify-center h-screen">
+        <div className="text-center">
+          <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-primary mx-auto"></div>
+          <p className="mt-4 text-muted-foreground">Cargando panel administrativo...</p>
         </div>
-      </Layout>
+      </div>
     );
   }
 
@@ -136,7 +142,26 @@ export default function PlatformAdmin() {
   }, 0) || 0;
 
   return (
-    <Layout>
+    <div className="min-h-screen bg-background">
+      {/* Header with logout */}
+      <div className="border-b bg-card">
+        <div className="container mx-auto px-6 py-4 flex items-center justify-between">
+          <div className="flex items-center gap-3">
+            <div className="w-10 h-10 rounded-lg bg-primary flex items-center justify-center">
+              <ShoppingCart className="w-6 h-6 text-primary-foreground" />
+            </div>
+            <div>
+              <h1 className="text-xl font-bold">RetailSnap</h1>
+              <p className="text-xs text-muted-foreground">Panel de Administración</p>
+            </div>
+          </div>
+          <Button variant="outline" onClick={handleLogout}>
+            <LogOut className="h-4 w-4 mr-2" />
+            Cerrar Sesión
+          </Button>
+        </div>
+      </div>
+
       <div className="container mx-auto p-6 space-y-6">
         <div>
           <h1 className="text-3xl font-bold">Panel de Administración de Plataforma</h1>
@@ -282,6 +307,6 @@ export default function PlatformAdmin() {
           </CardContent>
         </Card>
       </div>
-    </Layout>
+    </div>
   );
 }

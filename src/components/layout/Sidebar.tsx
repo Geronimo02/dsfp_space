@@ -257,30 +257,6 @@ export function Sidebar() {
           </div>
         )}
 
-        {/* Platform Admin Section - Only visible to platform admins */}
-        {isPlatformAdmin && (
-          <SidebarGroup>
-            {state !== "collapsed" && (
-              <SidebarGroupLabel>Administración de Plataforma</SidebarGroupLabel>
-            )}
-            <SidebarGroupContent>
-              <SidebarMenu>
-                <SidebarMenuItem>
-                  <SidebarMenuButton asChild>
-                    <NavLink 
-                      to="/admin/platform"
-                      className="hover:bg-sidebar-accent"
-                      activeClassName="bg-sidebar-accent text-sidebar-accent-foreground font-medium"
-                    >
-                      <Settings className="h-4 w-4" />
-                      {state !== "collapsed" && <span>Panel de Admin</span>}
-                    </NavLink>
-                  </SidebarMenuButton>
-                </SidebarMenuItem>
-              </SidebarMenu>
-            </SidebarGroupContent>
-          </SidebarGroup>
-        )}
 
         {navigationSections.map((section) => {
           const visibleItems = section.items.filter(item => canViewMenuItem(item.href));
