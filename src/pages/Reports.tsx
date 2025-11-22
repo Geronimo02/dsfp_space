@@ -6,7 +6,7 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { BarChart, Bar, LineChart, Line, PieChart, Pie, Cell, XAxis, YAxis, CartesianGrid, Tooltip, Legend, ResponsiveContainer } from "recharts";
-import { TrendingUp, DollarSign, Package, ShoppingCart, Wallet, ArrowUpRight, ArrowDownRight } from "lucide-react";
+import { TrendingUp, DollarSign, Package, ShoppingCart, Wallet, ArrowUpRight, ArrowDownRight, RotateCw, AlertTriangle, Zap } from "lucide-react";
 import { format, subDays, startOfDay, endOfDay } from "date-fns";
 import { es } from "date-fns/locale";
 
@@ -248,6 +248,67 @@ const Reports = () => {
     },
   });
 
+  // Rotación de inventario
+  const { data: rotationData } = useQuery({
+    queryKey: ["reports-rotation", currentCompany?.id],
+    queryFn: async () => {
+      // Obtener productos con ventas en los últimos 90 días
+      const ninetyDaysAgo = subDays(new Date(), 90);
+      
+      const { data: products, error: productsError } = await supabase
+        .from("products")
+        .select("id, name, stock, cost")
+        .eq("company_id", currentCompany?.id)
+        .eq("active", true);
+
+      if (productsError) throw productsError;
+
+      // Obtener ventas de cada producto en los últimos 90 días
+      const { data: saleItems, error: salesError } = await supabase
+        .from("sale_items")
+        .select(`
+          product_id,
+          quantity,
+          sales!inner(created_at, company_id)
+        `)
+        .eq("sales.company_id", currentCompany?.id)
+        .gte("sales.created_at", ninetyDaysAgo.toISOString());
+
+      if (salesError) throw salesError;
+
+      // Calcular métricas por producto
+      const productMetrics = products?.map(product => {
+        const productSales = saleItems?.filter((item: any) => item.product_id === product.id) || [];
+        const totalSold = productSales.reduce((sum: number, item: any) => sum + item.quantity, 0);
+        const avgDailySales = totalSold / 90;
+        const rotationDays = avgDailySales > 0 ? product.stock / avgDailySales : 999;
+        const lastSaleDate = productSales.length > 0 
+          ? Math.max(...productSales.map((s: any) => new Date(s.sales.created_at).getTime()))
+          : 0;
+        const daysSinceLastSale = lastSaleDate ? Math.floor((Date.now() - lastSaleDate) / (1000 * 60 * 60 * 24)) : 999;
+
+        let category = "Baja";
+        if (rotationDays < 15) category = "Alta";
+        else if (rotationDays < 45) category = "Media";
+        
+        return {
+          id: product.id,
+          name: product.name,
+          stock: product.stock,
+          totalSold,
+          avgDailySales: avgDailySales.toFixed(2),
+          rotationDays: Math.round(rotationDays),
+          category,
+          daysSinceLastSale,
+          isDeadStock: daysSinceLastSale > 90,
+          stockValue: product.stock * (product.cost || 0)
+        };
+      }) || [];
+
+      return productMetrics.sort((a, b) => a.rotationDays - b.rotationDays);
+    },
+  });
+
   const StatCard = ({ title, value, icon: Icon, trend, trendValue }: any) => (
     <Card>
       <CardHeader className="flex flex-row items-center justify-between pb-2">
@@ -317,13 +378,14 @@ const Reports = () => {
 
         {/* Gráficos */}
         <Tabs defaultValue="sales" className="space-y-4">
-          <TabsList className="grid w-full grid-cols-6">
+          <TabsList className="grid w-full grid-cols-7">
             <TabsTrigger value="sales">Ventas</TabsTrigger>
             <TabsTrigger value="customers">Por Cliente</TabsTrigger>
             <TabsTrigger value="products">Productos</TabsTrigger>
             <TabsTrigger value="balances">Saldos</TabsTrigger>
             <TabsTrigger value="purchases">Compras</TabsTrigger>
             <TabsTrigger value="payments">Pagos</TabsTrigger>
+            <TabsTrigger value="rotation">Rotación</TabsTrigger>
           </TabsList>
 
           <TabsContent value="sales" className="space-y-4">
@@ -480,6 +542,114 @@ const Reports = () => {
                     <Tooltip />
                   </PieChart>
                 </ResponsiveContainer>
+              </CardContent>
+            </Card>
+          </TabsContent>
+
+          <TabsContent value="rotation" className="space-y-4">
+            {/* Resumen de rotación */}
+            <div className="grid gap-4 md:grid-cols-3">
+              <Card>
+                <CardHeader className="flex flex-row items-center justify-between pb-2">
+                  <CardTitle className="text-sm font-medium text-muted-foreground">Alta Rotación</CardTitle>
+                  <Zap className="h-4 w-4 text-green-600" />
+                </CardHeader>
+                <CardContent>
+                  <div className="text-2xl font-bold">
+                    {rotationData?.filter(p => p.category === "Alta").length || 0}
+                  </div>
+                  <p className="text-xs text-muted-foreground">Productos con rotación {'<'} 15 días</p>
+                </CardContent>
+              </Card>
+              
+              <Card>
+                <CardHeader className="flex flex-row items-center justify-between pb-2">
+                  <CardTitle className="text-sm font-medium text-muted-foreground">Baja Rotación</CardTitle>
+                  <RotateCw className="h-4 w-4 text-orange-600" />
+                </CardHeader>
+                <CardContent>
+                  <div className="text-2xl font-bold">
+                    {rotationData?.filter(p => p.category === "Baja" && !p.isDeadStock).length || 0}
+                  </div>
+                  <p className="text-xs text-muted-foreground">Productos con rotación {'>'} 45 días</p>
+                </CardContent>
+              </Card>
+
+              <Card>
+                <CardHeader className="flex flex-row items-center justify-between pb-2">
+                  <CardTitle className="text-sm font-medium text-muted-foreground">Stock Muerto</CardTitle>
+                  <AlertTriangle className="h-4 w-4 text-destructive" />
+                </CardHeader>
+                <CardContent>
+                  <div className="text-2xl font-bold">
+                    {rotationData?.filter(p => p.isDeadStock).length || 0}
+                  </div>
+                  <p className="text-xs text-muted-foreground">Sin ventas en {'>'} 90 días</p>
+                </CardContent>
+              </Card>
+            </div>
+
+            {/* Tabla de rotación */}
+            <Card>
+              <CardHeader>
+                <CardTitle>Detalle de Rotación de Inventario</CardTitle>
+              </CardHeader>
+              <CardContent>
+                <div className="overflow-auto max-h-[500px]">
+                  <table className="w-full">
+                    <thead className="bg-muted sticky top-0">
+                      <tr>
+                        <th className="text-left p-2 font-semibold">Producto</th>
+                        <th className="text-right p-2 font-semibold">Stock</th>
+                        <th className="text-right p-2 font-semibold">Vendido (90d)</th>
+                        <th className="text-right p-2 font-semibold">Días Rotación</th>
+                        <th className="text-center p-2 font-semibold">Categoría</th>
+                        <th className="text-right p-2 font-semibold">Última Venta</th>
+                        <th className="text-right p-2 font-semibold">Valor Stock</th>
+                      </tr>
+                    </thead>
+                    <tbody>
+                      {rotationData?.map((item: any, idx: number) => (
+                        <tr 
+                          key={idx} 
+                          className={`border-b hover:bg-muted/50 ${item.isDeadStock ? 'bg-destructive/5' : ''}`}
+                        >
+                          <td className="p-2">
+                            {item.name}
+                            {item.isDeadStock && (
+                              <span className="ml-2 text-xs text-destructive">★ Muerto</span>
+                            )}
+                          </td>
+                          <td className="text-right p-2">{item.stock}</td>
+                          <td className="text-right p-2">{item.totalSold}</td>
+                          <td className="text-right p-2">
+                            <span className={
+                              item.rotationDays < 15 ? 'text-green-600 font-semibold' :
+                              item.rotationDays < 45 ? 'text-orange-600' :
+                              'text-destructive'
+                            }>
+                              {item.rotationDays >= 999 ? '∞' : item.rotationDays}
+                            </span>
+                          </td>
+                          <td className="text-center p-2">
+                            <span className={`inline-flex items-center px-2 py-1 rounded-full text-xs font-medium
+                              ${item.category === 'Alta' ? 'bg-green-100 text-green-800 dark:bg-green-900/30 dark:text-green-400' :
+                                item.category === 'Media' ? 'bg-orange-100 text-orange-800 dark:bg-orange-900/30 dark:text-orange-400' :
+                                'bg-red-100 text-red-800 dark:bg-red-900/30 dark:text-red-400'}`}>
+                              {item.category}
+                            </span>
+                          </td>
+                          <td className="text-right p-2">
+                            {item.daysSinceLastSale >= 999 ? 'Nunca' : `${item.daysSinceLastSale}d`}
+                          </td>
+                          <td className="text-right p-2">
+                            ${item.stockValue.toLocaleString()}
+                          </td>
+                        </tr>
+                      ))}
+                    </tbody>
+                  </table>
+                </div>
               </CardContent>
             </Card>
           </TabsContent>
