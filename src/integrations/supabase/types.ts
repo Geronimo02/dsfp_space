@@ -1389,6 +1389,80 @@ export type Database = {
           },
         ]
       }
+      employees: {
+        Row: {
+          active: boolean | null
+          address: string | null
+          base_salary: number
+          company_id: string | null
+          created_at: string | null
+          department: string | null
+          document_number: string | null
+          document_type: string | null
+          email: string | null
+          first_name: string
+          hire_date: string
+          id: string
+          last_name: string
+          notes: string | null
+          phone: string | null
+          position: string | null
+          salary_type: string | null
+          termination_date: string | null
+          updated_at: string | null
+        }
+        Insert: {
+          active?: boolean | null
+          address?: string | null
+          base_salary?: number
+          company_id?: string | null
+          created_at?: string | null
+          department?: string | null
+          document_number?: string | null
+          document_type?: string | null
+          email?: string | null
+          first_name: string
+          hire_date: string
+          id?: string
+          last_name: string
+          notes?: string | null
+          phone?: string | null
+          position?: string | null
+          salary_type?: string | null
+          termination_date?: string | null
+          updated_at?: string | null
+        }
+        Update: {
+          active?: boolean | null
+          address?: string | null
+          base_salary?: number
+          company_id?: string | null
+          created_at?: string | null
+          department?: string | null
+          document_number?: string | null
+          document_type?: string | null
+          email?: string | null
+          first_name?: string
+          hire_date?: string
+          id?: string
+          last_name?: string
+          notes?: string | null
+          phone?: string | null
+          position?: string | null
+          salary_type?: string | null
+          termination_date?: string | null
+          updated_at?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "employees_company_id_fkey"
+            columns: ["company_id"]
+            isOneToOne: false
+            referencedRelation: "companies"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       exchange_rate_history: {
         Row: {
           changed_at: string | null
@@ -1629,6 +1703,190 @@ export type Database = {
           },
         ]
       }
+      integration_logs: {
+        Row: {
+          action: string
+          company_id: string | null
+          created_at: string | null
+          details: Json | null
+          id: string
+          integration_id: string | null
+          message: string | null
+          status: string
+        }
+        Insert: {
+          action: string
+          company_id?: string | null
+          created_at?: string | null
+          details?: Json | null
+          id?: string
+          integration_id?: string | null
+          message?: string | null
+          status: string
+        }
+        Update: {
+          action?: string
+          company_id?: string | null
+          created_at?: string | null
+          details?: Json | null
+          id?: string
+          integration_id?: string | null
+          message?: string | null
+          status?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "integration_logs_company_id_fkey"
+            columns: ["company_id"]
+            isOneToOne: false
+            referencedRelation: "companies"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "integration_logs_integration_id_fkey"
+            columns: ["integration_id"]
+            isOneToOne: false
+            referencedRelation: "integrations"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      integration_orders: {
+        Row: {
+          company_id: string | null
+          created_at: string | null
+          customer_email: string | null
+          customer_name: string
+          customer_phone: string | null
+          error_message: string | null
+          external_order_id: string
+          id: string
+          integration_id: string | null
+          order_data: Json
+          processed_at: string | null
+          quotation_id: string | null
+          sale_id: string | null
+          status: string | null
+        }
+        Insert: {
+          company_id?: string | null
+          created_at?: string | null
+          customer_email?: string | null
+          customer_name: string
+          customer_phone?: string | null
+          error_message?: string | null
+          external_order_id: string
+          id?: string
+          integration_id?: string | null
+          order_data: Json
+          processed_at?: string | null
+          quotation_id?: string | null
+          sale_id?: string | null
+          status?: string | null
+        }
+        Update: {
+          company_id?: string | null
+          created_at?: string | null
+          customer_email?: string | null
+          customer_name?: string
+          customer_phone?: string | null
+          error_message?: string | null
+          external_order_id?: string
+          id?: string
+          integration_id?: string | null
+          order_data?: Json
+          processed_at?: string | null
+          quotation_id?: string | null
+          sale_id?: string | null
+          status?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "integration_orders_company_id_fkey"
+            columns: ["company_id"]
+            isOneToOne: false
+            referencedRelation: "companies"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "integration_orders_integration_id_fkey"
+            columns: ["integration_id"]
+            isOneToOne: false
+            referencedRelation: "integrations"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "integration_orders_quotation_id_fkey"
+            columns: ["quotation_id"]
+            isOneToOne: false
+            referencedRelation: "quotations"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "integration_orders_sale_id_fkey"
+            columns: ["sale_id"]
+            isOneToOne: false
+            referencedRelation: "sales"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      integrations: {
+        Row: {
+          active: boolean | null
+          auto_email: boolean | null
+          auto_invoice: boolean | null
+          company_id: string | null
+          config: Json | null
+          created_at: string | null
+          credentials: Json | null
+          id: string
+          integration_type: string
+          last_sync_at: string | null
+          name: string
+          sync_frequency: string | null
+          updated_at: string | null
+        }
+        Insert: {
+          active?: boolean | null
+          auto_email?: boolean | null
+          auto_invoice?: boolean | null
+          company_id?: string | null
+          config?: Json | null
+          created_at?: string | null
+          credentials?: Json | null
+          id?: string
+          integration_type: string
+          last_sync_at?: string | null
+          name: string
+          sync_frequency?: string | null
+          updated_at?: string | null
+        }
+        Update: {
+          active?: boolean | null
+          auto_email?: boolean | null
+          auto_invoice?: boolean | null
+          company_id?: string | null
+          config?: Json | null
+          created_at?: string | null
+          credentials?: Json | null
+          id?: string
+          integration_type?: string
+          last_sync_at?: string | null
+          name?: string
+          sync_frequency?: string | null
+          updated_at?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "integrations_company_id_fkey"
+            columns: ["company_id"]
+            isOneToOne: false
+            referencedRelation: "companies"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       invoice_payment_applications: {
         Row: {
           amount_applied: number
@@ -1864,6 +2122,185 @@ export type Database = {
             columns: ["company_id"]
             isOneToOne: false
             referencedRelation: "companies"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      payroll_concepts: {
+        Row: {
+          active: boolean | null
+          calculation_type: string | null
+          code: string
+          company_id: string | null
+          concept_type: string
+          created_at: string | null
+          default_value: number | null
+          description: string | null
+          id: string
+          name: string
+          updated_at: string | null
+        }
+        Insert: {
+          active?: boolean | null
+          calculation_type?: string | null
+          code: string
+          company_id?: string | null
+          concept_type: string
+          created_at?: string | null
+          default_value?: number | null
+          description?: string | null
+          id?: string
+          name: string
+          updated_at?: string | null
+        }
+        Update: {
+          active?: boolean | null
+          calculation_type?: string | null
+          code?: string
+          company_id?: string | null
+          concept_type?: string
+          created_at?: string | null
+          default_value?: number | null
+          description?: string | null
+          id?: string
+          name?: string
+          updated_at?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "payroll_concepts_company_id_fkey"
+            columns: ["company_id"]
+            isOneToOne: false
+            referencedRelation: "companies"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      payroll_liquidation_items: {
+        Row: {
+          concept_code: string
+          concept_id: string | null
+          concept_name: string
+          concept_type: string
+          created_at: string | null
+          id: string
+          liquidation_id: string | null
+          quantity: number | null
+          total_amount: number
+          unit_value: number
+        }
+        Insert: {
+          concept_code: string
+          concept_id?: string | null
+          concept_name: string
+          concept_type: string
+          created_at?: string | null
+          id?: string
+          liquidation_id?: string | null
+          quantity?: number | null
+          total_amount: number
+          unit_value: number
+        }
+        Update: {
+          concept_code?: string
+          concept_id?: string | null
+          concept_name?: string
+          concept_type?: string
+          created_at?: string | null
+          id?: string
+          liquidation_id?: string | null
+          quantity?: number | null
+          total_amount?: number
+          unit_value?: number
+        }
+        Relationships: [
+          {
+            foreignKeyName: "payroll_liquidation_items_concept_id_fkey"
+            columns: ["concept_id"]
+            isOneToOne: false
+            referencedRelation: "payroll_concepts"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "payroll_liquidation_items_liquidation_id_fkey"
+            columns: ["liquidation_id"]
+            isOneToOne: false
+            referencedRelation: "payroll_liquidations"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      payroll_liquidations: {
+        Row: {
+          approved_by: string | null
+          base_salary: number
+          company_id: string | null
+          created_at: string | null
+          created_by: string
+          employee_id: string | null
+          id: string
+          net_salary: number | null
+          notes: string | null
+          paid_at: string | null
+          period_month: number
+          period_year: number
+          status: string | null
+          total_deductions: number | null
+          total_non_remunerative: number | null
+          total_remunerative: number | null
+          updated_at: string | null
+        }
+        Insert: {
+          approved_by?: string | null
+          base_salary?: number
+          company_id?: string | null
+          created_at?: string | null
+          created_by: string
+          employee_id?: string | null
+          id?: string
+          net_salary?: number | null
+          notes?: string | null
+          paid_at?: string | null
+          period_month: number
+          period_year: number
+          status?: string | null
+          total_deductions?: number | null
+          total_non_remunerative?: number | null
+          total_remunerative?: number | null
+          updated_at?: string | null
+        }
+        Update: {
+          approved_by?: string | null
+          base_salary?: number
+          company_id?: string | null
+          created_at?: string | null
+          created_by?: string
+          employee_id?: string | null
+          id?: string
+          net_salary?: number | null
+          notes?: string | null
+          paid_at?: string | null
+          period_month?: number
+          period_year?: number
+          status?: string | null
+          total_deductions?: number | null
+          total_non_remunerative?: number | null
+          total_remunerative?: number | null
+          updated_at?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "payroll_liquidations_company_id_fkey"
+            columns: ["company_id"]
+            isOneToOne: false
+            referencedRelation: "companies"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "payroll_liquidations_employee_id_fkey"
+            columns: ["employee_id"]
+            isOneToOne: false
+            referencedRelation: "employees"
             referencedColumns: ["id"]
           },
         ]
