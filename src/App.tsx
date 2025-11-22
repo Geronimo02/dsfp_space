@@ -115,6 +115,8 @@ function AuthOnlyRoute({ children }: { children: React.ReactNode }) {
   const [user, setUser] = useState<User | null>(null);
   const [session, setSession] = useState<Session | null>(null);
   const [loading, setLoading] = useState(true);
+  const [isPlatformAdmin, setIsPlatformAdmin] = useState(false);
+  const [checkingAdmin, setCheckingAdmin] = useState(true);
 
   useEffect(() => {
     const { data: { subscription } } = supabase.auth.onAuthStateChange(
@@ -134,12 +136,40 @@ function AuthOnlyRoute({ children }: { children: React.ReactNode }) {
     return () => subscription.unsubscribe();
   }, []);
 
-  if (loading) {
+  useEffect(() => {
+    const checkPlatformAdmin = async () => {
+      if (!user) {
+        setCheckingAdmin(false);
+        return;
+      }
+
+      const { data } = await supabase
+        .from("platform_admins")
+        .select("active")
+        .eq("user_id", user.id)
+        .eq("active", true)
+        .single();
+
+      setIsPlatformAdmin(!!data);
+      setCheckingAdmin(false);
+    };
+
+    if (!loading) {
+      checkPlatformAdmin();
+    }
+  }, [user, loading]);
+
+  if (loading || checkingAdmin) {
     return <div className="flex items-center justify-center min-h-screen">Cargando...</div>;
   }
 
   if (!user) {
     return <Navigate to="/auth" />;
+  }
+
+  // Platform admins bypass company setup and go to platform admin
+  if (isPlatformAdmin) {
+    return <Navigate to="/admin/platform" replace />;
   }
 
   return <>{children}</>;

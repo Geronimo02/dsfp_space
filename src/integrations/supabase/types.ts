@@ -2386,6 +2386,94 @@ export type Database = {
         }
         Relationships: []
       }
+      platform_feedback: {
+        Row: {
+          admin_notes: string | null
+          category: string
+          company_id: string
+          created_at: string | null
+          id: string
+          message: string
+          rating: number | null
+          status: string
+          updated_at: string | null
+          user_id: string
+        }
+        Insert: {
+          admin_notes?: string | null
+          category: string
+          company_id: string
+          created_at?: string | null
+          id?: string
+          message: string
+          rating?: number | null
+          status?: string
+          updated_at?: string | null
+          user_id: string
+        }
+        Update: {
+          admin_notes?: string | null
+          category?: string
+          company_id?: string
+          created_at?: string | null
+          id?: string
+          message?: string
+          rating?: number | null
+          status?: string
+          updated_at?: string | null
+          user_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "platform_feedback_company_id_fkey"
+            columns: ["company_id"]
+            isOneToOne: false
+            referencedRelation: "companies"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      platform_notifications: {
+        Row: {
+          company_id: string | null
+          created_at: string | null
+          id: string
+          message: string
+          notification_type: string
+          read: boolean | null
+          severity: string
+          title: string
+        }
+        Insert: {
+          company_id?: string | null
+          created_at?: string | null
+          id?: string
+          message: string
+          notification_type: string
+          read?: boolean | null
+          severity?: string
+          title: string
+        }
+        Update: {
+          company_id?: string | null
+          created_at?: string | null
+          id?: string
+          message?: string
+          notification_type?: string
+          read?: boolean | null
+          severity?: string
+          title?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "platform_notifications_company_id_fkey"
+            columns: ["company_id"]
+            isOneToOne: false
+            referencedRelation: "companies"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       pos_afip: {
         Row: {
           active: boolean | null
@@ -4532,6 +4620,7 @@ export type Database = {
       check_inactive_customers: { Args: never; Returns: undefined }
       check_low_stock_alerts: { Args: never; Returns: undefined }
       check_overdue_invoices: { Args: never; Returns: undefined }
+      check_overdue_subscriptions: { Args: never; Returns: undefined }
       create_company_with_admin: {
         Args: {
           company_address?: string
