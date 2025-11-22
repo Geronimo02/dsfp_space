@@ -34,7 +34,9 @@ import {
   TrendingUp,
   Landmark,
   TrendingDown,
-  FileBarChart
+  FileBarChart,
+  Briefcase,
+  Plug
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { supabase } from "@/integrations/supabase/client";
@@ -106,6 +108,18 @@ const navigationSections = [
       { name: "Movimientos de Tarjetas", href: "/card-movements", icon: CreditCard },
       { name: "Retenciones", href: "/retentions", icon: FileBarChart },
     ]
+  },
+  {
+    title: "Integraciones",
+    items: [
+      { name: "Integraciones", href: "/integrations", icon: Plug },
+    ],
+  },
+  {
+    title: "RRHH",
+    items: [
+      { name: "Liquidaciones", href: "/payroll", icon: DollarSign },
+    ],
   },
   {
     title: "Reportes & Admin",

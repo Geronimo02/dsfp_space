@@ -48,6 +48,8 @@ import BankAccounts from "./pages/BankAccounts";
 import BankMovements from "./pages/BankMovements";
 import CardMovements from "./pages/CardMovements";
 import Retentions from "./pages/Retentions";
+import Integrations from "./pages/Integrations";
+import Payroll from "./pages/Payroll";
 import NotFound from "./pages/NotFound";
 
 const queryClient = new QueryClient();
@@ -195,6 +197,8 @@ const App = () => (
            <Route path="/bank-movements" element={<ProtectedRoute><BankMovements /></ProtectedRoute>} />
            <Route path="/card-movements" element={<ProtectedRoute><CardMovements /></ProtectedRoute>} />
            <Route path="/retentions" element={<ProtectedRoute><Retentions /></ProtectedRoute>} />
+           <Route path="/integrations" element={<ProtectedRoute><Integrations /></ProtectedRoute>} />
+           <Route path="/payroll" element={<ProtectedRoute><Payroll /></ProtectedRoute>} />
            <Route path="/ai-assistant" element={<ProtectedRoute><AIAssistantPage /></ProtectedRoute>} />
            <Route path="/settings" element={<ProtectedRoute><Settings /></ProtectedRoute>} />
            {/* ADD ALL CUSTOM ROUTES ABOVE THE CATCH-ALL "*" ROUTE */}
