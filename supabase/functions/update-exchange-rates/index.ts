@@ -5,14 +5,13 @@ const corsHeaders = {
   'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type',
 };
 
-interface BancoNacionRate {
-  venta: number;
+interface DolarApiResponse {
+  moneda: string;
+  casa: string;
+  nombre: string;
   compra: number;
-}
-
-interface BancoNacionResponse {
-  'Dolar U.S.A': BancoNacionRate;
-  'Euro': BancoNacionRate;
+  venta: number;
+  fechaActualizacion: string;
 }
 
 Deno.serve(async (req) => {
@@ -22,60 +21,88 @@ Deno.serve(async (req) => {
   }
 
   try {
-    console.log('Starting exchange rate update from Banco Nación...');
+    console.log('Starting exchange rate update from DolarApi...');
 
     // Initialize Supabase client
     const supabaseUrl = Deno.env.get('SUPABASE_URL')!;
     const supabaseServiceKey = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')!;
     const supabase = createClient(supabaseUrl, supabaseServiceKey);
 
-    // Fetch exchange rates from Banco Nación API
-    const bancoNacionResponse = await fetch('https://www.bna.com.ar/Cotizador/LatestPrices', {
+    // Fetch USD rate from DolarApi (Dólar Oficial)
+    const usdResponse = await fetch('https://dolarapi.com/v1/dolares/oficial', {
       headers: {
         'Accept': 'application/json',
-        'User-Agent': 'Mozilla/5.0',
       },
     });
 
-    if (!bancoNacionResponse.ok) {
-      throw new Error(`Banco Nación API error: ${bancoNacionResponse.statusText}`);
+    if (!usdResponse.ok) {
+      console.error('DolarApi USD error:', usdResponse.status, usdResponse.statusText);
+      const responseText = await usdResponse.text();
+      console.error('Response body:', responseText);
+      throw new Error(`DolarApi USD error: ${usdResponse.statusText}`);
     }
 
-    const bancoNacionData: BancoNacionResponse = await bancoNacionResponse.json();
-    console.log('Fetched rates from Banco Nación:', bancoNacionData);
+    const usdData: DolarApiResponse = await usdResponse.json();
+    console.log('Fetched USD rate from DolarApi:', usdData);
 
-    // Extract USD and EUR rates (using "venta" price)
-    const usdRate = bancoNacionData['Dolar U.S.A']?.venta;
-    const eurRate = bancoNacionData['Euro']?.venta;
+    // Fetch EUR rate from DolarApi (Euro Oficial)
+    const eurResponse = await fetch('https://dolarapi.com/v1/cotizaciones/eur', {
+      headers: {
+        'Accept': 'application/json',
+      },
+    });
+
+    if (!eurResponse.ok) {
+      console.error('DolarApi EUR error:', eurResponse.status, eurResponse.statusText);
+      const responseText = await eurResponse.text();
+      console.error('Response body:', responseText);
+      throw new Error(`DolarApi EUR error: ${eurResponse.statusText}`);
+    }
+
+    const eurData: DolarApiResponse = await eurResponse.json();
+    console.log('Fetched EUR rate from DolarApi:', eurData);
+
+    // Use the "venta" (sell) price as the exchange rate
+    const usdRate = usdData.venta;
+    const eurRate = eurData.venta;
 
     if (!usdRate || !eurRate) {
-      throw new Error('Could not extract USD or EUR rates from Banco Nación response');
+      throw new Error('Could not extract USD or EUR rates from DolarApi response');
     }
+
+    console.log(`Rates fetched - USD: ${usdRate}, EUR: ${eurRate}`);
 
     // Get all companies with auto-update enabled
     const { data: settings, error: settingsError } = await supabase
       .from('exchange_rate_settings')
       .select('company_id, last_update')
-      .eq('auto_update', true)
-      .eq('source', 'banco_nacion');
+      .eq('auto_update', true);
 
     if (settingsError) {
+      console.error('Error fetching settings:', settingsError);
       throw new Error(`Error fetching settings: ${settingsError.message}`);
     }
 
     // If no companies have auto-update enabled, update all active companies
-    const { data: companies, error: companiesError } = await supabase
-      .from('companies')
-      .select('id')
-      .eq('active', true);
+    let companyIds: string[] = [];
+    
+    if (!settings || settings.length === 0) {
+      console.log('No companies with auto-update, fetching all active companies...');
+      const { data: companies, error: companiesError } = await supabase
+        .from('companies')
+        .select('id')
+        .eq('active', true);
 
-    if (companiesError) {
-      throw new Error(`Error fetching companies: ${companiesError.message}`);
+      if (companiesError) {
+        throw new Error(`Error fetching companies: ${companiesError.message}`);
+      }
+
+      companyIds = (companies || []).map(c => c.id);
+    } else {
+      companyIds = settings.map(s => s.company_id);
     }
 
-    const companyIds = settings && settings.length > 0 
-      ? settings.map(s => s.company_id)
-      : (companies || []).map(c => c.id);
+    console.log(`Updating rates for ${companyIds.length} companies`);
 
     let updatedCount = 0;
     const results: any[] = [];
@@ -94,55 +121,55 @@ Deno.serve(async (req) => {
         const currentEurRate = currentRates?.find(r => r.currency === 'EUR')?.rate;
 
         // Update USD
-        if (currentUsdRate !== usdRate) {
-          const { error: usdError } = await supabase
-            .from('exchange_rates')
-            .upsert({
-              company_id: companyId,
-              currency: 'USD',
-              rate: usdRate,
-              updated_at: new Date().toISOString(),
-            }, {
-              onConflict: 'company_id,currency'
-            });
+        const { error: usdError } = await supabase
+          .from('exchange_rates')
+          .upsert({
+            company_id: companyId,
+            currency: 'USD',
+            rate: usdRate,
+            updated_at: new Date().toISOString(),
+          }, {
+            onConflict: 'company_id,currency'
+          });
 
-          if (!usdError) {
-            // Log history
-            await supabase.from('exchange_rate_history').insert({
-              company_id: companyId,
-              currency: 'USD',
-              old_rate: currentUsdRate,
-              new_rate: usdRate,
-              source: 'banco_nacion',
-            });
-            updatedCount++;
-          }
+        if (usdError) {
+          console.error(`Error updating USD for company ${companyId}:`, usdError);
+        } else if (currentUsdRate !== usdRate) {
+          // Log history only if rate changed
+          await supabase.from('exchange_rate_history').insert({
+            company_id: companyId,
+            currency: 'USD',
+            old_rate: currentUsdRate,
+            new_rate: usdRate,
+            source: 'dolarapi',
+          });
+          updatedCount++;
         }
 
         // Update EUR
-        if (currentEurRate !== eurRate) {
-          const { error: eurError } = await supabase
-            .from('exchange_rates')
-            .upsert({
-              company_id: companyId,
-              currency: 'EUR',
-              rate: eurRate,
-              updated_at: new Date().toISOString(),
-            }, {
-              onConflict: 'company_id,currency'
-            });
+        const { error: eurError } = await supabase
+          .from('exchange_rates')
+          .upsert({
+            company_id: companyId,
+            currency: 'EUR',
+            rate: eurRate,
+            updated_at: new Date().toISOString(),
+          }, {
+            onConflict: 'company_id,currency'
+          });
 
-          if (!eurError) {
-            // Log history
-            await supabase.from('exchange_rate_history').insert({
-              company_id: companyId,
-              currency: 'EUR',
-              old_rate: currentEurRate,
-              new_rate: eurRate,
-              source: 'banco_nacion',
-            });
-            updatedCount++;
-          }
+        if (eurError) {
+          console.error(`Error updating EUR for company ${companyId}:`, eurError);
+        } else if (currentEurRate !== eurRate) {
+          // Log history only if rate changed
+          await supabase.from('exchange_rate_history').insert({
+            company_id: companyId,
+            currency: 'EUR',
+            old_rate: currentEurRate,
+            new_rate: eurRate,
+            source: 'dolarapi',
+          });
+          updatedCount++;
         }
 
         // Update last_update timestamp in settings
@@ -152,7 +179,7 @@ Deno.serve(async (req) => {
             company_id: companyId,
             last_update: new Date().toISOString(),
             auto_update: true,
-            source: 'banco_nacion',
+            source: 'dolarapi',
           }, {
             onConflict: 'company_id'
           });
@@ -162,6 +189,8 @@ Deno.serve(async (req) => {
           success: true,
           usd_rate: usdRate,
           eur_rate: eurRate,
+          usd_changed: currentUsdRate !== usdRate,
+          eur_changed: currentEurRate !== eurRate,
         });
 
       } catch (error: any) {
@@ -184,6 +213,7 @@ Deno.serve(async (req) => {
           USD: usdRate,
           EUR: eurRate,
         },
+        source: 'dolarapi',
         timestamp: new Date().toISOString(),
         results,
       }),
@@ -195,10 +225,21 @@ Deno.serve(async (req) => {
 
   } catch (error: any) {
     console.error('Error updating exchange rates:', error);
+    
+    // Include more details in error response
+    const errorMessage = error?.message || 'Unknown error';
+    const errorStack = error?.stack || 'No stack trace';
+    
+    console.error('Error details:', {
+      message: errorMessage,
+      stack: errorStack,
+    });
+
     return new Response(
       JSON.stringify({
         success: false,
-        error: error?.message || 'Unknown error',
+        error: errorMessage,
+        details: error?.toString(),
         timestamp: new Date().toISOString(),
       }),
       {
