@@ -9,7 +9,7 @@ import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
 import { sanitizeSearchQuery } from "@/lib/searchUtils";
-import { Plus, Edit, Trash2, Search, Upload, Download, X, Package, ChevronDown, ChevronRight, DollarSign, AlertCircle, CheckCircle2, Info, Image as ImageIcon, BarChart3, ShoppingCart } from "lucide-react";
+import { Plus, Edit, Trash2, Search, Upload, Download, X, Package, ChevronDown, ChevronRight, DollarSign, AlertCircle, CheckCircle2, Info, Image as ImageIcon, BarChart3, ShoppingCart, PackageOpen } from "lucide-react";
 import { useNavigate } from "react-router-dom";
 import { toast } from "sonner";
 import { Badge } from "@/components/ui/badge";
@@ -23,6 +23,8 @@ import { Collapsible, CollapsibleContent, CollapsibleTrigger } from "@/component
 import { useCompany } from "@/contexts/CompanyContext";
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip";
 import { compressImage, isValidImage, formatFileSize } from "@/lib/imageUtils";
+import { ComboComponentsDialog } from "@/components/products/ComboComponentsDialog";
+import { Switch } from "@/components/ui/switch";
 
 const productSchema = z.object({
   name: z.string().trim().min(1, "El nombre es requerido").max(200, "El nombre debe tener máximo 200 caracteres"),
@@ -99,6 +101,7 @@ export default function Products() {
     location: "",
     batch_number: "",
     expiration_date: "",
+    is_combo: false,
   });
   const [imageFile, setImageFile] = useState<File | null>(null);
   const [imagePreview, setImagePreview] = useState<string>("");
@@ -123,6 +126,8 @@ export default function Products() {
   const [isPriceListDialogOpen, setIsPriceListDialogOpen] = useState(false);
   const [priceListProduct, setPriceListProduct] = useState<any>(null);
   const [priceListPrices, setPriceListPrices] = useState<Record<string, string>>({});
+  const [isComboDialogOpen, setIsComboDialogOpen] = useState(false);
+  const [comboProduct, setComboProduct] = useState<any>(null);
   const queryClient = useQueryClient();
 
   const { data: products, isLoading } = useQuery({
@@ -429,6 +434,7 @@ export default function Products() {
       location: "",
       batch_number: "",
       expiration_date: "",
+      is_combo: false,
     });
     setEditingProduct(null);
     setImageFile(null);
@@ -492,11 +498,14 @@ export default function Products() {
         price: validatedData.price,
         cost: validatedData.cost ?? 0,
         stock: validatedData.stock,
+        stock_physical: validatedData.stock,
+        stock_reserved: 0,
         min_stock: validatedData.min_stock ?? 0,
         category: validatedData.category || null,
         location: validatedData.location || null,
         batch_number: validatedData.batch_number || null,
         expiration_date: validatedData.expiration_date || null,
+        is_combo: formData.is_combo,
         last_restock_date: editingProduct ? undefined : new Date().toISOString(),
         company_id: currentCompany.id,
       };
@@ -533,6 +542,7 @@ export default function Products() {
       location: product.location || "",
       batch_number: product.batch_number || "",
       expiration_date: product.expiration_date || "",
+      is_combo: product.is_combo || false,
     });
     setImagePreview(product.image_url || "");
     setImageFile(null);
@@ -1188,6 +1198,40 @@ export default function Products() {
                   </div>
                 </div>
 
+                {/* Producto Combo */}
+                <div className="space-y-4">
+                  <div className="flex items-center gap-2 pb-2 border-b">
+                    <div className="p-2 bg-purple-500/10 rounded-lg">
+                      <PackageOpen className="h-4 w-4 text-purple-600 dark:text-purple-500" />
+                    </div>
+                    <h3 className="text-sm font-semibold">
+                      Producto Combo/Mix
+                    </h3>
+                  </div>
+                  <div className="flex items-center justify-between p-4 border rounded-lg">
+                    <div className="space-y-1">
+                      <Label htmlFor="is_combo" className="text-sm font-medium cursor-pointer">
+                        Este producto es un combo
+                      </Label>
+                      <p className="text-xs text-muted-foreground">
+                        Un combo está compuesto por otros productos. Al venderlo, se descontará el stock de sus componentes.
+                      </p>
+                    </div>
+                    <Switch
+                      id="is_combo"
+                      checked={formData.is_combo}
+                      onCheckedChange={(checked) => setFormData({ ...formData, is_combo: checked })}
+                    />
+                  </div>
+                  {formData.is_combo && editingProduct && (
+                    <div className="p-3 bg-muted/50 rounded-lg">
+                      <p className="text-sm text-muted-foreground mb-2">
+                        Para gestionar los componentes de este combo, guarda el producto y usa el botón "Gestionar Componentes" en la tabla.
+                      </p>
+                    </div>
+                  )}
+                </div>
+
                 {/* Información Adicional */}
                 <div className="space-y-4">
                   <div className="flex items-center gap-2 pb-2 border-b">
@@ -1507,7 +1551,20 @@ export default function Products() {
                                 <Package className="h-5 w-5 text-muted-foreground" />
                               </div>
                             )}
-                            <span className="font-medium">{product.name}</span>
+                            <div>
+                              <div className="flex items-center gap-2">
+                                <span className="font-medium">{product.name}</span>
+                                {product.is_combo && (
+                                  <Badge variant="outline" className="text-xs gap-1">
+                                    <PackageOpen className="h-3 w-3" />
+                                    Combo
+                                  </Badge>
+                                )}
+                              </div>
+                              {product.sku && (
+                                <span className="text-xs text-muted-foreground">SKU: {product.sku}</span>
+                              )}
+                            </div>
                           </div>
                         </TableCell>
                         <TableCell>
@@ -1627,6 +1684,27 @@ export default function Products() {
                                   <TooltipContent>Listas de precios</TooltipContent>
                                 </Tooltip>
                               </TooltipProvider>
+                              
+                              {product.is_combo && (
+                                <TooltipProvider>
+                                  <Tooltip>
+                                    <TooltipTrigger asChild>
+                                      <Button 
+                                        size="sm" 
+                                        variant="ghost" 
+                                        onClick={(e) => { 
+                                          e.stopPropagation(); 
+                                          setComboProduct(product);
+                                          setIsComboDialogOpen(true);
+                                        }}
+                                      >
+                                        <PackageOpen className="h-4 w-4" />
+                                      </Button>
+                                    </TooltipTrigger>
+                                    <TooltipContent>Gestionar componentes</TooltipContent>
+                                  </Tooltip>
+                                </TooltipProvider>
+                              )}
                               
                               <TooltipProvider>
                                 <Tooltip>
@@ -1803,6 +1881,19 @@ export default function Products() {
             </div>
           </DialogContent>
         </Dialog>
+
+        {/* Combo Components Dialog */}
+        {comboProduct && (
+          <ComboComponentsDialog
+            productId={comboProduct.id}
+            productName={comboProduct.name}
+            isOpen={isComboDialogOpen}
+            onClose={() => {
+              setIsComboDialogOpen(false);
+              setComboProduct(null);
+            }}
+          />
+        )}
       </div>
     </Layout>
   );

@@ -1770,6 +1770,58 @@ export type Database = {
           },
         ]
       }
+      product_components: {
+        Row: {
+          combo_product_id: string
+          company_id: string
+          component_product_id: string
+          created_at: string
+          id: string
+          quantity: number
+          updated_at: string
+        }
+        Insert: {
+          combo_product_id: string
+          company_id: string
+          component_product_id: string
+          created_at?: string
+          id?: string
+          quantity: number
+          updated_at?: string
+        }
+        Update: {
+          combo_product_id?: string
+          company_id?: string
+          component_product_id?: string
+          created_at?: string
+          id?: string
+          quantity?: number
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "product_components_combo_product_id_fkey"
+            columns: ["combo_product_id"]
+            isOneToOne: false
+            referencedRelation: "products"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "product_components_company_id_fkey"
+            columns: ["company_id"]
+            isOneToOne: false
+            referencedRelation: "companies"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "product_components_component_product_id_fkey"
+            columns: ["component_product_id"]
+            isOneToOne: false
+            referencedRelation: "products"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       product_prices: {
         Row: {
           created_at: string
@@ -1825,6 +1877,7 @@ export type Database = {
           expiration_date: string | null
           id: string
           image_url: string | null
+          is_combo: boolean
           last_restock_date: string | null
           location: string | null
           min_stock: number | null
@@ -1849,6 +1902,7 @@ export type Database = {
           expiration_date?: string | null
           id?: string
           image_url?: string | null
+          is_combo?: boolean
           last_restock_date?: string | null
           location?: string | null
           min_stock?: number | null
@@ -1873,6 +1927,7 @@ export type Database = {
           expiration_date?: string | null
           id?: string
           image_url?: string | null
+          is_combo?: boolean
           last_restock_date?: string | null
           location?: string | null
           min_stock?: number | null
@@ -3685,6 +3740,10 @@ export type Database = {
           sale_id: string
           status: string
         }[]
+      }
+      get_combo_available_stock: {
+        Args: { p_combo_product_id: string }
+        Returns: number
       }
       get_customer_movements: {
         Args: { customer_id: string }
