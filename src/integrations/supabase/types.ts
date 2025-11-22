@@ -808,6 +808,63 @@ export type Database = {
         }
         Relationships: []
       }
+      company_subscriptions: {
+        Row: {
+          amount_due: number | null
+          company_id: string
+          created_at: string | null
+          end_date: string | null
+          id: string
+          last_payment_date: string | null
+          next_payment_date: string | null
+          plan_id: string | null
+          start_date: string | null
+          status: string
+          updated_at: string | null
+        }
+        Insert: {
+          amount_due?: number | null
+          company_id: string
+          created_at?: string | null
+          end_date?: string | null
+          id?: string
+          last_payment_date?: string | null
+          next_payment_date?: string | null
+          plan_id?: string | null
+          start_date?: string | null
+          status?: string
+          updated_at?: string | null
+        }
+        Update: {
+          amount_due?: number | null
+          company_id?: string
+          created_at?: string | null
+          end_date?: string | null
+          id?: string
+          last_payment_date?: string | null
+          next_payment_date?: string | null
+          plan_id?: string | null
+          start_date?: string | null
+          status?: string
+          updated_at?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "company_subscriptions_company_id_fkey"
+            columns: ["company_id"]
+            isOneToOne: false
+            referencedRelation: "companies"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "company_subscriptions_plan_id_fkey"
+            columns: ["plan_id"]
+            isOneToOne: false
+            referencedRelation: "subscription_plans"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       company_users: {
         Row: {
           active: boolean | null
@@ -2304,6 +2361,30 @@ export type Database = {
             referencedColumns: ["id"]
           },
         ]
+      }
+      platform_admins: {
+        Row: {
+          active: boolean | null
+          created_at: string | null
+          email: string
+          id: string
+          user_id: string
+        }
+        Insert: {
+          active?: boolean | null
+          created_at?: string | null
+          email: string
+          id?: string
+          user_id: string
+        }
+        Update: {
+          active?: boolean | null
+          created_at?: string | null
+          email?: string
+          id?: string
+          user_id?: string
+        }
+        Relationships: []
       }
       pos_afip: {
         Row: {
@@ -3815,6 +3896,45 @@ export type Database = {
           },
         ]
       }
+      subscription_plans: {
+        Row: {
+          active: boolean | null
+          billing_period: string
+          created_at: string | null
+          description: string | null
+          features: Json | null
+          id: string
+          max_products: number | null
+          max_users: number | null
+          name: string
+          price: number
+        }
+        Insert: {
+          active?: boolean | null
+          billing_period?: string
+          created_at?: string | null
+          description?: string | null
+          features?: Json | null
+          id?: string
+          max_products?: number | null
+          max_users?: number | null
+          name: string
+          price?: number
+        }
+        Update: {
+          active?: boolean | null
+          billing_period?: string
+          created_at?: string | null
+          description?: string | null
+          features?: Json | null
+          id?: string
+          max_products?: number | null
+          max_users?: number | null
+          name?: string
+          price?: number
+        }
+        Relationships: []
+      }
       supplier_payments: {
         Row: {
           amount: number
@@ -4543,6 +4663,7 @@ export type Database = {
         }
         Returns: boolean
       }
+      is_platform_admin: { Args: { _user_id: string }; Returns: boolean }
       setup_accountant_permissions: {
         Args: { company_uuid: string }
         Returns: undefined

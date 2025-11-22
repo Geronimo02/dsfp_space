@@ -42,6 +42,7 @@ import { Button } from "@/components/ui/button";
 import { supabase } from "@/integrations/supabase/client";
 import { toast } from "sonner";
 import { usePermissions } from "@/hooks/usePermissions";
+import { usePlatformAdmin } from "@/hooks/usePlatformAdmin";
 import { NavLink } from "@/components/NavLink";
 import {
   Sidebar as SidebarUI,
@@ -143,6 +144,7 @@ export function Sidebar() {
   const navigate = useNavigate();
   const { hasPermission, isAdmin, loading } = usePermissions();
   const { state } = useSidebar();
+  const { isPlatformAdmin } = usePlatformAdmin();
 
   const handleLogout = async () => {
     const { error } = await supabase.auth.signOut();
@@ -253,6 +255,31 @@ export function Sidebar() {
               Contacta al administrador.
             </p>
           </div>
+        )}
+
+        {/* Platform Admin Section - Only visible to platform admins */}
+        {isPlatformAdmin && (
+          <SidebarGroup>
+            {state !== "collapsed" && (
+              <SidebarGroupLabel>Administración de Plataforma</SidebarGroupLabel>
+            )}
+            <SidebarGroupContent>
+              <SidebarMenu>
+                <SidebarMenuItem>
+                  <SidebarMenuButton asChild>
+                    <NavLink 
+                      to="/admin/platform"
+                      className="hover:bg-sidebar-accent"
+                      activeClassName="bg-sidebar-accent text-sidebar-accent-foreground font-medium"
+                    >
+                      <Settings className="h-4 w-4" />
+                      {state !== "collapsed" && <span>Panel de Admin</span>}
+                    </NavLink>
+                  </SidebarMenuButton>
+                </SidebarMenuItem>
+              </SidebarMenu>
+            </SidebarGroupContent>
+          </SidebarGroup>
         )}
 
         {navigationSections.map((section) => {
