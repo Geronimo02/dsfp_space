@@ -344,6 +344,149 @@ export type Database = {
           },
         ]
       }
+      commission_transactions: {
+        Row: {
+          commission_amount: number
+          commission_id: string | null
+          commission_type: string
+          commission_value: number
+          company_id: string
+          created_at: string | null
+          customer_id: string | null
+          id: string
+          notes: string | null
+          paid_at: string | null
+          sale_amount: number
+          sale_id: string
+          status: string | null
+          user_id: string
+        }
+        Insert: {
+          commission_amount: number
+          commission_id?: string | null
+          commission_type: string
+          commission_value: number
+          company_id: string
+          created_at?: string | null
+          customer_id?: string | null
+          id?: string
+          notes?: string | null
+          paid_at?: string | null
+          sale_amount: number
+          sale_id: string
+          status?: string | null
+          user_id: string
+        }
+        Update: {
+          commission_amount?: number
+          commission_id?: string | null
+          commission_type?: string
+          commission_value?: number
+          company_id?: string
+          created_at?: string | null
+          customer_id?: string | null
+          id?: string
+          notes?: string | null
+          paid_at?: string | null
+          sale_amount?: number
+          sale_id?: string
+          status?: string | null
+          user_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "commission_transactions_commission_id_fkey"
+            columns: ["commission_id"]
+            isOneToOne: false
+            referencedRelation: "commissions"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "commission_transactions_company_id_fkey"
+            columns: ["company_id"]
+            isOneToOne: false
+            referencedRelation: "companies"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "commission_transactions_customer_id_fkey"
+            columns: ["customer_id"]
+            isOneToOne: false
+            referencedRelation: "customer_pos_view"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "commission_transactions_customer_id_fkey"
+            columns: ["customer_id"]
+            isOneToOne: false
+            referencedRelation: "customers"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "commission_transactions_sale_id_fkey"
+            columns: ["sale_id"]
+            isOneToOne: false
+            referencedRelation: "sales"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      commissions: {
+        Row: {
+          active: boolean | null
+          applies_to: string
+          company_id: string
+          created_at: string | null
+          description: string | null
+          id: string
+          max_amount: number | null
+          min_amount: number | null
+          name: string
+          reference_id: string | null
+          type: string
+          updated_at: string | null
+          value: number
+        }
+        Insert: {
+          active?: boolean | null
+          applies_to: string
+          company_id: string
+          created_at?: string | null
+          description?: string | null
+          id?: string
+          max_amount?: number | null
+          min_amount?: number | null
+          name: string
+          reference_id?: string | null
+          type: string
+          updated_at?: string | null
+          value: number
+        }
+        Update: {
+          active?: boolean | null
+          applies_to?: string
+          company_id?: string
+          created_at?: string | null
+          description?: string | null
+          id?: string
+          max_amount?: number | null
+          min_amount?: number | null
+          name?: string
+          reference_id?: string | null
+          type?: string
+          updated_at?: string | null
+          value?: number
+        }
+        Relationships: [
+          {
+            foreignKeyName: "commissions_company_id_fkey"
+            columns: ["company_id"]
+            isOneToOne: false
+            referencedRelation: "companies"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       companies: {
         Row: {
           active: boolean | null
