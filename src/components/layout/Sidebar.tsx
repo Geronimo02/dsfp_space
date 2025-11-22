@@ -78,6 +78,7 @@ const navigationSections = [
       { name: "Depósitos", href: "/warehouses", icon: Building2 },
       { name: "Stock por Depósito", href: "/warehouse-stock", icon: Package },
       { name: "Transferencias", href: "/warehouse-transfers", icon: ArrowLeftRight },
+      { name: "Reservas de Stock", href: "/stock-reservations", icon: PackageCheck },
       { name: "Compras", href: "/purchases", icon: ShoppingBag },
       { name: "Proveedores", href: "/suppliers", icon: Truck },
     ]
@@ -145,6 +146,7 @@ export function Sidebar() {
       "/warehouses": "products",
       "/warehouse-stock": "products",
       "/warehouse-transfers": "products",
+      "/stock-reservations": "products",
       "/customers": "customers",
       "/customer-account": "customers",
       "/suppliers": "suppliers",
