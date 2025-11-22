@@ -7,6 +7,7 @@ import { useEffect, useState } from "react";
 import { supabase } from "@/integrations/supabase/client";
 import { CompanyProvider, useCompany } from "@/contexts/CompanyContext";
 import { User, Session } from "@supabase/supabase-js";
+import { usePlatformAdmin } from "@/hooks/usePlatformAdmin";
 import Dashboard from "./pages/Dashboard";
 import Auth from "./pages/Auth";
 import POS from "./pages/POS";
@@ -58,39 +59,16 @@ const queryClient = new QueryClient();
 // Wrapper to check if user has a company or is platform admin
 function CompanyCheck({ children }: { children: React.ReactNode }) {
   const { userCompanies, loading, currentCompany } = useCompany();
+  const { isPlatformAdmin, isLoading: isLoadingAdmin } = usePlatformAdmin();
   const [shouldRedirect, setShouldRedirect] = useState(false);
-  const [isPlatformAdmin, setIsPlatformAdmin] = useState(false);
-  const [checkingAdmin, setCheckingAdmin] = useState(true);
 
   useEffect(() => {
-    const checkPlatformAdmin = async () => {
-      const { data: { user } } = await supabase.auth.getUser();
-      if (!user) {
-        setCheckingAdmin(false);
-        return;
-      }
-
-      const { data } = await supabase
-        .from("platform_admins")
-        .select("active")
-        .eq("user_id", user.id)
-        .eq("active", true)
-        .single();
-
-      setIsPlatformAdmin(!!data);
-      setCheckingAdmin(false);
-    };
-
-    checkPlatformAdmin();
-  }, []);
-
-  useEffect(() => {
-    if (!loading && !checkingAdmin && !isPlatformAdmin && userCompanies.length === 0) {
+    if (!loading && !isLoadingAdmin && !isPlatformAdmin && userCompanies.length === 0) {
       setShouldRedirect(true);
     }
-  }, [loading, checkingAdmin, isPlatformAdmin, userCompanies]);
+  }, [loading, isLoadingAdmin, isPlatformAdmin, userCompanies]);
 
-  if (loading || checkingAdmin) {
+  if (loading || isLoadingAdmin) {
     return <div className="flex items-center justify-center min-h-screen">Cargando...</div>;
   }
 
@@ -115,8 +93,7 @@ function AuthOnlyRoute({ children }: { children: React.ReactNode }) {
   const [user, setUser] = useState<User | null>(null);
   const [session, setSession] = useState<Session | null>(null);
   const [loading, setLoading] = useState(true);
-  const [isPlatformAdmin, setIsPlatformAdmin] = useState(false);
-  const [checkingAdmin, setCheckingAdmin] = useState(true);
+  const { isPlatformAdmin, isLoading: isLoadingAdmin } = usePlatformAdmin();
 
   useEffect(() => {
     const { data: { subscription } } = supabase.auth.onAuthStateChange(
@@ -136,30 +113,7 @@ function AuthOnlyRoute({ children }: { children: React.ReactNode }) {
     return () => subscription.unsubscribe();
   }, []);
 
-  useEffect(() => {
-    const checkPlatformAdmin = async () => {
-      if (!user) {
-        setCheckingAdmin(false);
-        return;
-      }
-
-      const { data } = await supabase
-        .from("platform_admins")
-        .select("active")
-        .eq("user_id", user.id)
-        .eq("active", true)
-        .single();
-
-      setIsPlatformAdmin(!!data);
-      setCheckingAdmin(false);
-    };
-
-    if (!loading) {
-      checkPlatformAdmin();
-    }
-  }, [user, loading]);
-
-  if (loading || checkingAdmin) {
+  if (loading || isLoadingAdmin) {
     return <div className="flex items-center justify-center min-h-screen">Cargando...</div>;
   }
 
