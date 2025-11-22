@@ -230,13 +230,13 @@ export default function StockReservations() {
                   <Label htmlFor="warehouse_id">Depósito</Label>
                   <Select
                     value={formData.warehouse_id}
-                    onValueChange={(value) => setFormData({ ...formData, warehouse_id: value })}
+                    onValueChange={(value) => setFormData({ ...formData, warehouse_id: value === "all" ? "" : value })}
                   >
                     <SelectTrigger>
                       <SelectValue placeholder="Todos los depósitos" />
                     </SelectTrigger>
                     <SelectContent>
-                      <SelectItem value="">Todos los depósitos</SelectItem>
+                      <SelectItem value="all">Todos los depósitos</SelectItem>
                       {warehouses?.map((warehouse) => (
                         <SelectItem key={warehouse.id} value={warehouse.id}>
                           {warehouse.name}
