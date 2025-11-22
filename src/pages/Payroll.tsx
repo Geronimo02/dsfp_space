@@ -2,10 +2,14 @@ import { useState } from "react";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
 import { useCompany } from "@/contexts/CompanyContext";
+import { Layout } from "@/components/layout/Layout";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
+import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog";
+import { Label } from "@/components/ui/label";
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { toast } from "sonner";
 import { DollarSign, Plus, FileText } from "lucide-react";
 import { format } from "date-fns";
@@ -14,6 +18,10 @@ import { es } from "date-fns/locale";
 const Payroll = () => {
   const { currentCompany } = useCompany();
   const queryClient = useQueryClient();
+  const [dialogOpen, setDialogOpen] = useState(false);
+  const [selectedEmployee, setSelectedEmployee] = useState("");
+  const [selectedMonth, setSelectedMonth] = useState("");
+  const [selectedYear, setSelectedYear] = useState("");
 
   const { data: liquidations, isLoading } = useQuery({
     queryKey: ["payroll_liquidations", currentCompany?.id],
@@ -32,6 +40,65 @@ const Payroll = () => {
       return data;
     },
     enabled: !!currentCompany?.id,
+  });
+
+  const { data: employees } = useQuery({
+    queryKey: ["employees", currentCompany?.id],
+    queryFn: async () => {
+      if (!currentCompany?.id) return [];
+      const { data, error } = await supabase
+        .from("employees")
+        .select("*")
+        .eq("company_id", currentCompany.id)
+        .eq("active", true);
+      
+      if (error) throw error;
+      return data;
+    },
+    enabled: !!currentCompany?.id,
+  });
+
+  const createMutation = useMutation({
+    mutationFn: async () => {
+      if (!currentCompany?.id || !selectedEmployee || !selectedMonth || !selectedYear) {
+        throw new Error("Faltan datos requeridos");
+      }
+
+      const employee = employees?.find(e => e.id === selectedEmployee);
+      if (!employee) throw new Error("Empleado no encontrado");
+
+      const { data: { user } } = await supabase.auth.getUser();
+      if (!user) throw new Error("Usuario no autenticado");
+
+      const { error } = await supabase
+        .from("payroll_liquidations")
+        .insert({
+          company_id: currentCompany.id,
+          employee_id: selectedEmployee,
+          period_month: parseInt(selectedMonth),
+          period_year: parseInt(selectedYear),
+          base_salary: employee.base_salary,
+          total_remunerative: employee.base_salary,
+          total_non_remunerative: 0,
+          total_deductions: 0,
+          net_salary: employee.base_salary,
+          status: "draft",
+          created_by: user.id,
+        });
+      
+      if (error) throw error;
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["payroll_liquidations"] });
+      toast.success("Liquidación creada exitosamente");
+      setDialogOpen(false);
+      setSelectedEmployee("");
+      setSelectedMonth("");
+      setSelectedYear("");
+    },
+    onError: (error: any) => {
+      toast.error("Error al crear liquidación: " + error.message);
+    },
   });
 
   const getStatusBadge = (status: string) => {
@@ -58,34 +125,120 @@ const Payroll = () => {
 
   if (isLoading) {
     return (
+      <Layout>
+        <div className="container mx-auto p-6">
+          <div className="flex items-center justify-between mb-6">
+            <div className="flex items-center gap-2">
+              <DollarSign className="h-8 w-8" />
+              <h1 className="text-3xl font-bold">Liquidaciones</h1>
+            </div>
+            <Button>
+              <Plus className="mr-2 h-4 w-4" />
+              Nueva Liquidación
+            </Button>
+          </div>
+          <div className="animate-pulse bg-muted h-96 rounded-lg" />
+        </div>
+      </Layout>
+    );
+  }
+
+  const currentYear = new Date().getFullYear();
+  const years = Array.from({ length: 5 }, (_, i) => currentYear - 2 + i);
+  const months = [
+    { value: "1", label: "Enero" },
+    { value: "2", label: "Febrero" },
+    { value: "3", label: "Marzo" },
+    { value: "4", label: "Abril" },
+    { value: "5", label: "Mayo" },
+    { value: "6", label: "Junio" },
+    { value: "7", label: "Julio" },
+    { value: "8", label: "Agosto" },
+    { value: "9", label: "Septiembre" },
+    { value: "10", label: "Octubre" },
+    { value: "11", label: "Noviembre" },
+    { value: "12", label: "Diciembre" },
+  ];
+
+  return (
+    <Layout>
       <div className="container mx-auto p-6">
         <div className="flex items-center justify-between mb-6">
           <div className="flex items-center gap-2">
             <DollarSign className="h-8 w-8" />
             <h1 className="text-3xl font-bold">Liquidaciones</h1>
           </div>
-          <Button>
-            <Plus className="mr-2 h-4 w-4" />
-            Nueva Liquidación
-          </Button>
-        </div>
-        <div className="animate-pulse bg-muted h-96 rounded-lg" />
-      </div>
-    );
-  }
+          <Dialog open={dialogOpen} onOpenChange={setDialogOpen}>
+            <DialogTrigger asChild>
+              <Button>
+                <Plus className="mr-2 h-4 w-4" />
+                Nueva Liquidación
+              </Button>
+            </DialogTrigger>
+            <DialogContent>
+              <DialogHeader>
+                <DialogTitle>Crear Nueva Liquidación</DialogTitle>
+              </DialogHeader>
+              <div className="space-y-4 py-4">
+                <div className="space-y-2">
+                  <Label htmlFor="employee">Empleado</Label>
+                  <Select value={selectedEmployee} onValueChange={setSelectedEmployee}>
+                    <SelectTrigger>
+                      <SelectValue placeholder="Seleccionar empleado" />
+                    </SelectTrigger>
+                    <SelectContent>
+                      {employees?.map((emp) => (
+                        <SelectItem key={emp.id} value={emp.id}>
+                          {emp.first_name} {emp.last_name}
+                        </SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                </div>
 
-  return (
-    <div className="container mx-auto p-6">
-      <div className="flex items-center justify-between mb-6">
-        <div className="flex items-center gap-2">
-          <DollarSign className="h-8 w-8" />
-          <h1 className="text-3xl font-bold">Liquidaciones</h1>
+                <div className="space-y-2">
+                  <Label htmlFor="month">Mes</Label>
+                  <Select value={selectedMonth} onValueChange={setSelectedMonth}>
+                    <SelectTrigger>
+                      <SelectValue placeholder="Seleccionar mes" />
+                    </SelectTrigger>
+                    <SelectContent>
+                      {months.map((month) => (
+                        <SelectItem key={month.value} value={month.value}>
+                          {month.label}
+                        </SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                </div>
+
+                <div className="space-y-2">
+                  <Label htmlFor="year">Año</Label>
+                  <Select value={selectedYear} onValueChange={setSelectedYear}>
+                    <SelectTrigger>
+                      <SelectValue placeholder="Seleccionar año" />
+                    </SelectTrigger>
+                    <SelectContent>
+                      {years.map((year) => (
+                        <SelectItem key={year} value={year.toString()}>
+                          {year}
+                        </SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                </div>
+
+                <Button 
+                  onClick={() => createMutation.mutate()} 
+                  disabled={!selectedEmployee || !selectedMonth || !selectedYear || createMutation.isPending}
+                  className="w-full"
+                >
+                  {createMutation.isPending ? "Creando..." : "Crear Liquidación"}
+                </Button>
+              </div>
+            </DialogContent>
+          </Dialog>
         </div>
-        <Button>
-          <Plus className="mr-2 h-4 w-4" />
-          Nueva Liquidación
-        </Button>
-      </div>
 
       <Card>
         <CardHeader>
@@ -141,7 +294,7 @@ const Payroll = () => {
               <p className="text-muted-foreground mb-4">
                 Comienza creando la primera liquidación mensual
               </p>
-              <Button>
+              <Button onClick={() => setDialogOpen(true)}>
                 <Plus className="mr-2 h-4 w-4" />
                 Crear Primera Liquidación
               </Button>
@@ -149,7 +302,8 @@ const Payroll = () => {
           )}
         </CardContent>
       </Card>
-    </div>
+      </div>
+    </Layout>
   );
 };
 
