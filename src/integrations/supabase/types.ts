@@ -1833,6 +1833,8 @@ export type Database = {
           reorder_point: number | null
           sku: string | null
           stock: number
+          stock_physical: number
+          stock_reserved: number
           updated_at: string
         }
         Insert: {
@@ -1855,6 +1857,8 @@ export type Database = {
           reorder_point?: number | null
           sku?: string | null
           stock?: number
+          stock_physical?: number
+          stock_reserved?: number
           updated_at?: string
         }
         Update: {
@@ -1877,6 +1881,8 @@ export type Database = {
           reorder_point?: number | null
           sku?: string | null
           stock?: number
+          stock_physical?: number
+          stock_reserved?: number
           updated_at?: string
         }
         Relationships: [
@@ -2961,6 +2967,79 @@ export type Database = {
           },
         ]
       }
+      stock_reservations: {
+        Row: {
+          company_id: string
+          created_at: string
+          expires_at: string | null
+          id: string
+          notes: string | null
+          product_id: string
+          quantity: number
+          reference_id: string | null
+          reservation_type: string
+          reserved_by: string
+          reserved_for: string | null
+          status: string
+          updated_at: string
+          warehouse_id: string | null
+        }
+        Insert: {
+          company_id: string
+          created_at?: string
+          expires_at?: string | null
+          id?: string
+          notes?: string | null
+          product_id: string
+          quantity: number
+          reference_id?: string | null
+          reservation_type?: string
+          reserved_by: string
+          reserved_for?: string | null
+          status?: string
+          updated_at?: string
+          warehouse_id?: string | null
+        }
+        Update: {
+          company_id?: string
+          created_at?: string
+          expires_at?: string | null
+          id?: string
+          notes?: string | null
+          product_id?: string
+          quantity?: number
+          reference_id?: string | null
+          reservation_type?: string
+          reserved_by?: string
+          reserved_for?: string | null
+          status?: string
+          updated_at?: string
+          warehouse_id?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "stock_reservations_company_id_fkey"
+            columns: ["company_id"]
+            isOneToOne: false
+            referencedRelation: "companies"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "stock_reservations_product_id_fkey"
+            columns: ["product_id"]
+            isOneToOne: false
+            referencedRelation: "products"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "stock_reservations_warehouse_id_fkey"
+            columns: ["warehouse_id"]
+            isOneToOne: false
+            referencedRelation: "warehouses"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       supplier_payments: {
         Row: {
           amount: number
@@ -3265,6 +3344,8 @@ export type Database = {
           min_stock: number | null
           product_id: string
           stock: number
+          stock_physical: number
+          stock_reserved: number
           updated_at: string
           warehouse_id: string
         }
@@ -3276,6 +3357,8 @@ export type Database = {
           min_stock?: number | null
           product_id: string
           stock?: number
+          stock_physical?: number
+          stock_reserved?: number
           updated_at?: string
           warehouse_id: string
         }
@@ -3287,6 +3370,8 @@ export type Database = {
           min_stock?: number | null
           product_id?: string
           stock?: number
+          stock_physical?: number
+          stock_reserved?: number
           updated_at?: string
           warehouse_id?: string
         }
@@ -3571,6 +3656,7 @@ export type Database = {
         }
         Returns: string
       }
+      expire_old_reservations: { Args: never; Returns: undefined }
       format_comprobante_number: {
         Args: { _numero: number; _punto_venta: number }
         Returns: string

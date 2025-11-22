@@ -43,6 +43,7 @@ import MonthlyClosing from "./pages/MonthlyClosing";
 import AccountantReports from "./pages/AccountantReports";
 import AIAssistantPage from "./pages/AIAssistantPage";
 import Commissions from "./pages/Commissions";
+import StockReservations from "./pages/StockReservations";
 import NotFound from "./pages/NotFound";
 
 const queryClient = new QueryClient();
@@ -177,9 +178,10 @@ const App = () => (
           <Route path="/expenses" element={<ProtectedRoute><Expenses /></ProtectedRoute>} />
           <Route path="/bulk-operations" element={<ProtectedRoute><BulkOperations /></ProtectedRoute>} />
           <Route path="/warehouses" element={<ProtectedRoute><Warehouses /></ProtectedRoute>} />
-          <Route path="/warehouse-stock" element={<ProtectedRoute><WarehouseStock /></ProtectedRoute>} />
-          <Route path="/warehouse-transfers" element={<ProtectedRoute><WarehouseTransfers /></ProtectedRoute>} />
-          <Route path="/pos-points" element={<ProtectedRoute><POSPoints /></ProtectedRoute>} />
+           <Route path="/warehouse-stock" element={<ProtectedRoute><WarehouseStock /></ProtectedRoute>} />
+           <Route path="/warehouse-transfers" element={<ProtectedRoute><WarehouseTransfers /></ProtectedRoute>} />
+           <Route path="/stock-reservations" element={<ProtectedRoute><StockReservations /></ProtectedRoute>} />
+           <Route path="/pos-points" element={<ProtectedRoute><POSPoints /></ProtectedRoute>} />
            <Route path="/notification-settings" element={<ProtectedRoute><NotificationSettings /></ProtectedRoute>} />
            <Route path="/checks" element={<ProtectedRoute><Checks /></ProtectedRoute>} />
            <Route path="/monthly-closing" element={<ProtectedRoute><MonthlyClosing /></ProtectedRoute>} />
