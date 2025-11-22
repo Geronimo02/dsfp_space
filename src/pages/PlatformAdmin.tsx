@@ -11,17 +11,28 @@ import { Textarea } from "@/components/ui/textarea";
 import { toast } from "sonner";
 import { Building2, Users, DollarSign, TrendingUp, LogOut, ShoppingCart, AlertTriangle, MessageSquare, Bell, CheckCircle, XCircle } from "lucide-react";
 import { usePlatformAdmin } from "@/hooks/usePlatformAdmin";
-import { useNavigate } from "react-router-dom";
+import { useNavigate, Navigate } from "react-router-dom";
 
 export default function PlatformAdmin() {
   const { isPlatformAdmin, isLoading: adminLoading } = usePlatformAdmin();
   const navigate = useNavigate();
   const queryClient = useQueryClient();
 
+  // Show loading while checking admin status
+  if (adminLoading) {
+    return (
+      <div className="flex items-center justify-center h-screen">
+        <div className="text-center">
+          <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-primary mx-auto"></div>
+          <p className="mt-4 text-muted-foreground">Verificando permisos...</p>
+        </div>
+      </div>
+    );
+  }
+
   // Redirect if not platform admin
-  if (!adminLoading && !isPlatformAdmin) {
-    navigate("/");
-    return null;
+  if (!isPlatformAdmin) {
+    return <Navigate to="/" replace />;
   }
 
   // Fetch all companies with their subscriptions
@@ -47,7 +58,6 @@ export default function PlatformAdmin() {
       if (error) throw error;
       return data;
     },
-    enabled: isPlatformAdmin,
   });
 
   // Fetch feedback
@@ -66,7 +76,6 @@ export default function PlatformAdmin() {
       if (error) throw error;
       return data;
     },
-    enabled: isPlatformAdmin,
   });
 
   // Fetch notifications
@@ -85,7 +94,6 @@ export default function PlatformAdmin() {
       if (error) throw error;
       return data;
     },
-    enabled: isPlatformAdmin,
   });
 
   // Toggle company active status
@@ -149,7 +157,7 @@ export default function PlatformAdmin() {
     }
   };
 
-  if (adminLoading || isLoading) {
+  if (isLoading) {
     return (
       <div className="flex items-center justify-center h-screen">
         <div className="text-center">
