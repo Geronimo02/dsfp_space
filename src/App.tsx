@@ -55,19 +55,48 @@ import NotFound from "./pages/NotFound";
 
 const queryClient = new QueryClient();
 
-// Wrapper to check if user has a company
+// Wrapper to check if user has a company or is platform admin
 function CompanyCheck({ children }: { children: React.ReactNode }) {
   const { userCompanies, loading, currentCompany } = useCompany();
   const [shouldRedirect, setShouldRedirect] = useState(false);
+  const [isPlatformAdmin, setIsPlatformAdmin] = useState(false);
+  const [checkingAdmin, setCheckingAdmin] = useState(true);
 
   useEffect(() => {
-    if (!loading && userCompanies.length === 0) {
+    const checkPlatformAdmin = async () => {
+      const { data: { user } } = await supabase.auth.getUser();
+      if (!user) {
+        setCheckingAdmin(false);
+        return;
+      }
+
+      const { data } = await supabase
+        .from("platform_admins")
+        .select("active")
+        .eq("user_id", user.id)
+        .eq("active", true)
+        .single();
+
+      setIsPlatformAdmin(!!data);
+      setCheckingAdmin(false);
+    };
+
+    checkPlatformAdmin();
+  }, []);
+
+  useEffect(() => {
+    if (!loading && !checkingAdmin && !isPlatformAdmin && userCompanies.length === 0) {
       setShouldRedirect(true);
     }
-  }, [loading, userCompanies]);
+  }, [loading, checkingAdmin, isPlatformAdmin, userCompanies]);
 
-  if (loading) {
-    return <div className="flex items-center justify-center min-h-screen">Cargando empresa...</div>;
+  if (loading || checkingAdmin) {
+    return <div className="flex items-center justify-center min-h-screen">Cargando...</div>;
+  }
+
+  // Platform admins bypass company check and go to platform admin
+  if (isPlatformAdmin) {
+    return <Navigate to="/admin/platform" replace />;
   }
 
   if (shouldRedirect) {
