@@ -29,6 +29,7 @@ import {
   Bell,
   CreditCard as CheckIcon,
   CheckCircle,
+  BookOpen,
   Sparkles
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
@@ -96,6 +97,7 @@ const navigationSections = [
     items: [
       { name: "Reportes", href: "/reports", icon: BarChart3 },
       { name: "Cierre Mensual", href: "/monthly-closing", icon: CheckCircle },
+      { name: "Reportes Contador", href: "/accountant-reports", icon: BookOpen },
       { name: "Asistente IA", href: "/ai-assistant", icon: Sparkles },
       { name: "Auditoría", href: "/audit-logs", icon: FileText },
       { name: "Logs de Acceso", href: "/access-logs", icon: Activity },

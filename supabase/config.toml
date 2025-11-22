@@ -2,3 +2,6 @@ project_id = "pjcfncnydhxrlnaowbae"
 
 [functions.ai-assistant]
 verify_jwt = false
+
+[functions.send-monthly-reports]
+verify_jwt = false
