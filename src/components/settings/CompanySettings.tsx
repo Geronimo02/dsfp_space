@@ -75,6 +75,29 @@ export function CompanySettings() {
     enabled: !!currentCompany?.id,
   });
 
+  // Query para obtener configuración de actualización automática
+  const { data: exchangeRateSettings } = useQuery({
+    queryKey: ["exchange-rate-settings", currentCompany?.id],
+    queryFn: async () => {
+      if (!currentCompany?.id) return null;
+      const { data, error } = await supabase
+        .from("exchange_rate_settings")
+        .select("*")
+        .eq("company_id", currentCompany.id)
+        .single();
+      if (error && error.code !== 'PGRST116') throw error;
+      return data as { 
+        id: string; 
+        company_id: string; 
+        auto_update: boolean; 
+        update_frequency: string;
+        source: string;
+        last_update: string | null;
+      } | null;
+    },
+    enabled: !!currentCompany?.id,
+  });
+
   const [formData, setFormData] = useState({
     name: "",
     tax_id: "",
@@ -272,6 +295,54 @@ export function CompanySettings() {
     }
     updateExchangeRateMutation.mutate({ currency, rate });
   };
+
+  // Mutation para actualizar configuración de actualización automática
+  const updateExchangeRateSettingsMutation = useMutation({
+    mutationFn: async (settings: { auto_update: boolean; update_frequency?: string; source?: string }) => {
+      if (!currentCompany?.id) throw new Error("No hay empresa seleccionada");
+      
+      const { error } = await supabase
+        .from("exchange_rate_settings")
+        .upsert({
+          company_id: currentCompany.id,
+          auto_update: settings.auto_update,
+          update_frequency: settings.update_frequency || 'daily',
+          source: settings.source || 'banco_nacion',
+          updated_at: new Date().toISOString(),
+        }, {
+          onConflict: "company_id",
+        });
+
+      if (error) throw error;
+    },
+    onSuccess: () => {
+      toast.success("Configuración actualizada");
+      queryClient.invalidateQueries({ queryKey: ["exchange-rate-settings"] });
+    },
+    onError: (error: any) => {
+      toast.error(error.message || "Error al actualizar configuración");
+    },
+  });
+
+  // Mutation para actualizar tipos de cambio manualmente
+  const updateExchangeRatesNowMutation = useMutation({
+    mutationFn: async () => {
+      const { data, error } = await supabase.functions.invoke('update-exchange-rates', {
+        body: {},
+      });
+
+      if (error) throw error;
+      return data;
+    },
+    onSuccess: (data) => {
+      toast.success(`Tipos de cambio actualizados: USD ${data.rates.USD}, EUR ${data.rates.EUR}`);
+      queryClient.invalidateQueries({ queryKey: ["exchange-rates"] });
+      queryClient.invalidateQueries({ queryKey: ["exchange-rate-settings"] });
+    },
+    onError: (error: any) => {
+      toast.error(error.message || "Error al actualizar tipos de cambio");
+    },
+  });
 
   const uploadLogoMutation = useMutation({
     mutationFn: async (file: File) => {
@@ -609,6 +680,95 @@ export function CompanySettings() {
                     })}
                 </div>
               )}
+            </div>
+          </div>
+
+          {/* Actualización Automática de Tipos de Cambio */}
+          <div className="space-y-4 pt-4 border-t">
+            <div className="flex items-center justify-between">
+              <div>
+                <h3 className="font-semibold text-lg">Actualización Automática de Tipos de Cambio</h3>
+                <p className="text-sm text-muted-foreground">
+                  Configure la actualización automática desde Banco Nación
+                </p>
+              </div>
+              <Button
+                type="button"
+                variant="outline"
+                size="sm"
+                onClick={() => updateExchangeRatesNowMutation.mutate()}
+                disabled={updateExchangeRatesNowMutation.isPending}
+              >
+                {updateExchangeRatesNowMutation.isPending ? (
+                  <Loader2 className="h-4 w-4 animate-spin mr-2" />
+                ) : (
+                  <DollarSign className="h-4 w-4 mr-2" />
+                )}
+                Actualizar Ahora
+              </Button>
+            </div>
+
+            <div className="grid grid-cols-2 gap-4">
+              <div className="space-y-2">
+                <div className="flex items-center justify-between">
+                  <Label htmlFor="auto_update">Actualización Automática</Label>
+                  <Switch
+                    id="auto_update"
+                    checked={exchangeRateSettings?.auto_update ?? true}
+                    onCheckedChange={(checked) => {
+                      updateExchangeRateSettingsMutation.mutate({
+                        auto_update: checked,
+                        update_frequency: exchangeRateSettings?.update_frequency || 'daily',
+                        source: exchangeRateSettings?.source || 'banco_nacion',
+                      });
+                    }}
+                  />
+                </div>
+                <p className="text-xs text-muted-foreground">
+                  Actualizar automáticamente desde Banco Nación
+                </p>
+              </div>
+
+              <div className="space-y-2">
+                <Label htmlFor="update_frequency">Frecuencia de Actualización</Label>
+                <Select
+                  value={exchangeRateSettings?.update_frequency || 'daily'}
+                  onValueChange={(value) => {
+                    updateExchangeRateSettingsMutation.mutate({
+                      auto_update: exchangeRateSettings?.auto_update ?? true,
+                      update_frequency: value,
+                      source: exchangeRateSettings?.source || 'banco_nacion',
+                    });
+                  }}
+                  disabled={!(exchangeRateSettings?.auto_update ?? true)}
+                >
+                  <SelectTrigger id="update_frequency">
+                    <SelectValue />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="hourly">Cada hora</SelectItem>
+                    <SelectItem value="daily">Diario</SelectItem>
+                    <SelectItem value="weekly">Semanal</SelectItem>
+                  </SelectContent>
+                </Select>
+              </div>
+            </div>
+
+            {exchangeRateSettings?.last_update && (
+              <div className="text-sm text-muted-foreground">
+                Última actualización: {new Date(exchangeRateSettings.last_update).toLocaleString('es-AR', {
+                  dateStyle: 'short',
+                  timeStyle: 'short'
+                })}
+              </div>
+            )}
+
+            <div className="p-3 bg-muted rounded-lg text-sm">
+              <p className="font-medium mb-1">ℹ️ Fuente de datos: Banco Nación Argentina</p>
+              <p className="text-muted-foreground">
+                Los tipos de cambio se actualizan desde la API oficial del Banco Nación. 
+                Se utilizan los valores de venta para USD y EUR.
+              </p>
             </div>
           </div>
 
