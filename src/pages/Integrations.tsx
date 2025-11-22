@@ -2,6 +2,7 @@ import { useState } from "react";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
 import { useCompany } from "@/contexts/CompanyContext";
+import { Layout } from "@/components/layout/Layout";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
@@ -80,29 +81,32 @@ const Integrations = () => {
 
   if (isLoading) {
     return (
+      <Layout>
+        <div className="container mx-auto p-6">
+          <div className="flex items-center gap-2 mb-6">
+            <Settings className="h-8 w-8" />
+            <h1 className="text-3xl font-bold">Integraciones</h1>
+          </div>
+          <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-3">
+            {[1, 2, 3, 4].map((i) => (
+              <Card key={i} className="animate-pulse">
+                <CardHeader className="h-24 bg-muted" />
+                <CardContent className="h-32 bg-muted/50" />
+              </Card>
+            ))}
+          </div>
+        </div>
+      </Layout>
+    );
+  }
+
+  return (
+    <Layout>
       <div className="container mx-auto p-6">
         <div className="flex items-center gap-2 mb-6">
           <Settings className="h-8 w-8" />
           <h1 className="text-3xl font-bold">Integraciones</h1>
         </div>
-        <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-3">
-          {[1, 2, 3, 4].map((i) => (
-            <Card key={i} className="animate-pulse">
-              <CardHeader className="h-24 bg-muted" />
-              <CardContent className="h-32 bg-muted/50" />
-            </Card>
-          ))}
-        </div>
-      </div>
-    );
-  }
-
-  return (
-    <div className="container mx-auto p-6">
-      <div className="flex items-center gap-2 mb-6">
-        <Settings className="h-8 w-8" />
-        <h1 className="text-3xl font-bold">Integraciones</h1>
-      </div>
 
       <div className="grid gap-6 md:grid-cols-2 lg:grid-cols-3">
         {integrationTypes.map((integration) => {
@@ -177,7 +181,8 @@ const Integrations = () => {
           </CardContent>
         </Card>
       )}
-    </div>
+      </div>
+    </Layout>
   );
 };
 
