@@ -61,40 +61,44 @@ export default function PlatformAdmin() {
   });
 
   // Fetch feedback
-  const { data: feedbacks } = useQuery({
-    queryKey: ["platform-feedback"],
-    queryFn: async () => {
-      const { data, error } = await supabase
-        .from("platform_feedback")
-        .select(`
-          *,
-          companies (name)
-        `)
-        .order("created_at", { ascending: false })
-        .limit(10);
+  // TODO: Uncomment when platform_feedback table is created
+  // const { data: feedbacks } = useQuery({
+  //   queryKey: ["platform-feedback"],
+  //   queryFn: async () => {
+  //     const { data, error } = await supabase
+  //       .from("platform_feedback")
+  //       .select(`
+  //         *,
+  //         companies (name)
+  //       `)
+  //       .order("created_at", { ascending: false })
+  //       .limit(10);
 
-      if (error) throw error;
-      return data;
-    },
-  });
+  //     if (error) throw error;
+  //     return data;
+  //   },
+  // });
+  const feedbacks = [];
 
   // Fetch notifications
-  const { data: notifications } = useQuery({
-    queryKey: ["platform-notifications"],
-    queryFn: async () => {
-      const { data, error } = await supabase
-        .from("platform_notifications")
-        .select(`
-          *,
-          companies (name)
-        `)
-        .eq("read", false)
-        .order("created_at", { ascending: false });
+  // TODO: Uncomment when platform_notifications table is created
+  // const { data: notifications } = useQuery({
+  //   queryKey: ["platform-notifications"],
+  //   queryFn: async () => {
+  //     const { data, error } = await supabase
+  //       .from("platform_notifications")
+  //       .select(`
+  //         *,
+  //         companies (name)
+  //       `)
+  //       .eq("read", false)
+  //       .order("created_at", { ascending: false });
 
-      if (error) throw error;
-      return data;
-    },
-  });
+  //     if (error) throw error;
+  //     return data;
+  //   },
+  // });
+  const notifications = [];
 
   // Toggle company active status
   const toggleCompanyMutation = useMutation({
@@ -116,36 +120,38 @@ export default function PlatformAdmin() {
   });
 
   // Mark notification as read
-  const markNotificationReadMutation = useMutation({
-    mutationFn: async (notificationId: string) => {
-      const { error } = await supabase
-        .from("platform_notifications")
-        .update({ read: true })
-        .eq("id", notificationId);
+  // TODO: Uncomment when platform_notifications table is created
+  // const markNotificationReadMutation = useMutation({
+  //   mutationFn: async (notificationId: string) => {
+  //     const { error } = await supabase
+  //       .from("platform_notifications")
+  //       .update({ read: true })
+  //       .eq("id", notificationId);
 
-      if (error) throw error;
-    },
-    onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ["platform-notifications"] });
-      toast.success("Notificación marcada como leída");
-    },
-  });
+  //     if (error) throw error;
+  //   },
+  //   onSuccess: () => {
+  //     queryClient.invalidateQueries({ queryKey: ["platform-notifications"] });
+  //     toast.success("Notificación marcada como leída");
+  //   },
+  // });
 
   // Update feedback status
-  const updateFeedbackMutation = useMutation({
-    mutationFn: async ({ id, status, admin_notes }: { id: string; status: string; admin_notes?: string }) => {
-      const { error } = await supabase
-        .from("platform_feedback")
-        .update({ status, admin_notes })
-        .eq("id", id);
+  // TODO: Uncomment when platform_feedback table is created
+  // const updateFeedbackMutation = useMutation({
+  //   mutationFn: async ({ id, status, admin_notes }: { id: string; status: string; admin_notes?: string }) => {
+  //     const { error } = await supabase
+  //       .from("platform_feedback")
+  //       .update({ status, admin_notes })
+  //       .eq("id", id);
 
-      if (error) throw error;
-    },
-    onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ["platform-feedback"] });
-      toast.success("Feedback actualizado");
-    },
-  });
+  //     if (error) throw error;
+  //   },
+  //   onSuccess: () => {
+  //     queryClient.invalidateQueries({ queryKey: ["platform-feedback"] });
+  //     toast.success("Feedback actualizado");
+  //   },
+  // });
 
   const handleLogout = async () => {
     const { error } = await supabase.auth.signOut();
@@ -324,12 +330,14 @@ export default function PlatformAdmin() {
         <Tabs defaultValue="companies" className="space-y-4">
           <TabsList>
             <TabsTrigger value="companies">Empresas</TabsTrigger>
+            {/* TODO: Uncomment when platform_notifications and platform_feedback tables are created
             <TabsTrigger value="notifications">
               Notificaciones {notifications && notifications.length > 0 && (
                 <Badge variant="destructive" className="ml-2">{notifications.length}</Badge>
               )}
             </TabsTrigger>
             <TabsTrigger value="feedback">Feedback</TabsTrigger>
+            */}
           </TabsList>
 
           <TabsContent value="companies" className="space-y-4">
@@ -433,131 +441,15 @@ export default function PlatformAdmin() {
             </Card>
           </TabsContent>
 
+          {/* TODO: Uncomment when platform_notifications and platform_feedback tables are created
           <TabsContent value="notifications" className="space-y-4">
-            {notifications && notifications.length > 0 ? (
-              notifications.map((notification: any) => (
-                <Alert key={notification.id} variant={notification.severity === "critical" ? "destructive" : "default"}>
-                  <div className="flex items-start gap-3">
-                    {getSeverityIcon(notification.severity)}
-                    <div className="flex-1">
-                      <AlertTitle className="flex items-center gap-2">
-                        {notification.title}
-                        <Badge variant="outline" className="text-xs">
-                          {notification.companies?.name || "N/A"}
-                        </Badge>
-                      </AlertTitle>
-                      <AlertDescription className="mt-2">
-                        {notification.message}
-                        <div className="mt-3 flex gap-2">
-                          <Button
-                            size="sm"
-                            onClick={() => markNotificationReadMutation.mutate(notification.id)}
-                          >
-                            <CheckCircle className="h-4 w-4 mr-1" />
-                            Marcar como leída
-                          </Button>
-                        </div>
-                      </AlertDescription>
-                    </div>
-                  </div>
-                </Alert>
-              ))
-            ) : (
-              <Card>
-                <CardContent className="p-6 text-center text-muted-foreground">
-                  <Bell className="h-12 w-12 mx-auto mb-2 opacity-50" />
-                  No hay notificaciones pendientes
-                </CardContent>
-              </Card>
-            )}
+            ...
           </TabsContent>
 
           <TabsContent value="feedback" className="space-y-4">
-            <Card>
-              <CardHeader>
-                <CardTitle>Feedback de Empresas</CardTitle>
-                <CardDescription>
-                  Comentarios y sugerencias de los usuarios
-                </CardDescription>
-              </CardHeader>
-              <CardContent>
-                <div className="space-y-4">
-                  {feedbacks && feedbacks.length > 0 ? (
-                    feedbacks.map((feedback: any) => (
-                      <Card key={feedback.id}>
-                        <CardHeader>
-                          <div className="flex items-start justify-between">
-                            <div>
-                              <CardTitle className="text-base">
-                                {feedback.companies?.name || "Empresa desconocida"}
-                              </CardTitle>
-                              <CardDescription>
-                                {new Date(feedback.created_at).toLocaleDateString()} - {feedback.category}
-                              </CardDescription>
-                            </div>
-                            <div className="flex items-center gap-2">
-                              {feedback.rating && (
-                                <div className="flex gap-1">
-                                  {[...Array(5)].map((_, i) => (
-                                    <span key={i} className={i < feedback.rating ? "text-yellow-500" : "text-gray-300"}>
-                                      ★
-                                    </span>
-                                  ))}
-                                </div>
-                              )}
-                              <Badge variant={
-                                feedback.status === "resolved" ? "default" :
-                                feedback.status === "reviewed" ? "secondary" : "outline"
-                              }>
-                                {feedback.status}
-                              </Badge>
-                            </div>
-                          </div>
-                        </CardHeader>
-                        <CardContent>
-                          <p className="text-sm mb-4">{feedback.message}</p>
-                          {feedback.admin_notes && (
-                            <div className="bg-muted p-3 rounded-md mb-3">
-                              <p className="text-xs font-medium mb-1">Notas del admin:</p>
-                              <p className="text-sm">{feedback.admin_notes}</p>
-                            </div>
-                          )}
-                          <div className="flex gap-2">
-                            <Button
-                              size="sm"
-                              variant="outline"
-                              onClick={() => updateFeedbackMutation.mutate({
-                                id: feedback.id,
-                                status: "reviewed"
-                              })}
-                              disabled={feedback.status !== "pending"}
-                            >
-                              Marcar como revisado
-                            </Button>
-                            <Button
-                              size="sm"
-                              onClick={() => updateFeedbackMutation.mutate({
-                                id: feedback.id,
-                                status: "resolved"
-                              })}
-                              disabled={feedback.status === "resolved"}
-                            >
-                              Resolver
-                            </Button>
-                          </div>
-                        </CardContent>
-                      </Card>
-                    ))
-                  ) : (
-                    <div className="text-center text-muted-foreground p-6">
-                      <MessageSquare className="h-12 w-12 mx-auto mb-2 opacity-50" />
-                      No hay feedback todavía
-                    </div>
-                  )}
-                </div>
-              </CardContent>
-            </Card>
+            ...
           </TabsContent>
+          */}
         </Tabs>
       </div>
     </div>
