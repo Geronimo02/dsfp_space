@@ -13,9 +13,12 @@ export const usePlatformAdmin = () => {
         .select("active")
         .eq("user_id", user.id)
         .eq("active", true)
-        .single();
+        .maybeSingle();
 
-      if (error) return false;
+      if (error) {
+        console.error("Error checking platform admin:", error);
+        return false;
+      }
       return !!data;
     },
   });
