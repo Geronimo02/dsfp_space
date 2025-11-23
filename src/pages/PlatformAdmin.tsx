@@ -18,8 +18,11 @@ export default function PlatformAdmin() {
   const navigate = useNavigate();
   const queryClient = useQueryClient();
 
+  console.log("PlatformAdmin render - adminLoading:", adminLoading, "isPlatformAdmin:", isPlatformAdmin);
+
   // Show loading while checking admin status
   if (adminLoading) {
+    console.log("Showing admin loading screen");
     return (
       <div className="flex items-center justify-center h-screen">
         <div className="text-center">
@@ -32,13 +35,17 @@ export default function PlatformAdmin() {
 
   // Redirect if not platform admin
   if (!isPlatformAdmin) {
+    console.log("Not platform admin, redirecting to /");
     return <Navigate to="/" replace />;
   }
 
+  console.log("Platform admin confirmed, loading companies...");
+
   // Fetch all companies with their subscriptions
-  const { data: companies, isLoading } = useQuery({
+  const { data: companies, isLoading, error: companiesError } = useQuery({
     queryKey: ["platform-companies"],
     queryFn: async () => {
+      console.log("Fetching companies...");
       const { data, error } = await supabase
         .from("companies")
         .select(`
@@ -55,10 +62,16 @@ export default function PlatformAdmin() {
         `)
         .order("created_at", { ascending: false });
 
-      if (error) throw error;
+      if (error) {
+        console.error("Error fetching companies:", error);
+        throw error;
+      }
+      console.log("Companies fetched:", data);
       return data;
     },
   });
+
+  console.log("Companies query state - isLoading:", isLoading, "companiesError:", companiesError, "companies:", companies);
 
   // Fetch feedback
   // TODO: Uncomment when platform_feedback table is created
@@ -164,6 +177,7 @@ export default function PlatformAdmin() {
   };
 
   if (isLoading) {
+    console.log("Companies still loading...");
     return (
       <div className="flex items-center justify-center h-screen">
         <div className="text-center">
@@ -173,6 +187,20 @@ export default function PlatformAdmin() {
       </div>
     );
   }
+
+  if (companiesError) {
+    console.error("Companies error detected:", companiesError);
+    return (
+      <div className="flex items-center justify-center h-screen">
+        <div className="text-center text-destructive">
+          <p className="text-xl font-bold mb-2">Error al cargar empresas</p>
+          <p>{companiesError.message}</p>
+        </div>
+      </div>
+    );
+  }
+
+  console.log("Rendering platform admin dashboard");
 
   const getStatusBadge = (active: boolean) => {
     return active ? (

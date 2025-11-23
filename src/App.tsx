@@ -129,6 +129,39 @@ function AuthOnlyRoute({ children }: { children: React.ReactNode }) {
   return <>{children}</>;
 }
 
+// Route specifically for platform admins - only checks auth and admin status
+function PlatformAdminRoute({ children }: { children: React.ReactNode }) {
+  const [user, setUser] = useState<User | null>(null);
+  const [loading, setLoading] = useState(true);
+
+  useEffect(() => {
+    const { data: { subscription } } = supabase.auth.onAuthStateChange(
+      (event, session) => {
+        setUser(session?.user ?? null);
+        setLoading(false);
+      }
+    );
+
+    supabase.auth.getSession().then(({ data: { session } }) => {
+      setUser(session?.user ?? null);
+      setLoading(false);
+    });
+
+    return () => subscription.unsubscribe();
+  }, []);
+
+  if (loading) {
+    return <div className="flex items-center justify-center min-h-screen">Cargando...</div>;
+  }
+
+  if (!user) {
+    return <Navigate to="/auth" />;
+  }
+
+  // No redirect here - just render the children (PlatformAdmin will handle admin check)
+  return <>{children}</>;
+}
+
 // Protected route with both authentication and company checks
 function ProtectedRoute({ children }: { children: React.ReactNode }) {
   const [user, setUser] = useState<User | null>(null);
@@ -213,7 +246,7 @@ const App = () => (
            <Route path="/retentions" element={<ProtectedRoute><Retentions /></ProtectedRoute>} />
            <Route path="/integrations" element={<ProtectedRoute><Integrations /></ProtectedRoute>} />
            <Route path="/payroll" element={<ProtectedRoute><Payroll /></ProtectedRoute>} />
-           <Route path="/admin/platform" element={<AuthOnlyRoute><PlatformAdmin /></AuthOnlyRoute>} />
+           <Route path="/admin/platform" element={<PlatformAdminRoute><PlatformAdmin /></PlatformAdminRoute>} />
            <Route path="/ai-assistant" element={<ProtectedRoute><AIAssistantPage /></ProtectedRoute>} />
            <Route path="/settings" element={<ProtectedRoute><Settings /></ProtectedRoute>} />
            {/* ADD ALL CUSTOM ROUTES ABOVE THE CATCH-ALL "*" ROUTE */}
