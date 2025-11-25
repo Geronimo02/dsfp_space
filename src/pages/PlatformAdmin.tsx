@@ -4,11 +4,29 @@ import { supabase } from "@/integrations/supabase/client";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
-import { Switch } from "@/components/ui/switch";
+import { Input } from "@/components/ui/input";
+import { Label } from "@/components/ui/label";
+import { Textarea } from "@/components/ui/textarea";
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
+import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { toast } from "sonner";
-import { Building2, Users, DollarSign, TrendingUp, LogOut, ShoppingCart, AlertTriangle, AlertCircle, CheckCircle2 } from "lucide-react";
+import { 
+  Building2, 
+  Users, 
+  DollarSign, 
+  TrendingUp, 
+  LogOut, 
+  ShoppingCart, 
+  AlertCircle, 
+  CheckCircle2,
+  Bell,
+  MessageSquare,
+  Clock,
+  Search,
+  Plus
+} from "lucide-react";
 import { usePlatformAdmin } from "@/hooks/usePlatformAdmin";
 import { useNavigate, Navigate } from "react-router-dom";
 
@@ -16,6 +34,21 @@ export default function PlatformAdmin() {
   const { isPlatformAdmin, isLoading: adminLoading } = usePlatformAdmin();
   const navigate = useNavigate();
   const queryClient = useQueryClient();
+  
+  // State for filters and dialogs
+  const [companySearch, setCompanySearch] = useState("");
+  const [companyStatusFilter, setCompanyStatusFilter] = useState<string>("all");
+  const [notificationFilter, setNotificationFilter] = useState<string>("all");
+  const [feedbackStatusFilter, setFeedbackStatusFilter] = useState<string>("all");
+  const [paymentStatusFilter, setPaymentStatusFilter] = useState<string>("all");
+  const [isPaymentDialogOpen, setIsPaymentDialogOpen] = useState(false);
+  const [newPayment, setNewPayment] = useState({
+    company_id: "",
+    amount: "",
+    payment_method: "",
+    notes: "",
+    status: "pending"
+  });
 
   // Show loading while checking admin status
   if (adminLoading) {
@@ -112,6 +145,36 @@ export default function PlatformAdmin() {
     },
   });
 
+  // Stats query
+  const { data: stats } = useQuery({
+    queryKey: ["platform-stats"],
+    queryFn: async () => {
+      const activeCompanies = companies?.filter(c => c.active)?.length || 0;
+      const unreadNotifications = notifications?.filter(n => !n.read)?.length || 0;
+      const pendingFeedback = feedbacks?.filter(f => f.status === "pending")?.length || 0;
+      
+      const totalRevenue = payments?.reduce((sum, p) => {
+        if (p.status === "paid" || p.status === "completed") return sum + Number(p.amount);
+        return sum;
+      }, 0) || 0;
+      
+      const pendingRevenue = payments?.reduce((sum, p) => {
+        if (p.status === "pending") return sum + Number(p.amount);
+        return sum;
+      }, 0) || 0;
+      
+      return {
+        totalCompanies: companies?.length || 0,
+        activeCompanies,
+        unreadNotifications,
+        pendingFeedback,
+        totalRevenue,
+        pendingRevenue
+      };
+    },
+    enabled: !!companies && !!notifications && !!feedbacks && !!payments,
+  });
+
   // Toggle company active status
   const toggleCompanyMutation = useMutation({
     mutationFn: async ({ companyId, active }: { companyId: string; active: boolean }) => {
@@ -124,6 +187,7 @@ export default function PlatformAdmin() {
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["platform-companies"] });
+      queryClient.invalidateQueries({ queryKey: ["platform-stats"] });
       toast.success("Estado de la empresa actualizado");
     },
     onError: () => {
@@ -136,13 +200,14 @@ export default function PlatformAdmin() {
     mutationFn: async (notificationId: string) => {
       const { error } = await supabase
         .from("platform_notifications")
-        .update({ read: true, read_at: new Date().toISOString() })
+        .update({ read: true })
         .eq("id", notificationId);
 
       if (error) throw error;
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["platform-notifications"] });
+      queryClient.invalidateQueries({ queryKey: ["platform-stats"] });
       toast.success("Notificación marcada como leída");
     },
     onError: (error) => {
@@ -170,10 +235,6 @@ export default function PlatformAdmin() {
       if (adminNotes !== undefined) {
         updates.admin_notes = adminNotes;
       }
-      
-      if (status === "resolved") {
-        updates.resolved_at = new Date().toISOString();
-      }
 
       const { error } = await supabase
         .from("platform_feedback")
@@ -184,6 +245,7 @@ export default function PlatformAdmin() {
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["platform-feedback"] });
+      queryClient.invalidateQueries({ queryKey: ["platform-stats"] });
       toast.success("Feedback actualizado");
     },
     onError: (error) => {
@@ -222,11 +284,46 @@ export default function PlatformAdmin() {
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["platform-payments"] });
+      queryClient.invalidateQueries({ queryKey: ["platform-stats"] });
       toast.success("Pago actualizado");
     },
     onError: (error) => {
       toast.error("Error al actualizar pago");
       console.error("Error:", error);
+    },
+  });
+
+  // Create payment
+  const createPaymentMutation = useMutation({
+    mutationFn: async (payment: typeof newPayment) => {
+      const { error } = await supabase
+        .from("platform_payments")
+        .insert({
+          company_id: payment.company_id,
+          amount: Number(payment.amount),
+          payment_method: payment.payment_method,
+          notes: payment.notes,
+          status: payment.status,
+          payment_date: new Date().toISOString(),
+        });
+      
+      if (error) throw error;
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["platform-payments"] });
+      queryClient.invalidateQueries({ queryKey: ["platform-stats"] });
+      setIsPaymentDialogOpen(false);
+      setNewPayment({
+        company_id: "",
+        amount: "",
+        payment_method: "",
+        notes: "",
+        status: "pending"
+      });
+      toast.success("Pago registrado exitosamente");
+    },
+    onError: (error) => {
+      toast.error("Error al registrar el pago: " + error.message);
     },
   });
 
@@ -239,6 +336,88 @@ export default function PlatformAdmin() {
       toast.success("Sesión cerrada exitosamente");
     }
   };
+
+  // Helper functions
+  const getPaymentStatusBadge = (status: string) => {
+    const variants: Record<string, { variant: "default" | "secondary" | "destructive" | "outline"; label: string }> = {
+      paid: { variant: "default", label: "Pagado" },
+      completed: { variant: "default", label: "Completado" },
+      pending: { variant: "secondary", label: "Pendiente" },
+      overdue: { variant: "destructive", label: "Vencido" },
+      cancelled: { variant: "outline", label: "Cancelado" },
+    };
+    const config = variants[status] || variants.pending;
+    return <Badge variant={config.variant}>{config.label}</Badge>;
+  };
+
+  const getSeverityBadge = (severity: string) => {
+    const variants: Record<string, "default" | "secondary" | "destructive"> = {
+      critical: "destructive",
+      warning: "secondary",
+      info: "default",
+    };
+    return <Badge variant={variants[severity] || "default"}>{severity}</Badge>;
+  };
+
+  const getFeedbackCategoryBadge = (category: string) => {
+    const colors: Record<string, string> = {
+      bug: "bg-red-500/10 text-red-500",
+      feature: "bg-blue-500/10 text-blue-500",
+      improvement: "bg-green-500/10 text-green-500",
+      question: "bg-yellow-500/10 text-yellow-500",
+    };
+    return <Badge className={colors[category] || ""}>{category}</Badge>;
+  };
+
+  const getStatusBadge = (active: boolean) => {
+    return active ? (
+      <Badge variant="default">Activa</Badge>
+    ) : (
+      <Badge variant="destructive">Inactiva</Badge>
+    );
+  };
+
+  const getSubscriptionStatus = (subscription: any) => {
+    if (!subscription || subscription.length === 0) {
+      return <Badge variant="secondary">Sin suscripción</Badge>;
+    }
+
+    const status = subscription[0].status;
+    const labels: Record<string, { variant: "default" | "secondary" | "destructive" | "outline"; label: string }> = {
+      active: { variant: "default", label: "Activa" },
+      trial: { variant: "outline", label: "Prueba" },
+      suspended: { variant: "destructive", label: "Suspendida" },
+      cancelled: { variant: "secondary", label: "Cancelada" },
+    };
+
+    const config = labels[status] || labels.active;
+    return <Badge variant={config.variant}>{config.label}</Badge>;
+  };
+
+  // Filtered data
+  const filteredCompanies = companies?.filter(company => {
+    const matchesSearch = company.name.toLowerCase().includes(companySearch.toLowerCase());
+    const matchesStatus = companyStatusFilter === "all" || 
+      (companyStatusFilter === "active" && company.active) ||
+      (companyStatusFilter === "inactive" && !company.active);
+    return matchesSearch && matchesStatus;
+  });
+
+  const filteredNotifications = notifications?.filter(notification => {
+    if (notificationFilter === "all") return true;
+    if (notificationFilter === "unread") return !notification.read;
+    return notification.notification_type === notificationFilter;
+  });
+
+  const filteredFeedback = feedbacks?.filter(f => {
+    if (feedbackStatusFilter === "all") return true;
+    return f.status === feedbackStatusFilter;
+  });
+
+  const filteredPayments = payments?.filter(payment => {
+    if (paymentStatusFilter === "all") return true;
+    return payment.status === paymentStatusFilter;
+  });
 
   if (isLoading) {
     return (
@@ -262,74 +441,7 @@ export default function PlatformAdmin() {
     );
   }
 
-  const getStatusBadge = (active: boolean) => {
-    return active ? (
-      <Badge variant="default" className="bg-green-500">Activa</Badge>
-    ) : (
-      <Badge variant="destructive">Inactiva</Badge>
-    );
-  };
-
-  const getSubscriptionStatus = (subscription: any) => {
-    if (!subscription || subscription.length === 0) {
-      return <Badge variant="secondary">Sin suscripción</Badge>;
-    }
-
-    const status = subscription[0].status;
-    const colors: Record<string, string> = {
-      active: "bg-green-500",
-      trial: "bg-blue-500",
-      suspended: "bg-yellow-500",
-      cancelled: "bg-red-500",
-    };
-
-    return (
-      <Badge className={colors[status] || "bg-gray-500"}>
-        {status === "active" ? "Activa" : 
-         status === "trial" ? "Prueba" :
-         status === "suspended" ? "Suspendida" : "Cancelada"}
-      </Badge>
-    );
-  };
-
-  const getSeverityIcon = (severity: string) => {
-    switch (severity) {
-      case 'critical':
-        return <AlertCircle className="h-5 w-5 text-destructive" />;
-      case 'warning':
-        return <AlertCircle className="h-5 w-5 text-amber-500" />;
-      case 'info':
-      default:
-        return <CheckCircle2 className="h-5 w-5 text-primary" />;
-    }
-  };
-
-  const getPaymentStatusBadge = (status: string) => {
-    const variants: Record<string, string> = {
-      completed: "bg-green-500/10 text-green-500",
-      pending: "bg-yellow-500/10 text-yellow-500",
-      failed: "bg-red-500/10 text-red-500",
-      refunded: "bg-blue-500/10 text-blue-500"
-    };
-    return (
-      <Badge className={variants[status] || variants.pending}>
-        {status === 'completed' && 'Completado'}
-        {status === 'pending' && 'Pendiente'}
-        {status === 'failed' && 'Fallido'}
-        {status === 'refunded' && 'Reembolsado'}
-      </Badge>
-    );
-  };
-
-  // Calculate stats
-  const totalCompanies = companies?.length || 0;
-  const activeCompanies = companies?.filter(c => c.active)?.length || 0;
   const totalUsers = companies?.reduce((acc, c) => acc + (c.company_users?.filter((u: any) => u.active).length || 0), 0) || 0;
-  const totalRevenue = companies?.reduce((acc, c) => {
-    const sub = c.company_subscriptions?.[0];
-    return acc + (sub?.amount_due || 0);
-  }, 0) || 0;
-
   const overduePayments = companies?.filter(c => {
     const sub = c.company_subscriptions?.[0];
     return sub && sub.next_payment_date && new Date(sub.next_payment_date) < new Date();
@@ -358,395 +470,603 @@ export default function PlatformAdmin() {
 
       <div className="container mx-auto p-6 space-y-6">
         <div>
-          <h1 className="text-3xl font-bold">Panel de Administración de Plataforma</h1>
-          <p className="text-muted-foreground">Gestión completa de empresas y suscripciones</p>
+          <h1 className="text-3xl font-bold mb-2">Panel de Administración</h1>
+          <p className="text-muted-foreground">
+            Gestión completa de empresas, notificaciones, feedback y pagos
+          </p>
         </div>
 
-        {/* Stats Cards */}
-        <div className="grid grid-cols-1 md:grid-cols-5 gap-4">
-          <Card>
-            <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-              <CardTitle className="text-sm font-medium">Total Empresas</CardTitle>
-              <Building2 className="h-4 w-4 text-muted-foreground" />
-            </CardHeader>
-            <CardContent>
-              <div className="text-2xl font-bold">{totalCompanies}</div>
-              <p className="text-xs text-muted-foreground">
-                {activeCompanies} activas
-              </p>
-            </CardContent>
-          </Card>
+        {/* Stats Overview */}
+        {stats && (
+          <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-6">
+            <Card>
+              <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+                <CardTitle className="text-sm font-medium">Total Empresas</CardTitle>
+                <Building2 className="h-4 w-4 text-muted-foreground" />
+              </CardHeader>
+              <CardContent>
+                <div className="text-2xl font-bold">{stats.totalCompanies}</div>
+                <p className="text-xs text-muted-foreground">
+                  {stats.activeCompanies} activas
+                </p>
+              </CardContent>
+            </Card>
+            
+            <Card>
+              <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+                <CardTitle className="text-sm font-medium">Empresas Activas</CardTitle>
+                <CheckCircle2 className="h-4 w-4 text-green-500" />
+              </CardHeader>
+              <CardContent>
+                <div className="text-2xl font-bold">{stats.activeCompanies}</div>
+                <p className="text-xs text-muted-foreground">
+                  {Math.round((stats.activeCompanies / stats.totalCompanies) * 100)}% del total
+                </p>
+              </CardContent>
+            </Card>
+            
+            <Card>
+              <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+                <CardTitle className="text-sm font-medium">Notificaciones</CardTitle>
+                <Bell className="h-4 w-4 text-muted-foreground" />
+              </CardHeader>
+              <CardContent>
+                <div className="text-2xl font-bold">{stats.unreadNotifications}</div>
+                <p className="text-xs text-muted-foreground">
+                  Sin leer
+                </p>
+              </CardContent>
+            </Card>
+            
+            <Card>
+              <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+                <CardTitle className="text-sm font-medium">Feedback Pendiente</CardTitle>
+                <MessageSquare className="h-4 w-4 text-muted-foreground" />
+              </CardHeader>
+              <CardContent>
+                <div className="text-2xl font-bold">{stats.pendingFeedback}</div>
+                <p className="text-xs text-muted-foreground">
+                  Requiere atención
+                </p>
+              </CardContent>
+            </Card>
+            
+            <Card>
+              <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+                <CardTitle className="text-sm font-medium">Ingresos Totales</CardTitle>
+                <DollarSign className="h-4 w-4 text-green-500" />
+              </CardHeader>
+              <CardContent>
+                <div className="text-2xl font-bold">${stats.totalRevenue.toLocaleString()}</div>
+                <p className="text-xs text-muted-foreground">
+                  Cobrado
+                </p>
+              </CardContent>
+            </Card>
+            
+            <Card>
+              <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+                <CardTitle className="text-sm font-medium">Pendiente</CardTitle>
+                <Clock className="h-4 w-4 text-yellow-500" />
+              </CardHeader>
+              <CardContent>
+                <div className="text-2xl font-bold">${stats.pendingRevenue.toLocaleString()}</div>
+                <p className="text-xs text-muted-foreground">
+                  Por cobrar
+                </p>
+              </CardContent>
+            </Card>
+          </div>
+        )}
 
-          <Card>
-            <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-              <CardTitle className="text-sm font-medium">Total Usuarios</CardTitle>
-              <Users className="h-4 w-4 text-muted-foreground" />
-            </CardHeader>
-            <CardContent>
-              <div className="text-2xl font-bold">{totalUsers}</div>
-              <p className="text-xs text-muted-foreground">
-                Usuarios activos
-              </p>
-            </CardContent>
-          </Card>
+        <Tabs defaultValue="companies" className="space-y-6">
+          <TabsList className="grid w-full grid-cols-4">
+            <TabsTrigger value="companies" className="gap-2">
+              <Building2 className="h-4 w-4" />
+              Empresas
+            </TabsTrigger>
+            <TabsTrigger value="notifications" className="gap-2">
+              <Bell className="h-4 w-4" />
+              Notificaciones
+              {stats && stats.unreadNotifications > 0 && (
+                <Badge variant="destructive" className="ml-2">
+                  {stats.unreadNotifications}
+                </Badge>
+              )}
+            </TabsTrigger>
+            <TabsTrigger value="feedback" className="gap-2">
+              <MessageSquare className="h-4 w-4" />
+              Feedback
+            </TabsTrigger>
+            <TabsTrigger value="payments" className="gap-2">
+              <DollarSign className="h-4 w-4" />
+              Pagos
+            </TabsTrigger>
+          </TabsList>
 
-          <Card>
-            <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-              <CardTitle className="text-sm font-medium">Ingresos Mensuales</CardTitle>
-              <DollarSign className="h-4 w-4 text-muted-foreground" />
-            </CardHeader>
-            <CardContent>
-              <div className="text-2xl font-bold">${totalRevenue.toFixed(2)}</div>
-              <p className="text-xs text-muted-foreground">
-                Facturación estimada
-              </p>
-            </CardContent>
-          </Card>
-
-          <Card>
-            <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-              <CardTitle className="text-sm font-medium">Pagos Vencidos</CardTitle>
-              <AlertTriangle className="h-4 w-4 text-destructive" />
-            </CardHeader>
-            <CardContent>
-              <div className="text-2xl font-bold text-destructive">{overduePayments}</div>
-              <p className="text-xs text-muted-foreground">
-                Requieren atención
-              </p>
-            </CardContent>
-          </Card>
-
-          <Card>
-            <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-              <CardTitle className="text-sm font-medium">Tasa de Conversión</CardTitle>
-              <TrendingUp className="h-4 w-4 text-muted-foreground" />
-            </CardHeader>
-            <CardContent>
-              <div className="text-2xl font-bold">
-                {totalCompanies > 0 ? ((activeCompanies / totalCompanies) * 100).toFixed(1) : 0}%
-              </div>
-              <p className="text-xs text-muted-foreground">
-                Empresas activas
-              </p>
-            </CardContent>
-          </Card>
-        </div>
-
-        <div className="space-y-4">
-          <Tabs defaultValue="companies" className="w-full">
-            <TabsList className="grid w-full grid-cols-4">
-              <TabsTrigger value="companies">Empresas</TabsTrigger>
-              <TabsTrigger value="notifications">
-                Notificaciones
-                {notifications?.filter((n: any) => !n.read).length > 0 && (
-                  <Badge variant="destructive" className="ml-2">
-                    {notifications?.filter((n: any) => !n.read).length}
-                  </Badge>
-                )}
-              </TabsTrigger>
-              <TabsTrigger value="feedback">Feedback</TabsTrigger>
-              <TabsTrigger value="payments">Pagos</TabsTrigger>
-            </TabsList>
-
-            <TabsContent value="companies" className="space-y-4">
-              <Card>
-                <CardHeader>
-                  <CardTitle>Empresas Registradas</CardTitle>
-                  <CardDescription>
-                    Lista completa de empresas en la plataforma con detalles de suscripción
-                  </CardDescription>
-                </CardHeader>
-                <CardContent>
-                  <div className="rounded-md border">
-                    <table className="w-full">
-                      <thead>
-                        <tr className="border-b bg-muted/50">
-                          <th className="p-3 text-left font-medium">Empresa</th>
-                          <th className="p-3 text-left font-medium">Email</th>
-                          <th className="p-3 text-left font-medium">Usuarios</th>
-                          <th className="p-3 text-left font-medium">Plan</th>
-                          <th className="p-3 text-left font-medium">Próximo Pago</th>
-                          <th className="p-3 text-left font-medium">Monto</th>
-                          <th className="p-3 text-left font-medium">Suscripción</th>
-                          <th className="p-3 text-left font-medium">Estado</th>
-                          <th className="p-3 text-left font-medium">Acciones</th>
-                        </tr>
-                      </thead>
-                      <tbody>
-                        {companies?.map((company) => {
-                          const subscription = company.company_subscriptions?.[0];
-                          const plan = subscription?.subscription_plans;
-                          const activeUsers = company.company_users?.filter((u: any) => u.active).length || 0;
-                          const isOverdue = subscription?.next_payment_date && new Date(subscription.next_payment_date) < new Date();
-
-                          return (
-                            <tr key={company.id} className="border-b">
-                              <td className="p-3">
-                                <div>
-                                  <div className="font-medium">{company.name}</div>
-                                  {company.tax_id && (
-                                    <div className="text-sm text-muted-foreground">
-                                      CUIT: {company.tax_id}
-                                    </div>
-                                  )}
-                                </div>
-                              </td>
-                              <td className="p-3 text-sm">{company.email || "-"}</td>
-                              <td className="p-3 text-sm">{activeUsers}</td>
-                              <td className="p-3">
-                                {plan ? (
-                                  <div>
-                                    <div className="font-medium">{plan.name}</div>
-                                    <div className="text-sm text-muted-foreground">
-                                      ${plan.price}/{plan.billing_period}
-                                    </div>
-                                  </div>
-                                ) : (
-                                  <span className="text-muted-foreground">-</span>
-                                )}
-                              </td>
-                              <td className="p-3">
-                                {subscription?.next_payment_date ? (
-                                  <div className={isOverdue ? "text-destructive font-medium" : ""}>
-                                    {new Date(subscription.next_payment_date).toLocaleDateString()}
-                                    {isOverdue && (
-                                      <div className="text-xs">¡Vencido!</div>
-                                    )}
-                                  </div>
-                                ) : "-"}
-                              </td>
-                              <td className="p-3">
-                                {subscription?.amount_due ? (
-                                  <span className={isOverdue ? "text-destructive font-medium" : ""}>
-                                    ${subscription.amount_due.toFixed(2)}
-                                  </span>
-                                ) : "-"}
-                              </td>
-                              <td className="p-3">
-                                {getSubscriptionStatus(company.company_subscriptions)}
-                              </td>
-                              <td className="p-3">
-                                {getStatusBadge(company.active)}
-                              </td>
-                              <td className="p-3">
-                                <Switch
-                                  checked={company.active}
-                                  onCheckedChange={(checked) =>
-                                    toggleCompanyMutation.mutate({
-                                      companyId: company.id,
-                                      active: checked,
-                                    })
-                                  }
-                                />
-                              </td>
-                            </tr>
-                          );
-                        })}
-                      </tbody>
-                    </table>
+          {/* Companies Tab */}
+          <TabsContent value="companies" className="space-y-4">
+            <Card>
+              <CardHeader>
+                <div className="flex items-center justify-between">
+                  <div>
+                    <CardTitle>Empresas Registradas</CardTitle>
+                    <CardDescription>
+                      Gestiona todas las empresas del sistema
+                    </CardDescription>
                   </div>
-                </CardContent>
-              </Card>
-            </TabsContent>
-
-            <TabsContent value="notifications" className="space-y-4">
-              <Card>
-                <CardHeader>
-                  <CardTitle>Notificaciones del Sistema</CardTitle>
-                  <CardDescription>
-                    Alertas y notificaciones importantes de las empresas
-                  </CardDescription>
-                </CardHeader>
-                <CardContent>
-                  <div className="space-y-4">
-                    {notifications && notifications.length > 0 ? (
-                      notifications.map((notification: any) => (
-                        <div
-                          key={notification.id}
-                          className={`flex items-start gap-4 p-4 border rounded-lg ${
-                            !notification.read ? 'bg-muted/50' : ''
-                          }`}
-                        >
-                          {getSeverityIcon(notification.severity)}
-                          <div className="flex-1 space-y-1">
-                            <p className="text-sm font-medium">{notification.title}</p>
-                            <p className="text-sm text-muted-foreground">{notification.message}</p>
-                            <div className="flex items-center gap-2 text-xs text-muted-foreground">
-                              <Building2 className="h-3 w-3" />
-                              {notification.companies?.name}
-                              <span>•</span>
-                              {new Date(notification.created_at).toLocaleDateString()}
+                </div>
+                <div className="flex gap-4 mt-4">
+                  <div className="relative flex-1">
+                    <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 h-4 w-4 text-muted-foreground" />
+                    <Input
+                      placeholder="Buscar empresas..."
+                      value={companySearch}
+                      onChange={(e) => setCompanySearch(e.target.value)}
+                      className="pl-9"
+                    />
+                  </div>
+                  <Select value={companyStatusFilter} onValueChange={setCompanyStatusFilter}>
+                    <SelectTrigger className="w-[180px]">
+                      <SelectValue placeholder="Estado" />
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="all">Todas</SelectItem>
+                      <SelectItem value="active">Activas</SelectItem>
+                      <SelectItem value="inactive">Inactivas</SelectItem>
+                    </SelectContent>
+                  </Select>
+                </div>
+              </CardHeader>
+              <CardContent>
+                <Table>
+                  <TableHeader>
+                    <TableRow>
+                      <TableHead>Nombre</TableHead>
+                      <TableHead>Email</TableHead>
+                      <TableHead>Teléfono</TableHead>
+                      <TableHead>Estado</TableHead>
+                      <TableHead>Suscripción</TableHead>
+                      <TableHead>Próximo Pago</TableHead>
+                      <TableHead>Deuda</TableHead>
+                      <TableHead>Acciones</TableHead>
+                    </TableRow>
+                  </TableHeader>
+                  <TableBody>
+                    {filteredCompanies?.map((company) => {
+                      const subscription = company.company_subscriptions?.[0];
+                      return (
+                        <TableRow key={company.id}>
+                          <TableCell className="font-medium">{company.name}</TableCell>
+                          <TableCell>{company.email || "N/A"}</TableCell>
+                          <TableCell>{company.phone || "N/A"}</TableCell>
+                          <TableCell>
+                            {getStatusBadge(company.active)}
+                          </TableCell>
+                          <TableCell>
+                            {getSubscriptionStatus(company.company_subscriptions)}
+                          </TableCell>
+                          <TableCell>
+                            {subscription?.next_payment_date
+                              ? new Date(subscription.next_payment_date).toLocaleDateString()
+                              : "N/A"}
+                          </TableCell>
+                          <TableCell>
+                            {subscription?.amount_due ? (
+                              <span className="font-medium text-destructive">
+                                ${subscription.amount_due}
+                              </span>
+                            ) : (
+                              "—"
+                            )}
+                          </TableCell>
+                          <TableCell>
+                            <div className="flex gap-2">
+                              <Button 
+                                variant="outline" 
+                                size="sm"
+                                onClick={() => toggleCompanyMutation.mutate({ 
+                                  companyId: company.id, 
+                                  active: !company.active 
+                                })}
+                              >
+                                {company.active ? "Desactivar" : "Activar"}
+                              </Button>
                             </div>
+                          </TableCell>
+                        </TableRow>
+                      );
+                    })}
+                  </TableBody>
+                </Table>
+              </CardContent>
+            </Card>
+          </TabsContent>
+
+          {/* Notifications Tab */}
+          <TabsContent value="notifications" className="space-y-4">
+            <Card>
+              <CardHeader>
+                <div className="flex items-center justify-between">
+                  <div>
+                    <CardTitle>Notificaciones del Sistema</CardTitle>
+                    <CardDescription>
+                      Alertas y notificaciones importantes de todas las empresas
+                    </CardDescription>
+                  </div>
+                </div>
+                <div className="flex gap-4 mt-4">
+                  <Select value={notificationFilter} onValueChange={setNotificationFilter}>
+                    <SelectTrigger className="w-[200px]">
+                      <SelectValue placeholder="Filtrar por tipo" />
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="all">Todas</SelectItem>
+                      <SelectItem value="unread">No leídas</SelectItem>
+                      <SelectItem value="payment_overdue">Pagos vencidos</SelectItem>
+                      <SelectItem value="system_error">Errores del sistema</SelectItem>
+                    </SelectContent>
+                  </Select>
+                </div>
+              </CardHeader>
+              <CardContent>
+                <Table>
+                  <TableHeader>
+                    <TableRow>
+                      <TableHead>Estado</TableHead>
+                      <TableHead>Título</TableHead>
+                      <TableHead>Mensaje</TableHead>
+                      <TableHead>Severidad</TableHead>
+                      <TableHead>Fecha</TableHead>
+                      <TableHead>Acciones</TableHead>
+                    </TableRow>
+                  </TableHeader>
+                  <TableBody>
+                    {filteredNotifications?.map((notification) => (
+                      <TableRow key={notification.id}>
+                        <TableCell>
+                          <div className="flex items-center gap-2">
+                            {!notification.read && (
+                              <div className="h-2 w-2 rounded-full bg-primary" />
+                            )}
+                            <Badge variant={notification.read ? "outline" : "default"}>
+                              {notification.read ? "Leída" : "Nueva"}
+                            </Badge>
                           </div>
+                        </TableCell>
+                        <TableCell className="font-medium">{notification.title}</TableCell>
+                        <TableCell className="max-w-md">{notification.message}</TableCell>
+                        <TableCell>
+                          {getSeverityBadge(notification.severity)}
+                        </TableCell>
+                        <TableCell>
+                          {new Date(notification.created_at).toLocaleDateString()}
+                        </TableCell>
+                        <TableCell>
                           {!notification.read && (
                             <Button
-                              size="sm"
                               variant="outline"
-                              onClick={() => markNotificationReadMutation.mutate(notification.id)}
+                              size="sm"
+                              onClick={() =>
+                                markNotificationReadMutation.mutate(notification.id)
+                              }
                             >
-                              Marcar leída
+                              Marcar como leída
                             </Button>
                           )}
-                        </div>
-                      ))
-                    ) : (
-                      <p className="text-sm text-muted-foreground text-center py-8">
-                        No hay notificaciones
-                      </p>
-                    )}
+                        </TableCell>
+                      </TableRow>
+                    ))}
+                  </TableBody>
+                </Table>
+              </CardContent>
+            </Card>
+          </TabsContent>
+
+          {/* Feedback Tab */}
+          <TabsContent value="feedback" className="space-y-4">
+            <Card>
+              <CardHeader>
+                <div className="flex items-center justify-between">
+                  <div>
+                    <CardTitle>Feedback de Usuarios</CardTitle>
+                    <CardDescription>
+                      Comentarios y sugerencias de las empresas
+                    </CardDescription>
                   </div>
-                </CardContent>
-              </Card>
-            </TabsContent>
-
-            <TabsContent value="feedback" className="space-y-4">
-              <Card>
-                <CardHeader>
-                  <CardTitle>Feedback de Usuarios</CardTitle>
-                  <CardDescription>
-                    Sugerencias, reportes y comentarios de los usuarios
-                  </CardDescription>
-                </CardHeader>
-                <CardContent>
-                  <Table>
-                    <TableHeader>
-                      <TableRow>
-                        <TableHead>Empresa</TableHead>
-                        <TableHead>Tipo</TableHead>
-                        <TableHead>Asunto</TableHead>
-                        <TableHead>Prioridad</TableHead>
-                        <TableHead>Estado</TableHead>
-                        <TableHead>Fecha</TableHead>
-                        <TableHead>Acciones</TableHead>
+                </div>
+                <div className="flex gap-4 mt-4">
+                  <Select value={feedbackStatusFilter} onValueChange={setFeedbackStatusFilter}>
+                    <SelectTrigger className="w-[200px]">
+                      <SelectValue placeholder="Filtrar por estado" />
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="all">Todos</SelectItem>
+                      <SelectItem value="pending">Pendiente</SelectItem>
+                      <SelectItem value="in_progress">En progreso</SelectItem>
+                      <SelectItem value="resolved">Resuelto</SelectItem>
+                    </SelectContent>
+                  </Select>
+                </div>
+              </CardHeader>
+              <CardContent>
+                <Table>
+                  <TableHeader>
+                    <TableRow>
+                      <TableHead>Estado</TableHead>
+                      <TableHead>Categoría</TableHead>
+                      <TableHead>Mensaje</TableHead>
+                      <TableHead>Rating</TableHead>
+                      <TableHead>Fecha</TableHead>
+                      <TableHead>Acciones</TableHead>
+                    </TableRow>
+                  </TableHeader>
+                  <TableBody>
+                    {filteredFeedback?.map((item) => (
+                      <TableRow key={item.id}>
+                        <TableCell>
+                          <Badge
+                            variant={
+                              item.status === "pending"
+                                ? "secondary"
+                                : item.status === "resolved"
+                                ? "default"
+                                : "outline"
+                            }
+                          >
+                            {item.status}
+                          </Badge>
+                        </TableCell>
+                        <TableCell>
+                          {getFeedbackCategoryBadge(item.category)}
+                        </TableCell>
+                        <TableCell className="max-w-md">
+                          <div className="space-y-1">
+                            <p>{item.message}</p>
+                            {item.admin_notes && (
+                              <p className="text-xs text-muted-foreground">
+                                Nota: {item.admin_notes}
+                              </p>
+                            )}
+                          </div>
+                        </TableCell>
+                        <TableCell>
+                          {item.rating ? (
+                            <div className="flex items-center gap-1">
+                              <span className="font-medium">{item.rating}</span>
+                              <span className="text-muted-foreground">/5</span>
+                            </div>
+                          ) : (
+                            "N/A"
+                          )}
+                        </TableCell>
+                        <TableCell>
+                          {new Date(item.created_at).toLocaleDateString()}
+                        </TableCell>
+                        <TableCell>
+                          <Select
+                            defaultValue={item.status}
+                            onValueChange={(value) =>
+                              updateFeedbackMutation.mutate({
+                                feedbackId: item.id,
+                                status: value,
+                              })
+                            }
+                          >
+                            <SelectTrigger className="w-[140px]">
+                              <SelectValue />
+                            </SelectTrigger>
+                            <SelectContent>
+                              <SelectItem value="pending">Pendiente</SelectItem>
+                              <SelectItem value="in_progress">En progreso</SelectItem>
+                              <SelectItem value="resolved">Resuelto</SelectItem>
+                            </SelectContent>
+                          </Select>
+                        </TableCell>
                       </TableRow>
-                    </TableHeader>
-                    <TableBody>
-                      {feedbacks && feedbacks.length > 0 ? (
-                        feedbacks.map((feedback: any) => (
-                          <TableRow key={feedback.id}>
-                            <TableCell>{feedback.companies?.name}</TableCell>
-                            <TableCell>
-                              <Badge variant="outline">{feedback.type}</Badge>
-                            </TableCell>
-                            <TableCell className="max-w-xs truncate">{feedback.subject}</TableCell>
-                            <TableCell>
-                              <Badge 
-                                variant={
-                                  feedback.priority === 'critical' ? 'destructive' :
-                                  feedback.priority === 'high' ? 'default' : 'secondary'
-                                }
-                              >
-                                {feedback.priority}
-                              </Badge>
-                            </TableCell>
-                            <TableCell>
-                              <Badge variant={feedback.status === 'resolved' ? 'default' : 'secondary'}>
-                                {feedback.status}
-                              </Badge>
-                            </TableCell>
-                            <TableCell>
-                              {new Date(feedback.created_at).toLocaleDateString()}
-                            </TableCell>
-                            <TableCell>
-                              <Button
-                                size="sm"
-                                variant="outline"
-                                onClick={() => {
-                                  const newStatus = feedback.status === 'resolved' ? 'pending' : 'resolved';
-                                  updateFeedbackMutation.mutate({
-                                    feedbackId: feedback.id,
-                                    status: newStatus
-                                  });
-                                }}
-                              >
-                                {feedback.status === 'resolved' ? 'Reabrir' : 'Resolver'}
-                              </Button>
-                            </TableCell>
-                          </TableRow>
-                        ))
-                      ) : (
-                        <TableRow>
-                          <TableCell colSpan={7} className="text-center text-muted-foreground">
-                            No hay feedback registrado
+                    ))}
+                  </TableBody>
+                </Table>
+              </CardContent>
+            </Card>
+          </TabsContent>
+
+          {/* Payments Tab */}
+          <TabsContent value="payments" className="space-y-4">
+            <Card>
+              <CardHeader>
+                <div className="flex items-center justify-between">
+                  <div>
+                    <CardTitle>Gestión de Pagos</CardTitle>
+                    <CardDescription>
+                      Administra los pagos y suscripciones de las empresas
+                    </CardDescription>
+                  </div>
+                  <Dialog open={isPaymentDialogOpen} onOpenChange={setIsPaymentDialogOpen}>
+                    <DialogTrigger asChild>
+                      <Button className="gap-2">
+                        <Plus className="h-4 w-4" />
+                        Registrar Pago
+                      </Button>
+                    </DialogTrigger>
+                    <DialogContent>
+                      <DialogHeader>
+                        <DialogTitle>Registrar Nuevo Pago</DialogTitle>
+                        <DialogDescription>
+                          Ingresa los detalles del pago recibido
+                        </DialogDescription>
+                      </DialogHeader>
+                      <div className="space-y-4 py-4">
+                        <div className="space-y-2">
+                          <Label htmlFor="company">Empresa</Label>
+                          <Select 
+                            value={newPayment.company_id} 
+                            onValueChange={(value) => setNewPayment({...newPayment, company_id: value})}
+                          >
+                            <SelectTrigger id="company">
+                              <SelectValue placeholder="Seleccionar empresa" />
+                            </SelectTrigger>
+                            <SelectContent>
+                              {companies?.map((company) => (
+                                <SelectItem key={company.id} value={company.id}>
+                                  {company.name}
+                                </SelectItem>
+                              ))}
+                            </SelectContent>
+                          </Select>
+                        </div>
+                        <div className="space-y-2">
+                          <Label htmlFor="amount">Monto</Label>
+                          <Input
+                            id="amount"
+                            type="number"
+                            placeholder="0.00"
+                            value={newPayment.amount}
+                            onChange={(e) => setNewPayment({...newPayment, amount: e.target.value})}
+                          />
+                        </div>
+                        <div className="space-y-2">
+                          <Label htmlFor="method">Método de Pago</Label>
+                          <Select 
+                            value={newPayment.payment_method} 
+                            onValueChange={(value) => setNewPayment({...newPayment, payment_method: value})}
+                          >
+                            <SelectTrigger id="method">
+                              <SelectValue placeholder="Seleccionar método" />
+                            </SelectTrigger>
+                            <SelectContent>
+                              <SelectItem value="transfer">Transferencia</SelectItem>
+                              <SelectItem value="cash">Efectivo</SelectItem>
+                              <SelectItem value="card">Tarjeta</SelectItem>
+                              <SelectItem value="check">Cheque</SelectItem>
+                            </SelectContent>
+                          </Select>
+                        </div>
+                        <div className="space-y-2">
+                          <Label htmlFor="notes">Notas</Label>
+                          <Textarea
+                            id="notes"
+                            placeholder="Detalles adicionales..."
+                            value={newPayment.notes}
+                            onChange={(e) => setNewPayment({...newPayment, notes: e.target.value})}
+                          />
+                        </div>
+                        <div className="space-y-2">
+                          <Label htmlFor="status">Estado</Label>
+                          <Select 
+                            value={newPayment.status} 
+                            onValueChange={(value) => setNewPayment({...newPayment, status: value})}
+                          >
+                            <SelectTrigger id="status">
+                              <SelectValue />
+                            </SelectTrigger>
+                            <SelectContent>
+                              <SelectItem value="pending">Pendiente</SelectItem>
+                              <SelectItem value="paid">Pagado</SelectItem>
+                            </SelectContent>
+                          </Select>
+                        </div>
+                      </div>
+                      <DialogFooter>
+                        <Button 
+                          onClick={() => createPaymentMutation.mutate(newPayment)}
+                          disabled={!newPayment.company_id || !newPayment.amount}
+                        >
+                          Registrar Pago
+                        </Button>
+                      </DialogFooter>
+                    </DialogContent>
+                  </Dialog>
+                </div>
+                <div className="flex gap-4 mt-4">
+                  <Select value={paymentStatusFilter} onValueChange={setPaymentStatusFilter}>
+                    <SelectTrigger className="w-[200px]">
+                      <SelectValue placeholder="Filtrar por estado" />
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="all">Todos</SelectItem>
+                      <SelectItem value="pending">Pendiente</SelectItem>
+                      <SelectItem value="paid">Pagado</SelectItem>
+                      <SelectItem value="overdue">Vencido</SelectItem>
+                      <SelectItem value="cancelled">Cancelado</SelectItem>
+                    </SelectContent>
+                  </Select>
+                </div>
+              </CardHeader>
+              <CardContent>
+                <Table>
+                  <TableHeader>
+                    <TableRow>
+                      <TableHead>Empresa</TableHead>
+                      <TableHead>Monto</TableHead>
+                      <TableHead>Método</TableHead>
+                      <TableHead>Fecha</TableHead>
+                      <TableHead>Estado</TableHead>
+                      <TableHead>Notas</TableHead>
+                      <TableHead>Acciones</TableHead>
+                    </TableRow>
+                  </TableHeader>
+                  <TableBody>
+                    {filteredPayments?.map((payment) => {
+                      const company = companies?.find(c => c.id === payment.company_id);
+                      return (
+                        <TableRow key={payment.id}>
+                          <TableCell className="font-medium">
+                            {company?.name || "N/A"}
+                          </TableCell>
+                          <TableCell>
+                            <span className="font-medium">${Number(payment.amount).toLocaleString()}</span>
+                          </TableCell>
+                          <TableCell>
+                            {payment.payment_method ? (
+                              <Badge variant="outline">{payment.payment_method}</Badge>
+                            ) : (
+                              "N/A"
+                            )}
+                          </TableCell>
+                          <TableCell>
+                            {new Date(payment.payment_date).toLocaleDateString()}
+                          </TableCell>
+                          <TableCell>
+                            {getPaymentStatusBadge(payment.status)}
+                          </TableCell>
+                          <TableCell className="max-w-xs">
+                            {payment.notes && (
+                              <p className="text-sm text-muted-foreground truncate">
+                                {payment.notes}
+                              </p>
+                            )}
+                          </TableCell>
+                          <TableCell>
+                            <Select
+                              defaultValue={payment.status}
+                              onValueChange={(value) =>
+                                updatePaymentMutation.mutate({
+                                  paymentId: payment.id,
+                                  status: value,
+                                })
+                              }
+                            >
+                              <SelectTrigger className="w-[130px]">
+                                <SelectValue />
+                              </SelectTrigger>
+                              <SelectContent>
+                                <SelectItem value="pending">Pendiente</SelectItem>
+                                <SelectItem value="paid">Pagado</SelectItem>
+                                <SelectItem value="overdue">Vencido</SelectItem>
+                                <SelectItem value="cancelled">Cancelado</SelectItem>
+                              </SelectContent>
+                            </Select>
                           </TableCell>
                         </TableRow>
-                      )}
-                    </TableBody>
-                  </Table>
-                </CardContent>
-              </Card>
-            </TabsContent>
-
-            <TabsContent value="payments" className="space-y-4">
-              <Card>
-                <CardHeader>
-                  <CardTitle>Administración de Pagos</CardTitle>
-                  <CardDescription>
-                    Gestión de pagos y facturación de suscripciones
-                  </CardDescription>
-                </CardHeader>
-                <CardContent>
-                  <Table>
-                    <TableHeader>
-                      <TableRow>
-                        <TableHead>Empresa</TableHead>
-                        <TableHead>Monto</TableHead>
-                        <TableHead>Método</TableHead>
-                        <TableHead>Estado</TableHead>
-                        <TableHead>Fecha Pago</TableHead>
-                        <TableHead>Vencimiento</TableHead>
-                        <TableHead>Acciones</TableHead>
-                      </TableRow>
-                    </TableHeader>
-                    <TableBody>
-                      {payments && payments.length > 0 ? (
-                        payments.map((payment: any) => (
-                          <TableRow key={payment.id}>
-                            <TableCell>{payment.companies?.name}</TableCell>
-                            <TableCell>
-                              ${payment.amount.toLocaleString()} {payment.currency}
-                            </TableCell>
-                            <TableCell>
-                              <Badge variant="outline">{payment.payment_method || 'N/A'}</Badge>
-                            </TableCell>
-                            <TableCell>{getPaymentStatusBadge(payment.status)}</TableCell>
-                            <TableCell>
-                              {new Date(payment.payment_date).toLocaleDateString()}
-                            </TableCell>
-                            <TableCell>
-                              {payment.due_date ? new Date(payment.due_date).toLocaleDateString() : '-'}
-                            </TableCell>
-                            <TableCell>
-                              <Button
-                                size="sm"
-                                variant="outline"
-                                onClick={() => {
-                                  const newStatus = payment.status === 'completed' ? 'pending' : 'completed';
-                                  updatePaymentMutation.mutate({
-                                    paymentId: payment.id,
-                                    status: newStatus
-                                  });
-                                }}
-                              >
-                                {payment.status === 'completed' ? 'Revertir' : 'Confirmar'}
-                              </Button>
-                            </TableCell>
-                          </TableRow>
-                        ))
-                      ) : (
-                        <TableRow>
-                          <TableCell colSpan={7} className="text-center text-muted-foreground">
-                            No hay pagos registrados
-                          </TableCell>
-                        </TableRow>
-                      )}
-                    </TableBody>
-                  </Table>
-                </CardContent>
-              </Card>
-            </TabsContent>
-          </Tabs>
-        </div>
+                      );
+                    })}
+                  </TableBody>
+                </Table>
+              </CardContent>
+            </Card>
+          </TabsContent>
+        </Tabs>
       </div>
     </div>
   );
