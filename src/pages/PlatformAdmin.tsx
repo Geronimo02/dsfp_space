@@ -53,24 +53,7 @@ export default function PlatformAdmin() {
     status: "pending"
   });
 
-  // Show loading while checking admin status
-  if (adminLoading) {
-    return (
-      <div className="flex items-center justify-center h-screen">
-        <div className="text-center">
-          <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-primary mx-auto"></div>
-          <p className="mt-4 text-muted-foreground">Verificando permisos...</p>
-        </div>
-      </div>
-    );
-  }
-
-  // Redirect if not platform admin
-  if (!isPlatformAdmin) {
-    return <Navigate to="/" replace />;
-  }
-
-  // Fetch all companies with their subscriptions
+  // Fetch all companies with their subscriptions (must be before any conditional returns)
   const { data: companies, isLoading, error: companiesError } = useQuery({
     queryKey: ["platform-companies"],
     queryFn: async () => {
@@ -204,6 +187,23 @@ export default function PlatformAdmin() {
     },
     enabled: !!companies && !!notifications && !!feedbacks && !!payments,
   });
+
+  // Show loading while checking admin status
+  if (adminLoading) {
+    return (
+      <div className="flex items-center justify-center h-screen">
+        <div className="text-center">
+          <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-primary mx-auto"></div>
+          <p className="mt-4 text-muted-foreground">Verificando permisos...</p>
+        </div>
+      </div>
+    );
+  }
+
+  // Redirect if not platform admin
+  if (!isPlatformAdmin) {
+    return <Navigate to="/" replace />;
+  }
 
   // Toggle company active status
   const toggleCompanyMutation = useMutation({
