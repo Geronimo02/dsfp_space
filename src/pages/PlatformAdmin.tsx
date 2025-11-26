@@ -26,8 +26,15 @@ import {
   Clock,
   Search,
   Plus,
-  FileText
+  FileText,
+  BarChart3,
+  Settings,
+  Download,
+  Edit,
+  Trash
 } from "lucide-react";
+import { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip as RechartsTooltip, ResponsiveContainer, LineChart, Line } from "recharts";
+import { exportToExcel, exportToPDF, formatCurrency, formatDate } from "@/lib/exportUtils";
 import { usePlatformAdmin } from "@/hooks/usePlatformAdmin";
 import { useNavigate, Navigate } from "react-router-dom";
 
@@ -44,6 +51,9 @@ export default function PlatformAdmin() {
   const [paymentStatusFilter, setPaymentStatusFilter] = useState<string>("all");
   const [auditLogSearch, setAuditLogSearch] = useState("");
   const [auditLogActionFilter, setAuditLogActionFilter] = useState<string>("all");
+  const [userSearch, setUserSearch] = useState("");
+  const [planDialogOpen, setPlanDialogOpen] = useState(false);
+  const [editingPlan, setEditingPlan] = useState<any>(null);
   const [isPaymentDialogOpen, setIsPaymentDialogOpen] = useState(false);
   const [newPayment, setNewPayment] = useState({
     company_id: "",
@@ -51,6 +61,14 @@ export default function PlatformAdmin() {
     payment_method: "",
     notes: "",
     status: "pending"
+  });
+  const [newPlan, setNewPlan] = useState({
+    name: "",
+    description: "",
+    price: "",
+    billing_period: "monthly",
+    max_users: "",
+    features: ""
   });
 
   // Fetch all companies with their subscriptions (must be before any conditional returns)
@@ -155,6 +173,65 @@ export default function PlatformAdmin() {
         user_agent: string | null;
         created_at: string;
       }>;
+    },
+  });
+
+  // Fetch all users
+  const { data: allUsers } = useQuery({
+    queryKey: ["platform-all-users"],
+    queryFn: async () => {
+      const { data, error } = await supabase
+        .from("company_users")
+        .select(`
+          *,
+          companies (
+            name
+          )
+        `)
+        .order("created_at", { ascending: false });
+
+      if (error) throw error;
+      return data;
+    },
+  });
+
+  // Fetch subscription plans
+  const { data: subscriptionPlans } = useQuery({
+    queryKey: ["subscription-plans"],
+    queryFn: async () => {
+      const { data, error } = await supabase
+        .from("subscription_plans")
+        .select("*")
+        .order("price", { ascending: true });
+
+      if (error) throw error;
+      return data;
+    },
+  });
+
+  // Fetch revenue analytics
+  const { data: revenueAnalytics } = useQuery({
+    queryKey: ["platform-revenue-analytics"],
+    queryFn: async () => {
+      const { data, error } = await supabase
+        .from("platform_payments")
+        .select("amount, payment_date, status")
+        .eq("status", "paid")
+        .order("payment_date", { ascending: true });
+
+      if (error) throw error;
+      
+      // Group by month
+      const monthlyRevenue: Record<string, number> = {};
+      data?.forEach((payment) => {
+        const month = new Date(payment.payment_date).toLocaleDateString('es-AR', { year: 'numeric', month: 'short' });
+        monthlyRevenue[month] = (monthlyRevenue[month] || 0) + payment.amount;
+      });
+
+      return Object.entries(monthlyRevenue).map(([month, revenue]) => ({
+        month,
+        revenue
+      }));
     },
   });
 
@@ -601,7 +678,7 @@ export default function PlatformAdmin() {
         )}
 
         <Tabs defaultValue="companies" className="space-y-6">
-          <TabsList className="grid w-full grid-cols-5">
+          <TabsList className="grid w-full grid-cols-8">
             <TabsTrigger value="companies" className="gap-2">
               <Building2 className="h-4 w-4" />
               Empresas
@@ -622,6 +699,18 @@ export default function PlatformAdmin() {
             <TabsTrigger value="payments" className="gap-2">
               <DollarSign className="h-4 w-4" />
               Pagos
+            </TabsTrigger>
+            <TabsTrigger value="analytics" className="gap-2">
+              <BarChart3 className="h-4 w-4" />
+              Analytics
+            </TabsTrigger>
+            <TabsTrigger value="users" className="gap-2">
+              <Users className="h-4 w-4" />
+              Usuarios
+            </TabsTrigger>
+            <TabsTrigger value="plans" className="gap-2">
+              <Settings className="h-4 w-4" />
+              Planes
             </TabsTrigger>
             <TabsTrigger value="audit" className="gap-2">
               <FileText className="h-4 w-4" />
@@ -1108,6 +1197,447 @@ export default function PlatformAdmin() {
                     })}
                   </TableBody>
                 </Table>
+              </CardContent>
+            </Card>
+          </TabsContent>
+
+          {/* Analytics Tab */}
+          <TabsContent value="analytics" className="space-y-4">
+            <div className="flex justify-end gap-2 mb-4">
+              <Button
+                variant="outline"
+                size="sm"
+                onClick={() => {
+                  const data = revenueAnalytics?.map(item => ({
+                    Mes: item.month,
+                    Ingresos: item.revenue
+                  })) || [];
+                  exportToExcel(data, 'analytics-ingresos', 'Ingresos');
+                }}
+              >
+                <Download className="h-4 w-4 mr-2" />
+                Exportar Excel
+              </Button>
+              <Button
+                variant="outline"
+                size="sm"
+                onClick={() => {
+                  const headers = ['Mes', 'Ingresos'];
+                  const data = revenueAnalytics?.map(item => [
+                    item.month,
+                    formatCurrency(item.revenue)
+                  ]) || [];
+                  exportToPDF('Analytics de Ingresos', headers, data, 'analytics-ingresos');
+                }}
+              >
+                <Download className="h-4 w-4 mr-2" />
+                Exportar PDF
+              </Button>
+            </div>
+
+            <Card>
+              <CardHeader>
+                <CardTitle>Ingresos Mensuales</CardTitle>
+                <CardDescription>Evolución de ingresos por mes</CardDescription>
+              </CardHeader>
+              <CardContent>
+                <ResponsiveContainer width="100%" height={350}>
+                  <BarChart data={revenueAnalytics || []}>
+                    <CartesianGrid strokeDasharray="3 3" />
+                    <XAxis dataKey="month" />
+                    <YAxis />
+                    <RechartsTooltip 
+                      formatter={(value: number) => formatCurrency(value)}
+                    />
+                    <Bar dataKey="revenue" fill="hsl(var(--primary))" />
+                  </BarChart>
+                </ResponsiveContainer>
+              </CardContent>
+            </Card>
+
+            <div className="grid gap-4 md:grid-cols-2">
+              <Card>
+                <CardHeader>
+                  <CardTitle>MRR (Monthly Recurring Revenue)</CardTitle>
+                  <CardDescription>Ingresos recurrentes mensuales</CardDescription>
+                </CardHeader>
+                <CardContent>
+                  <div className="text-3xl font-bold">
+                    {formatCurrency(
+                      stats?.totalRevenue ? Math.round(stats.totalRevenue / 12) : 0
+                    )}
+                  </div>
+                  <p className="text-sm text-muted-foreground mt-2">
+                    Promedio mensual basado en ingresos totales
+                  </p>
+                </CardContent>
+              </Card>
+
+              <Card>
+                <CardHeader>
+                  <CardTitle>Tasa de Crecimiento</CardTitle>
+                  <CardDescription>Comparación mes actual vs anterior</CardDescription>
+                </CardHeader>
+                <CardContent>
+                  <div className="flex items-center gap-2">
+                    <TrendingUp className="h-6 w-6 text-green-500" />
+                    <span className="text-3xl font-bold text-green-500">
+                      {revenueAnalytics && revenueAnalytics.length >= 2
+                        ? `${Math.round(
+                            ((revenueAnalytics[revenueAnalytics.length - 1].revenue -
+                              revenueAnalytics[revenueAnalytics.length - 2].revenue) /
+                              revenueAnalytics[revenueAnalytics.length - 2].revenue) *
+                              100
+                          )}%`
+                        : 'N/A'}
+                    </span>
+                  </div>
+                  <p className="text-sm text-muted-foreground mt-2">
+                    Crecimiento respecto al mes anterior
+                  </p>
+                </CardContent>
+              </Card>
+            </div>
+          </TabsContent>
+
+          {/* Users Tab */}
+          <TabsContent value="users" className="space-y-4">
+            <Card>
+              <CardHeader>
+                <div className="flex items-center justify-between">
+                  <div>
+                    <CardTitle>Gestión de Usuarios Globales</CardTitle>
+                    <CardDescription>
+                      Todos los usuarios registrados en todas las empresas
+                    </CardDescription>
+                  </div>
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    onClick={() => {
+                      const data = allUsers?.map(user => ({
+                        ID: user.id,
+                        'Empresa': (user.companies as any)?.name || 'N/A',
+                        'Rol': user.role,
+                        'Estado': user.active ? 'Activo' : 'Inactivo',
+                        'Fecha Creación': formatDate(user.created_at || '')
+                      })) || [];
+                      exportToExcel(data, 'usuarios-plataforma', 'Usuarios');
+                    }}
+                  >
+                    <Download className="h-4 w-4 mr-2" />
+                    Exportar Excel
+                  </Button>
+                </div>
+                <div className="relative mt-4">
+                  <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 h-4 w-4 text-muted-foreground" />
+                  <Input
+                    placeholder="Buscar usuarios..."
+                    value={userSearch}
+                    onChange={(e) => setUserSearch(e.target.value)}
+                    className="pl-9"
+                  />
+                </div>
+              </CardHeader>
+              <CardContent>
+                <Table>
+                  <TableHeader>
+                    <TableRow>
+                      <TableHead>ID Usuario</TableHead>
+                      <TableHead>Empresa</TableHead>
+                      <TableHead>Rol</TableHead>
+                      <TableHead>Estado</TableHead>
+                      <TableHead>Fecha Creación</TableHead>
+                    </TableRow>
+                  </TableHeader>
+                  <TableBody>
+                    {allUsers
+                      ?.filter(user =>
+                        userSearch === '' ||
+                        user.id.toLowerCase().includes(userSearch.toLowerCase()) ||
+                        ((user.companies as any)?.name || '').toLowerCase().includes(userSearch.toLowerCase())
+                      )
+                      .map((user) => (
+                        <TableRow key={user.id}>
+                          <TableCell className="font-mono text-xs">
+                            {user.user_id?.substring(0, 8)}...
+                          </TableCell>
+                          <TableCell>
+                            {(user.companies as any)?.name || 'N/A'}
+                          </TableCell>
+                          <TableCell>
+                            <Badge variant="outline">{user.role}</Badge>
+                          </TableCell>
+                          <TableCell>
+                            {user.active ? (
+                              <Badge variant="default">Activo</Badge>
+                            ) : (
+                              <Badge variant="secondary">Inactivo</Badge>
+                            )}
+                          </TableCell>
+                          <TableCell>
+                            {formatDate(user.created_at || '')}
+                          </TableCell>
+                        </TableRow>
+                      ))}
+                  </TableBody>
+                </Table>
+              </CardContent>
+            </Card>
+          </TabsContent>
+
+          {/* Subscription Plans Tab */}
+          <TabsContent value="plans" className="space-y-4">
+            <Card>
+              <CardHeader>
+                <div className="flex items-center justify-between">
+                  <div>
+                    <CardTitle>Planes de Suscripción</CardTitle>
+                    <CardDescription>
+                      Gestionar planes disponibles para las empresas
+                    </CardDescription>
+                  </div>
+                  <Dialog open={planDialogOpen} onOpenChange={setPlanDialogOpen}>
+                    <DialogTrigger asChild>
+                      <Button>
+                        <Plus className="h-4 w-4 mr-2" />
+                        Nuevo Plan
+                      </Button>
+                    </DialogTrigger>
+                    <DialogContent>
+                      <DialogHeader>
+                        <DialogTitle>
+                          {editingPlan ? 'Editar Plan' : 'Crear Nuevo Plan'}
+                        </DialogTitle>
+                        <DialogDescription>
+                          Complete los detalles del plan de suscripción
+                        </DialogDescription>
+                      </DialogHeader>
+                      <div className="space-y-4">
+                        <div>
+                          <Label>Nombre del Plan</Label>
+                          <Input
+                            value={newPlan.name}
+                            onChange={(e) =>
+                              setNewPlan({ ...newPlan, name: e.target.value })
+                            }
+                            placeholder="Ej: Plan Pro"
+                          />
+                        </div>
+                        <div>
+                          <Label>Descripción</Label>
+                          <Textarea
+                            value={newPlan.description}
+                            onChange={(e) =>
+                              setNewPlan({ ...newPlan, description: e.target.value })
+                            }
+                            placeholder="Descripción del plan"
+                          />
+                        </div>
+                        <div className="grid grid-cols-2 gap-4">
+                          <div>
+                            <Label>Precio</Label>
+                            <Input
+                              type="number"
+                              value={newPlan.price}
+                              onChange={(e) =>
+                                setNewPlan({ ...newPlan, price: e.target.value })
+                              }
+                              placeholder="0.00"
+                            />
+                          </div>
+                          <div>
+                            <Label>Ciclo de Facturación</Label>
+                            <Select
+                              value={newPlan.billing_period}
+                              onValueChange={(value) =>
+                                setNewPlan({ ...newPlan, billing_period: value })
+                              }
+                            >
+                              <SelectTrigger>
+                                <SelectValue />
+                              </SelectTrigger>
+                              <SelectContent>
+                                <SelectItem value="monthly">Mensual</SelectItem>
+                                <SelectItem value="yearly">Anual</SelectItem>
+                              </SelectContent>
+                            </Select>
+                          </div>
+                        </div>
+                        <div>
+                          <Label>Máximo de Usuarios</Label>
+                          <Input
+                            type="number"
+                            value={newPlan.max_users}
+                            onChange={(e) =>
+                              setNewPlan({ ...newPlan, max_users: e.target.value })
+                            }
+                            placeholder="Ej: 5"
+                          />
+                        </div>
+                        <div>
+                          <Label>Características (una por línea)</Label>
+                          <Textarea
+                            value={newPlan.features}
+                            onChange={(e) =>
+                              setNewPlan({ ...newPlan, features: e.target.value })
+                            }
+                            placeholder="Característica 1&#10;Característica 2&#10;Característica 3"
+                          />
+                        </div>
+                      </div>
+                      <DialogFooter>
+                        <Button
+                          variant="outline"
+                          onClick={() => {
+                            setPlanDialogOpen(false);
+                            setEditingPlan(null);
+                            setNewPlan({
+                              name: '',
+                              description: '',
+                              price: '',
+                              billing_period: 'monthly',
+                              max_users: '',
+                              features: ''
+                            });
+                          }}
+                        >
+                          Cancelar
+                        </Button>
+                        <Button
+                          onClick={async () => {
+                            try {
+                              const planData = {
+                                name: newPlan.name,
+                                description: newPlan.description,
+                                price: Number(newPlan.price),
+                                billing_period: newPlan.billing_period,
+                                max_users: Number(newPlan.max_users),
+                                features: newPlan.features.split('\n').filter(f => f.trim())
+                              };
+
+                              if (editingPlan) {
+                                const { error } = await supabase
+                                  .from('subscription_plans')
+                                  .update(planData)
+                                  .eq('id', editingPlan.id);
+                                if (error) throw error;
+                                toast.success('Plan actualizado exitosamente');
+                              } else {
+                                const { error } = await supabase
+                                  .from('subscription_plans')
+                                  .insert(planData);
+                                if (error) throw error;
+                                toast.success('Plan creado exitosamente');
+                              }
+
+                              queryClient.invalidateQueries({ queryKey: ['subscription-plans'] });
+                              setPlanDialogOpen(false);
+                              setEditingPlan(null);
+                              setNewPlan({
+                                name: '',
+                                description: '',
+                                price: '',
+                                billing_period: 'monthly',
+                                max_users: '',
+                                features: ''
+                              });
+                            } catch (error: any) {
+                              toast.error('Error: ' + error.message);
+                            }
+                          }}
+                        >
+                          {editingPlan ? 'Actualizar' : 'Crear'} Plan
+                        </Button>
+                      </DialogFooter>
+                    </DialogContent>
+                  </Dialog>
+                </div>
+              </CardHeader>
+              <CardContent>
+                <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-3">
+                  {subscriptionPlans?.map((plan) => (
+                    <Card key={plan.id}>
+                      <CardHeader>
+                        <div className="flex items-center justify-between">
+                          <CardTitle>{plan.name}</CardTitle>
+                          <div className="flex gap-2">
+                            <Button
+                              variant="ghost"
+                              size="icon"
+                              onClick={() => {
+                                setEditingPlan(plan);
+                                setNewPlan({
+                                  name: plan.name,
+                                  description: plan.description || '',
+                                  price: plan.price.toString(),
+                                  billing_period: plan.billing_period,
+                                  max_users: plan.max_users?.toString() || '',
+                                  features: Array.isArray(plan.features) 
+                                    ? plan.features.join('\n') 
+                                    : ''
+                                });
+                                setPlanDialogOpen(true);
+                              }}
+                            >
+                              <Edit className="h-4 w-4" />
+                            </Button>
+                            <Button
+                              variant="ghost"
+                              size="icon"
+                              onClick={async () => {
+                                if (confirm('¿Está seguro de eliminar este plan?')) {
+                                  const { error } = await supabase
+                                    .from('subscription_plans')
+                                    .delete()
+                                    .eq('id', plan.id);
+                                  if (error) {
+                                    toast.error('Error al eliminar');
+                                  } else {
+                                    toast.success('Plan eliminado');
+                                    queryClient.invalidateQueries({ queryKey: ['subscription-plans'] });
+                                  }
+                                }
+                              }}
+                            >
+                              <Trash className="h-4 w-4" />
+                            </Button>
+                          </div>
+                        </div>
+                        <CardDescription>{plan.description}</CardDescription>
+                      </CardHeader>
+                      <CardContent>
+                        <div className="space-y-4">
+                          <div>
+                            <div className="text-3xl font-bold">
+                              {formatCurrency(plan.price)}
+                            </div>
+                            <p className="text-sm text-muted-foreground">
+                              {plan.billing_period === 'monthly' ? 'por mes' : 'por año'}
+                            </p>
+                          </div>
+                          {plan.max_users && (
+                            <div className="text-sm">
+                              <Badge variant="secondary">
+                                Hasta {plan.max_users} usuarios
+                              </Badge>
+                            </div>
+                          )}
+                          {plan.features && Array.isArray(plan.features) && (
+                            <ul className="space-y-2 text-sm">
+                              {plan.features.map((feature: string, idx: number) => (
+                                <li key={idx} className="flex items-center gap-2">
+                                  <CheckCircle2 className="h-4 w-4 text-green-500" />
+                                  {feature}
+                                </li>
+                              ))}
+                            </ul>
+                          )}
+                        </div>
+                      </CardContent>
+                    </Card>
+                  ))}
+                </div>
               </CardContent>
             </Card>
           </TabsContent>
