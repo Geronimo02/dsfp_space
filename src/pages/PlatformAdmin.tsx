@@ -25,7 +25,8 @@ import {
   MessageSquare,
   Clock,
   Search,
-  Plus
+  Plus,
+  FileText
 } from "lucide-react";
 import { usePlatformAdmin } from "@/hooks/usePlatformAdmin";
 import { useNavigate, Navigate } from "react-router-dom";
@@ -41,6 +42,8 @@ export default function PlatformAdmin() {
   const [notificationFilter, setNotificationFilter] = useState<string>("all");
   const [feedbackStatusFilter, setFeedbackStatusFilter] = useState<string>("all");
   const [paymentStatusFilter, setPaymentStatusFilter] = useState<string>("all");
+  const [auditLogSearch, setAuditLogSearch] = useState("");
+  const [auditLogActionFilter, setAuditLogActionFilter] = useState<string>("all");
   const [isPaymentDialogOpen, setIsPaymentDialogOpen] = useState(false);
   const [newPayment, setNewPayment] = useState({
     company_id: "",
@@ -142,6 +145,33 @@ export default function PlatformAdmin() {
 
       if (error) throw error;
       return data;
+    },
+  });
+
+  // Fetch audit logs
+  const { data: auditLogs } = useQuery({
+    queryKey: ["platform-audit-logs"],
+    queryFn: async () => {
+      const { data, error } = await (supabase as any)
+        .from("platform_audit_logs")
+        .select("*")
+        .order("created_at", { ascending: false })
+        .limit(100);
+
+      if (error) throw error;
+      return data as Array<{
+        id: string;
+        user_id: string | null;
+        user_email: string | null;
+        action: string;
+        entity_type: string | null;
+        entity_id: string | null;
+        description: string;
+        metadata: any;
+        ip_address: string | null;
+        user_agent: string | null;
+        created_at: string;
+      }>;
     },
   });
 
@@ -419,6 +449,17 @@ export default function PlatformAdmin() {
     return payment.status === paymentStatusFilter;
   });
 
+  const filteredAuditLogs = auditLogs?.filter(log => {
+    const matchesSearch = !auditLogSearch || 
+      log.user_email?.toLowerCase().includes(auditLogSearch.toLowerCase()) ||
+      log.entity_type?.toLowerCase().includes(auditLogSearch.toLowerCase()) ||
+      log.description?.toLowerCase().includes(auditLogSearch.toLowerCase());
+    
+    const matchesAction = auditLogActionFilter === "all" || log.action === auditLogActionFilter;
+    
+    return matchesSearch && matchesAction;
+  });
+
   if (isLoading) {
     return (
       <div className="flex items-center justify-center h-screen">
@@ -560,7 +601,7 @@ export default function PlatformAdmin() {
         )}
 
         <Tabs defaultValue="companies" className="space-y-6">
-          <TabsList className="grid w-full grid-cols-4">
+          <TabsList className="grid w-full grid-cols-5">
             <TabsTrigger value="companies" className="gap-2">
               <Building2 className="h-4 w-4" />
               Empresas
@@ -581,6 +622,10 @@ export default function PlatformAdmin() {
             <TabsTrigger value="payments" className="gap-2">
               <DollarSign className="h-4 w-4" />
               Pagos
+            </TabsTrigger>
+            <TabsTrigger value="audit" className="gap-2">
+              <FileText className="h-4 w-4" />
+              Auditoría
             </TabsTrigger>
           </TabsList>
 
@@ -1061,6 +1106,118 @@ export default function PlatformAdmin() {
                         </TableRow>
                       );
                     })}
+                  </TableBody>
+                </Table>
+              </CardContent>
+            </Card>
+          </TabsContent>
+
+          {/* Audit Logs Tab */}
+          <TabsContent value="audit" className="space-y-4">
+            <Card>
+              <CardHeader>
+                <div className="flex items-center justify-between">
+                  <div>
+                    <CardTitle>Registro de Auditoría</CardTitle>
+                    <CardDescription>
+                      Historial de acciones administrativas en la plataforma
+                    </CardDescription>
+                  </div>
+                </div>
+                <div className="flex gap-4 mt-4">
+                  <div className="relative flex-1">
+                    <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 h-4 w-4 text-muted-foreground" />
+                    <Input
+                      placeholder="Buscar por usuario, entidad o descripción..."
+                      value={auditLogSearch}
+                      onChange={(e) => setAuditLogSearch(e.target.value)}
+                      className="pl-10"
+                    />
+                  </div>
+                  <Select value={auditLogActionFilter} onValueChange={setAuditLogActionFilter}>
+                    <SelectTrigger className="w-[200px]">
+                      <SelectValue />
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="all">Todas las acciones</SelectItem>
+                      <SelectItem value="create">Crear</SelectItem>
+                      <SelectItem value="update">Actualizar</SelectItem>
+                      <SelectItem value="delete">Eliminar</SelectItem>
+                      <SelectItem value="login">Inicio de sesión</SelectItem>
+                      <SelectItem value="logout">Cierre de sesión</SelectItem>
+                    </SelectContent>
+                  </Select>
+                </div>
+              </CardHeader>
+              <CardContent>
+                <Table>
+                  <TableHeader>
+                    <TableRow>
+                      <TableHead>Fecha</TableHead>
+                      <TableHead>Usuario</TableHead>
+                      <TableHead>Acción</TableHead>
+                      <TableHead>Entidad</TableHead>
+                      <TableHead>Descripción</TableHead>
+                      <TableHead>IP</TableHead>
+                    </TableRow>
+                  </TableHeader>
+                  <TableBody>
+                    {filteredAuditLogs && filteredAuditLogs.length > 0 ? (
+                      filteredAuditLogs.map((log) => (
+                        <TableRow key={log.id}>
+                          <TableCell className="text-sm">
+                            {new Date(log.created_at).toLocaleString('es-AR', {
+                              day: '2-digit',
+                              month: '2-digit',
+                              year: 'numeric',
+                              hour: '2-digit',
+                              minute: '2-digit'
+                            })}
+                          </TableCell>
+                          <TableCell>
+                            <div>
+                              <p className="font-medium text-sm">{log.user_email || "Sistema"}</p>
+                            </div>
+                          </TableCell>
+                          <TableCell>
+                            <Badge 
+                              variant={
+                                log.action === 'create' ? 'default' :
+                                log.action === 'update' ? 'secondary' :
+                                log.action === 'delete' ? 'destructive' :
+                                'outline'
+                              }
+                            >
+                              {log.action === 'create' ? 'Crear' :
+                               log.action === 'update' ? 'Actualizar' :
+                               log.action === 'delete' ? 'Eliminar' :
+                               log.action === 'login' ? 'Login' :
+                               log.action === 'logout' ? 'Logout' :
+                               log.action}
+                            </Badge>
+                          </TableCell>
+                          <TableCell>
+                            <Badge variant="outline">
+                              {log.entity_type || "N/A"}
+                            </Badge>
+                          </TableCell>
+                          <TableCell className="max-w-md">
+                            <p className="text-sm text-muted-foreground line-clamp-2">
+                              {log.description}
+                            </p>
+                          </TableCell>
+                          <TableCell className="text-xs text-muted-foreground">
+                            {log.ip_address || "N/A"}
+                          </TableCell>
+                        </TableRow>
+                      ))
+                    ) : (
+                      <TableRow>
+                        <TableCell colSpan={6} className="text-center text-muted-foreground py-8">
+                          No se encontraron registros de auditoría
+                        </TableCell>
+                      </TableRow>
+                    )}
                   </TableBody>
                 </Table>
               </CardContent>
