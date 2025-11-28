@@ -4209,6 +4209,97 @@ export type Database = {
           },
         ]
       }
+      support_ticket_responses: {
+        Row: {
+          created_at: string | null
+          id: string
+          is_internal: boolean | null
+          message: string
+          ticket_id: string
+          user_id: string | null
+        }
+        Insert: {
+          created_at?: string | null
+          id?: string
+          is_internal?: boolean | null
+          message: string
+          ticket_id: string
+          user_id?: string | null
+        }
+        Update: {
+          created_at?: string | null
+          id?: string
+          is_internal?: boolean | null
+          message?: string
+          ticket_id?: string
+          user_id?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "support_ticket_responses_ticket_id_fkey"
+            columns: ["ticket_id"]
+            isOneToOne: false
+            referencedRelation: "support_tickets"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      support_tickets: {
+        Row: {
+          assigned_to: string | null
+          category: string
+          company_id: string | null
+          created_at: string | null
+          created_by: string | null
+          description: string
+          id: string
+          priority: string
+          resolved_at: string | null
+          status: string
+          ticket_number: string
+          title: string
+          updated_at: string | null
+        }
+        Insert: {
+          assigned_to?: string | null
+          category?: string
+          company_id?: string | null
+          created_at?: string | null
+          created_by?: string | null
+          description: string
+          id?: string
+          priority?: string
+          resolved_at?: string | null
+          status?: string
+          ticket_number: string
+          title: string
+          updated_at?: string | null
+        }
+        Update: {
+          assigned_to?: string | null
+          category?: string
+          company_id?: string | null
+          created_at?: string | null
+          created_by?: string | null
+          description?: string
+          id?: string
+          priority?: string
+          resolved_at?: string | null
+          status?: string
+          ticket_number?: string
+          title?: string
+          updated_at?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "support_tickets_company_id_fkey"
+            columns: ["company_id"]
+            isOneToOne: false
+            referencedRelation: "companies"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       technical_services: {
         Row: {
           brand: string | null
@@ -4715,6 +4806,7 @@ export type Database = {
       generate_reservation_number: { Args: never; Returns: string }
       generate_return_number: { Args: never; Returns: string }
       generate_service_number: { Args: never; Returns: string }
+      generate_ticket_number: { Args: never; Returns: string }
       generate_transfer_number: { Args: never; Returns: string }
       get_all_customer_movements: {
         Args: { search_query?: string }

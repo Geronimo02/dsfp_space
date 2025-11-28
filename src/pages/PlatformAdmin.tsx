@@ -31,7 +31,8 @@ import {
   Settings,
   Download,
   Edit,
-  Trash
+  Trash,
+  Ticket
 } from "lucide-react";
 import { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip as RechartsTooltip, ResponsiveContainer, LineChart, Line } from "recharts";
 import { exportToExcel, exportToPDF, formatCurrency, formatDate } from "@/lib/exportUtils";
@@ -55,6 +56,17 @@ export default function PlatformAdmin() {
   const [planDialogOpen, setPlanDialogOpen] = useState(false);
   const [editingPlan, setEditingPlan] = useState<any>(null);
   const [isPaymentDialogOpen, setIsPaymentDialogOpen] = useState(false);
+  const [ticketStatusFilter, setTicketStatusFilter] = useState<string>("all");
+  const [ticketDialogOpen, setTicketDialogOpen] = useState(false);
+  const [selectedTicket, setSelectedTicket] = useState<any>(null);
+  const [ticketResponse, setTicketResponse] = useState("");
+  const [newTicket, setNewTicket] = useState({
+    company_id: "",
+    title: "",
+    description: "",
+    priority: "medium",
+    category: "general"
+  });
   const [newPayment, setNewPayment] = useState({
     company_id: "",
     amount: "",
@@ -301,6 +313,23 @@ export default function PlatformAdmin() {
     }
   });
 
+  // Fetch support tickets
+  const { data: tickets } = useQuery({
+    queryKey: ["platform-support-tickets"],
+    queryFn: async () => {
+      const { data, error } = await supabase
+        .from("support_tickets")
+        .select(`
+          *,
+          companies (name)
+        `)
+        .order("created_at", { ascending: false });
+
+      if (error) throw error;
+      return data;
+    },
+  });
+
   // Stats query
   const { data: stats } = useQuery({
     queryKey: ["platform-stats"],
@@ -497,6 +526,121 @@ export default function PlatformAdmin() {
     },
     onError: (error) => {
       toast.error("Error al registrar el pago: " + error.message);
+    },
+  });
+
+  // Create ticket
+  const createTicketMutation = useMutation({
+    mutationFn: async (ticket: typeof newTicket) => {
+      // First generate ticket number
+      const { data: ticketNumber, error: fnError } = await supabase
+        .rpc('generate_ticket_number');
+      
+      if (fnError) throw fnError;
+
+      const { error } = await supabase
+        .from("support_tickets")
+        .insert({
+          company_id: ticket.company_id,
+          title: ticket.title,
+          description: ticket.description,
+          priority: ticket.priority,
+          category: ticket.category,
+          ticket_number: ticketNumber,
+          status: "open"
+        });
+      
+      if (error) throw error;
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["platform-support-tickets"] });
+      setTicketDialogOpen(false);
+      setNewTicket({
+        company_id: "",
+        title: "",
+        description: "",
+        priority: "medium",
+        category: "general"
+      });
+      toast.success("Ticket creado exitosamente");
+    },
+    onError: (error) => {
+      toast.error("Error al crear el ticket: " + error.message);
+    },
+  });
+
+  // Update ticket
+  const updateTicketMutation = useMutation({
+    mutationFn: async ({ 
+      ticketId, 
+      status, 
+      priority,
+      assigned_to 
+    }: { 
+      ticketId: string; 
+      status?: string;
+      priority?: string;
+      assigned_to?: string;
+    }) => {
+      const updates: any = { 
+        updated_at: new Date().toISOString()
+      };
+      
+      if (status) {
+        updates.status = status;
+        if (status === "resolved") {
+          updates.resolved_at = new Date().toISOString();
+        }
+      }
+      if (priority) updates.priority = priority;
+      if (assigned_to) updates.assigned_to = assigned_to;
+
+      const { error } = await supabase
+        .from("support_tickets")
+        .update(updates)
+        .eq("id", ticketId);
+
+      if (error) throw error;
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["platform-support-tickets"] });
+      toast.success("Ticket actualizado");
+    },
+    onError: (error) => {
+      toast.error("Error al actualizar ticket");
+      console.error("Error:", error);
+    },
+  });
+
+  // Create ticket response
+  const createTicketResponseMutation = useMutation({
+    mutationFn: async ({ 
+      ticketId, 
+      message,
+      isInternal 
+    }: { 
+      ticketId: string; 
+      message: string;
+      isInternal?: boolean;
+    }) => {
+      const { error } = await supabase
+        .from("support_ticket_responses")
+        .insert({
+          ticket_id: ticketId,
+          message,
+          is_internal: isInternal || false
+        });
+
+      if (error) throw error;
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["platform-support-tickets"] });
+      setTicketResponse("");
+      toast.success("Respuesta agregada");
+    },
+    onError: (error) => {
+      toast.error("Error al agregar respuesta");
+      console.error("Error:", error);
     },
   });
 
@@ -744,7 +888,7 @@ export default function PlatformAdmin() {
         )}
 
         <Tabs defaultValue="companies" className="space-y-6">
-          <TabsList className="grid w-full grid-cols-9">
+          <TabsList className="grid w-full grid-cols-10">
             <TabsTrigger value="companies" className="gap-2">
               <Building2 className="h-4 w-4" />
               Empresas
@@ -752,6 +896,10 @@ export default function PlatformAdmin() {
             <TabsTrigger value="usage" className="gap-2">
               <TrendingUp className="h-4 w-4" />
               Métricas
+            </TabsTrigger>
+            <TabsTrigger value="tickets" className="gap-2">
+              <Ticket className="h-4 w-4" />
+              Tickets
             </TabsTrigger>
             <TabsTrigger value="notifications" className="gap-2">
               <Bell className="h-4 w-4" />
@@ -894,6 +1042,296 @@ export default function PlatformAdmin() {
                 )}
               </CardContent>
             </Card>
+          </TabsContent>
+
+          {/* Support Tickets Tab */}
+          <TabsContent value="tickets" className="space-y-4">
+            <Card>
+              <CardHeader>
+                <div className="flex items-center justify-between">
+                  <div>
+                    <CardTitle>Sistema de Tickets de Soporte</CardTitle>
+                    <CardDescription>
+                      Gestiona consultas y tickets de las empresas
+                    </CardDescription>
+                  </div>
+                  <Button onClick={() => {
+                    setNewTicket({
+                      company_id: "",
+                      title: "",
+                      description: "",
+                      priority: "medium",
+                      category: "general"
+                    });
+                    setTicketDialogOpen(true);
+                  }}>
+                    <Plus className="h-4 w-4 mr-2" />
+                    Nuevo Ticket
+                  </Button>
+                </div>
+                <div className="flex gap-4 mt-4">
+                  <Select value={ticketStatusFilter} onValueChange={setTicketStatusFilter}>
+                    <SelectTrigger className="w-[200px]">
+                      <SelectValue placeholder="Filtrar por estado" />
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="all">Todos</SelectItem>
+                      <SelectItem value="open">Abiertos</SelectItem>
+                      <SelectItem value="in_progress">En proceso</SelectItem>
+                      <SelectItem value="resolved">Resueltos</SelectItem>
+                      <SelectItem value="closed">Cerrados</SelectItem>
+                    </SelectContent>
+                  </Select>
+                </div>
+              </CardHeader>
+              <CardContent>
+                <Table>
+                  <TableHeader>
+                    <TableRow>
+                      <TableHead>Número</TableHead>
+                      <TableHead>Empresa</TableHead>
+                      <TableHead>Título</TableHead>
+                      <TableHead>Estado</TableHead>
+                      <TableHead>Prioridad</TableHead>
+                      <TableHead>Categoría</TableHead>
+                      <TableHead>Creado</TableHead>
+                      <TableHead>Acciones</TableHead>
+                    </TableRow>
+                  </TableHeader>
+                  <TableBody>
+                    {tickets?.filter(ticket => ticketStatusFilter === "all" || ticket.status === ticketStatusFilter).map((ticket: any) => (
+                      <TableRow key={ticket.id}>
+                        <TableCell className="font-mono">{ticket.ticket_number}</TableCell>
+                        <TableCell>{ticket.companies?.name || "N/A"}</TableCell>
+                        <TableCell className="max-w-xs truncate">{ticket.title}</TableCell>
+                        <TableCell>
+                          <Badge 
+                            variant={
+                              ticket.status === "open" ? "default" : 
+                              ticket.status === "in_progress" ? "secondary" :
+                              ticket.status === "resolved" ? "default" :
+                              "outline"
+                            }
+                          >
+                            {ticket.status === "open" ? "Abierto" : 
+                             ticket.status === "in_progress" ? "En proceso" :
+                             ticket.status === "resolved" ? "Resuelto" :
+                             "Cerrado"}
+                          </Badge>
+                        </TableCell>
+                        <TableCell>
+                          <Badge 
+                            variant={
+                              ticket.priority === "urgent" ? "destructive" :
+                              ticket.priority === "high" ? "destructive" :
+                              ticket.priority === "medium" ? "secondary" :
+                              "outline"
+                            }
+                          >
+                            {ticket.priority === "urgent" ? "Urgente" :
+                             ticket.priority === "high" ? "Alta" :
+                             ticket.priority === "medium" ? "Media" :
+                             "Baja"}
+                          </Badge>
+                        </TableCell>
+                        <TableCell>
+                          <Badge variant="outline">
+                            {ticket.category === "technical" ? "Técnico" :
+                             ticket.category === "billing" ? "Facturación" :
+                             ticket.category === "feature_request" ? "Funcionalidad" :
+                             ticket.category === "bug" ? "Bug" :
+                             "General"}
+                          </Badge>
+                        </TableCell>
+                        <TableCell>{new Date(ticket.created_at).toLocaleDateString()}</TableCell>
+                        <TableCell>
+                          <Button
+                            variant="outline"
+                            size="sm"
+                            onClick={() => {
+                              setSelectedTicket(ticket);
+                              setTicketDialogOpen(true);
+                            }}
+                          >
+                            Ver detalle
+                          </Button>
+                        </TableCell>
+                      </TableRow>
+                    ))}
+                    {(!tickets || tickets.length === 0) && (
+                      <TableRow>
+                        <TableCell colSpan={8} className="text-center text-muted-foreground">
+                          No hay tickets disponibles
+                        </TableCell>
+                      </TableRow>
+                    )}
+                  </TableBody>
+                </Table>
+              </CardContent>
+            </Card>
+
+            {/* Ticket Dialog */}
+            <Dialog open={ticketDialogOpen} onOpenChange={(open) => {
+              setTicketDialogOpen(open);
+              if (!open) {
+                setSelectedTicket(null);
+                setTicketResponse("");
+              }
+            }}>
+              <DialogContent className="max-w-2xl">
+                <DialogHeader>
+                  <DialogTitle>
+                    {selectedTicket ? `Ticket ${selectedTicket.ticket_number}` : "Nuevo Ticket"}
+                  </DialogTitle>
+                  <DialogDescription>
+                    {selectedTicket ? "Detalles y respuestas del ticket" : "Crear un nuevo ticket de soporte"}
+                  </DialogDescription>
+                </DialogHeader>
+                <div className="space-y-4">
+                  {selectedTicket ? (
+                    <>
+                      <div className="grid grid-cols-2 gap-4">
+                        <div>
+                          <Label>Estado</Label>
+                          <Select defaultValue={selectedTicket.status}>
+                            <SelectTrigger>
+                              <SelectValue />
+                            </SelectTrigger>
+                            <SelectContent>
+                              <SelectItem value="open">Abierto</SelectItem>
+                              <SelectItem value="in_progress">En proceso</SelectItem>
+                              <SelectItem value="resolved">Resuelto</SelectItem>
+                              <SelectItem value="closed">Cerrado</SelectItem>
+                            </SelectContent>
+                          </Select>
+                        </div>
+                        <div>
+                          <Label>Prioridad</Label>
+                          <Select defaultValue={selectedTicket.priority}>
+                            <SelectTrigger>
+                              <SelectValue />
+                            </SelectTrigger>
+                            <SelectContent>
+                              <SelectItem value="low">Baja</SelectItem>
+                              <SelectItem value="medium">Media</SelectItem>
+                              <SelectItem value="high">Alta</SelectItem>
+                              <SelectItem value="urgent">Urgente</SelectItem>
+                            </SelectContent>
+                          </Select>
+                        </div>
+                      </div>
+                      <div>
+                        <Label>Título</Label>
+                        <Input value={selectedTicket.title} disabled />
+                      </div>
+                      <div>
+                        <Label>Descripción</Label>
+                        <Textarea value={selectedTicket.description} disabled rows={4} />
+                      </div>
+                      <div>
+                        <Label>Agregar respuesta</Label>
+                        <Textarea 
+                          value={ticketResponse}
+                          onChange={(e) => setTicketResponse(e.target.value)}
+                          placeholder="Escribe una respuesta..."
+                          rows={3}
+                        />
+                      </div>
+                    </>
+                  ) : (
+                    <>
+                      <div>
+                        <Label>Empresa</Label>
+                        <Select value={newTicket.company_id} onValueChange={(value) => setNewTicket({...newTicket, company_id: value})}>
+                          <SelectTrigger>
+                            <SelectValue placeholder="Seleccionar empresa" />
+                          </SelectTrigger>
+                          <SelectContent>
+                            {companies?.map((company) => (
+                              <SelectItem key={company.id} value={company.id}>
+                                {company.name}
+                              </SelectItem>
+                            ))}
+                          </SelectContent>
+                        </Select>
+                      </div>
+                      <div className="grid grid-cols-2 gap-4">
+                        <div>
+                          <Label>Prioridad</Label>
+                          <Select value={newTicket.priority} onValueChange={(value) => setNewTicket({...newTicket, priority: value})}>
+                            <SelectTrigger>
+                              <SelectValue />
+                            </SelectTrigger>
+                            <SelectContent>
+                              <SelectItem value="low">Baja</SelectItem>
+                              <SelectItem value="medium">Media</SelectItem>
+                              <SelectItem value="high">Alta</SelectItem>
+                              <SelectItem value="urgent">Urgente</SelectItem>
+                            </SelectContent>
+                          </Select>
+                        </div>
+                        <div>
+                          <Label>Categoría</Label>
+                          <Select value={newTicket.category} onValueChange={(value) => setNewTicket({...newTicket, category: value})}>
+                            <SelectTrigger>
+                              <SelectValue />
+                            </SelectTrigger>
+                            <SelectContent>
+                              <SelectItem value="technical">Técnico</SelectItem>
+                              <SelectItem value="billing">Facturación</SelectItem>
+                              <SelectItem value="feature_request">Funcionalidad</SelectItem>
+                              <SelectItem value="bug">Bug</SelectItem>
+                              <SelectItem value="general">General</SelectItem>
+                            </SelectContent>
+                          </Select>
+                        </div>
+                      </div>
+                      <div>
+                        <Label>Título</Label>
+                        <Input 
+                          value={newTicket.title}
+                          onChange={(e) => setNewTicket({...newTicket, title: e.target.value})}
+                          placeholder="Título del ticket"
+                        />
+                      </div>
+                      <div>
+                        <Label>Descripción</Label>
+                        <Textarea 
+                          value={newTicket.description}
+                          onChange={(e) => setNewTicket({...newTicket, description: e.target.value})}
+                          placeholder="Describe el problema o consulta..."
+                          rows={4}
+                        />
+                      </div>
+                    </>
+                  )}
+                </div>
+                <DialogFooter>
+                  <Button variant="outline" onClick={() => setTicketDialogOpen(false)}>
+                    Cancelar
+                  </Button>
+                  <Button onClick={() => {
+                    if (selectedTicket) {
+                      updateTicketMutation.mutate({
+                        ticketId: selectedTicket.id,
+                        status: selectedTicket.status,
+                        priority: selectedTicket.priority
+                      });
+                      if (ticketResponse.trim()) {
+                        createTicketResponseMutation.mutate({
+                          ticketId: selectedTicket.id,
+                          message: ticketResponse
+                        });
+                      }
+                    } else {
+                      createTicketMutation.mutate(newTicket);
+                    }
+                  }}>
+                    {selectedTicket ? "Guardar cambios" : "Crear ticket"}
+                  </Button>
+                </DialogFooter>
+              </DialogContent>
+            </Dialog>
           </TabsContent>
 
           {/* Companies Tab */}
