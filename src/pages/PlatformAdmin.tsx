@@ -235,6 +235,72 @@ export default function PlatformAdmin() {
     },
   });
 
+  // Fetch usage metrics per company
+  const { data: usageMetrics, isLoading: isLoadingMetrics } = useQuery({
+    queryKey: ['platform-usage-metrics'],
+    queryFn: async () => {
+      const { data: companies } = await supabase
+        .from('companies')
+        .select('id, name')
+        .eq('active', true);
+      
+      if (!companies) return [];
+      
+      const metrics = await Promise.all(companies.map(async (company) => {
+        // Get sales count for current month
+        const startOfMonth = new Date();
+        startOfMonth.setDate(1);
+        startOfMonth.setHours(0, 0, 0, 0);
+        
+        const { count: salesCount } = await supabase
+          .from('sales')
+          .select('*', { count: 'exact', head: true })
+          .eq('company_id', company.id)
+          .gte('created_at', startOfMonth.toISOString());
+        
+        // Get active products count
+        const { count: productsCount } = await supabase
+          .from('products')
+          .select('*', { count: 'exact', head: true })
+          .eq('company_id', company.id)
+          .eq('active', true);
+        
+        // Get active users count
+        const { count: usersCount } = await supabase
+          .from('company_users')
+          .select('*', { count: 'exact', head: true })
+          .eq('company_id', company.id)
+          .eq('active', true);
+        
+        // Get sales from last month for growth calculation
+        const lastMonthStart = new Date(startOfMonth);
+        lastMonthStart.setMonth(lastMonthStart.getMonth() - 1);
+        
+        const { count: lastMonthSales } = await supabase
+          .from('sales')
+          .select('*', { count: 'exact', head: true })
+          .eq('company_id', company.id)
+          .gte('created_at', lastMonthStart.toISOString())
+          .lt('created_at', startOfMonth.toISOString());
+        
+        const growth = lastMonthSales && lastMonthSales > 0
+          ? ((salesCount || 0) - lastMonthSales) / lastMonthSales * 100
+          : 0;
+        
+        return {
+          company_id: company.id,
+          company_name: company.name,
+          sales_this_month: salesCount || 0,
+          active_products: productsCount || 0,
+          active_users: usersCount || 0,
+          growth_percentage: growth
+        };
+      }));
+      
+      return metrics;
+    }
+  });
+
   // Stats query
   const { data: stats } = useQuery({
     queryKey: ["platform-stats"],
@@ -678,10 +744,14 @@ export default function PlatformAdmin() {
         )}
 
         <Tabs defaultValue="companies" className="space-y-6">
-          <TabsList className="grid w-full grid-cols-8">
+          <TabsList className="grid w-full grid-cols-9">
             <TabsTrigger value="companies" className="gap-2">
               <Building2 className="h-4 w-4" />
               Empresas
+            </TabsTrigger>
+            <TabsTrigger value="usage" className="gap-2">
+              <TrendingUp className="h-4 w-4" />
+              Métricas
             </TabsTrigger>
             <TabsTrigger value="notifications" className="gap-2">
               <Bell className="h-4 w-4" />
@@ -717,6 +787,114 @@ export default function PlatformAdmin() {
               Auditoría
             </TabsTrigger>
           </TabsList>
+
+          {/* Usage Metrics Tab */}
+          <TabsContent value="usage" className="space-y-4">
+            <Card>
+              <CardHeader>
+                <div className="flex items-center justify-between">
+                  <div>
+                    <CardTitle>Métricas de Uso por Empresa</CardTitle>
+                    <CardDescription>
+                      Estadísticas de actividad y crecimiento de cada empresa
+                    </CardDescription>
+                  </div>
+                  <Button
+                    onClick={() => {
+                      if (!usageMetrics) return;
+                      exportToExcel(
+                        usageMetrics.map(m => ({
+                          'Empresa': m.company_name,
+                          'Ventas este mes': m.sales_this_month,
+                          'Productos activos': m.active_products,
+                          'Usuarios activos': m.active_users,
+                          'Crecimiento (%)': m.growth_percentage.toFixed(1)
+                        })),
+                        'metricas-uso-empresas'
+                      );
+                    }}
+                  >
+                    <Download className="mr-2 h-4 w-4" />
+                    Exportar
+                  </Button>
+                </div>
+                <div className="flex gap-4 mt-4">
+                  <div className="relative flex-1">
+                    <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 h-4 w-4 text-muted-foreground" />
+                    <Input
+                      placeholder="Buscar empresa..."
+                      value={companySearch}
+                      onChange={(e) => setCompanySearch(e.target.value)}
+                      className="pl-9"
+                    />
+                  </div>
+                </div>
+              </CardHeader>
+              <CardContent>
+                {isLoadingMetrics ? (
+                  <div className="flex items-center justify-center py-8">
+                    <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-primary"></div>
+                  </div>
+                ) : (
+                  <Table>
+                    <TableHeader>
+                      <TableRow>
+                        <TableHead>Empresa</TableHead>
+                        <TableHead className="text-right">Ventas este mes</TableHead>
+                        <TableHead className="text-right">Productos activos</TableHead>
+                        <TableHead className="text-right">Usuarios activos</TableHead>
+                        <TableHead className="text-right">Crecimiento</TableHead>
+                      </TableRow>
+                    </TableHeader>
+                    <TableBody>
+                      {usageMetrics && usageMetrics.length > 0 ? (
+                        usageMetrics
+                          .filter(metric => 
+                            metric.company_name.toLowerCase().includes(companySearch.toLowerCase())
+                          )
+                          .map((metric) => (
+                            <TableRow key={metric.company_id}>
+                              <TableCell className="font-medium">
+                                {metric.company_name}
+                              </TableCell>
+                              <TableCell className="text-right">
+                                <Badge variant="secondary">
+                                  {metric.sales_this_month}
+                                </Badge>
+                              </TableCell>
+                              <TableCell className="text-right">
+                                <Badge variant="outline">
+                                  {metric.active_products}
+                                </Badge>
+                              </TableCell>
+                              <TableCell className="text-right">
+                                <Badge variant="outline">
+                                  {metric.active_users}
+                                </Badge>
+                              </TableCell>
+                              <TableCell className="text-right">
+                                <Badge 
+                                  variant={metric.growth_percentage >= 0 ? "default" : "destructive"}
+                                >
+                                  {metric.growth_percentage > 0 ? '+' : ''}
+                                  {metric.growth_percentage.toFixed(1)}%
+                                </Badge>
+                              </TableCell>
+                            </TableRow>
+                          ))
+                      ) : (
+                        <TableRow>
+                          <TableCell colSpan={5} className="text-center text-muted-foreground">
+                            No hay métricas disponibles
+                          </TableCell>
+                        </TableRow>
+                      )}
+                    </TableBody>
+                  </Table>
+                )}
+              </CardContent>
+            </Card>
+          </TabsContent>
 
           {/* Companies Tab */}
           <TabsContent value="companies" className="space-y-4">
