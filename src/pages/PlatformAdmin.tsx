@@ -32,7 +32,10 @@ import {
   Download,
   Edit,
   Trash,
-  Ticket
+  Ticket,
+  Plug,
+  Activity,
+  XCircle
 } from "lucide-react";
 import { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip as RechartsTooltip, ResponsiveContainer, LineChart, Line } from "recharts";
 import { exportToExcel, exportToPDF, formatCurrency, formatDate } from "@/lib/exportUtils";
@@ -67,6 +70,7 @@ export default function PlatformAdmin() {
     priority: "medium",
     category: "general"
   });
+  const [integrationStatusFilter, setIntegrationStatusFilter] = useState<string>("all");
   const [newPayment, setNewPayment] = useState({
     company_id: "",
     amount: "",
@@ -324,6 +328,58 @@ export default function PlatformAdmin() {
           companies (name)
         `)
         .order("created_at", { ascending: false });
+
+      if (error) throw error;
+      return data;
+    },
+  });
+
+  // Fetch integrations data
+  const { data: integrationsData } = useQuery({
+    queryKey: ["platform-integrations"],
+    queryFn: async () => {
+      const { data, error } = await supabase
+        .from("integrations")
+        .select(`
+          *,
+          companies (name)
+        `)
+        .order("created_at", { ascending: false});
+
+      if (error) throw error;
+      return data;
+    },
+  });
+
+  // Fetch AFIP status per company
+  const { data: afipData } = useQuery({
+    queryKey: ["platform-afip-status"],
+    queryFn: async () => {
+      const { data, error } = await supabase
+        .from("pos_afip")
+        .select(`
+          *,
+          companies (name)
+        `);
+
+      if (error) throw error;
+      return data;
+    },
+  });
+
+  // Fetch integration logs
+  const { data: integrationLogs } = useQuery({
+    queryKey: ["platform-integration-logs"],
+    queryFn: async () => {
+      const { data, error } = await supabase
+        .from("integration_logs")
+        .select(`
+          *,
+          companies (name),
+          integrations (name, integration_type)
+        `)
+        .order("created_at", { ascending: false })
+        .limit(100);
 
       if (error) throw error;
       return data;
@@ -888,7 +944,7 @@ export default function PlatformAdmin() {
         )}
 
         <Tabs defaultValue="companies" className="space-y-6">
-          <TabsList className="grid w-full grid-cols-10">
+          <TabsList className="grid w-full grid-cols-11">
             <TabsTrigger value="companies" className="gap-2">
               <Building2 className="h-4 w-4" />
               Empresas
@@ -933,6 +989,10 @@ export default function PlatformAdmin() {
             <TabsTrigger value="audit" className="gap-2">
               <FileText className="h-4 w-4" />
               Auditoría
+            </TabsTrigger>
+            <TabsTrigger value="integrations" className="gap-2">
+              <Plug className="h-4 w-4" />
+              Integraciones
             </TabsTrigger>
           </TabsList>
 
@@ -2366,6 +2426,211 @@ export default function PlatformAdmin() {
                     )}
                   </TableBody>
                 </Table>
+              </CardContent>
+            </Card>
+          </TabsContent>
+
+          {/* Integrations Monitor Tab */}
+          <TabsContent value="integrations" className="space-y-4">
+            <Card>
+              <CardHeader>
+                <CardTitle className="flex items-center gap-2">
+                  <Plug className="h-5 w-5" />
+                  Monitor de Integraciones
+                </CardTitle>
+                <CardDescription>
+                  Estado de integraciones AFIP, logs de sincronización y errores
+                </CardDescription>
+              </CardHeader>
+              <CardContent className="space-y-6">
+                {/* AFIP Status Section */}
+                <div className="space-y-4">
+                  <h3 className="text-lg font-semibold flex items-center gap-2">
+                    <Activity className="h-4 w-4" />
+                    Estado AFIP por Empresa
+                  </h3>
+                  <Table>
+                    <TableHeader>
+                      <TableRow>
+                        <TableHead>Empresa</TableHead>
+                        <TableHead>Punto de Venta</TableHead>
+                        <TableHead>Tipo Comprobante</TableHead>
+                        <TableHead>Último Número</TableHead>
+                        <TableHead>Estado</TableHead>
+                        <TableHead>Última Actualización</TableHead>
+                      </TableRow>
+                    </TableHeader>
+                    <TableBody>
+                      {afipData?.map((afip: any) => (
+                        <TableRow key={afip.id}>
+                          <TableCell className="font-medium">
+                            {afip.companies?.name || "N/A"}
+                          </TableCell>
+                          <TableCell>{afip.punto_venta}</TableCell>
+                          <TableCell>{afip.tipo_comprobante}</TableCell>
+                          <TableCell>{afip.ultimo_numero}</TableCell>
+                          <TableCell>
+                            {afip.activo ? (
+                              <span className="flex items-center gap-1 text-green-600">
+                                <CheckCircle2 className="h-4 w-4" />
+                                Activo
+                              </span>
+                            ) : (
+                              <span className="flex items-center gap-1 text-red-600">
+                                <XCircle className="h-4 w-4" />
+                                Inactivo
+                              </span>
+                            )}
+                          </TableCell>
+                          <TableCell>
+                            {new Date(afip.updated_at || afip.created_at).toLocaleString()}
+                          </TableCell>
+                        </TableRow>
+                      ))}
+                    </TableBody>
+                  </Table>
+                </div>
+
+                {/* Other Integrations Section */}
+                <div className="space-y-4">
+                  <div className="flex items-center justify-between">
+                    <h3 className="text-lg font-semibold">Otras Integraciones</h3>
+                    <Select value={integrationStatusFilter} onValueChange={setIntegrationStatusFilter}>
+                      <SelectTrigger className="w-[180px]">
+                        <SelectValue placeholder="Filtrar por estado" />
+                      </SelectTrigger>
+                      <SelectContent>
+                        <SelectItem value="all">Todas</SelectItem>
+                        <SelectItem value="active">Activas</SelectItem>
+                        <SelectItem value="inactive">Inactivas</SelectItem>
+                      </SelectContent>
+                    </Select>
+                  </div>
+                  <Table>
+                    <TableHeader>
+                      <TableRow>
+                        <TableHead>Empresa</TableHead>
+                        <TableHead>Nombre</TableHead>
+                        <TableHead>Tipo</TableHead>
+                        <TableHead>Estado</TableHead>
+                        <TableHead>Última Sincronización</TableHead>
+                        <TableHead>Auto Email</TableHead>
+                        <TableHead>Auto Factura</TableHead>
+                      </TableRow>
+                    </TableHeader>
+                    <TableBody>
+                      {integrationsData
+                        ?.filter((int: any) => {
+                          if (integrationStatusFilter === "all") return true;
+                          if (integrationStatusFilter === "active") return int.active;
+                          if (integrationStatusFilter === "inactive") return !int.active;
+                          return true;
+                        })
+                        .map((integration: any) => (
+                          <TableRow key={integration.id}>
+                            <TableCell className="font-medium">
+                              {integration.companies?.name || "N/A"}
+                            </TableCell>
+                            <TableCell>{integration.name}</TableCell>
+                            <TableCell>
+                              <Badge variant="outline">
+                                {integration.integration_type}
+                              </Badge>
+                            </TableCell>
+                            <TableCell>
+                              {integration.active ? (
+                                <span className="flex items-center gap-1 text-green-600">
+                                  <CheckCircle2 className="h-4 w-4" />
+                                  Activa
+                                </span>
+                              ) : (
+                                <span className="flex items-center gap-1 text-gray-600">
+                                  <XCircle className="h-4 w-4" />
+                                  Inactiva
+                                </span>
+                              )}
+                            </TableCell>
+                            <TableCell>
+                              {integration.last_sync_at
+                                ? new Date(integration.last_sync_at).toLocaleString()
+                                : "Nunca"}
+                            </TableCell>
+                            <TableCell>
+                              {integration.auto_email ? (
+                                <CheckCircle2 className="h-4 w-4 text-green-600" />
+                              ) : (
+                                <XCircle className="h-4 w-4 text-gray-400" />
+                              )}
+                            </TableCell>
+                            <TableCell>
+                              {integration.auto_invoice ? (
+                                <CheckCircle2 className="h-4 w-4 text-green-600" />
+                              ) : (
+                                <XCircle className="h-4 w-4 text-gray-400" />
+                              )}
+                            </TableCell>
+                          </TableRow>
+                        ))}
+                    </TableBody>
+                  </Table>
+                </div>
+
+                {/* Integration Logs Section */}
+                <div className="space-y-4">
+                  <h3 className="text-lg font-semibold">Logs de Sincronización (últimos 100)</h3>
+                  <Table>
+                    <TableHeader>
+                      <TableRow>
+                        <TableHead>Fecha</TableHead>
+                        <TableHead>Empresa</TableHead>
+                        <TableHead>Integración</TableHead>
+                        <TableHead>Acción</TableHead>
+                        <TableHead>Estado</TableHead>
+                        <TableHead>Mensaje</TableHead>
+                      </TableRow>
+                    </TableHeader>
+                    <TableBody>
+                      {integrationLogs?.map((log: any) => (
+                        <TableRow key={log.id}>
+                          <TableCell>
+                            {new Date(log.created_at || "").toLocaleString()}
+                          </TableCell>
+                          <TableCell className="font-medium">
+                            {log.companies?.name || "N/A"}
+                          </TableCell>
+                          <TableCell>
+                            {log.integrations?.name || "N/A"}
+                            <span className="ml-2 text-xs text-muted-foreground">
+                              ({log.integrations?.integration_type})
+                            </span>
+                          </TableCell>
+                          <TableCell>{log.action}</TableCell>
+                          <TableCell>
+                            {log.status === "success" ? (
+                              <span className="flex items-center gap-1 text-green-600">
+                                <CheckCircle2 className="h-4 w-4" />
+                                Éxito
+                              </span>
+                            ) : log.status === "error" ? (
+                              <span className="flex items-center gap-1 text-red-600">
+                                <XCircle className="h-4 w-4" />
+                                Error
+                              </span>
+                            ) : (
+                              <span className="flex items-center gap-1 text-yellow-600">
+                                <AlertCircle className="h-4 w-4" />
+                                {log.status}
+                              </span>
+                            )}
+                          </TableCell>
+                          <TableCell className="max-w-md truncate">
+                            {log.message || "Sin mensaje"}
+                          </TableCell>
+                        </TableRow>
+                      ))}
+                    </TableBody>
+                  </Table>
+                </div>
               </CardContent>
             </Card>
           </TabsContent>
