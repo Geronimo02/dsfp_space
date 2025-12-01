@@ -808,6 +808,74 @@ export type Database = {
         }
         Relationships: []
       }
+      company_onboarding: {
+        Row: {
+          afip_configured: boolean | null
+          company_id: string
+          company_info_completed: boolean | null
+          completed_at: string | null
+          completion_percentage: number | null
+          created_at: string | null
+          first_customer_added: boolean | null
+          first_product_added: boolean | null
+          first_sale_completed: boolean | null
+          id: string
+          is_active: boolean | null
+          last_activity_at: string | null
+          notes: string | null
+          payment_method_configured: boolean | null
+          started_at: string | null
+          team_members_invited: boolean | null
+          updated_at: string | null
+        }
+        Insert: {
+          afip_configured?: boolean | null
+          company_id: string
+          company_info_completed?: boolean | null
+          completed_at?: string | null
+          completion_percentage?: number | null
+          created_at?: string | null
+          first_customer_added?: boolean | null
+          first_product_added?: boolean | null
+          first_sale_completed?: boolean | null
+          id?: string
+          is_active?: boolean | null
+          last_activity_at?: string | null
+          notes?: string | null
+          payment_method_configured?: boolean | null
+          started_at?: string | null
+          team_members_invited?: boolean | null
+          updated_at?: string | null
+        }
+        Update: {
+          afip_configured?: boolean | null
+          company_id?: string
+          company_info_completed?: boolean | null
+          completed_at?: string | null
+          completion_percentage?: number | null
+          created_at?: string | null
+          first_customer_added?: boolean | null
+          first_product_added?: boolean | null
+          first_sale_completed?: boolean | null
+          id?: string
+          is_active?: boolean | null
+          last_activity_at?: string | null
+          notes?: string | null
+          payment_method_configured?: boolean | null
+          started_at?: string | null
+          team_members_invited?: boolean | null
+          updated_at?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "company_onboarding_company_id_fkey"
+            columns: ["company_id"]
+            isOneToOne: true
+            referencedRelation: "companies"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       company_subscriptions: {
         Row: {
           amount_due: number | null
