@@ -43,6 +43,7 @@ import { supabase } from "@/integrations/supabase/client";
 import { toast } from "sonner";
 import { usePermissions } from "@/hooks/usePermissions";
 import { usePlatformAdmin } from "@/hooks/usePlatformAdmin";
+import { useActiveModules } from "@/hooks/useActiveModules";
 import { NavLink } from "@/components/NavLink";
 import {
   Sidebar as SidebarUI,
@@ -145,6 +146,7 @@ export function Sidebar() {
   const { hasPermission, isAdmin, loading } = usePermissions();
   const { state } = useSidebar();
   const { isPlatformAdmin } = usePlatformAdmin();
+  const { data: activeModules = [], isLoading: modulesLoading } = useActiveModules();
 
   const handleLogout = async () => {
     const { error } = await supabase.auth.signOut();
@@ -159,53 +161,69 @@ export function Sidebar() {
   };
 
   const canViewMenuItem = (href: string): boolean => {
+    // Platform Admin sees everything
+    if (isPlatformAdmin) return true;
+    
     // Admin sees everything
     if (isAdmin) return true;
 
     // Dashboard is always visible
     if (href === "/") return true;
 
-    // Map routes to modules
-    const routeToModule: Record<string, string> = {
-      "/pos": "sales",
+    // Map routes to module codes (same as platform_modules.code)
+    const routeToModuleCode: Record<string, string> = {
+      "/": "dashboard",
+      "/pos": "pos",
       "/sales": "sales",
       "/products": "products",
-      "/inventory-alerts": "products",
-      "/warehouses": "products",
-      "/warehouse-stock": "products",
-      "/warehouse-transfers": "products",
-      "/stock-reservations": "products",
+      "/inventory-alerts": "inventory_alerts",
+      "/warehouses": "warehouses",
+      "/warehouse-stock": "warehouses",
+      "/warehouse-transfers": "warehouses",
+      "/stock-reservations": "reservations",
       "/customers": "customers",
-      "/customer-account": "customers",
+      "/customer-account": "accounts_receivable",
       "/suppliers": "suppliers",
       "/purchases": "purchases",
       "/reports": "reports",
       "/audit-logs": "reports",
       "/access-logs": "reports",
       "/employees": "employees",
-      "/settings": "settings",
+      "/settings": "dashboard", // Settings siempre visible con dashboard
       "/cash-register": "cash_register",
-      "/checks": "cash_register",
+      "/checks": "checks",
       "/technical-services": "technical_services",
       "/quotations": "quotations",
       "/delivery-notes": "delivery_notes",
       "/promotions": "promotions",
       "/returns": "returns",
-      "/reservations": "sales",
+      "/reservations": "reservations",
       "/expenses": "expenses",
-      "/commissions": "sales",
-      "/bulk-operations": "bulk_operations",
-      "/pos-points": "pos_afip",
-      "/notification-settings": "settings",
+      "/commissions": "commissions",
+      "/bulk-operations": "dashboard", // Visible solo para admins
+      "/pos-points": "afip",
+      "/notification-settings": "dashboard",
       "/monthly-closing": "reports",
       "/accountant-reports": "reports",
       "/ai-assistant": "reports",
+      "/payroll": "payroll",
+      "/integrations": "dashboard",
+      "/bank-accounts": "bank_accounts",
+      "/bank-movements": "bank_accounts",
+      "/card-movements": "bank_accounts",
+      "/retentions": "bank_accounts",
     };
 
-    const module = routeToModule[href];
-    if (!module) return false;
+    const moduleCode = routeToModuleCode[href];
+    if (!moduleCode) return false;
 
-    return hasPermission(module as any, "view");
+    // Check if the company has this module active
+    const hasModule = activeModules.includes(moduleCode);
+    
+    // Also check permissions
+    const hasModulePermission = hasPermission(moduleCode as any, "view");
+
+    return hasModule && hasModulePermission;
   };
 
   // Check if user can see any menu items
@@ -213,7 +231,7 @@ export function Sidebar() {
     section.items.some(item => canViewMenuItem(item.href))
   );
 
-  if (loading) {
+  if (loading || modulesLoading) {
     return (
       <SidebarUI collapsible="icon">
         <SidebarContent>

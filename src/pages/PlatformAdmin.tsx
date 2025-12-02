@@ -37,12 +37,17 @@ import {
   Activity,
   XCircle,
   Rocket,
-  Circle
+  Circle,
+  Calculator,
+  Package
 } from "lucide-react";
 import { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip as RechartsTooltip, ResponsiveContainer, LineChart, Line } from "recharts";
 import { exportToExcel, exportToPDF, formatCurrency, formatDate } from "@/lib/exportUtils";
 import { usePlatformAdmin } from "@/hooks/usePlatformAdmin";
 import { useNavigate, Navigate } from "react-router-dom";
+import { PricingConfiguration } from "@/components/settings/PricingConfiguration";
+import { PricingCalculator } from "@/components/settings/PricingCalculator";
+import { CompanyModuleSelector } from "@/components/settings/CompanyModuleSelector";
 
 export default function PlatformAdmin() {
   const { isPlatformAdmin, isLoading: adminLoading } = usePlatformAdmin();
@@ -88,6 +93,8 @@ export default function PlatformAdmin() {
     max_users: "",
     features: ""
   });
+  const [modulesDialogOpen, setModulesDialogOpen] = useState(false);
+  const [selectedCompanyForModules, setSelectedCompanyForModules] = useState<any>(null);
 
   // Fetch all companies with their subscriptions (must be before any conditional returns)
   const { data: companies, isLoading, error: companiesError } = useQuery({
@@ -435,23 +442,6 @@ export default function PlatformAdmin() {
     enabled: !!companies && !!notifications && !!feedbacks && !!payments,
   });
 
-  // Show loading while checking admin status
-  if (adminLoading) {
-    return (
-      <div className="flex items-center justify-center h-screen">
-        <div className="text-center">
-          <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-primary mx-auto"></div>
-          <p className="mt-4 text-muted-foreground">Verificando permisos...</p>
-        </div>
-      </div>
-    );
-  }
-
-  // Redirect if not platform admin
-  if (!isPlatformAdmin) {
-    return <Navigate to="/" replace />;
-  }
-
   // Toggle company active status
   const toggleCompanyMutation = useMutation({
     mutationFn: async ({ companyId, active }: { companyId: string; active: boolean }) => {
@@ -719,6 +709,23 @@ export default function PlatformAdmin() {
     },
   });
 
+  // Show loading while checking admin status
+  if (adminLoading) {
+    return (
+      <div className="flex items-center justify-center h-screen">
+        <div className="text-center">
+          <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-primary mx-auto"></div>
+          <p className="mt-4 text-muted-foreground">Verificando permisos...</p>
+        </div>
+      </div>
+    );
+  }
+
+  // Redirect if not platform admin
+  if (!isPlatformAdmin) {
+    return <Navigate to="/" replace />;
+  }
+
   const handleLogout = async () => {
     const { error } = await supabase.auth.signOut();
     if (error) {
@@ -962,62 +969,89 @@ export default function PlatformAdmin() {
           </div>
         )}
 
-        <Tabs defaultValue="companies" className="space-y-6">
-          <TabsList className="grid w-full grid-cols-12">
-            <TabsTrigger value="companies" className="gap-2">
-              <Building2 className="h-4 w-4" />
-              Empresas
-            </TabsTrigger>
-            <TabsTrigger value="usage" className="gap-2">
-              <TrendingUp className="h-4 w-4" />
-              Métricas
-            </TabsTrigger>
-            <TabsTrigger value="onboarding" className="gap-2">
-              <Rocket className="h-4 w-4" />
-              Onboarding
-            </TabsTrigger>
-            <TabsTrigger value="tickets" className="gap-2">
-              <Ticket className="h-4 w-4" />
-              Tickets
-            </TabsTrigger>
-            <TabsTrigger value="notifications" className="gap-2">
-              <Bell className="h-4 w-4" />
-              Notificaciones
-              {stats && stats.unreadNotifications > 0 && (
-                <Badge variant="destructive" className="ml-2">
-                  {stats.unreadNotifications}
-                </Badge>
-              )}
-            </TabsTrigger>
-            <TabsTrigger value="feedback" className="gap-2">
-              <MessageSquare className="h-4 w-4" />
-              Feedback
-            </TabsTrigger>
-            <TabsTrigger value="payments" className="gap-2">
-              <DollarSign className="h-4 w-4" />
-              Pagos
-            </TabsTrigger>
-            <TabsTrigger value="analytics" className="gap-2">
-              <BarChart3 className="h-4 w-4" />
-              Analytics
-            </TabsTrigger>
-            <TabsTrigger value="users" className="gap-2">
-              <Users className="h-4 w-4" />
-              Usuarios
-            </TabsTrigger>
-            <TabsTrigger value="plans" className="gap-2">
-              <Settings className="h-4 w-4" />
-              Planes
-            </TabsTrigger>
-            <TabsTrigger value="audit" className="gap-2">
-              <FileText className="h-4 w-4" />
-              Auditoría
-            </TabsTrigger>
-            <TabsTrigger value="integrations" className="gap-2">
-              <Plug className="h-4 w-4" />
-              Integraciones
-            </TabsTrigger>
-          </TabsList>
+        <Tabs defaultValue="companies" className="flex gap-6">
+          <Card className="w-64 flex-shrink-0 h-fit sticky top-6">
+            <CardHeader className="pb-3">
+              <CardTitle className="text-sm font-medium">Navegación</CardTitle>
+            </CardHeader>
+            <CardContent className="p-2">
+              <TabsList className="flex flex-col h-auto w-full space-y-1 bg-transparent p-0">
+              <TabsTrigger value="companies" className="w-full justify-start gap-2 data-[state=active]:bg-primary data-[state=active]:text-primary-foreground">
+                <Building2 className="h-4 w-4" />
+                <span>Empresas</span>
+              </TabsTrigger>
+              <TabsTrigger value="pricing" className="w-full justify-start gap-2 data-[state=active]:bg-primary data-[state=active]:text-primary-foreground">
+                <Package className="h-4 w-4" />
+                <span>Precios</span>
+              </TabsTrigger>
+              <TabsTrigger value="calculator" className="w-full justify-start gap-2 data-[state=active]:bg-primary data-[state=active]:text-primary-foreground">
+                <Calculator className="h-4 w-4" />
+                <span>Cotizador</span>
+              </TabsTrigger>
+              <TabsTrigger value="usage" className="w-full justify-start gap-2 data-[state=active]:bg-primary data-[state=active]:text-primary-foreground">
+                <TrendingUp className="h-4 w-4" />
+                <span>Métricas</span>
+              </TabsTrigger>
+              <TabsTrigger value="onboarding" className="w-full justify-start gap-2 data-[state=active]:bg-primary data-[state=active]:text-primary-foreground">
+                <Rocket className="h-4 w-4" />
+                <span>Onboarding</span>
+              </TabsTrigger>
+              <TabsTrigger value="tickets" className="w-full justify-start gap-2 data-[state=active]:bg-primary data-[state=active]:text-primary-foreground">
+                <Ticket className="h-4 w-4" />
+                <span>Tickets</span>
+              </TabsTrigger>
+              <TabsTrigger value="notifications" className="w-full justify-start gap-2 data-[state=active]:bg-primary data-[state=active]:text-primary-foreground">
+                <Bell className="h-4 w-4" />
+                <span>Notificaciones</span>
+                {stats && stats.unreadNotifications > 0 && (
+                  <Badge variant="destructive" className="ml-auto">
+                    {stats.unreadNotifications}
+                  </Badge>
+                )}
+              </TabsTrigger>
+              <TabsTrigger value="feedback" className="w-full justify-start gap-2 data-[state=active]:bg-primary data-[state=active]:text-primary-foreground">
+                <MessageSquare className="h-4 w-4" />
+                <span>Feedback</span>
+              </TabsTrigger>
+              <TabsTrigger value="payments" className="w-full justify-start gap-2 data-[state=active]:bg-primary data-[state=active]:text-primary-foreground">
+                <DollarSign className="h-4 w-4" />
+                <span>Pagos</span>
+              </TabsTrigger>
+              <TabsTrigger value="analytics" className="w-full justify-start gap-2 data-[state=active]:bg-primary data-[state=active]:text-primary-foreground">
+                <BarChart3 className="h-4 w-4" />
+                <span>Analytics</span>
+              </TabsTrigger>
+              <TabsTrigger value="users" className="w-full justify-start gap-2 data-[state=active]:bg-primary data-[state=active]:text-primary-foreground">
+                <Users className="h-4 w-4" />
+                <span>Usuarios</span>
+              </TabsTrigger>
+              <TabsTrigger value="plans" className="w-full justify-start gap-2 data-[state=active]:bg-primary data-[state=active]:text-primary-foreground">
+                <Settings className="h-4 w-4" />
+                <span>Planes</span>
+              </TabsTrigger>
+              <TabsTrigger value="audit" className="w-full justify-start gap-2 data-[state=active]:bg-primary data-[state=active]:text-primary-foreground">
+                <FileText className="h-4 w-4" />
+                <span>Auditoría</span>
+              </TabsTrigger>
+              <TabsTrigger value="integrations" className="w-full justify-start gap-2 data-[state=active]:bg-primary data-[state=active]:text-primary-foreground">
+                <Plug className="h-4 w-4" />
+                <span>Integraciones</span>
+              </TabsTrigger>
+            </TabsList>
+            </CardContent>
+          </Card>
+
+          <div className="flex-1 min-w-0">
+
+          {/* Pricing Configuration Tab */}
+          <TabsContent value="pricing" className="space-y-4">
+            <PricingConfiguration />
+          </TabsContent>
+
+          {/* Pricing Calculator Tab */}
+          <TabsContent value="calculator" className="space-y-4">
+            <PricingCalculator />
+          </TabsContent>
 
           {/* Usage Metrics Tab */}
           <TabsContent value="usage" className="space-y-4">
@@ -1495,6 +1529,17 @@ export default function PlatformAdmin() {
                           </TableCell>
                           <TableCell>
                             <div className="flex gap-2">
+                              <Button 
+                                variant="outline" 
+                                size="sm"
+                                onClick={() => {
+                                  setSelectedCompanyForModules(company);
+                                  setModulesDialogOpen(true);
+                                }}
+                              >
+                                <Package className="h-4 w-4 mr-1" />
+                                Módulos
+                              </Button>
                               <Button 
                                 variant="outline" 
                                 size="sm"
@@ -2857,8 +2902,33 @@ export default function PlatformAdmin() {
               </CardContent>
             </Card>
           </TabsContent>
+          </div>
         </Tabs>
       </div>
+
+      {/* Dialog para gestionar módulos de empresa */}
+      <Dialog open={modulesDialogOpen} onOpenChange={setModulesDialogOpen}>
+        <DialogContent className="max-w-4xl max-h-[80vh] overflow-y-auto">
+          <DialogHeader>
+            <DialogTitle>
+              Gestionar Módulos - {selectedCompanyForModules?.name}
+            </DialogTitle>
+            <DialogDescription>
+              Activa o desactiva los módulos disponibles para esta empresa
+            </DialogDescription>
+          </DialogHeader>
+          
+          {selectedCompanyForModules && (
+            <CompanyModuleSelector companyId={selectedCompanyForModules.id} />
+          )}
+          
+          <DialogFooter>
+            <Button onClick={() => setModulesDialogOpen(false)}>
+              Cerrar
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
     </div>
   );
 }

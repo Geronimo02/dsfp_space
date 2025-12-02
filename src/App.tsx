@@ -52,7 +52,9 @@ import Retentions from "./pages/Retentions";
 import Integrations from "./pages/Integrations";
 import Payroll from "./pages/Payroll";
 import PlatformAdmin from "./pages/PlatformAdmin";
+import ModuleNotAvailable from "./pages/ModuleNotAvailable";
 import NotFound from "./pages/NotFound";
+import { ModuleProtectedRoute } from "./components/ModuleProtectedRoute";
 
 const queryClient = new QueryClient();
 
@@ -208,31 +210,32 @@ const App = () => (
           <Route path="/auth" element={<Auth />} />
           <Route path="/reset-password" element={<ResetPassword />} />
           <Route path="/company-setup" element={<AuthOnlyRoute><CompanySetup /></AuthOnlyRoute>} />
+          <Route path="/module-not-available" element={<ProtectedRoute><ModuleNotAvailable /></ProtectedRoute>} />
           <Route path="/" element={<ProtectedRoute><Dashboard /></ProtectedRoute>} />
           <Route path="/pos" element={<ProtectedRoute><POS /></ProtectedRoute>} />
           <Route path="/products" element={<ProtectedRoute><Products /></ProtectedRoute>} />
-          <Route path="/suppliers" element={<ProtectedRoute><Suppliers /></ProtectedRoute>} />
+          <Route path="/suppliers" element={<ProtectedRoute><ModuleProtectedRoute moduleCode="suppliers"><Suppliers /></ModuleProtectedRoute></ProtectedRoute>} />
           <Route path="/customers" element={<ProtectedRoute><Customers /></ProtectedRoute>} />
           <Route path="/sales" element={<ProtectedRoute><Sales /></ProtectedRoute>} />
-          <Route path="/quotations" element={<ProtectedRoute><Quotations /></ProtectedRoute>} />
-          <Route path="/delivery-notes" element={<ProtectedRoute><DeliveryNotes /></ProtectedRoute>} />
+          <Route path="/quotations" element={<ProtectedRoute><ModuleProtectedRoute moduleCode="quotations"><Quotations /></ModuleProtectedRoute></ProtectedRoute>} />
+          <Route path="/delivery-notes" element={<ProtectedRoute><ModuleProtectedRoute moduleCode="delivery_notes"><DeliveryNotes /></ModuleProtectedRoute></ProtectedRoute>} />
           <Route path="/customer-account" element={<ProtectedRoute><CustomerAccount /></ProtectedRoute>} />
           <Route path="/promotions" element={<ProtectedRoute><Promotions /></ProtectedRoute>} />
           <Route path="/returns" element={<ProtectedRoute><Returns /></ProtectedRoute>} />
           <Route path="/reservations" element={<ProtectedRoute><Reservations /></ProtectedRoute>} />
           <Route path="/technical-services" element={<ProtectedRoute><TechnicalServices /></ProtectedRoute>} />
-          <Route path="/employees" element={<ProtectedRoute><Employees /></ProtectedRoute>} />
-          <Route path="/cash-register" element={<ProtectedRoute><CashRegister /></ProtectedRoute>} />
-          <Route path="/purchases" element={<ProtectedRoute><Purchases /></ProtectedRoute>} />
-          <Route path="/reports" element={<ProtectedRoute><Reports /></ProtectedRoute>} />
+          <Route path="/employees" element={<ProtectedRoute><ModuleProtectedRoute moduleCode="employees"><Employees /></ModuleProtectedRoute></ProtectedRoute>} />
+          <Route path="/cash-register" element={<ProtectedRoute><ModuleProtectedRoute moduleCode="cash_register"><CashRegister /></ModuleProtectedRoute></ProtectedRoute>} />
+          <Route path="/purchases" element={<ProtectedRoute><ModuleProtectedRoute moduleCode="purchases"><Purchases /></ModuleProtectedRoute></ProtectedRoute>} />
+          <Route path="/reports" element={<ProtectedRoute><ModuleProtectedRoute moduleCode="reports"><Reports /></ModuleProtectedRoute></ProtectedRoute>} />
           <Route path="/audit-logs" element={<ProtectedRoute><AuditLogs /></ProtectedRoute>} />
           <Route path="/access-logs" element={<ProtectedRoute><AccessLogs /></ProtectedRoute>} />
           <Route path="/inventory-alerts" element={<ProtectedRoute><InventoryAlerts /></ProtectedRoute>} />
-          <Route path="/expenses" element={<ProtectedRoute><Expenses /></ProtectedRoute>} />
+          <Route path="/expenses" element={<ProtectedRoute><ModuleProtectedRoute moduleCode="expenses"><Expenses /></ModuleProtectedRoute></ProtectedRoute>} />
           <Route path="/bulk-operations" element={<ProtectedRoute><BulkOperations /></ProtectedRoute>} />
-          <Route path="/warehouses" element={<ProtectedRoute><Warehouses /></ProtectedRoute>} />
-           <Route path="/warehouse-stock" element={<ProtectedRoute><WarehouseStock /></ProtectedRoute>} />
-           <Route path="/warehouse-transfers" element={<ProtectedRoute><WarehouseTransfers /></ProtectedRoute>} />
+          <Route path="/warehouses" element={<ProtectedRoute><ModuleProtectedRoute moduleCode="warehouses"><Warehouses /></ModuleProtectedRoute></ProtectedRoute>} />
+           <Route path="/warehouse-stock" element={<ProtectedRoute><ModuleProtectedRoute moduleCode="warehouses"><WarehouseStock /></ModuleProtectedRoute></ProtectedRoute>} />
+           <Route path="/warehouse-transfers" element={<ProtectedRoute><ModuleProtectedRoute moduleCode="warehouses"><WarehouseTransfers /></ModuleProtectedRoute></ProtectedRoute>} />
            <Route path="/stock-reservations" element={<ProtectedRoute><StockReservations /></ProtectedRoute>} />
            <Route path="/pos-points" element={<ProtectedRoute><POSPoints /></ProtectedRoute>} />
            <Route path="/notification-settings" element={<ProtectedRoute><NotificationSettings /></ProtectedRoute>} />
@@ -245,7 +248,7 @@ const App = () => (
            <Route path="/card-movements" element={<ProtectedRoute><CardMovements /></ProtectedRoute>} />
            <Route path="/retentions" element={<ProtectedRoute><Retentions /></ProtectedRoute>} />
            <Route path="/integrations" element={<ProtectedRoute><Integrations /></ProtectedRoute>} />
-           <Route path="/payroll" element={<ProtectedRoute><Payroll /></ProtectedRoute>} />
+           <Route path="/payroll" element={<ProtectedRoute><ModuleProtectedRoute moduleCode="payroll"><Payroll /></ModuleProtectedRoute></ProtectedRoute>} />
            <Route path="/admin/platform" element={<PlatformAdminRoute><PlatformAdmin /></PlatformAdminRoute>} />
            <Route path="/ai-assistant" element={<ProtectedRoute><AIAssistantPage /></ProtectedRoute>} />
            <Route path="/settings" element={<ProtectedRoute><Settings /></ProtectedRoute>} />

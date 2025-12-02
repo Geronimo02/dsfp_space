@@ -1,3 +1,4 @@
+// Updated: Added platform_pricing_config, platform_modules, company_modules tables and calculate_subscription_price function
 export type Json =
   | string
   | number
@@ -876,14 +877,67 @@ export type Database = {
           },
         ]
       }
+      company_modules: {
+        Row: {
+          activated_at: string | null
+          active: boolean | null
+          company_id: string
+          created_at: string | null
+          deactivated_at: string | null
+          id: string
+          module_id: string
+          updated_at: string | null
+        }
+        Insert: {
+          activated_at?: string | null
+          active?: boolean | null
+          company_id: string
+          created_at?: string | null
+          deactivated_at?: string | null
+          id?: string
+          module_id: string
+          updated_at?: string | null
+        }
+        Update: {
+          activated_at?: string | null
+          active?: boolean | null
+          company_id?: string
+          created_at?: string | null
+          deactivated_at?: string | null
+          id?: string
+          module_id?: string
+          updated_at?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "company_modules_company_id_fkey"
+            columns: ["company_id"]
+            isOneToOne: false
+            referencedRelation: "companies"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "company_modules_module_id_fkey"
+            columns: ["module_id"]
+            isOneToOne: false
+            referencedRelation: "platform_modules"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       company_subscriptions: {
         Row: {
           amount_due: number | null
+          billing_cycle: string | null
+          calculated_annual_price: number | null
+          calculated_monthly_price: number | null
           company_id: string
           created_at: string | null
           end_date: string | null
           id: string
+          invoice_volume_tier: string | null
           last_payment_date: string | null
+          monthly_invoice_volume: number | null
           next_payment_date: string | null
           plan_id: string | null
           start_date: string | null
@@ -892,11 +946,16 @@ export type Database = {
         }
         Insert: {
           amount_due?: number | null
+          billing_cycle?: string | null
+          calculated_annual_price?: number | null
+          calculated_monthly_price?: number | null
           company_id: string
           created_at?: string | null
           end_date?: string | null
           id?: string
+          invoice_volume_tier?: string | null
           last_payment_date?: string | null
+          monthly_invoice_volume?: number | null
           next_payment_date?: string | null
           plan_id?: string | null
           start_date?: string | null
@@ -905,11 +964,16 @@ export type Database = {
         }
         Update: {
           amount_due?: number | null
+          billing_cycle?: string | null
+          calculated_annual_price?: number | null
+          calculated_monthly_price?: number | null
           company_id?: string
           created_at?: string | null
           end_date?: string | null
           id?: string
+          invoice_volume_tier?: string | null
           last_payment_date?: string | null
+          monthly_invoice_volume?: number | null
           next_payment_date?: string | null
           plan_id?: string | null
           start_date?: string | null
@@ -2789,6 +2853,78 @@ export type Database = {
             referencedColumns: ["id"]
           },
         ]
+      }
+      platform_modules: {
+        Row: {
+          code: string
+          created_at: string | null
+          description: string | null
+          display_order: number | null
+          id: string
+          is_active: boolean | null
+          is_base_module: boolean | null
+          name: string
+          price_annual: number | null
+          price_monthly: number | null
+          updated_at: string | null
+        }
+        Insert: {
+          code: string
+          created_at?: string | null
+          description?: string | null
+          display_order?: number | null
+          id?: string
+          is_active?: boolean | null
+          is_base_module?: boolean | null
+          name: string
+          price_annual?: number | null
+          price_monthly?: number | null
+          updated_at?: string | null
+        }
+        Update: {
+          code?: string
+          created_at?: string | null
+          description?: string | null
+          display_order?: number | null
+          id?: string
+          is_active?: boolean | null
+          is_base_module?: boolean | null
+          name?: string
+          price_annual?: number | null
+          price_monthly?: number | null
+          updated_at?: string | null
+        }
+        Relationships: []
+      }
+      platform_pricing_config: {
+        Row: {
+          annual_discount_percentage: number | null
+          base_package_price_annual: number | null
+          base_package_price_monthly: number | null
+          created_at: string | null
+          id: string
+          invoice_volume_tiers: Json | null
+          updated_at: string | null
+        }
+        Insert: {
+          annual_discount_percentage?: number | null
+          base_package_price_annual?: number | null
+          base_package_price_monthly?: number | null
+          created_at?: string | null
+          id?: string
+          invoice_volume_tiers?: Json | null
+          updated_at?: string | null
+        }
+        Update: {
+          annual_discount_percentage?: number | null
+          base_package_price_annual?: number | null
+          base_package_price_monthly?: number | null
+          created_at?: string | null
+          id?: string
+          invoice_volume_tiers?: Json | null
+          updated_at?: string | null
+        }
+        Relationships: []
       }
       products: {
         Row: {
@@ -4836,6 +4972,21 @@ export type Database = {
           p_user_id: string
         }
         Returns: undefined
+      }
+      calculate_subscription_price: {
+        Args: {
+          p_company_id: string
+          p_billing_cycle: string
+          p_invoice_volume: number
+        }
+        Returns: {
+          base_package_price: number
+          modules_price: number
+          volume_charge: number
+          subtotal: number
+          annual_discount: number
+          final_price: number
+        }
       }
       check_expiring_checks: { Args: never; Returns: undefined }
       check_expiring_products: { Args: never; Returns: undefined }
