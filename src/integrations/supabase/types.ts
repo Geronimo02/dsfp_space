@@ -682,6 +682,8 @@ export type Database = {
           address: string | null
           autoprint_receipt: boolean | null
           backup_enabled: boolean | null
+          base_price: number | null
+          calculated_price: number | null
           card_surcharge_rate: number | null
           certificado_afip_url: string | null
           clave_fiscal: string | null
@@ -707,6 +709,8 @@ export type Database = {
           loyalty_silver_threshold: number | null
           max_discount_percentage: number | null
           max_installments: number | null
+          modules_price: number | null
+          monthly_invoice_volume: number | null
           name: string
           nombre_fantasia: string | null
           phone: string | null
@@ -715,8 +719,12 @@ export type Database = {
           receipt_format: string | null
           receipt_printer_name: string | null
           require_customer_document: boolean | null
+          subscription_end_date: string | null
+          subscription_start_date: string | null
+          subscription_type: string | null
           tax_id: string | null
           updated_at: string | null
+          volume_price: number | null
           whatsapp_enabled: boolean | null
           whatsapp_number: string | null
         }
@@ -725,6 +733,8 @@ export type Database = {
           address?: string | null
           autoprint_receipt?: boolean | null
           backup_enabled?: boolean | null
+          base_price?: number | null
+          calculated_price?: number | null
           card_surcharge_rate?: number | null
           certificado_afip_url?: string | null
           clave_fiscal?: string | null
@@ -750,6 +760,8 @@ export type Database = {
           loyalty_silver_threshold?: number | null
           max_discount_percentage?: number | null
           max_installments?: number | null
+          modules_price?: number | null
+          monthly_invoice_volume?: number | null
           name: string
           nombre_fantasia?: string | null
           phone?: string | null
@@ -758,8 +770,12 @@ export type Database = {
           receipt_format?: string | null
           receipt_printer_name?: string | null
           require_customer_document?: boolean | null
+          subscription_end_date?: string | null
+          subscription_start_date?: string | null
+          subscription_type?: string | null
           tax_id?: string | null
           updated_at?: string | null
+          volume_price?: number | null
           whatsapp_enabled?: boolean | null
           whatsapp_number?: string | null
         }
@@ -768,6 +784,8 @@ export type Database = {
           address?: string | null
           autoprint_receipt?: boolean | null
           backup_enabled?: boolean | null
+          base_price?: number | null
+          calculated_price?: number | null
           card_surcharge_rate?: number | null
           certificado_afip_url?: string | null
           clave_fiscal?: string | null
@@ -793,6 +811,8 @@ export type Database = {
           loyalty_silver_threshold?: number | null
           max_discount_percentage?: number | null
           max_installments?: number | null
+          modules_price?: number | null
+          monthly_invoice_volume?: number | null
           name?: string
           nombre_fantasia?: string | null
           phone?: string | null
@@ -801,12 +821,64 @@ export type Database = {
           receipt_format?: string | null
           receipt_printer_name?: string | null
           require_customer_document?: boolean | null
+          subscription_end_date?: string | null
+          subscription_start_date?: string | null
+          subscription_type?: string | null
           tax_id?: string | null
           updated_at?: string | null
+          volume_price?: number | null
           whatsapp_enabled?: boolean | null
           whatsapp_number?: string | null
         }
         Relationships: []
+      }
+      company_modules: {
+        Row: {
+          activated_at: string | null
+          active: boolean | null
+          company_id: string
+          created_at: string | null
+          deactivated_at: string | null
+          id: string
+          module_id: string
+          updated_at: string | null
+        }
+        Insert: {
+          activated_at?: string | null
+          active?: boolean | null
+          company_id: string
+          created_at?: string | null
+          deactivated_at?: string | null
+          id?: string
+          module_id: string
+          updated_at?: string | null
+        }
+        Update: {
+          activated_at?: string | null
+          active?: boolean | null
+          company_id?: string
+          created_at?: string | null
+          deactivated_at?: string | null
+          id?: string
+          module_id?: string
+          updated_at?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "company_modules_company_id_fkey"
+            columns: ["company_id"]
+            isOneToOne: false
+            referencedRelation: "companies"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "company_modules_module_id_fkey"
+            columns: ["module_id"]
+            isOneToOne: false
+            referencedRelation: "platform_modules"
+            referencedColumns: ["id"]
+          },
+        ]
       }
       company_onboarding: {
         Row: {
@@ -879,39 +951,51 @@ export type Database = {
       company_subscriptions: {
         Row: {
           amount_due: number | null
+          billing_cycle: string | null
+          calculated_price: number | null
           company_id: string
           created_at: string | null
           end_date: string | null
           id: string
           last_payment_date: string | null
+          monthly_invoice_volume: number | null
           next_payment_date: string | null
           plan_id: string | null
+          price_breakdown: Json | null
           start_date: string | null
           status: string
           updated_at: string | null
         }
         Insert: {
           amount_due?: number | null
+          billing_cycle?: string | null
+          calculated_price?: number | null
           company_id: string
           created_at?: string | null
           end_date?: string | null
           id?: string
           last_payment_date?: string | null
+          monthly_invoice_volume?: number | null
           next_payment_date?: string | null
           plan_id?: string | null
+          price_breakdown?: Json | null
           start_date?: string | null
           status?: string
           updated_at?: string | null
         }
         Update: {
           amount_due?: number | null
+          billing_cycle?: string | null
+          calculated_price?: number | null
           company_id?: string
           created_at?: string | null
           end_date?: string | null
           id?: string
           last_payment_date?: string | null
+          monthly_invoice_volume?: number | null
           next_payment_date?: string | null
           plan_id?: string | null
+          price_breakdown?: Json | null
           start_date?: string | null
           status?: string
           updated_at?: string | null
@@ -2501,6 +2585,48 @@ export type Database = {
           },
         ]
       }
+      platform_modules: {
+        Row: {
+          code: string
+          created_at: string | null
+          description: string | null
+          display_order: number | null
+          id: string
+          is_active: boolean | null
+          is_base_module: boolean | null
+          name: string
+          price_annual: number
+          price_monthly: number
+          updated_at: string | null
+        }
+        Insert: {
+          code: string
+          created_at?: string | null
+          description?: string | null
+          display_order?: number | null
+          id?: string
+          is_active?: boolean | null
+          is_base_module?: boolean | null
+          name: string
+          price_annual?: number
+          price_monthly?: number
+          updated_at?: string | null
+        }
+        Update: {
+          code?: string
+          created_at?: string | null
+          description?: string | null
+          display_order?: number | null
+          id?: string
+          is_active?: boolean | null
+          is_base_module?: boolean | null
+          name?: string
+          price_annual?: number
+          price_monthly?: number
+          updated_at?: string | null
+        }
+        Relationships: []
+      }
       platform_notifications: {
         Row: {
           company_id: string | null
@@ -2604,6 +2730,39 @@ export type Database = {
             referencedColumns: ["id"]
           },
         ]
+      }
+      platform_pricing_config: {
+        Row: {
+          annual_discount_percentage: number
+          base_package_price_annual: number
+          base_package_price_monthly: number
+          created_at: string | null
+          id: string
+          invoice_volume_tiers: Json
+          is_active: boolean | null
+          updated_at: string | null
+        }
+        Insert: {
+          annual_discount_percentage?: number
+          base_package_price_annual?: number
+          base_package_price_monthly?: number
+          created_at?: string | null
+          id?: string
+          invoice_volume_tiers?: Json
+          is_active?: boolean | null
+          updated_at?: string | null
+        }
+        Update: {
+          annual_discount_percentage?: number
+          base_package_price_annual?: number
+          base_package_price_monthly?: number
+          created_at?: string | null
+          id?: string
+          invoice_volume_tiers?: Json
+          is_active?: boolean | null
+          updated_at?: string | null
+        }
+        Relationships: []
       }
       pos_afip: {
         Row: {
@@ -4837,6 +4996,20 @@ export type Database = {
         }
         Returns: undefined
       }
+      calculate_subscription_price:
+        | {
+            Args: { p_company_id: string; p_subscription_type?: string }
+            Returns: {
+              base_price: number
+              modules_price: number
+              total_price: number
+              volume_price: number
+            }[]
+          }
+        | {
+            Args: { p_billing_cycle?: string; p_company_id: string }
+            Returns: Json
+          }
       check_expiring_checks: { Args: never; Returns: undefined }
       check_expiring_products: { Args: never; Returns: undefined }
       check_inactive_customers: { Args: never; Returns: undefined }
@@ -4980,6 +5153,14 @@ export type Database = {
         Args: { company_uuid: string }
         Returns: undefined
       }
+      toggle_company_module: {
+        Args: {
+          p_active?: boolean
+          p_company_id: string
+          p_module_code: string
+        }
+        Returns: boolean
+      }
       user_belongs_to_company: {
         Args: { _company_id: string; _user_id: string }
         Returns: boolean
@@ -4996,6 +5177,7 @@ export type Database = {
         | "warehouse"
         | "technician"
         | "auditor"
+        | "platform_admin"
       delivery_status: "pending" | "in_transit" | "delivered" | "cancelled"
       quotation_status:
         | "draft"
@@ -5147,6 +5329,7 @@ export const Constants = {
         "warehouse",
         "technician",
         "auditor",
+        "platform_admin",
       ],
       delivery_status: ["pending", "in_transit", "delivered", "cancelled"],
       quotation_status: [
