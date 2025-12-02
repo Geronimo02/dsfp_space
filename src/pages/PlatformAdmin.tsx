@@ -35,7 +35,9 @@ import {
   Ticket,
   Plug,
   Activity,
-  XCircle
+  XCircle,
+  Rocket,
+  Circle
 } from "lucide-react";
 import { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip as RechartsTooltip, ResponsiveContainer, LineChart, Line } from "recharts";
 import { exportToExcel, exportToPDF, formatCurrency, formatDate } from "@/lib/exportUtils";
@@ -380,6 +382,23 @@ export default function PlatformAdmin() {
         `)
         .order("created_at", { ascending: false })
         .limit(100);
+
+      if (error) throw error;
+      return data;
+    },
+  });
+
+  // Fetch company onboarding data
+  const { data: onboardingData } = useQuery({
+    queryKey: ["platform-onboarding"],
+    queryFn: async () => {
+      const { data, error } = await supabase
+        .from("company_onboarding")
+        .select(`
+          *,
+          companies (name, active, created_at)
+        `)
+        .order("created_at", { ascending: false });
 
       if (error) throw error;
       return data;
@@ -944,7 +963,7 @@ export default function PlatformAdmin() {
         )}
 
         <Tabs defaultValue="companies" className="space-y-6">
-          <TabsList className="grid w-full grid-cols-11">
+          <TabsList className="grid w-full grid-cols-12">
             <TabsTrigger value="companies" className="gap-2">
               <Building2 className="h-4 w-4" />
               Empresas
@@ -952,6 +971,10 @@ export default function PlatformAdmin() {
             <TabsTrigger value="usage" className="gap-2">
               <TrendingUp className="h-4 w-4" />
               Métricas
+            </TabsTrigger>
+            <TabsTrigger value="onboarding" className="gap-2">
+              <Rocket className="h-4 w-4" />
+              Onboarding
             </TabsTrigger>
             <TabsTrigger value="tickets" className="gap-2">
               <Ticket className="h-4 w-4" />
@@ -2631,6 +2654,206 @@ export default function PlatformAdmin() {
                     </TableBody>
                   </Table>
                 </div>
+              </CardContent>
+            </Card>
+          </TabsContent>
+
+          {/* Onboarding Tab */}
+          <TabsContent value="onboarding" className="space-y-4">
+            <Card>
+              <CardHeader>
+                <div className="flex items-center justify-between">
+                  <div>
+                    <CardTitle>Panel de Onboarding</CardTitle>
+                    <CardDescription>
+                      Progreso de configuración inicial de cada empresa
+                    </CardDescription>
+                  </div>
+                  <Button
+                    onClick={() => {
+                      if (!onboardingData) return;
+                      exportToExcel(
+                        onboardingData.map((o: any) => ({
+                          'Empresa': o.companies?.name || 'N/A',
+                          'Progreso (%)': o.completion_percentage || 0,
+                          'Info Empresa': o.company_info_completed ? 'Sí' : 'No',
+                          'Primer Producto': o.first_product_added ? 'Sí' : 'No',
+                          'Primer Cliente': o.first_customer_added ? 'Sí' : 'No',
+                          'Primera Venta': o.first_sale_completed ? 'Sí' : 'No',
+                          'Método Pago': o.payment_method_configured ? 'Sí' : 'No',
+                          'Equipo Invitado': o.team_members_invited ? 'Sí' : 'No',
+                          'AFIP Config.': o.afip_configured ? 'Sí' : 'No',
+                          'Iniciado': o.started_at ? new Date(o.started_at).toLocaleDateString() : 'N/A',
+                          'Completado': o.completed_at ? new Date(o.completed_at).toLocaleDateString() : 'En progreso'
+                        })),
+                        'onboarding-empresas'
+                      );
+                    }}
+                  >
+                    <Download className="mr-2 h-4 w-4" />
+                    Exportar
+                  </Button>
+                </div>
+              </CardHeader>
+              <CardContent className="space-y-6">
+                {/* Summary Stats */}
+                <div className="grid gap-4 md:grid-cols-4">
+                  <Card>
+                    <CardHeader className="pb-2">
+                      <CardTitle className="text-sm font-medium">Completados</CardTitle>
+                    </CardHeader>
+                    <CardContent>
+                      <div className="text-2xl font-bold text-green-600">
+                        {onboardingData?.filter((o: any) => o.completion_percentage === 100).length || 0}
+                      </div>
+                      <p className="text-xs text-muted-foreground">100% configurado</p>
+                    </CardContent>
+                  </Card>
+                  <Card>
+                    <CardHeader className="pb-2">
+                      <CardTitle className="text-sm font-medium">En Progreso</CardTitle>
+                    </CardHeader>
+                    <CardContent>
+                      <div className="text-2xl font-bold text-yellow-600">
+                        {onboardingData?.filter((o: any) => o.completion_percentage > 0 && o.completion_percentage < 100).length || 0}
+                      </div>
+                      <p className="text-xs text-muted-foreground">Configurando</p>
+                    </CardContent>
+                  </Card>
+                  <Card>
+                    <CardHeader className="pb-2">
+                      <CardTitle className="text-sm font-medium">Sin Iniciar</CardTitle>
+                    </CardHeader>
+                    <CardContent>
+                      <div className="text-2xl font-bold text-red-600">
+                        {onboardingData?.filter((o: any) => o.completion_percentage === 0).length || 0}
+                      </div>
+                      <p className="text-xs text-muted-foreground">0% progreso</p>
+                    </CardContent>
+                  </Card>
+                  <Card>
+                    <CardHeader className="pb-2">
+                      <CardTitle className="text-sm font-medium">Promedio General</CardTitle>
+                    </CardHeader>
+                    <CardContent>
+                      <div className="text-2xl font-bold">
+                        {onboardingData && onboardingData.length > 0
+                          ? Math.round(onboardingData.reduce((sum: number, o: any) => sum + (o.completion_percentage || 0), 0) / onboardingData.length)
+                          : 0}%
+                      </div>
+                      <p className="text-xs text-muted-foreground">Todas las empresas</p>
+                    </CardContent>
+                  </Card>
+                </div>
+
+                {/* Onboarding Table */}
+                <Table>
+                  <TableHeader>
+                    <TableRow>
+                      <TableHead>Empresa</TableHead>
+                      <TableHead>Progreso</TableHead>
+                      <TableHead className="text-center">Info</TableHead>
+                      <TableHead className="text-center">Producto</TableHead>
+                      <TableHead className="text-center">Cliente</TableHead>
+                      <TableHead className="text-center">Venta</TableHead>
+                      <TableHead className="text-center">Pago</TableHead>
+                      <TableHead className="text-center">Equipo</TableHead>
+                      <TableHead className="text-center">AFIP</TableHead>
+                      <TableHead>Última Actividad</TableHead>
+                    </TableRow>
+                  </TableHeader>
+                  <TableBody>
+                    {onboardingData && onboardingData.length > 0 ? (
+                      onboardingData.map((onb: any) => (
+                        <TableRow key={onb.id}>
+                          <TableCell className="font-medium">
+                            {onb.companies?.name || "N/A"}
+                            {!onb.companies?.active && (
+                              <Badge variant="secondary" className="ml-2">Inactiva</Badge>
+                            )}
+                          </TableCell>
+                          <TableCell>
+                            <div className="flex items-center gap-2">
+                              <div className="w-24 h-2 bg-muted rounded-full overflow-hidden">
+                                <div 
+                                  className={`h-full transition-all ${
+                                    onb.completion_percentage === 100 
+                                      ? 'bg-green-500' 
+                                      : onb.completion_percentage >= 50 
+                                        ? 'bg-yellow-500' 
+                                        : 'bg-red-500'
+                                  }`}
+                                  style={{ width: `${onb.completion_percentage || 0}%` }}
+                                />
+                              </div>
+                              <span className="text-sm font-medium">{onb.completion_percentage || 0}%</span>
+                            </div>
+                          </TableCell>
+                          <TableCell className="text-center">
+                            {onb.company_info_completed ? (
+                              <CheckCircle2 className="h-4 w-4 text-green-600 mx-auto" />
+                            ) : (
+                              <Circle className="h-4 w-4 text-muted-foreground mx-auto" />
+                            )}
+                          </TableCell>
+                          <TableCell className="text-center">
+                            {onb.first_product_added ? (
+                              <CheckCircle2 className="h-4 w-4 text-green-600 mx-auto" />
+                            ) : (
+                              <Circle className="h-4 w-4 text-muted-foreground mx-auto" />
+                            )}
+                          </TableCell>
+                          <TableCell className="text-center">
+                            {onb.first_customer_added ? (
+                              <CheckCircle2 className="h-4 w-4 text-green-600 mx-auto" />
+                            ) : (
+                              <Circle className="h-4 w-4 text-muted-foreground mx-auto" />
+                            )}
+                          </TableCell>
+                          <TableCell className="text-center">
+                            {onb.first_sale_completed ? (
+                              <CheckCircle2 className="h-4 w-4 text-green-600 mx-auto" />
+                            ) : (
+                              <Circle className="h-4 w-4 text-muted-foreground mx-auto" />
+                            )}
+                          </TableCell>
+                          <TableCell className="text-center">
+                            {onb.payment_method_configured ? (
+                              <CheckCircle2 className="h-4 w-4 text-green-600 mx-auto" />
+                            ) : (
+                              <Circle className="h-4 w-4 text-muted-foreground mx-auto" />
+                            )}
+                          </TableCell>
+                          <TableCell className="text-center">
+                            {onb.team_members_invited ? (
+                              <CheckCircle2 className="h-4 w-4 text-green-600 mx-auto" />
+                            ) : (
+                              <Circle className="h-4 w-4 text-muted-foreground mx-auto" />
+                            )}
+                          </TableCell>
+                          <TableCell className="text-center">
+                            {onb.afip_configured ? (
+                              <CheckCircle2 className="h-4 w-4 text-green-600 mx-auto" />
+                            ) : (
+                              <Circle className="h-4 w-4 text-muted-foreground mx-auto" />
+                            )}
+                          </TableCell>
+                          <TableCell className="text-sm text-muted-foreground">
+                            {onb.last_activity_at 
+                              ? new Date(onb.last_activity_at).toLocaleDateString()
+                              : 'Sin actividad'}
+                          </TableCell>
+                        </TableRow>
+                      ))
+                    ) : (
+                      <TableRow>
+                        <TableCell colSpan={10} className="text-center text-muted-foreground">
+                          No hay datos de onboarding disponibles
+                        </TableCell>
+                      </TableRow>
+                    )}
+                  </TableBody>
+                </Table>
               </CardContent>
             </Card>
           </TabsContent>
