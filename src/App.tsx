@@ -211,44 +211,67 @@ const App = () => (
           <Route path="/reset-password" element={<ResetPassword />} />
           <Route path="/company-setup" element={<AuthOnlyRoute><CompanySetup /></AuthOnlyRoute>} />
           <Route path="/module-not-available" element={<ProtectedRoute><ModuleNotAvailable /></ProtectedRoute>} />
+          {/* Módulos Base - siempre disponibles */}
           <Route path="/" element={<ProtectedRoute><Dashboard /></ProtectedRoute>} />
-          <Route path="/pos" element={<ProtectedRoute><POS /></ProtectedRoute>} />
-          <Route path="/products" element={<ProtectedRoute><Products /></ProtectedRoute>} />
-          <Route path="/suppliers" element={<ProtectedRoute><ModuleProtectedRoute moduleCode="suppliers"><Suppliers /></ModuleProtectedRoute></ProtectedRoute>} />
-          <Route path="/customers" element={<ProtectedRoute><Customers /></ProtectedRoute>} />
-          <Route path="/sales" element={<ProtectedRoute><Sales /></ProtectedRoute>} />
+          <Route path="/pos" element={<ProtectedRoute><ModuleProtectedRoute moduleCode="pos"><POS /></ModuleProtectedRoute></ProtectedRoute>} />
+          <Route path="/products" element={<ProtectedRoute><ModuleProtectedRoute moduleCode="products"><Products /></ModuleProtectedRoute></ProtectedRoute>} />
+          <Route path="/customers" element={<ProtectedRoute><ModuleProtectedRoute moduleCode="customers"><Customers /></ModuleProtectedRoute></ProtectedRoute>} />
+          <Route path="/sales" element={<ProtectedRoute><ModuleProtectedRoute moduleCode="sales"><Sales /></ModuleProtectedRoute></ProtectedRoute>} />
+          <Route path="/settings" element={<ProtectedRoute><Settings /></ProtectedRoute>} />
+          
+          {/* Módulos Adicionales - requieren contrato */}
           <Route path="/quotations" element={<ProtectedRoute><ModuleProtectedRoute moduleCode="quotations"><Quotations /></ModuleProtectedRoute></ProtectedRoute>} />
           <Route path="/delivery-notes" element={<ProtectedRoute><ModuleProtectedRoute moduleCode="delivery_notes"><DeliveryNotes /></ModuleProtectedRoute></ProtectedRoute>} />
-          <Route path="/customer-account" element={<ProtectedRoute><CustomerAccount /></ProtectedRoute>} />
-          <Route path="/promotions" element={<ProtectedRoute><Promotions /></ProtectedRoute>} />
-          <Route path="/returns" element={<ProtectedRoute><Returns /></ProtectedRoute>} />
-          <Route path="/reservations" element={<ProtectedRoute><Reservations /></ProtectedRoute>} />
-          <Route path="/technical-services" element={<ProtectedRoute><TechnicalServices /></ProtectedRoute>} />
+          <Route path="/returns" element={<ProtectedRoute><ModuleProtectedRoute moduleCode="returns"><Returns /></ModuleProtectedRoute></ProtectedRoute>} />
+          <Route path="/reservations" element={<ProtectedRoute><ModuleProtectedRoute moduleCode="reservations"><Reservations /></ModuleProtectedRoute></ProtectedRoute>} />
+          <Route path="/customer-account" element={<ProtectedRoute><ModuleProtectedRoute moduleCode="accounts_receivable"><CustomerAccount /></ModuleProtectedRoute></ProtectedRoute>} />
+          <Route path="/promotions" element={<ProtectedRoute><ModuleProtectedRoute moduleCode="promotions"><Promotions /></ModuleProtectedRoute></ProtectedRoute>} />
+          
+          {/* Inventario & Compras */}
+          <Route path="/suppliers" element={<ProtectedRoute><ModuleProtectedRoute moduleCode="suppliers"><Suppliers /></ModuleProtectedRoute></ProtectedRoute>} />
+          <Route path="/purchases" element={<ProtectedRoute><ModuleProtectedRoute moduleCode="purchases"><Purchases /></ModuleProtectedRoute></ProtectedRoute>} />
+          <Route path="/warehouses" element={<ProtectedRoute><ModuleProtectedRoute moduleCode="warehouses"><Warehouses /></ModuleProtectedRoute></ProtectedRoute>} />
+          <Route path="/warehouse-stock" element={<ProtectedRoute><ModuleProtectedRoute moduleCode="warehouse_stock"><WarehouseStock /></ModuleProtectedRoute></ProtectedRoute>} />
+          <Route path="/warehouse-transfers" element={<ProtectedRoute><ModuleProtectedRoute moduleCode="warehouse_transfers"><WarehouseTransfers /></ModuleProtectedRoute></ProtectedRoute>} />
+          <Route path="/stock-reservations" element={<ProtectedRoute><ModuleProtectedRoute moduleCode="stock_reservations"><StockReservations /></ModuleProtectedRoute></ProtectedRoute>} />
+          <Route path="/inventory-alerts" element={<ProtectedRoute><ModuleProtectedRoute moduleCode="inventory_alerts"><InventoryAlerts /></ModuleProtectedRoute></ProtectedRoute>} />
+          
+          {/* Gestión */}
+          <Route path="/technical-services" element={<ProtectedRoute><ModuleProtectedRoute moduleCode="technical_services"><TechnicalServices /></ModuleProtectedRoute></ProtectedRoute>} />
           <Route path="/employees" element={<ProtectedRoute><ModuleProtectedRoute moduleCode="employees"><Employees /></ModuleProtectedRoute></ProtectedRoute>} />
           <Route path="/cash-register" element={<ProtectedRoute><ModuleProtectedRoute moduleCode="cash_register"><CashRegister /></ModuleProtectedRoute></ProtectedRoute>} />
-          <Route path="/purchases" element={<ProtectedRoute><ModuleProtectedRoute moduleCode="purchases"><Purchases /></ModuleProtectedRoute></ProtectedRoute>} />
-          <Route path="/reports" element={<ProtectedRoute><ModuleProtectedRoute moduleCode="reports"><Reports /></ModuleProtectedRoute></ProtectedRoute>} />
-          <Route path="/audit-logs" element={<ProtectedRoute><AuditLogs /></ProtectedRoute>} />
-          <Route path="/access-logs" element={<ProtectedRoute><AccessLogs /></ProtectedRoute>} />
-          <Route path="/inventory-alerts" element={<ProtectedRoute><InventoryAlerts /></ProtectedRoute>} />
+          <Route path="/checks" element={<ProtectedRoute><ModuleProtectedRoute moduleCode="checks"><Checks /></ModuleProtectedRoute></ProtectedRoute>} />
           <Route path="/expenses" element={<ProtectedRoute><ModuleProtectedRoute moduleCode="expenses"><Expenses /></ModuleProtectedRoute></ProtectedRoute>} />
-          <Route path="/bulk-operations" element={<ProtectedRoute><BulkOperations /></ProtectedRoute>} />
-          <Route path="/warehouses" element={<ProtectedRoute><ModuleProtectedRoute moduleCode="warehouses"><Warehouses /></ModuleProtectedRoute></ProtectedRoute>} />
-           <Route path="/warehouse-stock" element={<ProtectedRoute><ModuleProtectedRoute moduleCode="warehouses"><WarehouseStock /></ModuleProtectedRoute></ProtectedRoute>} />
-           <Route path="/warehouse-transfers" element={<ProtectedRoute><ModuleProtectedRoute moduleCode="warehouses"><WarehouseTransfers /></ModuleProtectedRoute></ProtectedRoute>} />
-           <Route path="/stock-reservations" element={<ProtectedRoute><StockReservations /></ProtectedRoute>} />
-           <Route path="/pos-points" element={<ProtectedRoute><POSPoints /></ProtectedRoute>} />
-           <Route path="/notification-settings" element={<ProtectedRoute><NotificationSettings /></ProtectedRoute>} />
-           <Route path="/checks" element={<ProtectedRoute><Checks /></ProtectedRoute>} />
-           <Route path="/monthly-closing" element={<ProtectedRoute><MonthlyClosing /></ProtectedRoute>} />
-           <Route path="/accountant-reports" element={<ProtectedRoute><AccountantReports /></ProtectedRoute>} />
-           <Route path="/commissions" element={<ProtectedRoute><Commissions /></ProtectedRoute>} />
-           <Route path="/bank-accounts" element={<ProtectedRoute><BankAccounts /></ProtectedRoute>} />
-           <Route path="/bank-movements" element={<ProtectedRoute><BankMovements /></ProtectedRoute>} />
-           <Route path="/card-movements" element={<ProtectedRoute><CardMovements /></ProtectedRoute>} />
-           <Route path="/retentions" element={<ProtectedRoute><Retentions /></ProtectedRoute>} />
-           <Route path="/integrations" element={<ProtectedRoute><Integrations /></ProtectedRoute>} />
-           <Route path="/payroll" element={<ProtectedRoute><ModuleProtectedRoute moduleCode="payroll"><Payroll /></ModuleProtectedRoute></ProtectedRoute>} />
+          <Route path="/commissions" element={<ProtectedRoute><ModuleProtectedRoute moduleCode="commissions"><Commissions /></ModuleProtectedRoute></ProtectedRoute>} />
+          
+          {/* Tesorería */}
+          <Route path="/bank-accounts" element={<ProtectedRoute><ModuleProtectedRoute moduleCode="bank_accounts"><BankAccounts /></ModuleProtectedRoute></ProtectedRoute>} />
+          <Route path="/bank-movements" element={<ProtectedRoute><ModuleProtectedRoute moduleCode="bank_movements"><BankMovements /></ModuleProtectedRoute></ProtectedRoute>} />
+          <Route path="/card-movements" element={<ProtectedRoute><ModuleProtectedRoute moduleCode="card_movements"><CardMovements /></ModuleProtectedRoute></ProtectedRoute>} />
+          <Route path="/retentions" element={<ProtectedRoute><ModuleProtectedRoute moduleCode="retentions"><Retentions /></ModuleProtectedRoute></ProtectedRoute>} />
+          
+          {/* Reportes & Admin */}
+          <Route path="/reports" element={<ProtectedRoute><ModuleProtectedRoute moduleCode="reports"><Reports /></ModuleProtectedRoute></ProtectedRoute>} />
+          <Route path="/monthly-closing" element={<ProtectedRoute><ModuleProtectedRoute moduleCode="monthly_closing"><MonthlyClosing /></ModuleProtectedRoute></ProtectedRoute>} />
+          <Route path="/accountant-reports" element={<ProtectedRoute><ModuleProtectedRoute moduleCode="accountant_reports"><AccountantReports /></ModuleProtectedRoute></ProtectedRoute>} />
+          <Route path="/audit-logs" element={<ProtectedRoute><ModuleProtectedRoute moduleCode="audit_logs"><AuditLogs /></ModuleProtectedRoute></ProtectedRoute>} />
+          <Route path="/access-logs" element={<ProtectedRoute><ModuleProtectedRoute moduleCode="access_logs"><AccessLogs /></ModuleProtectedRoute></ProtectedRoute>} />
+          <Route path="/bulk-operations" element={<ProtectedRoute><ModuleProtectedRoute moduleCode="bulk_operations"><BulkOperations /></ModuleProtectedRoute></ProtectedRoute>} />
+          
+          {/* AFIP & Facturación */}
+          <Route path="/pos-points" element={<ProtectedRoute><ModuleProtectedRoute moduleCode="afip_pos_points"><POSPoints /></ModuleProtectedRoute></ProtectedRoute>} />
+          
+          {/* RRHH */}
+          <Route path="/payroll" element={<ProtectedRoute><ModuleProtectedRoute moduleCode="payroll"><Payroll /></ModuleProtectedRoute></ProtectedRoute>} />
+          
+          {/* Integraciones */}
+          <Route path="/integrations" element={<ProtectedRoute><ModuleProtectedRoute moduleCode="integrations"><Integrations /></ModuleProtectedRoute></ProtectedRoute>} />
+          
+          {/* AI */}
+          <Route path="/ai-assistant" element={<ProtectedRoute><AIAssistantPage /></ProtectedRoute>} />
+          
+          {/* Notificaciones - siempre disponible */}
+          <Route path="/notification-settings" element={<ProtectedRoute><NotificationSettings /></ProtectedRoute>} />
            <Route path="/admin/platform" element={<PlatformAdminRoute><PlatformAdmin /></PlatformAdminRoute>} />
            <Route path="/ai-assistant" element={<ProtectedRoute><AIAssistantPage /></ProtectedRoute>} />
            <Route path="/settings" element={<ProtectedRoute><Settings /></ProtectedRoute>} />
