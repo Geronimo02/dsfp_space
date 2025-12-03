@@ -18,7 +18,7 @@ interface CompanyUser {
   id: string;
   company_id: string;
   user_id: string;
-  role: 'admin' | 'manager' | 'accountant' | 'employee' | 'cashier' | 'viewer' | 'warehouse' | 'technician' | 'auditor';
+  role: 'admin' | 'manager' | 'accountant' | 'employee' | 'cashier' | 'viewer' | 'warehouse' | 'technician' | 'auditor' | 'platform_admin';
   active: boolean;
   companies: Company;
 }

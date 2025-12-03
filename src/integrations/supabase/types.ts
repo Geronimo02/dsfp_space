@@ -1,4 +1,3 @@
-// Updated: Added platform_pricing_config, platform_modules, company_modules tables and calculate_subscription_price function
 export type Json =
   | string
   | number
@@ -952,64 +951,66 @@ export type Database = {
       company_subscriptions: {
         Row: {
           amount_due: number | null
+          base_price: number | null
           billing_cycle: string | null
-          calculated_annual_price: number | null
-          calculated_monthly_price: number | null
-
           calculated_price: number | null
           company_id: string
           created_at: string | null
           end_date: string | null
           id: string
-          invoice_volume_tier: string | null
           last_payment_date: string | null
+          modules_price: number | null
           monthly_invoice_volume: number | null
           next_payment_date: string | null
           plan_id: string | null
           price_breakdown: Json | null
+          pricing_details: Json | null
           start_date: string | null
           status: string
           updated_at: string | null
+          volume_price: number | null
         }
         Insert: {
           amount_due?: number | null
+          base_price?: number | null
           billing_cycle?: string | null
-          calculated_annual_price?: number | null
-          calculated_monthly_price?: number | null
-
           calculated_price?: number | null
           company_id: string
           created_at?: string | null
           end_date?: string | null
           id?: string
-          invoice_volume_tier?: string | null
           last_payment_date?: string | null
+          modules_price?: number | null
           monthly_invoice_volume?: number | null
           next_payment_date?: string | null
           plan_id?: string | null
           price_breakdown?: Json | null
+          pricing_details?: Json | null
           start_date?: string | null
           status?: string
           updated_at?: string | null
+          volume_price?: number | null
         }
         Update: {
           amount_due?: number | null
+          base_price?: number | null
           billing_cycle?: string | null
-          calculated_annual_price?: number | null
-          calculated_monthly_price?: number | null
           calculated_price?: number | null
           company_id?: string
           created_at?: string | null
           end_date?: string | null
           id?: string
-          invoice_volume_tier?: string | null
           last_payment_date?: string | null
+          modules_price?: number | null
+          monthly_invoice_volume?: number | null
           next_payment_date?: string | null
           plan_id?: string | null
           price_breakdown?: Json | null
+          pricing_details?: Json | null
           start_date?: string | null
           status?: string
           updated_at?: string | null
+          volume_price?: number | null
         }
         Relationships: [
           {
@@ -5007,21 +5008,34 @@ export type Database = {
         }
         Returns: undefined
       }
-      calculate_subscription_price: {
-        Args: {
-          p_company_id: string
-          p_billing_cycle: string
-          p_invoice_volume: number
-        }
-        Returns: {
-          base_package_price: number
-          modules_price: number
-          volume_charge: number
-          subtotal: number
-          annual_discount: number
-          final_price: number
-        }
-      }
+      calculate_subscription_price:
+        | {
+            Args: { p_company_id: string; p_subscription_type?: string }
+            Returns: {
+              base_price: number
+              modules_price: number
+              total_price: number
+              volume_price: number
+            }[]
+          }
+        | {
+            Args: { p_billing_cycle?: string; p_company_id: string }
+            Returns: Json
+          }
+        | {
+            Args: {
+              p_billing_cycle?: string
+              p_company_id: string
+              p_invoice_volume?: number
+            }
+            Returns: {
+              base_price: number
+              breakdown: Json
+              modules_price: number
+              total_price: number
+              volume_price: number
+            }[]
+          }
       check_expiring_checks: { Args: never; Returns: undefined }
       check_expiring_products: { Args: never; Returns: undefined }
       check_inactive_customers: { Args: never; Returns: undefined }
