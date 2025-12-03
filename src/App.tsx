@@ -19,6 +19,9 @@ import TechnicalServices from "./pages/TechnicalServices";
 import Employees from "./pages/Employees";
 import CashRegister from "./pages/CashRegister";
 import Purchases from "./pages/Purchases";
+import PurchaseOrders from "./pages/PurchaseOrders";
+import PurchaseReception from "./pages/PurchaseReception";
+import PurchaseReturns from "./pages/PurchaseReturns";
 import Reports from "./pages/Reports";
 import Settings from "./pages/Settings";
 import AuditLogs from "./pages/AuditLogs";
@@ -230,6 +233,9 @@ const App = () => (
           {/* Inventario & Compras */}
           <Route path="/suppliers" element={<ProtectedRoute><ModuleProtectedRoute moduleCode="suppliers"><Suppliers /></ModuleProtectedRoute></ProtectedRoute>} />
           <Route path="/purchases" element={<ProtectedRoute><ModuleProtectedRoute moduleCode="purchases"><Purchases /></ModuleProtectedRoute></ProtectedRoute>} />
+          <Route path="/purchase-orders" element={<ProtectedRoute><ModuleProtectedRoute moduleCode="purchases"><PurchaseOrders /></ModuleProtectedRoute></ProtectedRoute>} />
+          <Route path="/purchase-reception" element={<ProtectedRoute><ModuleProtectedRoute moduleCode="purchases"><PurchaseReception /></ModuleProtectedRoute></ProtectedRoute>} />
+          <Route path="/purchase-returns" element={<ProtectedRoute><ModuleProtectedRoute moduleCode="purchases"><PurchaseReturns /></ModuleProtectedRoute></ProtectedRoute>} />
           <Route path="/warehouses" element={<ProtectedRoute><ModuleProtectedRoute moduleCode="warehouses"><Warehouses /></ModuleProtectedRoute></ProtectedRoute>} />
           <Route path="/warehouse-stock" element={<ProtectedRoute><ModuleProtectedRoute moduleCode="warehouse_stock"><WarehouseStock /></ModuleProtectedRoute></ProtectedRoute>} />
           <Route path="/warehouse-transfers" element={<ProtectedRoute><ModuleProtectedRoute moduleCode="warehouse_transfers"><WarehouseTransfers /></ModuleProtectedRoute></ProtectedRoute>} />
