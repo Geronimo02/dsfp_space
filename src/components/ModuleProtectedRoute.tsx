@@ -10,6 +10,9 @@ interface ModuleProtectedRouteProps {
   redirectTo?: string;
 }
 
+// Módulos base que siempre están disponibles (sincronizado con platform_modules.is_base_module = true)
+const BASE_MODULES = ["dashboard", "pos", "products", "sales", "customers", "settings", "reports"];
+
 export function ModuleProtectedRoute({
   children,
   moduleCode,
@@ -34,8 +37,7 @@ export function ModuleProtectedRoute({
   }
 
   // Módulos base siempre disponibles
-  const alwaysAvailableModules = ["dashboard"];
-  if (alwaysAvailableModules.includes(moduleCode)) {
+  if (BASE_MODULES.includes(moduleCode)) {
     return <>{children}</>;
   }
 
