@@ -100,6 +100,8 @@ async function copyToClipboard(text: string, label: string) {
 }
 
 const Integrations = () => {
+  console.log("VITE_SUPABASE_URL =", import.meta.env.VITE_SUPABASE_URL);
+console.log("VITE_SUPABASE_ANON_KEY starts =", (import.meta.env.VITE_SUPABASE_ANON_KEY ?? "").slice(0, 12));
   const { currentCompany } = useCompany();
   const queryClient = useQueryClient();
 
@@ -646,6 +648,7 @@ const Integrations = () => {
 
 
     </Layout>
+    
   );
 };
 

@@ -16,47 +16,54 @@ function json(body: any, status = 200) {
 }
 
 Deno.serve(async (req) => {
-  // ✅ CORS preflight
+  // CORS preflight
   if (req.method === "OPTIONS") return new Response(null, { status: 204, headers: corsHeaders });
   if (req.method !== "POST") return json({ error: "Method not allowed" }, 405);
 
   try {
+    // ✅ IMPORTANT: usa SIEMPRE estas env vars (no hardcodear URLs/keys)
     const supabaseUrl = Deno.env.get("SB_URL") ?? Deno.env.get("SUPABASE_URL");
     const serviceKey =
       Deno.env.get("SB_SERVICE_ROLE_KEY") ?? Deno.env.get("SUPABASE_SERVICE_ROLE_KEY");
+    const anonKey = Deno.env.get("SUPABASE_ANON_KEY");
 
-    if (!supabaseUrl || !serviceKey) {
+    if (!supabaseUrl || !serviceKey || !anonKey) {
       return json(
         {
           error: "Missing env vars",
-          hasSB_URL: !!Deno.env.get("SB_URL"),
-          hasSB_SERVICE_ROLE_KEY: !!Deno.env.get("SB_SERVICE_ROLE_KEY"),
-          hasSUPABASE_URL: !!Deno.env.get("SUPABASE_URL"),
-          hasSUPABASE_SERVICE_ROLE_KEY: !!Deno.env.get("SUPABASE_SERVICE_ROLE_KEY"),
+          hasUrl: !!supabaseUrl,
+          hasService: !!serviceKey,
+          hasAnon: !!anonKey,
         },
         500
       );
     }
 
-    const supabaseAdmin = createClient(supabaseUrl, serviceKey);
+    // ✅ 1) Cliente ANON para validar el JWT
+    const supabaseAuth = createClient(supabaseUrl, anonKey, {
+      auth: { persistSession: false, autoRefreshToken: false },
+    });
 
-    // ✅ Auth: el frontend manda Authorization: Bearer <jwt>
-    const authHeader = req.headers.get("Authorization") || req.headers.get("authorization") || "";
-if (!authHeader) return json({ error: "Missing authorization header" }, 401);
+    // ✅ 2) Cliente SERVICE ROLE para DB
+    const supabaseAdmin = createClient(supabaseUrl, serviceKey, {
+      auth: { persistSession: false, autoRefreshToken: false },
+    });
 
-const jwt = authHeader.startsWith("Bearer ") ? authHeader.slice(7) : null;
-if (!jwt) return json({ error: "Authorization header is not Bearer" }, 401);
+    // --- Auth
+    const authHeader = req.headers.get("authorization") || "";
+    if (!authHeader) return json({ error: "Missing authorization header" }, 401);
 
-const { data: userRes, error: userErr } = await supabaseAdmin.auth.getUser(jwt);
-if (userErr || !userRes?.user) {
-  return json({ error: "Invalid token", details: userErr?.message ?? null }, 401);
-}
+    const jwt = authHeader.startsWith("Bearer ") ? authHeader.slice(7) : null;
+    if (!jwt) return json({ error: "Authorization header is not Bearer" }, 401);
 
-
+    const { data: userRes, error: userErr } = await supabaseAuth.auth.getUser(jwt);
+    if (userErr || !userRes?.user) {
+      return json({ error: "Invalid token", details: userErr?.message ?? null }, 401);
+    }
     const userId = userRes.user.id;
 
-    // ✅ Parse body
-    let body: any = {};
+    // --- Body
+    let body: any;
     try {
       body = await req.json();
     } catch {
@@ -68,7 +75,7 @@ if (userErr || !userRes?.user) {
       return json({ error: "Missing integrationId/type/credentials" }, 400);
     }
 
-    // ✅ Traer integración
+    // --- Load integration
     const { data: integ, error: integErr } = await supabaseAdmin
       .from("integrations")
       .select("id, company_id, integration_type")
@@ -78,7 +85,7 @@ if (userErr || !userRes?.user) {
     if (integErr || !integ) return json({ error: "Integration not found" }, 404);
     if (integ.integration_type !== type) return json({ error: "Type mismatch" }, 400);
 
-    // ✅ Verificar que el user pertenece a esa company (company_users)
+    // --- Check membership
     const { data: cu, error: cuErr } = await supabaseAdmin
       .from("company_users")
       .select("user_id, company_id, active")
@@ -90,15 +97,14 @@ if (userErr || !userRes?.user) {
     if (cuErr) return json({ error: cuErr.message }, 500);
     if (!cu) return json({ error: "Forbidden (not member of company)" }, 403);
 
-    // ✅ Upsert credentials (server-side, no RLS issues)
+    // --- Upsert credentials
+    // ⚠️ Necesitás unique constraint en integration_credentials para este onConflict:
+    // alter table public.integration_credentials
+    // add constraint integration_credentials_company_integration_unique unique (company_id, integration_id);
     const { error: upErr } = await supabaseAdmin
       .from("integration_credentials")
       .upsert(
-        {
-          company_id: integ.company_id,
-          integration_id: integ.id,
-          credentials,
-        },
+        { company_id: integ.company_id, integration_id: integ.id, credentials },
         { onConflict: "company_id,integration_id" }
       );
 
