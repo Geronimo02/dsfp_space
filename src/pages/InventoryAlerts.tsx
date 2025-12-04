@@ -13,7 +13,8 @@ import {
   Package, 
   Search,
   MapPin,
-  Loader2
+  Loader2,
+  DollarSign
 } from "lucide-react";
 import { formatDistanceToNow } from "date-fns";
 import { es } from "date-fns/locale";
@@ -62,6 +63,58 @@ export default function InventoryAlerts() {
 
       if (error) throw error;
       return data;
+    },
+    enabled: !!currentCompany?.id,
+  });
+
+  // Currency alerts - detect significant rate changes
+  const { data: currencyAlerts, isLoading: loadingCurrencyAlerts } = useQuery({
+    queryKey: ["currency-alerts", currentCompany?.id],
+    queryFn: async () => {
+      if (!currentCompany?.id) return [];
+      
+      // Get current rates
+      const { data: currentRates, error: currentError } = await supabase
+        .from("exchange_rates")
+        .select("*")
+        .eq("company_id", currentCompany.id);
+      
+      if (currentError) throw currentError;
+      
+      // Get rates from 24 hours ago
+      const oneDayAgo = new Date();
+      oneDayAgo.setHours(oneDayAgo.getHours() - 24);
+      
+      const { data: previousRates, error: previousError } = await supabase
+        .from("exchange_rates")
+        .select("*")
+        .eq("company_id", currentCompany.id)
+        .lte("updated_at", oneDayAgo.toISOString());
+      
+      if (previousError) throw previousError;
+      
+      // Calculate variations
+      const alerts: any[] = [];
+      const THRESHOLD_PERCENTAGE = 5; // Alert if change > 5%
+      
+      currentRates?.forEach(current => {
+        const previous = previousRates?.find(p => p.currency === current.currency);
+        if (previous) {
+          const variation = ((current.rate - previous.rate) / previous.rate) * 100;
+          if (Math.abs(variation) >= THRESHOLD_PERCENTAGE) {
+            alerts.push({
+              currency: current.currency,
+              currentRate: current.rate,
+              previousRate: previous.rate,
+              variation: variation,
+              severity: Math.abs(variation) >= 10 ? 'high' : 'medium',
+              timestamp: current.updated_at
+            });
+          }
+        }
+      });
+      
+      return alerts;
     },
     enabled: !!currentCompany?.id,
   });
@@ -148,7 +201,7 @@ export default function InventoryAlerts() {
         </Button>
       </div>
 
-      <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+      <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
         <Card className="p-4">
           <div className="flex items-center justify-between">
             <div>
@@ -166,6 +219,21 @@ export default function InventoryAlerts() {
               <p className="text-2xl font-bold">{expiringProducts?.length || 0}</p>
             </div>
             <Calendar className="h-8 w-8 text-warning" />
+          </div>
+        </Card>
+
+        <Card className="p-4 border-l-4 border-amber-500">
+          <div className="flex items-center justify-between">
+            <div>
+              <p className="text-sm text-muted-foreground">Alertas de Monedas</p>
+              <p className="text-2xl font-bold">{currencyAlerts?.length || 0}</p>
+              {currencyAlerts && currencyAlerts.length > 0 && (
+                <p className="text-xs text-muted-foreground mt-1">
+                  {currencyAlerts.filter((a: any) => a.severity === 'high').length} alta prioridad
+                </p>
+              )}
+            </div>
+            <DollarSign className="h-8 w-8 text-amber-500" />
           </div>
         </Card>
 
@@ -193,9 +261,10 @@ export default function InventoryAlerts() {
       </div>
 
       <Tabs defaultValue="low-stock" className="w-full">
-        <TabsList className="grid w-full grid-cols-3">
+        <TabsList className="grid w-full grid-cols-4">
           <TabsTrigger value="low-stock">Stock Bajo</TabsTrigger>
           <TabsTrigger value="expiring">Próximos a Vencer</TabsTrigger>
+          <TabsTrigger value="currency">Alertas de Monedas</TabsTrigger>
           <TabsTrigger value="notifications">Notificaciones</TabsTrigger>
         </TabsList>
 
@@ -291,6 +360,96 @@ export default function InventoryAlerts() {
                 </div>
               </Card>
             ))
+          )}
+        </TabsContent>
+
+        <TabsContent value="currency" className="space-y-4">
+          {loadingCurrencyAlerts ? (
+            <div className="flex justify-center p-8">
+              <Loader2 className="h-8 w-8 animate-spin" />
+            </div>
+          ) : currencyAlerts?.length === 0 ? (
+            <Card className="p-8 text-center">
+              <p className="text-muted-foreground">
+                No hay variaciones significativas en las cotizaciones
+              </p>
+              <p className="text-xs text-muted-foreground mt-2">
+                Se alertan variaciones mayores al 5% en las últimas 24 horas
+              </p>
+            </Card>
+          ) : (
+            currencyAlerts?.map((alert, index) => {
+              const isPositive = alert.variation > 0;
+              const Icon = isPositive ? AlertTriangle : AlertTriangle;
+              
+              return (
+                <Card 
+                  key={index} 
+                  className={`p-4 border-l-4 ${
+                    alert.severity === 'high' 
+                      ? 'border-red-500 bg-red-50/50 dark:bg-red-950/20' 
+                      : 'border-amber-500 bg-amber-50/50 dark:bg-amber-950/20'
+                  }`}
+                >
+                  <div className="flex items-start justify-between">
+                    <div className="space-y-3 flex-1">
+                      <div className="flex items-center gap-3">
+                        <Icon className={`h-6 w-6 ${alert.severity === 'high' ? 'text-red-600' : 'text-amber-600'}`} />
+                        <div>
+                          <h3 className="font-semibold text-lg flex items-center gap-2">
+                            {alert.currency}
+                            <Badge variant={alert.severity === 'high' ? 'destructive' : 'default'}>
+                              {isPositive ? '↑' : '↓'} {Math.abs(alert.variation).toFixed(2)}%
+                            </Badge>
+                          </h3>
+                          <p className="text-sm text-muted-foreground">
+                            Variación significativa en las últimas 24 horas
+                          </p>
+                        </div>
+                      </div>
+                      
+                      <div className="grid grid-cols-2 gap-4 text-sm">
+                        <div className="space-y-1">
+                          <p className="text-muted-foreground">Cotización Anterior:</p>
+                          <p className="font-semibold">$ {alert.previousRate.toFixed(2)}</p>
+                        </div>
+                        <div className="space-y-1">
+                          <p className="text-muted-foreground">Cotización Actual:</p>
+                          <p className="font-semibold text-lg">$ {alert.currentRate.toFixed(2)}</p>
+                        </div>
+                      </div>
+                      
+                      <div className="flex items-center gap-2 text-xs text-muted-foreground">
+                        <Calendar className="h-3 w-3" />
+                        Última actualización: {formatDistanceToNow(new Date(alert.timestamp), {
+                          addSuffix: true,
+                          locale: es,
+                        })}
+                      </div>
+
+                      {alert.severity === 'high' && (
+                        <div className="p-3 bg-background rounded-lg border border-border">
+                          <p className="text-sm font-medium mb-1">⚠️ Acción Recomendada</p>
+                          <p className="text-xs text-muted-foreground">
+                            {isPositive 
+                              ? `Considera actualizar tus precios en ${alert.currency} para mantener la rentabilidad` 
+                              : `Buen momento para comprar productos valuados en ${alert.currency}`
+                            }
+                          </p>
+                        </div>
+                      )}
+                    </div>
+                    <Button
+                      variant="outline"
+                      size="sm"
+                      onClick={() => navigate("/products")}
+                    >
+                      Revisar Productos
+                    </Button>
+                  </div>
+                </Card>
+              );
+            })
           )}
         </TabsContent>
 

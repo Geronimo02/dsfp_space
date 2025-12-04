@@ -52,6 +52,7 @@ interface PaymentMethod {
   surcharge: number;     // Recargo aplicado (solo tarjeta con cuotas > 1)
   amount: number;        // Total del tramo (baseAmount + surcharge)
   installments?: number;
+  currency?: string;     // Moneda del pago
 }
 
 export default function POS() {
@@ -62,6 +63,7 @@ export default function POS() {
   const [currentPaymentMethod, setCurrentPaymentMethod] = useState("cash");
   const [currentPaymentAmount, setCurrentPaymentAmount] = useState("");
   const [currentInstallments, setCurrentInstallments] = useState(1);
+  const [currentPaymentCurrency, setCurrentPaymentCurrency] = useState("ARS");
   const [discountRate, setDiscountRate] = useState(0);
   const [loyaltyPointsToUse, setLoyaltyPointsToUse] = useState(0);
   const [selectedCustomer, setSelectedCustomer] = useState<any>(null);
@@ -156,6 +158,48 @@ export default function POS() {
       setSelectedPOSAfipId(posPoints[0].id);
     }
   }, [posPoints]);
+
+  // Exchange rates query
+  const { data: exchangeRates } = useQuery({
+    queryKey: ["exchange-rates-pos", currentCompany?.id],
+    queryFn: async () => {
+      if (!currentCompany?.id) return [];
+      const { data, error } = await supabase
+        .from("exchange_rates")
+        .select("*")
+        .eq("company_id", currentCompany.id)
+        .order("updated_at", { ascending: false });
+      if (error) throw error;
+      return data;
+    },
+    enabled: !!currentCompany?.id,
+  });
+
+  // Helper function to convert from one currency to another
+  const convertCurrency = (amount: number, fromCurrency: string, toCurrency: string): number => {
+    if (fromCurrency === toCurrency) return amount;
+    
+    const rates = exchangeRates || [];
+    
+    // Convert to ARS first if needed
+    let amountInARS = amount;
+    if (fromCurrency !== 'ARS') {
+      const fromRate = rates.find(r => r.currency === fromCurrency);
+      if (fromRate) {
+        amountInARS = amount * fromRate.rate;
+      }
+    }
+    
+    // Then convert from ARS to target currency if needed
+    if (toCurrency !== 'ARS') {
+      const toRate = rates.find(r => r.currency === toCurrency);
+      if (toRate && toRate.rate > 0) {
+        return amountInARS / toRate.rate;
+      }
+    }
+    
+    return amountInARS;
+  };
 
   const { data: customers } = useQuery({
     queryKey: ["customers-pos"],
@@ -307,8 +351,11 @@ export default function POS() {
       return;
     }
     
+    // Convert payment amount to ARS for comparison
+    const baseAmountInARS = convertCurrency(baseAmount, currentPaymentCurrency, 'ARS');
+    
     // Validar que no exceda el restante_base
-    if (baseAmount > restante_base + 0.01) {
+    if (baseAmountInARS > restante_base + 0.01) {
       toast.error("El monto base excede el restante");
       return;
     }
@@ -317,22 +364,23 @@ export default function POS() {
     let surcharge = 0;
     if (currentPaymentMethod === 'card' && currentInstallments > 1) {
       const tasa_recargo = cardSurchargeRate * currentInstallments / 100;
-      surcharge = baseAmount * tasa_recargo;
+      surcharge = baseAmountInARS * tasa_recargo;
     }
     
-    const totalAmount = baseAmount + surcharge;
+    const totalAmount = baseAmountInARS + surcharge;
     
     setPaymentMethods([...paymentMethods, {
       id: Date.now().toString(),
       method: currentPaymentMethod,
-      baseAmount: baseAmount,
+      baseAmount: baseAmountInARS,
       surcharge: surcharge,
       amount: totalAmount,
-      installments: currentPaymentMethod === 'card' ? currentInstallments : 1
+      installments: currentPaymentMethod === 'card' ? currentInstallments : 1,
+      currency: currentPaymentCurrency
     }]);
     setCurrentPaymentAmount("");
     setCurrentInstallments(1);
-    toast.success("Método de pago agregado");
+    toast.success(`Método de pago agregado (${currentPaymentCurrency})`);
   };
 
   const payTotalAmount = () => {
@@ -1110,7 +1158,10 @@ Impuestos: $${saleData.tax.toFixed(2)}
                       </div>
                     </CardHeader>
                     <CardContent className="pt-2">
-                      <div className="flex items-center justify-center">
+                      <div className="flex items-center justify-center gap-1">
+                        <span className="text-xs font-medium text-muted-foreground">
+                          {product.currency || 'ARS'}
+                        </span>
                         <span className="text-lg font-bold text-primary">
                           ${product.price.toFixed(2)}
                         </span>
@@ -1357,6 +1408,39 @@ Impuestos: $${saleData.tax.toFixed(2)}
                               <SelectItem value="credit">📝 Crédito</SelectItem>
                             </SelectContent>
                           </Select>
+
+                          <div className="space-y-2">
+                            <Label className="text-xs">Moneda del Pago</Label>
+                            <Select value={currentPaymentCurrency} onValueChange={setCurrentPaymentCurrency}>
+                              <SelectTrigger>
+                                <SelectValue />
+                              </SelectTrigger>
+                              <SelectContent>
+                                <SelectItem value="ARS">ARS - Peso Argentino</SelectItem>
+                                <SelectItem value="USD">USD - Dólar</SelectItem>
+                                <SelectItem value="EUR">EUR - Euro</SelectItem>
+                                <SelectItem value="BRL">BRL - Real</SelectItem>
+                                <SelectItem value="UYU">UYU - Peso Uruguayo</SelectItem>
+                              </SelectContent>
+                            </Select>
+                            {currentPaymentCurrency !== 'ARS' && exchangeRates && (
+                              <div className="text-xs text-muted-foreground p-2 bg-muted/30 rounded">
+                                {(() => {
+                                  const rate = exchangeRates.find(r => r.currency === currentPaymentCurrency);
+                                  if (rate) {
+                                    const totalInForeign = convertCurrency(restante_base, 'ARS', currentPaymentCurrency);
+                                    return (
+                                      <>
+                                        <div>Cotización: 1 {currentPaymentCurrency} = ${rate.rate.toFixed(2)} ARS</div>
+                                        <div className="font-medium mt-1">Total a pagar: {currentPaymentCurrency} {totalInForeign.toFixed(2)}</div>
+                                      </>
+                                    );
+                                  }
+                                  return null;
+                                })()}
+                              </div>
+                            )}
+                          </div>
                           
                         {currentPaymentMethod === 'card' && (
                             <div className="space-y-2">
@@ -1430,14 +1514,19 @@ Impuestos: $${saleData.tax.toFixed(2)}
                                 style={{ animationDelay: `${index * 50}ms` }}
                               >
                                 <div className="flex-1">
-                                  <div className="text-sm font-medium">{methodLabel}{installmentInfo}</div>
+                                  <div className="text-sm font-medium">
+                                    {methodLabel}{installmentInfo}
+                                    {pm.currency && pm.currency !== 'ARS' && (
+                                      <Badge variant="outline" className="ml-2 text-xs">{pm.currency}</Badge>
+                                    )}
+                                  </div>
                                   <div className="text-xs text-muted-foreground">
-                                    Base: ${pm.baseAmount.toFixed(2)}
+                                    Base: ${pm.baseAmount.toFixed(2)} ARS
                                     {pm.surcharge > 0 && ` + Recargo: $${pm.surcharge.toFixed(2)}`}
                                   </div>
                                 </div>
                                 <div className="flex items-center gap-2">
-                                  <span className="text-sm font-semibold">${pm.amount.toFixed(2)}</span>
+                                  <span className="text-sm font-semibold">${pm.amount.toFixed(2)} ARS</span>
                                   <Button size="icon" variant="ghost" className="h-6 w-6 hover:scale-110 transition-transform" onClick={() => removePaymentMethod(pm.id)}>
                                     <Trash2 className="h-3 w-3" />
                                   </Button>
@@ -1449,14 +1538,36 @@ Impuestos: $${saleData.tax.toFixed(2)}
                           <div className="space-y-1 animate-fade-in">
                             <div className="flex justify-between text-sm">
                               <span className="text-muted-foreground">Total pagado:</span>
-                              <span className="font-medium">${total_cobrado.toFixed(2)}</span>
+                              <span className="font-medium">${total_cobrado.toFixed(2)} ARS</span>
                             </div>
                             <div className="flex justify-between text-sm">
                               <span className="text-muted-foreground">Restante:</span>
                               <span className={`font-semibold ${remaining > 0.01 ? "text-destructive" : "text-success"}`}>
-                                ${remaining.toFixed(2)}
+                                ${remaining.toFixed(2)} ARS
                               </span>
                             </div>
+                            {remaining < -0.01 && (
+                              <div className="mt-2 p-2 bg-success/10 rounded border border-success/20">
+                                <div className="text-xs font-semibold text-success mb-1">Vuelto a entregar:</div>
+                                <div className="space-y-1">
+                                  <div className="flex justify-between text-xs">
+                                    <span>ARS:</span>
+                                    <span className="font-medium">${Math.abs(remaining).toFixed(2)}</span>
+                                  </div>
+                                  {exchangeRates && ['USD', 'EUR', 'BRL'].map(currency => {
+                                    const changeInCurrency = convertCurrency(Math.abs(remaining), 'ARS', currency);
+                                    const rate = exchangeRates.find(r => r.currency === currency);
+                                    if (!rate) return null;
+                                    return (
+                                      <div key={currency} className="flex justify-between text-xs text-muted-foreground">
+                                        <span>{currency}:</span>
+                                        <span>{changeInCurrency.toFixed(2)}</span>
+                                      </div>
+                                    );
+                                  })}
+                                </div>
+                              </div>
+                            )}
                           </div>
                         </div>
                       )}

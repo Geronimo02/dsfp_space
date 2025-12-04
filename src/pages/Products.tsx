@@ -25,24 +25,25 @@ import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/comp
 import { compressImage, isValidImage, formatFileSize } from "@/lib/imageUtils";
 import { ComboComponentsDialog } from "@/components/products/ComboComponentsDialog";
 import { Switch } from "@/components/ui/switch";
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 
 const productSchema = z.object({
   name: z.string().trim().min(1, "El nombre es requerido").max(200, "El nombre debe tener máximo 200 caracteres"),
   price: z.number({ invalid_type_error: "El precio debe ser un número" })
     .positive("El precio debe ser mayor a 0")
-    .max(999999.99, "El precio debe ser menor a 1,000,000"),
+    .max(9999999999.99, "El precio debe ser menor a 10,000,000,000"),
   cost: z.number({ invalid_type_error: "El costo debe ser un número" })
     .nonnegative("El costo no puede ser negativo")
-    .max(999999.99, "El costo debe ser menor a 1,000,000")
+    .max(9999999999.99, "El costo debe ser menor a 10,000,000,000")
     .optional(),
   stock: z.number({ invalid_type_error: "El stock debe ser un número" })
     .int("El stock debe ser un número entero")
     .nonnegative("El stock no puede ser negativo")
-    .max(1000000, "El stock debe ser menor a 1,000,000"),
+    .max(10000000, "El stock debe ser menor a 10,000,000"),
   min_stock: z.number({ invalid_type_error: "El stock mínimo debe ser un número" })
     .int("El stock mínimo debe ser un número entero")
     .nonnegative("El stock mínimo no puede ser negativo")
-    .max(1000000, "El stock mínimo debe ser menor a 1,000,000")
+    .max(10000000, "El stock mínimo debe ser menor a 10,000,000")
     .optional(),
   category: z.string().max(100, "La categoría debe tener máximo 100 caracteres").optional(),
   barcode: z.string().max(50, "El código de barras debe tener máximo 50 caracteres").optional(),
@@ -102,6 +103,7 @@ export default function Products() {
     batch_number: "",
     expiration_date: "",
     is_combo: false,
+    currency: "ARS",
   });
   const [imageFile, setImageFile] = useState<File | null>(null);
   const [imagePreview, setImagePreview] = useState<string>("");
@@ -126,6 +128,19 @@ export default function Products() {
   const [isPriceListDialogOpen, setIsPriceListDialogOpen] = useState(false);
   const [priceListProduct, setPriceListProduct] = useState<any>(null);
   const [priceListPrices, setPriceListPrices] = useState<Record<string, string>>({});
+  const [isCurrencyAdjustDialogOpen, setIsCurrencyAdjustDialogOpen] = useState(false);
+  const [adjustmentCurrency, setAdjustmentCurrency] = useState<string>('USD');
+  const [adjustmentPercentage, setAdjustmentPercentage] = useState<string>('');
+  const [previewAdjustments, setPreviewAdjustments] = useState<any[]>([]);
+  const [isApplyingAdjustments, setIsApplyingAdjustments] = useState(false);
+
+  // Función para convertir precio a ARS
+  const convertToARS = (price: number, currency: string) => {
+    if (!currency || currency === 'ARS') return price;
+    const rate = exchangeRates?.find(r => r.currency === currency);
+    if (!rate) return null;
+    return price * rate.rate;
+  };
   const [isComboDialogOpen, setIsComboDialogOpen] = useState(false);
   const [comboProduct, setComboProduct] = useState<any>(null);
   const queryClient = useQueryClient();
@@ -182,6 +197,25 @@ export default function Products() {
       if (error) {
         console.error('Error loading price lists:', error);
         throw error;
+      }
+      return data;
+    },
+    enabled: !!currentCompany?.id,
+  });
+
+  const { data: exchangeRates } = useQuery({
+    queryKey: ["exchange-rates", currentCompany?.id],
+    queryFn: async () => {
+      if (!currentCompany?.id) return [];
+      
+      const { data, error } = await supabase
+        .from("exchange_rates")
+        .select("*")
+        .eq("company_id", currentCompany.id);
+      
+      if (error) {
+        console.error('Error loading exchange rates:', error);
+        return [];
       }
       return data;
     },
@@ -435,6 +469,7 @@ export default function Products() {
       batch_number: "",
       expiration_date: "",
       is_combo: false,
+      currency: "ARS",
     });
     setEditingProduct(null);
     setImageFile(null);
@@ -506,6 +541,7 @@ export default function Products() {
         batch_number: validatedData.batch_number || null,
         expiration_date: validatedData.expiration_date || null,
         is_combo: formData.is_combo,
+        currency: formData.currency || 'ARS',
         last_restock_date: editingProduct ? undefined : new Date().toISOString(),
         company_id: currentCompany.id,
       };
@@ -543,6 +579,7 @@ export default function Products() {
       batch_number: product.batch_number || "",
       expiration_date: product.expiration_date || "",
       is_combo: product.is_combo || false,
+      currency: product.currency || "ARS",
     });
     setImagePreview(product.image_url || "");
     setImageFile(null);
@@ -950,6 +987,106 @@ export default function Products() {
     }
   };
 
+  const calculatePriceAdjustmentPreview = () => {
+    if (!adjustmentPercentage || !products) {
+      toast.error("Ingresa un porcentaje de ajuste");
+      return;
+    }
+
+    const percentage = parseFloat(adjustmentPercentage);
+    if (isNaN(percentage)) {
+      toast.error("Porcentaje inválido");
+      return;
+    }
+
+    const productsToAdjust = products.filter((p: any) => {
+      const currency = p.currency || 'ARS';
+      return currency === adjustmentCurrency;
+    });
+
+    if (productsToAdjust.length === 0) {
+      toast.error(`No hay productos en ${adjustmentCurrency}`);
+      setPreviewAdjustments([]);
+      return;
+    }
+
+    const previews = productsToAdjust.map((product: any) => {
+      const currentPrice = Number(product.price);
+      const newPrice = currentPrice * (1 + percentage / 100);
+      const currency = product.currency || 'ARS';
+      const currentARS = convertToARS(currentPrice, currency);
+      const newARS = convertToARS(newPrice, currency);
+
+      return {
+        id: product.id,
+        name: product.name,
+        currentPrice,
+        newPrice,
+        currentARS,
+        newARS,
+        difference: newPrice - currentPrice,
+      };
+    });
+
+    setPreviewAdjustments(previews);
+    toast.success(`${previews.length} productos listos para ajustar`);
+  };
+
+  const applyPriceAdjustments = async () => {
+    if (previewAdjustments.length === 0) {
+      toast.error("No hay ajustes para aplicar");
+      return;
+    }
+
+    setIsApplyingAdjustments(true);
+    
+    try {
+      let successCount = 0;
+      let errorCount = 0;
+      const errors: string[] = [];
+      
+      for (const adjustment of previewAdjustments) {
+        const { error } = await supabase
+          .from("products")
+          .update({ 
+            price: adjustment.newPrice,
+            updated_at: new Date().toISOString()
+          })
+          .eq("id", adjustment.id)
+          .eq("company_id", currentCompany?.id);
+
+        if (error) {
+          console.error(`Error actualizando producto ${adjustment.name}:`, error);
+          errors.push(`${adjustment.name}: ${error.message}`);
+          errorCount++;
+        } else {
+          successCount++;
+        }
+      }
+
+      if (successCount > 0) {
+        toast.success(`✅ ${successCount} de ${previewAdjustments.length} precios actualizados`);
+      }
+      if (errorCount > 0) {
+        console.error("Errores detallados:", errors);
+        toast.error(`❌ ${errorCount} productos no pudieron actualizarse. Revisa la consola.`);
+      }
+      
+      queryClient.invalidateQueries({ queryKey: ["products"] });
+      
+      if (errorCount === 0) {
+        setIsCurrencyAdjustDialogOpen(false);
+        setPreviewAdjustments([]);
+        setAdjustmentPercentage('');
+      }
+    } catch (error: any) {
+      console.error("Error en applyPriceAdjustments:", error);
+      toast.error(error.message || "Error al ajustar precios");
+    } finally {
+      setIsApplyingAdjustments(false);
+    }
+  };
+
   const getWarehouseStockForProduct = (productId: string) => {
     return warehouseStock?.filter(ws => ws.product_id === productId) || [];
   };
@@ -969,6 +1106,16 @@ export default function Products() {
             <p className="text-muted-foreground">Gestiona tu inventario con control de depósitos</p>
           </div>
           <div className="flex gap-2">
+            {canEdit && (
+              <Button 
+                variant="outline" 
+                onClick={() => setIsCurrencyAdjustDialogOpen(true)}
+                className="border-blue-500/50 text-blue-600 hover:bg-blue-50 dark:hover:bg-blue-950"
+              >
+                <DollarSign className="mr-2 h-4 w-4" />
+                Ajustar por Cotización
+              </Button>
+            )}
             {canExport && (
               <Button variant="outline" onClick={handleExportCSV}>
                 <Download className="mr-2 h-4 w-4" />
@@ -1146,7 +1293,7 @@ export default function Products() {
                       Precios y Stock
                     </h3>
                   </div>
-                  <div className="grid grid-cols-2 gap-4">
+                  <div className="grid grid-cols-3 gap-4">
                   <div className="space-y-2">
                     <Label htmlFor="price" className="flex items-center gap-1">
                       Precio de Venta <span className="text-destructive">*</span>
@@ -1172,6 +1319,24 @@ export default function Products() {
                       placeholder="0.00"
                     />
                   </div>
+                  <div className="space-y-2">
+                    <Label htmlFor="currency">Moneda</Label>
+                    <Select value={formData.currency} onValueChange={(value) => setFormData({ ...formData, currency: value })}>
+                      <SelectTrigger>
+                        <SelectValue />
+                      </SelectTrigger>
+                      <SelectContent>
+                        <SelectItem value="ARS">🇦🇷 ARS (Peso Argentino)</SelectItem>
+                        <SelectItem value="USD">🇺🇸 USD (Dólar)</SelectItem>
+                        <SelectItem value="EUR">🇪🇺 EUR (Euro)</SelectItem>
+                        <SelectItem value="BRL">🇧🇷 BRL (Real)</SelectItem>
+                        <SelectItem value="CLP">🇨🇱 CLP (Peso Chileno)</SelectItem>
+                        <SelectItem value="UYU">🇺🇾 UYU (Peso Uruguayo)</SelectItem>
+                      </SelectContent>
+                    </Select>
+                  </div>
+                  </div>
+                  <div className="grid grid-cols-2 gap-4">
                   <div className="space-y-2">
                     <Label htmlFor="stock" className="flex items-center gap-1">
                       Cantidad en Stock <span className="text-destructive">*</span>
@@ -1571,9 +1736,16 @@ export default function Products() {
                           <span className="text-muted-foreground">{product.category || "—"}</span>
                         </TableCell>
                         <TableCell>
-                          <span className="font-semibold text-green-600 dark:text-green-500">
-                            ${Number(product.price).toFixed(2)}
-                          </span>
+                          <div className="flex flex-col gap-1">
+                            <span className="font-semibold text-green-600 dark:text-green-500">
+                              {(product as any).currency || 'ARS'} ${Number(product.price).toFixed(2)}
+                            </span>
+                            {(product as any).currency && (product as any).currency !== 'ARS' && convertToARS(product.price, (product as any).currency) && (
+                              <span className="text-xs text-muted-foreground">
+                                ≈ ARS ${convertToARS(product.price, (product as any).currency)?.toFixed(2)}
+                              </span>
+                            )}
+                          </div>
                         </TableCell>
                         <TableCell>
                           <div className="flex items-center gap-2">
@@ -1894,6 +2066,174 @@ export default function Products() {
             }}
           />
         )}
+
+        {/* Currency Adjustment Dialog */}
+        <Dialog open={isCurrencyAdjustDialogOpen} onOpenChange={setIsCurrencyAdjustDialogOpen}>
+          <DialogContent className="max-w-4xl max-h-[80vh] overflow-y-auto">
+            <DialogHeader>
+              <DialogTitle className="flex items-center gap-2">
+                <DollarSign className="h-5 w-5 text-blue-600" />
+                Ajuste Masivo por Cotización
+              </DialogTitle>
+              <DialogDescription>
+                Actualiza los precios en ARS de productos en moneda extranjera basándote en la nueva cotización
+              </DialogDescription>
+            </DialogHeader>
+            
+            <div className="space-y-6">
+              {/* Configuration */}
+              <div className="grid grid-cols-2 gap-4">
+                <div className="space-y-2">
+                  <Label>Moneda a Ajustar</Label>
+                  <Select value={adjustmentCurrency} onValueChange={setAdjustmentCurrency}>
+                    <SelectTrigger>
+                      <SelectValue />
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="USD">🇺🇸 USD (Dólar)</SelectItem>
+                      <SelectItem value="EUR">🇪🇺 EUR (Euro)</SelectItem>
+                      <SelectItem value="BRL">🇧🇷 BRL (Real)</SelectItem>
+                      <SelectItem value="CLP">🇨🇱 CLP (Peso Chileno)</SelectItem>
+                      <SelectItem value="UYU">🇺🇾 UYU (Peso Uruguayo)</SelectItem>
+                    </SelectContent>
+                  </Select>
+                  <p className="text-xs text-muted-foreground">
+                    Productos afectados: {products?.filter((p: any) => p.currency === adjustmentCurrency).length || 0}
+                  </p>
+                </div>
+
+                <div className="space-y-2">
+                  <Label htmlFor="adjustment-percentage">Porcentaje de Ajuste</Label>
+                  <div className="flex gap-2">
+                    <Input
+                      id="adjustment-percentage"
+                      type="number"
+                      step="0.1"
+                      placeholder="Ej: 10 para subir 10%"
+                      value={adjustmentPercentage}
+                      onChange={(e) => {
+                        console.log('Porcentaje input change:', e.target.value);
+                        setAdjustmentPercentage(e.target.value);
+                      }}
+                      onInput={(e) => {
+                        const target = e.target as HTMLInputElement;
+                        console.log('Porcentaje input:', target.value);
+                      }}
+                      className="flex-1"
+                      autoComplete="off"
+                    />
+                    <Button onClick={calculatePriceAdjustmentPreview} variant="outline">
+                      <Search className="h-4 w-4 mr-2" />
+                      Preview
+                    </Button>
+                  </div>
+                  <p className="text-xs text-muted-foreground">
+                    Use números negativos para bajar precios (ej: -5 para bajar 5%)
+                  </p>
+                </div>
+              </div>
+
+              {/* Current Exchange Rate */}
+              {exchangeRates && (
+                <div className="bg-blue-50 dark:bg-blue-950 p-4 rounded-lg border border-blue-200 dark:border-blue-800">
+                  <div className="flex items-center justify-between">
+                    <span className="font-medium">Cotización Actual:</span>
+                    <span className="text-lg font-bold">
+                      1 {adjustmentCurrency} = {exchangeRates.find(r => r.currency === adjustmentCurrency)?.rate?.toFixed(2) || 'N/A'} ARS
+                    </span>
+                  </div>
+                </div>
+              )}
+
+              {/* Preview Table */}
+              {previewAdjustments.length > 0 && (
+                <div className="space-y-3">
+                  <div className="flex items-center justify-between">
+                    <Label className="text-base font-semibold">Vista Previa de Cambios</Label>
+                    <Badge variant="secondary">{previewAdjustments.length} productos</Badge>
+                  </div>
+                  
+                  <div className="border rounded-lg max-h-[400px] overflow-y-auto">
+                    <Table>
+                      <TableHeader className="sticky top-0 bg-background">
+                        <TableRow>
+                          <TableHead>Producto</TableHead>
+                          <TableHead className="text-right">Precio Actual</TableHead>
+                          <TableHead className="text-right">Precio Nuevo</TableHead>
+                          <TableHead className="text-right">En ARS Actual</TableHead>
+                          <TableHead className="text-right">En ARS Nuevo</TableHead>
+                          <TableHead className="text-right">Diferencia</TableHead>
+                        </TableRow>
+                      </TableHeader>
+                      <TableBody>
+                        {previewAdjustments.map((adj) => (
+                          <TableRow key={adj.id}>
+                            <TableCell className="font-medium">{adj.name}</TableCell>
+                            <TableCell className="text-right">
+                              {adjustmentCurrency} ${adj.currentPrice.toFixed(2)}
+                            </TableCell>
+                            <TableCell className="text-right font-semibold text-blue-600">
+                              {adjustmentCurrency} ${adj.newPrice.toFixed(2)}
+                            </TableCell>
+                            <TableCell className="text-right text-muted-foreground">
+                              {adj.currentARS ? `ARS $${adj.currentARS.toFixed(2)}` : 'N/A'}
+                            </TableCell>
+                            <TableCell className="text-right font-semibold">
+                              {adj.newARS ? `ARS $${adj.newARS.toFixed(2)}` : 'N/A'}
+                            </TableCell>
+                            <TableCell className={`text-right font-bold ${adj.difference >= 0 ? 'text-green-600' : 'text-red-600'}`}>
+                              {adj.difference >= 0 ? '+' : ''}{adjustmentCurrency} ${adj.difference.toFixed(2)}
+                            </TableCell>
+                          </TableRow>
+                        ))}
+                      </TableBody>
+                    </Table>
+                  </div>
+
+                  <div className="flex justify-end gap-2">
+                    <Button 
+                      variant="outline" 
+                      onClick={() => {
+                        setPreviewAdjustments([]);
+                        setAdjustmentPercentage('');
+                      }}
+                      disabled={isApplyingAdjustments}
+                    >
+                      Cancelar
+                    </Button>
+                    <Button 
+                      onClick={applyPriceAdjustments} 
+                      className="bg-blue-600 hover:bg-blue-700"
+                      disabled={isApplyingAdjustments}
+                    >
+                      {isApplyingAdjustments ? (
+                        <>
+                          <svg className="animate-spin h-4 w-4 mr-2" viewBox="0 0 24 24">
+                            <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" fill="none" />
+                            <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z" />
+                          </svg>
+                          Aplicando...
+                        </>
+                      ) : (
+                        <>
+                          <CheckCircle2 className="h-4 w-4 mr-2" />
+                          Aplicar Cambios
+                        </>
+                      )}
+                    </Button>
+                  </div>
+                </div>
+              )}
+
+              {previewAdjustments.length === 0 && adjustmentPercentage && (
+                <div className="text-center text-muted-foreground py-8">
+                  <AlertCircle className="h-12 w-12 mx-auto mb-2 opacity-50" />
+                  <p>Haz clic en "Preview" para ver los cambios antes de aplicarlos</p>
+                </div>
+              )}
+            </div>
+          </DialogContent>
+        </Dialog>
       </div>
     </Layout>
   );

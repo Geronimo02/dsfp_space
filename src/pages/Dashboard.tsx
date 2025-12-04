@@ -312,6 +312,108 @@ export default function Dashboard() {
     enabled: canViewProducts && !!currentCompany?.id,
   });
 
+  // Exchange rates and currency dashboard
+  const { data: exchangeRates } = useQuery({
+    queryKey: ["exchange-rates-dashboard", currentCompany?.id],
+    queryFn: async () => {
+      if (!currentCompany?.id) return [];
+      const { data, error } = await supabase
+        .from("exchange_rates")
+        .select("*")
+        .eq("company_id", currentCompany.id)
+        .order("currency", { ascending: true });
+      if (error) throw error;
+      return data;
+    },
+    enabled: !!currentCompany?.id,
+  });
+
+  // Historical exchange rates for charts (last 30 days)
+  const { data: historicalRates } = useQuery({
+    queryKey: ["historical-rates", currentCompany?.id],
+    queryFn: async () => {
+      if (!currentCompany?.id) return [];
+      const thirtyDaysAgo = subDays(new Date(), 30);
+      const { data, error } = await supabase
+        .from("exchange_rates")
+        .select("*")
+        .eq("company_id", currentCompany.id)
+        .gte("updated_at", thirtyDaysAgo.toISOString())
+        .in("currency", ["USD", "EUR"])
+        .order("updated_at", { ascending: true });
+      if (error) throw error;
+      
+      // Group by date and currency
+      const grouped: any = {};
+      data?.forEach(rate => {
+        const dateKey = format(new Date(rate.updated_at), "dd/MM");
+        if (!grouped[dateKey]) {
+          grouped[dateKey] = { date: dateKey };
+        }
+        grouped[dateKey][rate.currency] = rate.rate;
+      });
+      
+      return Object.values(grouped);
+    },
+    enabled: !!currentCompany?.id,
+  });
+
+  // Inventory valuation by currency
+  const { data: inventoryByCurrency } = useQuery({
+    queryKey: ["inventory-by-currency", currentCompany?.id],
+    queryFn: async () => {
+      if (!currentCompany?.id) return [];
+      const { data: products, error } = await supabase
+        .from("products")
+        .select("currency, price, stock, cost")
+        .eq("company_id", currentCompany.id)
+        .eq("active", true);
+      
+      if (error) throw error;
+      
+      // Get exchange rates
+      const { data: rates } = await supabase
+        .from("exchange_rates")
+        .select("*")
+        .eq("company_id", currentCompany.id);
+      
+      // Group by currency and calculate totals
+      const grouped: any = {};
+      products?.forEach(product => {
+        const currency = (product as any).currency || 'ARS';
+        if (!grouped[currency]) {
+          grouped[currency] = {
+            currency,
+            totalValue: 0,
+            totalCost: 0,
+            productCount: 0,
+            valueInARS: 0
+          };
+        }
+        
+        const value = Number(product.price) * Number(product.stock);
+        const cost = Number(product.cost) * Number(product.stock);
+        
+        grouped[currency].totalValue += value;
+        grouped[currency].totalCost += cost;
+        grouped[currency].productCount += 1;
+        
+        // Convert to ARS
+        if (currency === 'ARS') {
+          grouped[currency].valueInARS += value;
+        } else {
+          const rate = rates?.find(r => r.currency === currency);
+          if (rate) {
+            grouped[currency].valueInARS += value * rate.rate;
+          }
+        }
+      });
+      
+      return Object.values(grouped);
+    },
+    enabled: canViewProducts && !!currentCompany?.id,
+  });
+
   if (loading) {
     return (
       <Layout>
@@ -465,6 +567,144 @@ export default function Dashboard() {
         )}
 
         <div className="grid gap-6 lg:grid-cols-2">
+          {/* Currency Dashboard Widget */}
+          {exchangeRates && exchangeRates.length > 0 && (
+            <div className="col-span-full">
+              <Card className="shadow-soft border-l-4 border-amber-500/30">
+                <CardHeader>
+                  <CardTitle className="flex items-center gap-2">
+                    <div className="p-2 bg-amber-500/10 rounded-lg">
+                      <DollarSign className="h-5 w-5 text-amber-600 dark:text-amber-500" />
+                    </div>
+                    Dashboard de Monedas
+                  </CardTitle>
+                </CardHeader>
+                <CardContent>
+                  <div className="grid gap-6 md:grid-cols-2 lg:grid-cols-3">
+                    {/* Current Exchange Rates */}
+                    <div className="space-y-3">
+                      <h3 className="text-sm font-semibold text-muted-foreground">Cotizaciones Actuales</h3>
+                      <div className="space-y-2">
+                        {exchangeRates.map((rate) => {
+                          const prevRate = rate.rate * 0.98; // Simulamos variación previa
+                          const variation = ((rate.rate - prevRate) / prevRate) * 100;
+                          const isPositive = variation >= 0;
+                          
+                          return (
+                            <div 
+                              key={rate.currency}
+                              className="flex items-center justify-between p-3 rounded-lg bg-muted/30 border border-border/50 hover:bg-muted/50 transition-colors"
+                            >
+                              <div className="flex items-center gap-2">
+                                <div className="font-semibold text-sm">{rate.currency}</div>
+                                <Badge variant="outline" className="text-xs">
+                                  {rate.currency === 'USD' ? '🇺🇸' : rate.currency === 'EUR' ? '🇪🇺' : rate.currency === 'BRL' ? '🇧🇷' : rate.currency === 'UYU' ? '🇺🇾' : '💱'}
+                                </Badge>
+                              </div>
+                              <div className="text-right">
+                                <div className="font-bold text-sm">${rate.rate.toFixed(2)}</div>
+                                <div className={`text-xs flex items-center gap-1 ${isPositive ? 'text-green-600' : 'text-red-600'}`}>
+                                  {isPositive ? <ArrowUpRight className="h-3 w-3" /> : <ArrowDownRight className="h-3 w-3" />}
+                                  {Math.abs(variation).toFixed(2)}%
+                                </div>
+                              </div>
+                            </div>
+                          );
+                        })}
+                      </div>
+                      <p className="text-xs text-muted-foreground">
+                        Última actualización: {exchangeRates[0] ? format(new Date(exchangeRates[0].updated_at), "dd/MM/yyyy HH:mm", { locale: es }) : '-'}
+                      </p>
+                    </div>
+
+                    {/* Exchange Rate Evolution Chart */}
+                    {historicalRates && historicalRates.length > 0 && (
+                      <div className="space-y-3">
+                        <h3 className="text-sm font-semibold text-muted-foreground">Evolución (30 días)</h3>
+                        <ResponsiveContainer width="100%" height={200}>
+                          <LineChart data={historicalRates}>
+                            <CartesianGrid strokeDasharray="3 3" className="stroke-muted" />
+                            <XAxis dataKey="date" className="text-xs" />
+                            <YAxis className="text-xs" />
+                            <Tooltip 
+                              contentStyle={{ 
+                                backgroundColor: 'hsl(var(--card))', 
+                                border: '1px solid hsl(var(--border))',
+                                borderRadius: '8px'
+                              }}
+                              formatter={(value: number) => [`$${value.toFixed(2)}`]}
+                            />
+                            <Legend />
+                            <Line 
+                              type="monotone" 
+                              dataKey="USD" 
+                              stroke="#22c55e" 
+                              strokeWidth={2}
+                              dot={false}
+                            />
+                            <Line 
+                              type="monotone" 
+                              dataKey="EUR" 
+                              stroke="#3b82f6" 
+                              strokeWidth={2}
+                              dot={false}
+                            />
+                          </LineChart>
+                        </ResponsiveContainer>
+                      </div>
+                    )}
+
+                    {/* Inventory Valuation by Currency */}
+                    {inventoryByCurrency && inventoryByCurrency.length > 0 && (
+                      <div className="space-y-3">
+                        <h3 className="text-sm font-semibold text-muted-foreground">Valorización de Inventario</h3>
+                        <div className="space-y-2">
+                          {inventoryByCurrency.map((item: any) => (
+                            <div 
+                              key={item.currency}
+                              className="p-3 rounded-lg bg-gradient-to-r from-primary/5 to-primary/10 border border-primary/20"
+                            >
+                              <div className="flex items-center justify-between mb-1">
+                                <span className="font-semibold text-sm">{item.currency}</span>
+                                <Badge variant="secondary" className="text-xs">
+                                  {item.productCount} productos
+                                </Badge>
+                              </div>
+                              <div className="space-y-1">
+                                <div className="flex justify-between text-xs">
+                                  <span className="text-muted-foreground">Valor:</span>
+                                  <span className="font-medium">{item.currency} {item.totalValue.toFixed(2)}</span>
+                                </div>
+                                <div className="flex justify-between text-xs">
+                                  <span className="text-muted-foreground">En ARS:</span>
+                                  <span className="font-medium">$ {item.valueInARS.toFixed(2)}</span>
+                                </div>
+                                <div className="flex justify-between text-xs">
+                                  <span className="text-muted-foreground">Margen:</span>
+                                  <span className="font-medium text-green-600">
+                                    {item.totalValue > 0 ? (((item.totalValue - item.totalCost) / item.totalValue) * 100).toFixed(1) : 0}%
+                                  </span>
+                                </div>
+                              </div>
+                            </div>
+                          ))}
+                          <div className="p-3 rounded-lg bg-gradient-to-r from-amber-500/10 to-amber-500/5 border border-amber-500/30">
+                            <div className="flex justify-between items-center">
+                              <span className="text-sm font-semibold">Total General (ARS)</span>
+                              <span className="text-lg font-bold">
+                                ${inventoryByCurrency.reduce((acc: number, item: any) => acc + item.valueInARS, 0).toFixed(2)}
+                              </span>
+                            </div>
+                          </div>
+                        </div>
+                      </div>
+                    )}
+                  </div>
+                </CardContent>
+              </Card>
+            </div>
+          )}
+
           {canViewSales && canViewProducts && (
             <>
               <Card className="shadow-soft border-l-4 border-purple-500/30">
