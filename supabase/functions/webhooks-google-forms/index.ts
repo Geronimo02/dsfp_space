@@ -1,61 +1,99 @@
-// deno-lint-ignore-file no-explicit-any
-import { serve } from "https://deno.land/std@0.224.0/http/server.ts";
-import { createClient } from "https://esm.sh/@supabase/supabase-js@2.45.4";
+/// <reference types="jsr:@supabase/functions-js/edge-runtime.d.ts" />
+import { createClient } from "https://esm.sh/@supabase/supabase-js@2.45.4?dts";
 
-serve(async (req) => {
+const corsHeaders = {
+  "Access-Control-Allow-Origin": "*", // si querés más estricto: poné tu dominio de Netlify
+  "Access-Control-Allow-Headers": "authorization, x-client-info, apikey, content-type",
+  "Access-Control-Allow-Methods": "POST, OPTIONS",
+};
+
+Deno.serve(async (req) => {
+  // ✅ 1) Preflight CORS
+  if (req.method === "OPTIONS") {
+    return new Response(null, { status: 204, headers: corsHeaders });
+  }
+
   try {
-    const SUPABASE_URL = Deno.env.get("https://pjcfncnydhxrlnaowbae.supabase.co")!;
-    const SERVICE_ROLE_KEY = Deno.env.get("eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InBqY2ZuY255ZGh4cmxuYW93YmFlIiwicm9sZSI6InNlcnZpY2Vfcm9sZSIsImlhdCI6MTc2MTA0MzkyMCwiZXhwIjoyMDc2NjE5OTIwfQ.bJi0mP3cCYJz-ftjlTEuY5TjpoJsA17hasehPJsXn3Q")!;
-    const supabaseAdmin = createClient(SUPABASE_URL, SERVICE_ROLE_KEY);
+    if (req.method !== "POST") {
+      return new Response("Method not allowed", { status: 405, headers: corsHeaders });
+    }
 
-    if (req.method !== "POST") return new Response("Method not allowed", { status: 405 });
+    const SUPABASE_URL = Deno.env.get("SUPABASE_URL");
+    const SERVICE_ROLE_KEY = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY");
+    if (!SUPABASE_URL || !SERVICE_ROLE_KEY) {
+      return new Response(
+        JSON.stringify({ error: "Missing SUPABASE_URL or SUPABASE_SERVICE_ROLE_KEY" }),
+        { status: 500, headers: { ...corsHeaders, "Content-Type": "application/json" } }
+      );
+    }
+
+    const supabaseAdmin = createClient(SUPABASE_URL, SERVICE_ROLE_KEY);
 
     const body = await req.json();
     const { integrationId, secret, namedValues, values, submittedAt, _test } = body ?? {};
 
     if (!integrationId || !secret) {
-      return Response.json({ error: "Missing integrationId/secret" }, { status: 400 });
+      return new Response(JSON.stringify({ error: "Missing integrationId/secret" }), {
+        status: 400,
+        headers: { ...corsHeaders, "Content-Type": "application/json" },
+      });
     }
 
-    // Get expected secret from integration_credentials
     const { data: cred, error: credErr } = await supabaseAdmin
       .from("integration_credentials")
       .select("company_id, credentials")
       .eq("integration_id", integrationId)
       .single();
 
-    if (credErr || !cred) return Response.json({ error: "Credentials not found" }, { status: 404 });
+    if (credErr || !cred) {
+      return new Response(JSON.stringify({ error: "Credentials not found" }), {
+        status: 404,
+        headers: { ...corsHeaders, "Content-Type": "application/json" },
+      });
+    }
 
-    const expected = cred.credentials?.webhookSecret;
+    const expected = (cred as any).credentials?.webhookSecret;
     if (!expected || expected !== secret) {
-      return Response.json({ error: "Unauthorized" }, { status: 401 });
+      return new Response(JSON.stringify({ error: "Unauthorized" }), {
+        status: 401,
+        headers: { ...corsHeaders, "Content-Type": "application/json" },
+      });
     }
 
     if (_test) {
-      return Response.json({ ok: true, message: "Test received" });
+      return new Response(JSON.stringify({ ok: true, message: "Test received" }), {
+        status: 200,
+        headers: { ...corsHeaders, "Content-Type": "application/json" },
+      });
     }
 
-    // Insert into integration_orders as "lead" / "form submission"
-    // external_order_id can be something deterministic; here we use timestamp+random
     const externalId = `gforms_${Date.now()}_${crypto.randomUUID().slice(0, 8)}`;
 
     const { error: insErr } = await supabaseAdmin.from("integration_orders").insert({
       integration_id: integrationId,
       company_id: cred.company_id,
       external_order_id: externalId,
-      customer_name: null,
-      customer_email: null,
-      customer_phone: null,
       order_data: { namedValues, values, submittedAt },
       status: "received",
-      error_message: null,
       processed_at: null,
+      error_message: null,
     });
 
-    if (insErr) return Response.json({ error: insErr.message }, { status: 400 });
+    if (insErr) {
+      return new Response(JSON.stringify({ error: insErr.message }), {
+        status: 400,
+        headers: { ...corsHeaders, "Content-Type": "application/json" },
+      });
+    }
 
-    return Response.json({ ok: true });
-  } catch (e: any) {
-    return Response.json({ error: e?.message ?? "Unknown error" }, { status: 500 });
+    return new Response(JSON.stringify({ ok: true }), {
+      status: 200,
+      headers: { ...corsHeaders, "Content-Type": "application/json" },
+    });
+  } catch (e) {
+    return new Response(JSON.stringify({ error: String(e) }), {
+      status: 500,
+      headers: { ...corsHeaders, "Content-Type": "application/json" },
+    });
   }
 });

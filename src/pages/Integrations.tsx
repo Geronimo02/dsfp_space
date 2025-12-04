@@ -337,29 +337,32 @@ const Integrations = () => {
     }
   };
 
-  const verifyGoogleFormsWebhook = async () => {
-    // Verifica que el endpoint exista y responda (needs edge function webhooks-google-forms)
-    try {
-      const { error: fnErr } = await supabase.functions.invoke("webhooks-google-forms", {
-        body: {
-          _test: true,
-          secret: gfSecret,
-          submittedAt: new Date().toISOString(),
-          namedValues: { "Test question": ["Test answer"] },
-          values: ["Test answer"],
-        },
-      });
-      if (fnErr) throw fnErr;
-
-      toast.success("Endpoint OK (recibió el test)");
-    } catch (e: any) {
-      console.error(e);
-      toast.error(
-        e?.message ??
-          "Falló la verificación. Probable: falta deploy de la Edge Function webhooks-google-forms"
-      );
+ const verifyGoogleFormsWebhook = async () => {
+  try {
+    if (!configModal.open || configModal.type !== "google_forms") {
+      toast.error("Abrí la configuración de Google Forms primero");
+      return;
     }
-  };
+
+    const { error } = await supabase.functions.invoke("webhooks-google-forms", {
+      body: {
+        _test: true,
+        integrationId: configModal.integrationId, // ✅ CLAVE
+        secret: gfSecret,
+        submittedAt: new Date().toISOString(),
+        namedValues: { "Test question": ["Test answer"] },
+        values: ["Test answer"],
+      },
+    });
+
+    if (error) throw error;
+    toast.success("Endpoint OK (recibió el test)");
+  } catch (e: any) {
+    console.error(e);
+    toast.error(e?.message ?? "Falló la verificación del endpoint");
+  }
+};
+
 
   if (isLoadingIntegrations) {
     return (
