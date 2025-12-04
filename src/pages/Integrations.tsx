@@ -306,6 +306,12 @@ const Integrations = () => {
 
     try {
       // 1) Store secret securely (integration_credentials). Requires edge function.
+      const { data: { session } } = await supabase.auth.getSession();
+      console.log("session?", !!session, session?.user?.id);
+      if (!session) {
+        toast.error("No estás logueado (no hay sesión). Iniciá sesión y reintentá.");
+        return;
+      }
       const { error: fnErr } = await supabase.functions.invoke("integrations-save-credentials", {
         body: {
           integrationId: configModal.integrationId,

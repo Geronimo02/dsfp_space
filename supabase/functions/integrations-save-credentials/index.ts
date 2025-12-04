@@ -41,12 +41,17 @@ Deno.serve(async (req) => {
     const supabaseAdmin = createClient(supabaseUrl, serviceKey);
 
     // ✅ Auth: el frontend manda Authorization: Bearer <jwt>
-    const authHeader = req.headers.get("Authorization") ?? "";
-    const jwt = authHeader.startsWith("Bearer ") ? authHeader.slice(7) : null;
-    if (!jwt) return json({ error: "Missing authorization header" }, 401);
+    const authHeader = req.headers.get("Authorization") || req.headers.get("authorization") || "";
+if (!authHeader) return json({ error: "Missing authorization header" }, 401);
 
-    const { data: userRes, error: userErr } = await supabaseAdmin.auth.getUser(jwt);
-    if (userErr || !userRes?.user) return json({ error: "Invalid token" }, 401);
+const jwt = authHeader.startsWith("Bearer ") ? authHeader.slice(7) : null;
+if (!jwt) return json({ error: "Authorization header is not Bearer" }, 401);
+
+const { data: userRes, error: userErr } = await supabaseAdmin.auth.getUser(jwt);
+if (userErr || !userRes?.user) {
+  return json({ error: "Invalid token", details: userErr?.message ?? null }, 401);
+}
+
 
     const userId = userRes.user.id;
 
