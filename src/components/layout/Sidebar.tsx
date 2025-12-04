@@ -1,4 +1,4 @@
-import { Link, useLocation } from "react-router-dom";
+import { Link, useLocation, useNavigate } from "react-router-dom";
 import { cn } from "@/lib/utils";
 import {
   LayoutDashboard,
@@ -44,6 +44,7 @@ import {
   Search,
   Star,
   PackageCheck,
+  LogOut,
 } from "lucide-react";
 import { useActiveModules } from "@/hooks/useActiveModules";
 import { usePermissions } from "@/hooks/usePermissions";
@@ -52,6 +53,8 @@ import { Collapsible, CollapsibleContent, CollapsibleTrigger } from "@/component
 import { Input } from "@/components/ui/input";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
+import { supabase } from "@/integrations/supabase/client";
+import { toast } from "sonner";
 
 interface NavItem {
   title: string;
@@ -66,6 +69,7 @@ interface NavItem {
 
 export function Sidebar() {
   const location = useLocation();
+  const navigate = useNavigate();
   const activeModules = useActiveModules();
   const { hasPermission, isAdmin } = usePermissions();
   
@@ -723,9 +727,8 @@ export function Sidebar() {
           return null;
         })}
       </nav>
-
       {/* AI Assistant - Botón especial al final */}
-      <div className="p-3 border-t bg-gradient-to-r from-sidebar to-sidebar/95">
+      <div className="p-3 border-t bg-gradient-to-r from-sidebar to-sidebar/95 space-y-2">
         <Link
           to="/ai-assistant"
           className="flex items-center gap-3 px-3 py-2.5 text-sm rounded-lg transition-all bg-gradient-to-r from-purple-500 to-pink-500 text-white hover:from-purple-600 hover:to-pink-600 shadow-lg hover:shadow-xl transform hover:scale-[1.02]"
@@ -733,6 +736,24 @@ export function Sidebar() {
           <Sparkles className="w-4 h-4" />
           <span className="font-semibold">Asistente IA</span>
         </Link>
+        
+        <Button
+          onClick={async () => {
+            const { error } = await supabase.auth.signOut();
+            if (error) {
+              toast.error("Error al cerrar sesión");
+              console.error(error);
+            } else {
+              toast.success("Sesión cerrada correctamente");
+              navigate("/auth");
+            }
+          }}
+          variant="outline"
+          className="w-full flex items-center gap-3 px-3 py-2.5 text-sm rounded-lg border-destructive/50 text-destructive hover:bg-destructive hover:text-destructive-foreground transition-all"
+        >
+          <LogOut className="w-4 h-4" />
+          <span className="font-medium">Cerrar Sesión</span>
+        </Button>
       </div>
     </div>
   );
