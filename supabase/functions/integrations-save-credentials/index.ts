@@ -8,8 +8,8 @@ serve(async (req) => {
       return new Response("Method not allowed", { status: 405 });
     }
 
-    const SUPABASE_URL = Deno.env.get("SUPABASE_URL")!;
-    const SERVICE_ROLE_KEY = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!;
+    const SUPABASE_URL = Deno.env.get("https://pjcfncnydhxrlnaowbae.supabase.co")!;
+    const SERVICE_ROLE_KEY = Deno.env.get("eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InBqY2ZuY255ZGh4cmxuYW93YmFlIiwicm9sZSI6InNlcnZpY2Vfcm9sZSIsImlhdCI6MTc2MTA0MzkyMCwiZXhwIjoyMDc2NjE5OTIwfQ.bJi0mP3cCYJz-ftjlTEuY5TjpoJsA17hasehPJsXn3Q")!;
 
     const supabaseAdmin = createClient(SUPABASE_URL, SERVICE_ROLE_KEY);
 
