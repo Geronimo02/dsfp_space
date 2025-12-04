@@ -20,8 +20,8 @@ serve(async (req) => {
     }
 
     // ✅ leer secrets correctamente
-    const SUPABASE_URL = Deno.env.get("SUPABASE_URL");
-    const SERVICE_ROLE_KEY = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY");
+    const SUPABASE_URL = Deno.env.get("SB_URL");
+const SERVICE_ROLE_KEY = Deno.env.get("SB_SERVICE_ROLE_KEY");
     if (!SUPABASE_URL || !SERVICE_ROLE_KEY) {
       return Response.json(
         { error: "Missing SUPABASE_URL or SUPABASE_SERVICE_ROLE_KEY" },
