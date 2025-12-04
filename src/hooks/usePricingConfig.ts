@@ -235,17 +235,51 @@ export const useToggleCompanyModule = () => {
       moduleId: string;
       active: boolean;
     }) => {
-      const { data, error } = await supabase
+      // Check if module already exists for this company
+      const { data: existing, error: checkError } = await supabase
         .from('company_modules')
-        .upsert({
-          company_id: companyId,
-          module_id: moduleId,
-          active,
-          activated_at: active ? new Date().toISOString() : undefined,
-          deactivated_at: !active ? new Date().toISOString() : null,
-        })
-        .select()
-        .single();
+        .select('id')
+        .eq('company_id', companyId)
+        .eq('module_id', moduleId)
+        .maybeSingle();
+
+      let data;
+      let error;
+
+      if (existing) {
+        // Update existing record
+        const result = await supabase
+          .from('company_modules')
+          .update({
+            active,
+            activated_at: active ? new Date().toISOString() : undefined,
+            deactivated_at: !active ? new Date().toISOString() : null,
+            updated_at: new Date().toISOString(),
+          })
+          .eq('company_id', companyId)
+          .eq('module_id', moduleId)
+          .select()
+          .single();
+        
+        data = result.data;
+        error = result.error;
+      } else {
+        // Insert new record
+        const result = await supabase
+          .from('company_modules')
+          .insert({
+            company_id: companyId,
+            module_id: moduleId,
+            active,
+            activated_at: active ? new Date().toISOString() : null,
+            deactivated_at: !active ? new Date().toISOString() : null,
+          })
+          .select()
+          .single();
+        
+        data = result.data;
+        error = result.error;
+      }
 
       if (error) throw error;
       return data;
@@ -304,7 +338,49 @@ export const useCalculatePrice = () => {
       });
 
       if (error) throw error;
-      return data[0] as PriceCalculation;
+      
+      // La función devuelve TABLE, así que data es un array
+      const resultArray = data as Array<{
+        total_price: number;
+        base_price: number;
+        modules_price: number;
+        volume_price: number;
+        breakdown: any;
+      }>;
+      
+      const result = resultArray && resultArray.length > 0 ? resultArray[0] : null;
+      
+      if (!result) {
+        return {
+          total_price: 0,
+          base_price: 0,
+          modules_price: 0,
+          volume_price: 0,
+          breakdown: {
+            base_price: 0,
+            modules_price: 0,
+            volume_price: 0,
+            total_price: 0,
+            billing_cycle: billingCycle,
+            invoice_volume: invoiceVolume,
+          },
+        } as PriceCalculation;
+      }
+      
+      return {
+        total_price: result.total_price || 0,
+        base_price: result.base_price || 0,
+        modules_price: result.modules_price || 0,
+        volume_price: result.volume_price || 0,
+        breakdown: result.breakdown || {
+          base_price: 0,
+          modules_price: 0,
+          volume_price: 0,
+          total_price: 0,
+          billing_cycle: billingCycle,
+          invoice_volume: invoiceVolume,
+        },
+      } as PriceCalculation;
     },
   });
 };

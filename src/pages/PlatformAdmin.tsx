@@ -48,6 +48,9 @@ import { useNavigate, Navigate } from "react-router-dom";
 import { PricingConfiguration } from "@/components/settings/PricingConfiguration";
 import { PricingCalculator } from "@/components/settings/PricingCalculator";
 import { CompanyModuleSelector } from "@/components/settings/CompanyModuleSelector";
+import { CustomPricingManager } from "@/components/settings/CustomPricingManager";
+import { ModuleLimitsManager } from "@/components/settings/ModuleLimitsManager";
+import { ModuleAuditLog } from "@/components/settings/ModuleAuditLog";
 
 export default function PlatformAdmin() {
   const { isPlatformAdmin, isLoading: adminLoading } = usePlatformAdmin();
@@ -95,6 +98,8 @@ export default function PlatformAdmin() {
   });
   const [modulesDialogOpen, setModulesDialogOpen] = useState(false);
   const [selectedCompanyForModules, setSelectedCompanyForModules] = useState<any>(null);
+  const [customPricingDialogOpen, setCustomPricingDialogOpen] = useState(false);
+  const [selectedCompanyForPricing, setSelectedCompanyForPricing] = useState<any>(null);
 
   // Fetch all companies with their subscriptions (must be before any conditional returns)
   const { data: companies, isLoading, error: companiesError } = useQuery({
@@ -174,18 +179,12 @@ export default function PlatformAdmin() {
     },
   });
 
-  // Fetch audit logs
+  // Fetch audit logs (tabla no existe aún, comentada temporalmente)
   const { data: auditLogs } = useQuery({
     queryKey: ["platform-audit-logs"],
     queryFn: async () => {
-      const { data, error } = await (supabase as any)
-        .from("platform_audit_logs")
-        .select("*")
-        .order("created_at", { ascending: false })
-        .limit(100);
-
-      if (error) throw error;
-      return data as Array<{
+      // TODO: Crear tabla platform_audit_logs
+      return [] as Array<{
         id: string;
         user_id: string | null;
         user_email: string | null;
@@ -988,6 +987,14 @@ export default function PlatformAdmin() {
                 <Calculator className="h-4 w-4" />
                 <span>Cotizador</span>
               </TabsTrigger>
+              <TabsTrigger value="module-limits" className="w-full justify-start gap-2 data-[state=active]:bg-primary data-[state=active]:text-primary-foreground">
+                <Settings className="h-4 w-4" />
+                <span>Límites de Módulos</span>
+              </TabsTrigger>
+              <TabsTrigger value="module-audit" className="w-full justify-start gap-2 data-[state=active]:bg-primary data-[state=active]:text-primary-foreground">
+                <Activity className="h-4 w-4" />
+                <span>Auditoría de Módulos</span>
+              </TabsTrigger>
               <TabsTrigger value="usage" className="w-full justify-start gap-2 data-[state=active]:bg-primary data-[state=active]:text-primary-foreground">
                 <TrendingUp className="h-4 w-4" />
                 <span>Métricas</span>
@@ -1051,6 +1058,16 @@ export default function PlatformAdmin() {
           {/* Pricing Calculator Tab */}
           <TabsContent value="calculator" className="space-y-4">
             <PricingCalculator />
+          </TabsContent>
+
+          {/* Module Limits Manager Tab */}
+          <TabsContent value="module-limits" className="space-y-4">
+            <ModuleLimitsManager />
+          </TabsContent>
+
+          {/* Module Audit Log Tab */}
+          <TabsContent value="module-audit" className="space-y-4">
+            <ModuleAuditLog />
           </TabsContent>
 
           {/* Usage Metrics Tab */}
@@ -1539,6 +1556,17 @@ export default function PlatformAdmin() {
                               >
                                 <Package className="h-4 w-4 mr-1" />
                                 Módulos
+                              </Button>
+                              <Button 
+                                variant="outline" 
+                                size="sm"
+                                onClick={() => {
+                                  setSelectedCompanyForPricing(company);
+                                  setCustomPricingDialogOpen(true);
+                                }}
+                              >
+                                <DollarSign className="h-4 w-4 mr-1" />
+                                Precios
                               </Button>
                               <Button 
                                 variant="outline" 
@@ -2924,6 +2952,33 @@ export default function PlatformAdmin() {
           
           <DialogFooter>
             <Button onClick={() => setModulesDialogOpen(false)}>
+              Cerrar
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      {/* Dialog para gestionar precios personalizados */}
+      <Dialog open={customPricingDialogOpen} onOpenChange={setCustomPricingDialogOpen}>
+        <DialogContent className="max-w-6xl max-h-[90vh] overflow-y-auto">
+          <DialogHeader>
+            <DialogTitle>
+              Precios Personalizados - {selectedCompanyForPricing?.name}
+            </DialogTitle>
+            <DialogDescription>
+              Configura precios especiales para módulos específicos de esta empresa
+            </DialogDescription>
+          </DialogHeader>
+          
+          {selectedCompanyForPricing && (
+            <CustomPricingManager 
+              companyId={selectedCompanyForPricing.id}
+              companyName={selectedCompanyForPricing.name}
+            />
+          )}
+          
+          <DialogFooter>
+            <Button onClick={() => setCustomPricingDialogOpen(false)}>
               Cerrar
             </Button>
           </DialogFooter>
