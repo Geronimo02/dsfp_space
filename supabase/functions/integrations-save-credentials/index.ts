@@ -82,6 +82,10 @@ Deno.serve(async (req) => {
       .eq("id", integrationId)
       .single();
 
+// ADD LOGGING HERE
+console.log("Integration query result:", { integ, integErr });
+
+
     if (integErr || !integ) return json({ error: "Integration not found" }, 404);
     if (integ.integration_type !== type) return json({ error: "Type mismatch" }, 400);
 
