@@ -12,6 +12,9 @@ Deno.serve(async (req) => {
   if (req.method === "OPTIONS") {
     return new Response(null, { status: 204, headers: corsHeaders });
   }
+  if (req.method === "OPTIONS") return new Response(null, { status: 204, headers: corsHeaders });
+if (req.method === "GET") return new Response("WEBHOOK_V3_OK", { status: 200, headers: corsHeaders });
+
 
   try {
     if (req.method !== "POST") {
@@ -21,11 +24,18 @@ Deno.serve(async (req) => {
     const SUPABASE_URL = Deno.env.get("SB_URL");
 const SERVICE_ROLE_KEY = Deno.env.get("SB_SERVICE_ROLE_KEY");
     if (!SUPABASE_URL || !SERVICE_ROLE_KEY) {
-      return new Response(
-        JSON.stringify({ error: "Missing SUPABASE_URL or SUPABASE_SERVICE_ROLE_KEY" }),
-        { status: 500, headers: { ...corsHeaders, "Content-Type": "application/json" } }
-      );
-    }
+  return new Response(
+    JSON.stringify({
+      error: "Missing env",
+      hasSB_URL: !!Deno.env.get("SB_URL"),
+      hasSB_SERVICE_ROLE_KEY: !!Deno.env.get("SB_SERVICE_ROLE_KEY"),
+      hasSUPABASE_URL: !!Deno.env.get("SUPABASE_URL"),
+      hasSUPABASE_SERVICE_ROLE_KEY: !!Deno.env.get("SUPABASE_SERVICE_ROLE_KEY"),
+    }),
+    { status: 500, headers: { ...corsHeaders, "Content-Type": "application/json" } }
+  );
+}
+
 
     const supabaseAdmin = createClient(SUPABASE_URL, SERVICE_ROLE_KEY);
 
