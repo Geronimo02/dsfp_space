@@ -45,7 +45,7 @@ const PurchaseReturns = () => {
     queryFn: async () => {
       if (!currentCompany?.id) return [];
       
-      let query = supabase
+      let query = (supabase as any)
         .from("purchase_returns")
         .select(`
           *,
@@ -91,7 +91,7 @@ const PurchaseReturns = () => {
     queryKey: ["purchases-by-supplier", supplierId, currentCompany?.id],
     queryFn: async () => {
       if (!supplierId || !currentCompany?.id) return [];
-      const { data, error } = await supabase
+      const { data, error } = await (supabase as any)
         .from("purchases")
         .select(`
           *,
@@ -121,7 +121,7 @@ const PurchaseReturns = () => {
         sum + (item.quantity * item.unit_cost), 0
       );
 
-      const { data: returnRecord, error: returnError } = await supabase
+      const { data: returnRecord, error: returnError } = await (supabase as any)
         .from("purchase_returns")
         .insert({
           company_id: currentCompany.id,
@@ -138,14 +138,14 @@ const PurchaseReturns = () => {
       if (returnError) throw returnError;
 
       const itemsToInsert = returnData.items.map((item: ReturnItem) => ({
-        purchase_return_id: returnRecord.id,
+        purchase_return_id: (returnRecord as any).id,
         product_id: item.product_id,
         quantity: item.quantity,
         unit_cost: item.unit_cost,
         reason: item.reason,
       }));
 
-      const { error: itemsError } = await supabase
+      const { error: itemsError } = await (supabase as any)
         .from("purchase_return_items")
         .insert(itemsToInsert);
 
@@ -185,7 +185,7 @@ const PurchaseReturns = () => {
 
   const deleteReturnMutation = useMutation({
     mutationFn: async (returnId: string) => {
-      const { error } = await supabase
+      const { error } = await (supabase as any)
         .from("purchase_returns")
         .delete()
         .eq("id", returnId);
