@@ -1,82 +1,95 @@
 /// <reference types="jsr:@supabase/functions-js/edge-runtime.d.ts" />
+// deno-lint-ignore-file no-explicit-any
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2.45.4?dts";
 
 const corsHeaders = {
-  "Access-Control-Allow-Origin": "*", // si querés más estricto: poné tu dominio de Netlify
+  "Access-Control-Allow-Origin": "*",
   "Access-Control-Allow-Headers": "authorization, x-client-info, apikey, content-type",
   "Access-Control-Allow-Methods": "POST, OPTIONS",
 };
 
-Deno.serve(async (req) => {
-  // ✅ 1) Preflight CORS
-  if (req.method === "OPTIONS") {
-    return new Response(null, { status: 204, headers: corsHeaders });
-  }
-  if (req.method === "OPTIONS") return new Response(null, { status: 204, headers: corsHeaders });
-if (req.method === "GET") return new Response("WEBHOOK_V3_OK", { status: 200, headers: corsHeaders });
-
-
-  try {
-    if (req.method !== "POST") {
-      return new Response("Method not allowed", { status: 405, headers: corsHeaders });
-    }
-
-    const SUPABASE_URL = Deno.env.get("SB_URL");
-const SERVICE_ROLE_KEY = Deno.env.get("SB_SERVICE_ROLE_KEY");
-    if (!SUPABASE_URL || !SERVICE_ROLE_KEY) {
-  return new Response(
-    JSON.stringify({
-      error: "Missing env",
-      hasSB_URL: !!Deno.env.get("SB_URL"),
-      hasSB_SERVICE_ROLE_KEY: !!Deno.env.get("SB_SERVICE_ROLE_KEY"),
-      hasSUPABASE_URL: !!Deno.env.get("SUPABASE_URL"),
-      hasSUPABASE_SERVICE_ROLE_KEY: !!Deno.env.get("SUPABASE_SERVICE_ROLE_KEY"),
-    }),
-    { status: 500, headers: { ...corsHeaders, "Content-Type": "application/json" } }
-  );
+function json(body: any, status = 200) {
+  return new Response(JSON.stringify(body), {
+    status,
+    headers: { ...corsHeaders, "Content-Type": "application/json" },
+  });
 }
 
+Deno.serve(async (req) => {
+  // ✅ CORS preflight
+  if (req.method === "OPTIONS") return new Response(null, { status: 204, headers: corsHeaders });
 
-    const supabaseAdmin = createClient(SUPABASE_URL, SERVICE_ROLE_KEY);
+  if (req.method !== "POST") return json({ error: "Method not allowed" }, 405);
 
-    const body = await req.json();
-    const { integrationId, secret, namedValues, values, submittedAt, _test } = body ?? {};
-
-    if (!integrationId || !secret) {
-      return new Response(JSON.stringify({ error: "Missing integrationId/secret" }), {
-        status: 400,
-        headers: { ...corsHeaders, "Content-Type": "application/json" },
-      });
+  try {
+    // ✅ Parse body safely
+    let body: any = {};
+    try {
+      body = await req.json();
+    } catch {
+      return json({ error: "Invalid JSON body" }, 400);
     }
 
+    // ✅ 1) Ping: prueba “endpoint vivo” SIN necesitar credenciales
+    // Usalo para tu botón "Probar webhook"
+    if (body?._ping === true) {
+      return json({ ok: true, message: "webhook alive" }, 200);
+    }
+
+    // ✅ Secrets (no usar hardcode)
+    const supabaseUrl = Deno.env.get("SB_URL") ?? Deno.env.get("SUPABASE_URL");
+    const serviceKey =
+      Deno.env.get("SB_SERVICE_ROLE_KEY") ?? Deno.env.get("SUPABASE_SERVICE_ROLE_KEY");
+
+    if (!supabaseUrl || !serviceKey) {
+      return json(
+        {
+          error: "Missing env vars",
+          hasSB_URL: !!Deno.env.get("SB_URL"),
+          hasSB_SERVICE_ROLE_KEY: !!Deno.env.get("SB_SERVICE_ROLE_KEY"),
+          hasSUPABASE_URL: !!Deno.env.get("SUPABASE_URL"),
+          hasSUPABASE_SERVICE_ROLE_KEY: !!Deno.env.get("SUPABASE_SERVICE_ROLE_KEY"),
+        },
+        500
+      );
+    }
+
+    const supabaseAdmin = createClient(supabaseUrl, serviceKey);
+
+    // ✅ Require these for real webhook handling
+    const integrationId = body?.integrationId ?? new URL(req.url).searchParams.get("integrationId");
+    const secret = body?.secret;
+
+    const namedValues = body?.namedValues ?? {};
+    const values = body?.values ?? [];
+    const submittedAt = body?.submittedAt ?? new Date().toISOString();
+    const isTest = body?._test === true;
+
+    if (!integrationId) return json({ error: "Missing integrationId" }, 400);
+
+    // ✅ 2) Si querés que "_test" sea “test real” (valida secret guardado), entonces pedimos secret
+    // Para ping sin secret usá _ping.
+    if (!secret) return json({ error: "Missing secret" }, 400);
+
+    // ✅ Buscar credenciales guardadas
     const { data: cred, error: credErr } = await supabaseAdmin
       .from("integration_credentials")
       .select("company_id, credentials")
       .eq("integration_id", integrationId)
-      .single();
+      .maybeSingle();
 
-    if (credErr || !cred) {
-      return new Response(JSON.stringify({ error: "Credentials not found" }), {
-        status: 404,
-        headers: { ...corsHeaders, "Content-Type": "application/json" },
-      });
-    }
+    if (credErr) return json({ error: credErr.message }, 500);
+    if (!cred) return json({ error: "Credentials not found. Primero hacé 'Guardar integración'." }, 404);
 
     const expected = (cred as any).credentials?.webhookSecret;
-    if (!expected || expected !== secret) {
-      return new Response(JSON.stringify({ error: "Unauthorized" }), {
-        status: 401,
-        headers: { ...corsHeaders, "Content-Type": "application/json" },
-      });
+    if (!expected || expected !== secret) return json({ error: "Unauthorized (bad secret)" }, 401);
+
+    // ✅ 3) Test mode: responde OK sin insertar orden
+    if (isTest) {
+      return json({ ok: true, message: "Test received (secret ok)" }, 200);
     }
 
-    if (_test) {
-      return new Response(JSON.stringify({ ok: true, message: "Test received" }), {
-        status: 200,
-        headers: { ...corsHeaders, "Content-Type": "application/json" },
-      });
-    }
-
+    // ✅ Normal mode: insertar en integration_orders
     const externalId = `gforms_${Date.now()}_${crypto.randomUUID().slice(0, 8)}`;
 
     const { error: insErr } = await supabaseAdmin.from("integration_orders").insert({
@@ -89,21 +102,10 @@ const SERVICE_ROLE_KEY = Deno.env.get("SB_SERVICE_ROLE_KEY");
       error_message: null,
     });
 
-    if (insErr) {
-      return new Response(JSON.stringify({ error: insErr.message }), {
-        status: 400,
-        headers: { ...corsHeaders, "Content-Type": "application/json" },
-      });
-    }
+    if (insErr) return json({ error: insErr.message }, 400);
 
-    return new Response(JSON.stringify({ ok: true }), {
-      status: 200,
-      headers: { ...corsHeaders, "Content-Type": "application/json" },
-    });
-  } catch (e) {
-    return new Response(JSON.stringify({ error: String(e) }), {
-      status: 500,
-      headers: { ...corsHeaders, "Content-Type": "application/json" },
-    });
+    return json({ ok: true, external_order_id: externalId }, 200);
+  } catch (e: any) {
+    return json({ error: e?.message ?? String(e) }, 500);
   }
 });

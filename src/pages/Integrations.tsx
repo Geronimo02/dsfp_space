@@ -339,29 +339,18 @@ const Integrations = () => {
 
  const verifyGoogleFormsWebhook = async () => {
   try {
-    if (!configModal.open || configModal.type !== "google_forms") {
-      toast.error("Abrí la configuración de Google Forms primero");
-      return;
-    }
-
-    const { error } = await supabase.functions.invoke("webhooks-google-forms", {
-      body: {
-        _test: true,
-        integrationId: configModal.integrationId, // ✅ CLAVE
-        secret: gfSecret,
-        submittedAt: new Date().toISOString(),
-        namedValues: { "Test question": ["Test answer"] },
-        values: ["Test answer"],
-      },
+    const { data, error } = await supabase.functions.invoke("webhooks-google-forms", {
+      body: { _ping: true },
     });
 
     if (error) throw error;
-    toast.success("Endpoint OK (recibió el test)");
+    toast.success(data?.message ?? "Endpoint OK");
   } catch (e: any) {
     console.error(e);
-    toast.error(e?.message ?? "Falló la verificación del endpoint");
+    toast.error(e?.message ?? "No se pudo verificar el endpoint");
   }
 };
+
 
 
   if (isLoadingIntegrations) {
