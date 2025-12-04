@@ -33,7 +33,7 @@ Deno.serve(async (req) => {
     // ✅ 1) Ping: prueba “endpoint vivo” SIN necesitar credenciales
     // Usalo para tu botón "Probar webhook"
     if (body?._ping === true) {
-      return json({ ok: true, message: "webhook alive" }, 200);
+      return json({ ok: true, message: "Webhook OK!" }, 200);
     }
 
     // ✅ Secrets (no usar hardcode)

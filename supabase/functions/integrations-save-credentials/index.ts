@@ -1,5 +1,5 @@
+/// <reference types="jsr:@supabase/functions-js/edge-runtime.d.ts" />
 // deno-lint-ignore-file no-explicit-any
-import { serve } from "https://deno.land/std@0.224.0/http/server.ts";
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2.45.4?dts";
 
 const corsHeaders = {
@@ -8,50 +8,84 @@ const corsHeaders = {
   "Access-Control-Allow-Methods": "POST, OPTIONS",
 };
 
-serve(async (req) => {
-  // ✅ Preflight
-  if (req.method === "OPTIONS") {
-    return new Response(null, { status: 204, headers: corsHeaders });
-  }
+function json(body: any, status = 200) {
+  return new Response(JSON.stringify(body), {
+    status,
+    headers: { ...corsHeaders, "Content-Type": "application/json" },
+  });
+}
+
+Deno.serve(async (req) => {
+  // ✅ CORS preflight
+  if (req.method === "OPTIONS") return new Response(null, { status: 204, headers: corsHeaders });
+  if (req.method !== "POST") return json({ error: "Method not allowed" }, 405);
 
   try {
-    if (req.method !== "POST") {
-      return new Response("Method not allowed", { status: 405, headers: corsHeaders });
-    }
+    const supabaseUrl = Deno.env.get("SB_URL") ?? Deno.env.get("SUPABASE_URL");
+    const serviceKey =
+      Deno.env.get("SB_SERVICE_ROLE_KEY") ?? Deno.env.get("SUPABASE_SERVICE_ROLE_KEY");
 
-    // ✅ leer secrets correctamente
-    const SUPABASE_URL = Deno.env.get("SB_URL");
-const SERVICE_ROLE_KEY = Deno.env.get("SB_SERVICE_ROLE_KEY");
-    if (!SUPABASE_URL || !SERVICE_ROLE_KEY) {
-      return Response.json(
-        { error: "Missing SUPABASE_URL or SUPABASE_SERVICE_ROLE_KEY" },
-        { status: 500, headers: corsHeaders }
+    if (!supabaseUrl || !serviceKey) {
+      return json(
+        {
+          error: "Missing env vars",
+          hasSB_URL: !!Deno.env.get("SB_URL"),
+          hasSB_SERVICE_ROLE_KEY: !!Deno.env.get("SB_SERVICE_ROLE_KEY"),
+          hasSUPABASE_URL: !!Deno.env.get("SUPABASE_URL"),
+          hasSUPABASE_SERVICE_ROLE_KEY: !!Deno.env.get("SUPABASE_SERVICE_ROLE_KEY"),
+        },
+        500
       );
     }
 
-    const supabaseAdmin = createClient(SUPABASE_URL, SERVICE_ROLE_KEY);
+    const supabaseAdmin = createClient(supabaseUrl, serviceKey);
 
-    const body = await req.json();
-    const { integrationId, type, credentials } = body ?? {};
+    // ✅ Auth: el frontend manda Authorization: Bearer <jwt>
+    const authHeader = req.headers.get("Authorization") ?? "";
+    const jwt = authHeader.startsWith("Bearer ") ? authHeader.slice(7) : null;
+    if (!jwt) return json({ error: "Missing authorization header" }, 401);
 
-    if (!integrationId || !type || !credentials) {
-      return Response.json({ error: "Missing integrationId/type/credentials" }, { status: 400, headers: corsHeaders });
+    const { data: userRes, error: userErr } = await supabaseAdmin.auth.getUser(jwt);
+    if (userErr || !userRes?.user) return json({ error: "Invalid token" }, 401);
+
+    const userId = userRes.user.id;
+
+    // ✅ Parse body
+    let body: any = {};
+    try {
+      body = await req.json();
+    } catch {
+      return json({ error: "Invalid JSON body" }, 400);
     }
 
+    const { integrationId, type, credentials } = body ?? {};
+    if (!integrationId || !type || !credentials) {
+      return json({ error: "Missing integrationId/type/credentials" }, 400);
+    }
+
+    // ✅ Traer integración
     const { data: integ, error: integErr } = await supabaseAdmin
       .from("integrations")
       .select("id, company_id, integration_type")
       .eq("id", integrationId)
       .single();
 
-    if (integErr || !integ) {
-      return Response.json({ error: "Integration not found" }, { status: 404, headers: corsHeaders });
-    }
+    if (integErr || !integ) return json({ error: "Integration not found" }, 404);
+    if (integ.integration_type !== type) return json({ error: "Type mismatch" }, 400);
 
-    if (integ.integration_type !== type) {
-      return Response.json({ error: "Type mismatch" }, { status: 400, headers: corsHeaders });
-    }
+    // ✅ Verificar que el user pertenece a esa company (company_users)
+    const { data: cu, error: cuErr } = await supabaseAdmin
+      .from("company_users")
+      .select("user_id, company_id, active")
+      .eq("user_id", userId)
+      .eq("company_id", integ.company_id)
+      .eq("active", true)
+      .maybeSingle();
 
+    if (cuErr) return json({ error: cuErr.message }, 500);
+    if (!cu) return json({ error: "Forbidden (not member of company)" }, 403);
+
+    // ✅ Upsert credentials (server-side, no RLS issues)
     const { error: upErr } = await supabaseAdmin
       .from("integration_credentials")
       .upsert(
@@ -63,12 +97,10 @@ const SERVICE_ROLE_KEY = Deno.env.get("SB_SERVICE_ROLE_KEY");
         { onConflict: "company_id,integration_id" }
       );
 
-    if (upErr) {
-      return Response.json({ error: upErr.message }, { status: 400, headers: corsHeaders });
-    }
+    if (upErr) return json({ error: upErr.message }, 400);
 
-    return Response.json({ ok: true }, { headers: corsHeaders });
+    return json({ ok: true });
   } catch (e: any) {
-    return Response.json({ error: e?.message ?? String(e) }, { status: 500, headers: corsHeaders });
+    return json({ error: e?.message ?? String(e) }, 500);
   }
 });
