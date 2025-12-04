@@ -45,7 +45,7 @@ const PurchaseOrders = () => {
     queryFn: async () => {
       if (!currentCompany?.id) return [];
       
-      let query = supabase
+      let query = (supabase as any)
         .from("purchase_orders")
         .select(`
           *,
@@ -102,7 +102,7 @@ const PurchaseOrders = () => {
     mutationFn: async (orderData: any) => {
       if (!currentCompany?.id) throw new Error("No company selected");
 
-      const { data: order, error: orderError } = await supabase
+      const { data: order, error: orderError } = await (supabase as any)
         .from("purchase_orders")
         .insert({
           company_id: currentCompany.id,
@@ -126,7 +126,7 @@ const PurchaseOrders = () => {
         subtotal: item.subtotal,
       }));
 
-      const { error: itemsError } = await supabase
+      const { error: itemsError } = await (supabase as any)
         .from("purchase_order_items")
         .insert(itemsToInsert);
 
@@ -146,7 +146,7 @@ const PurchaseOrders = () => {
 
   const updateOrderStatusMutation = useMutation({
     mutationFn: async ({ orderId, status }: { orderId: string; status: string }) => {
-      const { error } = await supabase
+      const { error } = await (supabase as any)
         .from("purchase_orders")
         .update({ status })
         .eq("id", orderId);
@@ -163,7 +163,7 @@ const PurchaseOrders = () => {
 
   const deleteOrderMutation = useMutation({
     mutationFn: async (orderId: string) => {
-      const { error } = await supabase
+      const { error } = await (supabase as any)
         .from("purchase_orders")
         .delete()
         .eq("id", orderId);

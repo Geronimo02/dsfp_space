@@ -32,7 +32,7 @@ const PurchaseReception = () => {
     queryFn: async () => {
       if (!currentCompany?.id) return [];
       
-      let query = supabase
+      let query = (supabase as any)
         .from("purchase_orders")
         .select(`
           *,
@@ -78,7 +78,7 @@ const PurchaseReception = () => {
       if (!currentCompany?.id) throw new Error("No company selected");
 
       // Update order status
-      const { error: orderError } = await supabase
+      const { error: orderError } = await (supabase as any)
         .from("purchase_orders")
         .update({ status: "received" })
         .eq("id", receptionData.order_id);
@@ -87,7 +87,7 @@ const PurchaseReception = () => {
 
       // Update stock for each product
       for (const item of receptionData.items) {
-        const { data: currentStock } = await supabase
+        const { data: currentStock } = await (supabase as any)
           .from("warehouse_stock")
           .select("quantity")
           .eq("warehouse_id", receptionData.warehouse_id)
@@ -96,10 +96,10 @@ const PurchaseReception = () => {
 
         if (currentStock) {
           // Update existing stock
-          const { error: stockError } = await supabase
+          const { error: stockError } = await (supabase as any)
             .from("warehouse_stock")
             .update({ 
-              quantity: currentStock.quantity + item.received_quantity,
+              quantity: (currentStock as any).quantity + item.received_quantity,
               updated_at: new Date().toISOString()
             })
             .eq("warehouse_id", receptionData.warehouse_id)
@@ -108,7 +108,7 @@ const PurchaseReception = () => {
           if (stockError) throw stockError;
         } else {
           // Create new stock entry
-          const { error: stockError } = await supabase
+          const { error: stockError } = await (supabase as any)
             .from("warehouse_stock")
             .insert({
               warehouse_id: receptionData.warehouse_id,
@@ -138,7 +138,7 @@ const PurchaseReception = () => {
       }
 
       // Create reception record
-      const { error: receptionError } = await supabase
+      const { error: receptionError } = await (supabase as any)
         .from("purchase_receptions")
         .insert({
           company_id: currentCompany.id,
