@@ -17,6 +17,7 @@ import { useCompany } from "@/contexts/CompanyContext";
 const Reports = () => {
   const { currentCompany } = useCompany();
   const [dateRange, setDateRange] = useState("7");
+  const [reportCurrency, setReportCurrency] = useState("ARS");
 
   const getDateRange = () => {
     const days = parseInt(dateRange);
@@ -26,9 +27,41 @@ const Reports = () => {
     };
   };
 
+  // Exchange rates query for currency conversion
+  const { data: exchangeRates } = useQuery({
+    queryKey: ["exchange-rates-reports", currentCompany?.id],
+    queryFn: async () => {
+      if (!currentCompany?.id) return [];
+      const { data, error } = await supabase
+        .from("exchange_rates")
+        .select("*")
+        .eq("company_id", currentCompany.id)
+        .order("updated_at", { ascending: false });
+      if (error) throw error;
+      return data;
+    },
+    enabled: !!currentCompany?.id,
+  });
+
+  // Helper function to convert amounts
+  const convertAmount = (amount: number, toCurrency: string = reportCurrency): number => {
+    if (toCurrency === 'ARS' || !exchangeRates) return amount;
+    
+    const rate = exchangeRates.find(r => r.currency === toCurrency);
+    if (rate && rate.rate > 0) {
+      return amount / rate.rate;
+    }
+    return amount;
+  };
+
+  // Format amount with currency
+  const formatCurrency = (amount: number): string => {
+    return `${reportCurrency} ${convertAmount(amount).toFixed(2)}`;
+  };
+
   // Ventas por día
   const { data: salesData } = useQuery({
-    queryKey: ["reports-sales", dateRange, currentCompany?.id],
+    queryKey: ["reports-sales", dateRange, currentCompany?.id, reportCurrency],
     queryFn: async () => {
       const { start, end } = getDateRange();
       const { data, error } = await supabase
@@ -47,7 +80,7 @@ const Reports = () => {
         if (!acc[day]) {
           acc[day] = { day, total: 0, count: 0 };
         }
-        acc[day].total += Number(sale.total);
+        acc[day].total += convertAmount(Number(sale.total));
         acc[day].count += 1;
         return acc;
       }, {});
@@ -58,7 +91,7 @@ const Reports = () => {
 
   // Métodos de pago
   const { data: paymentMethodsData } = useQuery({
-    queryKey: ["reports-payment-methods", dateRange, currentCompany?.id],
+    queryKey: ["reports-payment-methods", dateRange, currentCompany?.id, reportCurrency],
     queryFn: async () => {
       const { start, end } = getDateRange();
       const { data, error } = await supabase
@@ -75,7 +108,7 @@ const Reports = () => {
         if (!acc[method]) {
           acc[method] = { name: method, value: 0 };
         }
-        acc[method].value += Number(sale.total);
+        acc[method].value += convertAmount(Number(sale.total));
         return acc;
       }, {});
 
@@ -85,7 +118,7 @@ const Reports = () => {
 
   // Productos más vendidos
   const { data: topProductsData } = useQuery({
-    queryKey: ["reports-top-products", dateRange, currentCompany?.id],
+    queryKey: ["reports-top-products", dateRange, currentCompany?.id, reportCurrency],
     queryFn: async () => {
       const { start, end } = getDateRange();
       const { data, error } = await supabase
@@ -109,7 +142,7 @@ const Reports = () => {
           acc[name] = { name, quantity: 0, revenue: 0 };
         }
         acc[name].quantity += item.quantity;
-        acc[name].revenue += Number(item.subtotal);
+        acc[name].revenue += convertAmount(Number(item.subtotal));
         return acc;
       }, {});
 
@@ -335,43 +368,57 @@ const Reports = () => {
             <h1 className="text-3xl font-bold">Reportes y Análisis</h1>
             <p className="text-muted-foreground">Visualiza el rendimiento de tu negocio</p>
           </div>
-          <Select value={dateRange} onValueChange={setDateRange}>
-            <SelectTrigger className="w-[180px]">
-              <SelectValue />
-            </SelectTrigger>
-            <SelectContent>
-              <SelectItem value="7">Últimos 7 días</SelectItem>
-              <SelectItem value="15">Últimos 15 días</SelectItem>
-              <SelectItem value="30">Últimos 30 días</SelectItem>
-              <SelectItem value="90">Últimos 90 días</SelectItem>
-            </SelectContent>
-          </Select>
+          <div className="flex gap-2">
+            <Select value={dateRange} onValueChange={setDateRange}>
+              <SelectTrigger className="w-[180px]">
+                <SelectValue />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="7">Últimos 7 días</SelectItem>
+                <SelectItem value="15">Últimos 15 días</SelectItem>
+                <SelectItem value="30">Últimos 30 días</SelectItem>
+                <SelectItem value="90">Últimos 90 días</SelectItem>
+              </SelectContent>
+            </Select>
+            <Select value={reportCurrency} onValueChange={setReportCurrency}>
+              <SelectTrigger className="w-[140px]">
+                <SelectValue />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="ARS">💵 ARS</SelectItem>
+                <SelectItem value="USD">💵 USD</SelectItem>
+                <SelectItem value="EUR">💶 EUR</SelectItem>
+                <SelectItem value="BRL">💵 BRL</SelectItem>
+                <SelectItem value="UYU">💵 UYU</SelectItem>
+              </SelectContent>
+            </Select>
+          </div>
         </div>
 
         {/* Resumen de métricas */}
         <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-4">
           <StatCard
             title="Ventas Totales"
-            value={`$${summary?.totalSales.toFixed(2) || "0.00"}`}
+            value={formatCurrency(summary?.totalSales || 0)}
             icon={DollarSign}
             trend="up"
             trendValue={`${summary?.salesCount || 0} ventas`}
           />
           <StatCard
             title="Compras Totales"
-            value={`$${summary?.totalPurchases.toFixed(2) || "0.00"}`}
+            value={formatCurrency(summary?.totalPurchases || 0)}
             icon={ShoppingCart}
           />
           <StatCard
             title="Ganancia Bruta"
-            value={`$${summary?.profit.toFixed(2) || "0.00"}`}
+            value={formatCurrency(summary?.profit || 0)}
             icon={TrendingUp}
             trend={summary?.profit >= 0 ? "up" : "down"}
             trendValue={`${((summary?.profit / summary?.totalSales) * 100 || 0).toFixed(1)}%`}
           />
           <StatCard
             title="Balance de Caja"
-            value={`$${summary?.cashBalance.toFixed(2) || "0.00"}`}
+            value={formatCurrency(summary?.cashBalance || 0)}
             icon={Wallet}
           />
         </div>
