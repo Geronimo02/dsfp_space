@@ -72,12 +72,31 @@ const buildAppsScript = (webhookUrl: string, secret: string) => `
 const WEBHOOK_URL = "${webhookUrl}";
 const WEBHOOK_SECRET = "${secret}";
 
+// Trigger: From spreadsheet → On form submit
 function onFormSubmit(e) {
+  // Timestamp real (primera columna suele ser timestamp)
+  const sheetTimestamp = (e && e.values && e.values[0]) ? e.values[0] : null;
+
   const payload = {
     secret: WEBHOOK_SECRET,
-    submittedAt: new Date().toISOString(),
-    namedValues: e && e.namedValues ? e.namedValues : {},
-    values: e && e.values ? e.values : [],
+
+    // Preferimos timestamp del sheet si existe, si no usamos "ahora"
+    submittedAt: sheetTimestamp
+      ? new Date(sheetTimestamp).toISOString()
+      : new Date().toISOString(),
+
+    // Named values: { "[customer_name] Nombre": ["Juan"], ... }
+    namedValues: (e && e.namedValues) ? e.namedValues : {},
+
+    // Fila completa (por si querés debuggear o reconstruir)
+    values: (e && e.values) ? e.values : [],
+
+    // Meta útil para debug
+    meta: {
+      spreadsheetId: SpreadsheetApp.getActiveSpreadsheet().getId(),
+      sheetName: SpreadsheetApp.getActiveSheet().getName(),
+      formUrl: SpreadsheetApp.getActiveSpreadsheet().getFormUrl(),
+    },
   };
 
   const options = {
@@ -87,8 +106,17 @@ function onFormSubmit(e) {
     muteHttpExceptions: true,
   };
 
-  const res = UrlFetchApp.fetch(WEBHOOK_URL, options);
-  Logger.log(res.getContentText());
+  try {
+    Logger.log("Sending payload namedValues:");
+    Logger.log(JSON.stringify(payload.namedValues, null, 2));
+
+    const res = UrlFetchApp.fetch(WEBHOOK_URL, options);
+    Logger.log("STATUS " + res.getResponseCode());
+    Logger.log("BODY " + res.getContentText());
+  } catch (err) {
+    Logger.log("ERROR");
+    Logger.log(String(err));
+  }
 }
 `.trim();
 
