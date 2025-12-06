@@ -6,6 +6,9 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/com
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Switch } from "@/components/ui/switch";
+import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription } from "@/components/ui/dialog";
+import { Separator } from "@/components/ui/separator";
+import { ScrollArea } from "@/components/ui/scroll-area";
 import { toast } from "sonner";
 import { useMemo, useState, useEffect } from "react";
 import { Settings, ShoppingCart, Store, FileText, BarChart3 } from "lucide-react";
@@ -32,8 +35,14 @@ type IntegrationOrderRow = {
   external_order_id: string | null;
   customer_name: string | null;
   customer_email: string | null;
+  customer_phone: string | null;
   status: string | null;
   created_at: string;
+  currency: string | null;
+  total_amount: number | string | null;
+  items_count: number | null;
+  external_created_at: string | null;
+  order_data: any;
   integrations?: { integration_type?: string | null; name?: string | null } | null;
 };
 
@@ -48,9 +57,7 @@ const genSecret = () =>
 
 const getFunctionsBaseUrl = () => {
   const url =
-    (import.meta as any)?.env?.VITE_SUPABASE_URL ||
-    (import.meta as any)?.env?.PUBLIC_SUPABASE_URL ||
-    "";
+    (import.meta as any)?.env?.VITE_SUPABASE_URL || (import.meta as any)?.env?.PUBLIC_SUPABASE_URL || "";
   return url ? `${String(url).replace(/\/$/, "")}/functions/v1` : "";
 };
 
@@ -85,10 +92,10 @@ function onFormSubmit(e) {
       ? new Date(sheetTimestamp).toISOString()
       : new Date().toISOString(),
 
-    // Named values: { "[customer_name] Nombre": ["Juan"], ... }
+    // Named values
     namedValues: (e && e.namedValues) ? e.namedValues : {},
 
-    // Fila completa (por si querés debuggear o reconstruir)
+    // Fila completa
     values: (e && e.values) ? e.values : [],
 
     // Meta útil para debug
@@ -126,18 +133,11 @@ async function copyToClipboard(text: string, label: string) {
 }
 
 const Integrations = () => {
-  console.log("VITE_SUPABASE_URL =", import.meta.env.VITE_SUPABASE_URL);
-  console.log(
-    "VITE_SUPABASE_ANON_KEY starts =",
-    (import.meta.env.VITE_SUPABASE_ANON_KEY ?? "").slice(0, 12)
-  );
-
   const { currentCompany } = useCompany();
   const queryClient = useQueryClient();
-
   const companyId = currentCompany?.id ?? null;
 
-  // ---- Modal Google Forms (UX “usuario normal”)
+  // -------------------- Google Forms modal --------------------
   const [configModal, setConfigModal] = useState<ConfigModalState>({ open: false });
   const [gfWebhookUrl, setGfWebhookUrl] = useState<string>("");
   const [gfSecret, setGfSecret] = useState<string>("");
@@ -147,9 +147,7 @@ const Integrations = () => {
     if (configModal.open && configModal.type === "google_forms") {
       const base = import.meta.env.VITE_SUPABASE_URL?.replace(/\/$/, "");
       if (base) {
-        setGfWebhookUrl(
-          `${base}/functions/v1/webhooks-google-forms?integrationId=${configModal.integrationId}`
-        );
+        setGfWebhookUrl(`${base}/functions/v1/webhooks-google-forms?integrationId=${configModal.integrationId}`);
       }
       setGfSecret((prev) => prev || genSecret());
       setShowInstructions(true);
@@ -158,32 +156,32 @@ const Integrations = () => {
 
   const appsScript = useMemo(() => buildAppsScript(gfWebhookUrl, gfSecret), [gfWebhookUrl, gfSecret]);
 
+  // -------------------- Order detail modal --------------------
+  const [orderModalOpen, setOrderModalOpen] = useState(false);
+  const [selectedOrder, setSelectedOrder] = useState<IntegrationOrderRow | null>(null);
+
+  const openOrder = (o: IntegrationOrderRow) => {
+    setSelectedOrder(o);
+    setOrderModalOpen(true);
+  };
+
+  const formatMoney = (amount: any, currency?: string | null) => {
+    const n = typeof amount === "string" ? Number(amount) : amount;
+    if (n === null || n === undefined || Number.isNaN(n)) return "-";
+    const cur = (currency ?? "ARS").toUpperCase();
+    try {
+      return new Intl.NumberFormat("es-AR", { style: "currency", currency: cur }).format(n);
+    } catch {
+      return `${n} ${cur}`;
+    }
+  };
+
   const integrationTypes = useMemo(
     () => [
-      {
-        type: "mercadolibre" as const,
-        name: "Mercado Libre",
-        icon: ShoppingCart,
-        description: "Sincroniza pedidos y genera facturas automáticamente",
-      },
-      {
-        type: "tiendanube" as const,
-        name: "Tienda Nube",
-        icon: Store,
-        description: "Conecta tu tienda online con tu sistema",
-      },
-      {
-        type: "woocommerce" as const,
-        name: "WooCommerce",
-        icon: Store,
-        description: "Integración con tu tienda WordPress",
-      },
-      {
-        type: "google_forms" as const,
-        name: "Google Forms",
-        icon: FileText,
-        description: "Crea clientes y presupuestos desde formularios",
-      },
+      { type: "mercadolibre" as const, name: "Mercado Libre", icon: ShoppingCart, description: "Sincroniza pedidos y genera facturas automáticamente" },
+      { type: "tiendanube" as const, name: "Tienda Nube", icon: Store, description: "Conecta tu tienda online con tu sistema" },
+      { type: "woocommerce" as const, name: "WooCommerce", icon: Store, description: "Integración con tu tienda WordPress" },
+      { type: "google_forms" as const, name: "Google Forms", icon: FileText, description: "Crea clientes y presupuestos desde formularios" },
     ],
     []
   );
@@ -196,9 +194,7 @@ const Integrations = () => {
       if (!companyId) return [];
       const { data, error } = await supabase
         .from("integrations")
-        .select(
-          "id, company_id, integration_type, name, active, config, last_sync_at, sync_frequency, auto_invoice, auto_email, created_at, updated_at"
-        )
+        .select("id, company_id, integration_type, name, active, config, last_sync_at, sync_frequency, auto_invoice, auto_email, created_at, updated_at")
         .eq("company_id", companyId)
         .order("created_at", { ascending: false });
 
@@ -207,12 +203,7 @@ const Integrations = () => {
     },
   });
 
-
-
-
-
-
-  // ---- derivaciones de integraciones activas (sirve para: panel / query / filtros)
+  // ---- derivaciones integraciones activas
   const activeIntegrationTypes = useMemo(() => {
     return new Set(
       (integrations ?? [])
@@ -221,12 +212,9 @@ const Integrations = () => {
     );
   }, [integrations]);
 
-  const hasAnyActiveIntegration = useMemo(
-    () => activeIntegrationTypes.size > 0,
-    [activeIntegrationTypes]
-  );
+  const hasAnyActiveIntegration = useMemo(() => activeIntegrationTypes.size > 0, [activeIntegrationTypes]);
 
-  // ---- filtros por tipo en el panel de pedidos
+  // ---- filtros por tipo (chips)
   const [orderTypeFilter, setOrderTypeFilter] = useState<Record<IntegrationType, boolean>>({
     mercadolibre: true,
     tiendanube: true,
@@ -234,8 +222,6 @@ const Integrations = () => {
     google_forms: true,
   });
 
-
-  
   // si un módulo deja de estar activo, apago su filtro automáticamente
   useEffect(() => {
     setOrderTypeFilter((prev) => {
@@ -253,66 +239,6 @@ const Integrations = () => {
     );
   }, [orderTypeFilter, activeIntegrationTypes]);
 
-  // ---- Orders query (performance: solo corre si hay integraciones activas y algún filtro seleccionado)
-  const PAGE_SIZE = 15;
-
-const {
-  data: ordersPages,
-  isLoading: isLoadingOrders,
-  isFetchingNextPage,
-  fetchNextPage,
-  hasNextPage,
-} = useInfiniteQuery({
-  queryKey: [
-    "integration_orders",
-    companyId,
-    // cache distinto si cambian tipos activos o filtros seleccionados
-    [...activeIntegrationTypes].sort().join(","),
-    (Object.keys(orderTypeFilter) as IntegrationType[])
-      .filter((t) => orderTypeFilter[t])
-      .sort()
-      .join(","),
-  ],
-   enabled: !!companyId,
-  initialPageParam: 0 as number,
-  queryFn: async ({ pageParam }) => {
-    if (!companyId) return [];
-
-    const from = pageParam as number;
-    const to = from + PAGE_SIZE - 1;
-
-    const { data, error } = await supabase
-      .from("integration_orders")
-      .select(
-        `
-        id,
-        external_order_id,
-        customer_name,
-        customer_email,
-        status,
-        created_at,
-        integrations (
-          integration_type,
-          name
-        )
-      `
-      )
-      .eq("company_id", companyId)
-      .order("created_at", { ascending: false })
-      .range(from, to);
-
-    if (error) throw error;
-    return (data ?? []) as IntegrationOrderRow[];
-  },
-  getNextPageParam: (lastPage, allPages) => {
-    // si viene una página con menos de PAGE_SIZE, ya no hay más
-    if (!lastPage || lastPage.length < PAGE_SIZE) return undefined;
-    return allPages.length * PAGE_SIZE;
-  },
-});
-
-
-
   const selectedTypes = useMemo(() => {
     const selected = new Set<IntegrationType>();
     (Object.keys(orderTypeFilter) as IntegrationType[]).forEach((t) => {
@@ -321,66 +247,108 @@ const {
     return selected;
   }, [orderTypeFilter, activeIntegrationTypes]);
 
-  const allOrders = useMemo(() => {
-  const pages = ordersPages?.pages ?? [];
-  return pages.flat();
-}, [ordersPages]);
+  // ---- Orders infinite query (pages de 15)
+  const PAGE_SIZE = 15;
 
-const countsByType = useMemo(() => {
-  const counts: Record<IntegrationType, number> = {
-    mercadolibre: 0,
-    tiendanube: 0,
-    woocommerce: 0,
-    google_forms: 0,
-  };
+  const {
+    data: ordersPages,
+    isLoading: isLoadingOrders,
+    isFetchingNextPage,
+    fetchNextPage,
+    hasNextPage,
+  } = useInfiniteQuery({
+    queryKey: [
+      "integration_orders",
+      companyId,
+      [...activeIntegrationTypes].sort().join(","),
+      (Object.keys(orderTypeFilter) as IntegrationType[])
+        .filter((t) => orderTypeFilter[t])
+        .sort()
+        .join(","),
+    ],
+    enabled: !!companyId && hasAnyActiveIntegration, // performance: si no hay activas, ni consulta
+    initialPageParam: 0 as number,
+    queryFn: async ({ pageParam }) => {
+      if (!companyId) return [];
 
-  for (const o of allOrders) {
-    const t = (o.integrations?.integration_type ?? "") as IntegrationType;
-    if (t in counts) counts[t] += 1;
-  }
-  return counts;
-}, [allOrders]);
+      const from = pageParam as number;
+      const to = from + PAGE_SIZE - 1;
 
+      const { data, error } = await supabase
+        .from("integration_orders")
+        .select(
+          `
+          id,
+          external_order_id,
+          customer_name,
+          customer_email,
+          customer_phone,
+          status,
+          created_at,
+          currency,
+          total_amount,
+          items_count,
+          external_created_at,
+          order_data,
+          integrations (
+            integration_type,
+            name
+          )
+        `
+        )
+        .eq("company_id", companyId)
+        .order("created_at", { ascending: false })
+        .range(from, to);
 
-const filteredOrders = useMemo(() => {
-  return allOrders.filter((o) => {
-    const t = (o.integrations?.integration_type ?? "") as IntegrationType;
-    return selectedTypes.has(t);
+      if (error) throw error;
+      return (data ?? []) as unknown as IntegrationOrderRow[];
+    },
+    getNextPageParam: (lastPage, allPages) => {
+      if (!lastPage || lastPage.length < PAGE_SIZE) return undefined;
+      return allPages.length * PAGE_SIZE;
+    },
   });
-}, [allOrders, selectedTypes]);
 
+  const allOrders = useMemo(() => {
+    const pages = ordersPages?.pages ?? [];
+    return pages.flat();
+  }, [ordersPages]);
 
- const { data: countsRows, isLoading: isLoadingCounts } = useQuery({
-  queryKey: ["integration_orders_counts", companyId],
-  enabled: !!companyId,
-  queryFn: async () => {
-    const { data, error } = await (supabase as any).rpc("integration_orders_counts", {
-      p_company_id: companyId,
+  const filteredOrders = useMemo(() => {
+    return allOrders.filter((o) => {
+      const t = (o.integrations?.integration_type ?? "") as IntegrationType;
+      return selectedTypes.has(t);
+    });
+  }, [allOrders, selectedTypes]);
+
+  // counts reales desde DB (para mostrar "0" aunque esté off)
+  const { data: countsRows, isLoading: isLoadingCounts } = useQuery({
+    queryKey: ["integration_orders_counts", companyId],
+    enabled: !!companyId,
+    queryFn: async () => {
+      const { data, error } = await (supabase as any).rpc("integration_orders_counts", {
+        p_company_id: companyId,
+      });
+      if (error) throw error;
+      return (data as unknown) as { integration_type: string; total: number }[];
+    },
+  });
+
+  const countsByTypeDb = useMemo(() => {
+    const base: Record<IntegrationType, number> = {
+      mercadolibre: 0,
+      tiendanube: 0,
+      woocommerce: 0,
+      google_forms: 0,
+    };
+
+    (countsRows ?? []).forEach((r) => {
+      const t = r.integration_type as IntegrationType;
+      if (t in base) base[t] = Number(r.total ?? 0);
     });
 
-    if (error) throw error;
-
-    return (data as unknown) as { integration_type: string; total: number }[];
-  },
-});
-
-const countsByTypeDb = useMemo(() => {
-  const base: Record<IntegrationType, number> = {
-    mercadolibre: 0,
-    tiendanube: 0,
-    woocommerce: 0,
-    google_forms: 0,
-  };
-
-  (countsRows ?? []).forEach((r) => {
-    const t = r.integration_type as IntegrationType;
-    if (t in base) base[t] = Number(r.total ?? 0);
-  });
-
-  return base;
-}, [countsRows]);
-
-
+    return base;
+  }, [countsRows]);
 
   // -------------------- Mutations --------------------
   const toggleMutation = useMutation({
@@ -391,6 +359,7 @@ const countsByTypeDb = useMemo(() => {
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["integrations", companyId] });
       queryClient.invalidateQueries({ queryKey: ["integration_orders", companyId] });
+      queryClient.invalidateQueries({ queryKey: ["integration_orders_counts", companyId] });
       toast.success("Integración actualizada");
     },
     onError: () => toast.error("Error al actualizar la integración"),
@@ -401,11 +370,6 @@ const countsByTypeDb = useMemo(() => {
     return (integrations ?? []).find((i) => i.integration_type === type) ?? null;
   };
 
-  /**
-   * IMPORTANT:
-   * This requires a UNIQUE constraint on (company_id, integration_type) to avoid duplicates:
-   *  alter table public.integrations add constraint integrations_company_type_unique unique (company_id, integration_type);
-   */
   const ensureIntegrationRow = async (type: IntegrationType) => {
     if (!companyId) throw new Error("No companyId");
     const { data, error } = await supabase
@@ -422,9 +386,7 @@ const countsByTypeDb = useMemo(() => {
         },
         { onConflict: "company_id,integration_type" }
       )
-      .select(
-        "id, company_id, integration_type, name, active, config, last_sync_at, sync_frequency, auto_invoice, auto_email, created_at, updated_at"
-      )
+      .select("id, company_id, integration_type, name, active, config, last_sync_at, sync_frequency, auto_invoice, auto_email, created_at, updated_at")
       .single();
 
     if (error) throw error;
@@ -467,7 +429,6 @@ const countsByTypeDb = useMemo(() => {
     }
   };
 
-  // ---- Google Forms actions (needs edge functions)
   const saveGoogleFormsCredentials = async () => {
     if (!companyId) return toast.error("No hay companyId");
     if (!gfSecret || gfSecret.length < 16) return toast.error("El secret debe tener al menos 16 caracteres");
@@ -475,8 +436,10 @@ const countsByTypeDb = useMemo(() => {
     if (!configModal.open) return;
 
     try {
-      const { data: { session } } = await supabase.auth.getSession();
-      console.log("session?", !!session, session?.user?.id);
+      const {
+        data: { session },
+      } = await supabase.auth.getSession();
+
       if (!session) {
         toast.error("No estás logueado (no hay sesión). Iniciá sesión y reintentá.");
         return;
@@ -493,9 +456,7 @@ const countsByTypeDb = useMemo(() => {
 
       const { error: upErr } = await supabase
         .from("integrations")
-        .update({
-          config: { googleForms: { webhookUrl: gfWebhookUrl } },
-        })
+        .update({ config: { googleForms: { webhookUrl: gfWebhookUrl } } })
         .eq("id", configModal.integrationId);
 
       if (upErr) throw upErr;
@@ -505,10 +466,7 @@ const countsByTypeDb = useMemo(() => {
       setConfigModal({ open: false });
     } catch (e: any) {
       console.error(e);
-      toast.error(
-        e?.message ??
-          "No se pudo guardar. Probable: falta deploy de la Edge Function integrations-save-credentials"
-      );
+      toast.error(e?.message ?? "No se pudo guardar (falta deploy de Edge Function integrations-save-credentials)");
     }
   };
 
@@ -611,12 +569,7 @@ const countsByTypeDb = useMemo(() => {
                         <BarChart3 className="mr-2 h-4 w-4" />
                         Ver Logs
                       </Button>
-                      <Button
-                        variant="outline"
-                        className="w-full"
-                        size="sm"
-                        onClick={() => onConfigure(integration.type)}
-                      >
+                      <Button variant="outline" className="w-full" size="sm" onClick={() => onConfigure(integration.type)}>
                         <Settings className="mr-2 h-4 w-4" />
                         Configuración
                       </Button>
@@ -637,77 +590,75 @@ const countsByTypeDb = useMemo(() => {
             </CardHeader>
 
             <CardContent>
-              {/* Filtros (solo aparecen para integraciones activas) */}
+              {/* Filtros chips */}
               <div className="mb-4 flex flex-wrap items-center gap-2">
                 {(Object.keys(orderTypeFilter) as IntegrationType[])
-    .filter((t) => activeIntegrationTypes.has(t))
-    .map((t) => {
-      const label =
-        t === "google_forms"
-          ? "Google Forms"
-          : t === "mercadolibre"
-          ? "Mercado Libre"
-          : t === "tiendanube"
-          ? "Tienda Nube"
-          : t === "woocommerce"
-          ? "WooCommerce"
-          : t;
+                  .filter((t) => activeIntegrationTypes.has(t))
+                  .map((t) => {
+                    const label =
+                      t === "google_forms"
+                        ? "Google Forms"
+                        : t === "mercadolibre"
+                        ? "Mercado Libre"
+                        : t === "tiendanube"
+                        ? "Tienda Nube"
+                        : t === "woocommerce"
+                        ? "WooCommerce"
+                        : t;
 
-      const on = orderTypeFilter[t];
-      const countLabel = isLoadingCounts ? "—" : String(countsByTypeDb[t] ?? 0);
+                    const on = orderTypeFilter[t];
+                    const countLabel = isLoadingCounts ? "—" : String(countsByTypeDb[t] ?? 0);
 
-      return (
-        <Badge
-          key={t}
-          variant={on ? "default" : "outline"}
-          className="cursor-pointer select-none px-3 py-1.5 text-sm"
-          onClick={() => setOrderTypeFilter((p) => ({ ...p, [t]: !p[t] }))}
-          title="Click para filtrar"
-        >
-          {label} <span className="ml-2 opacity-80">({countLabel})</span>
-        </Badge>
-      );
-    })}
+                    return (
+                      <Badge
+                        key={t}
+                        variant={on ? "default" : "outline"}
+                        className="cursor-pointer select-none px-3 py-1.5 text-sm"
+                        onClick={() => setOrderTypeFilter((p) => ({ ...p, [t]: !p[t] }))}
+                        title="Click para filtrar"
+                      >
+                        {label} <span className="ml-2 opacity-80">({countLabel})</span>
+                      </Badge>
+                    );
+                  })}
 
-  <div className="ml-auto flex gap-2">
-    <Button
-      type="button"
-      variant="outline"
-      size="sm"
-      onClick={() =>
-        setOrderTypeFilter((p) => {
-          const next = { ...p };
-          (Object.keys(next) as IntegrationType[]).forEach((t) => {
-            next[t] = activeIntegrationTypes.has(t);
-          });
-          return next;
-        })
-      }
-    >
-      Ver todos
-    </Button>
+                <div className="ml-auto flex gap-2">
+                  <Button
+                    type="button"
+                    variant="outline"
+                    size="sm"
+                    onClick={() =>
+                      setOrderTypeFilter((p) => {
+                        const next = { ...p };
+                        (Object.keys(next) as IntegrationType[]).forEach((t) => {
+                          next[t] = activeIntegrationTypes.has(t);
+                        });
+                        return next;
+                      })
+                    }
+                  >
+                    Ver todos
+                  </Button>
 
-    <Button
-      type="button"
-      variant="outline"
-      size="sm"
-      onClick={() =>
-        setOrderTypeFilter((p) => {
-          const next = { ...p };
-          (Object.keys(next) as IntegrationType[]).forEach((t) => (next[t] = false));
-          return next;
-        })
-      }
-    >
-      Limpiar
-    </Button>
-  </div>
+                  <Button
+                    type="button"
+                    variant="outline"
+                    size="sm"
+                    onClick={() =>
+                      setOrderTypeFilter((p) => {
+                        const next = { ...p };
+                        (Object.keys(next) as IntegrationType[]).forEach((t) => (next[t] = false));
+                        return next;
+                      })
+                    }
+                  >
+                    Limpiar
+                  </Button>
+                </div>
               </div>
 
               {!hasSelectedTypes ? (
-                <div className="text-center text-muted-foreground py-8">
-                  Seleccioná al menos una integración para ver pedidos.
-                </div>
+                <div className="text-center text-muted-foreground py-8">Seleccioná al menos una integración para ver pedidos.</div>
               ) : isLoadingOrders ? (
                 <div className="text-center text-muted-foreground py-8">Cargando pedidos...</div>
               ) : filteredOrders.length > 0 ? (
@@ -725,42 +676,163 @@ const countsByTypeDb = useMemo(() => {
                           {o.customer_email ? ` · ${o.customer_email}` : ""}
                         </div>
 
-                        <div className="text-xs text-muted-foreground">
-                          {o.created_at ? new Date(o.created_at).toLocaleString() : ""}
+                        <div className="text-xs text-muted-foreground flex gap-3 flex-wrap">
+                          <span>{o.created_at ? new Date(o.created_at).toLocaleString() : ""}</span>
+                          {o.items_count != null && <span>{o.items_count} ítems</span>}
+                          {o.total_amount != null && <span>{formatMoney(o.total_amount, o.currency)}</span>}
                         </div>
                       </div>
 
-                      <Badge variant={o.status === "processed" ? "default" : "secondary"}>
-                        {o.status || "unknown"}
-                      </Badge>
+                      <div className="flex items-center gap-2">
+                        <Badge variant={o.status === "processed" ? "default" : "secondary"}>{o.status || "unknown"}</Badge>
+                        <Button variant="outline" size="sm" onClick={() => openOrder(o)}>
+                          Ver pedido
+                        </Button>
+                      </div>
                     </div>
                   ))}
-                  <div className="pt-4 flex justify-center">
-                  {hasNextPage ? (
-                    <Button variant="outline" onClick={() => fetchNextPage()} disabled={isFetchingNextPage}>
-                      {isFetchingNextPage ? "Cargando..." : "Cargar más"}
-                    </Button>
-                  ) : (
-                    <div className="text-xs text-muted-foreground py-2">No hay más pedidos</div>
-                  )}
-                </div>
 
+                  <div className="pt-4 flex justify-center">
+                    {hasNextPage ? (
+                      <Button variant="outline" onClick={() => fetchNextPage()} disabled={isFetchingNextPage}>
+                        {isFetchingNextPage ? "Cargando..." : "Cargar más"}
+                      </Button>
+                    ) : (
+                      <div className="text-xs text-muted-foreground py-2">No hay más pedidos</div>
+                    )}
+                  </div>
                 </div>
               ) : (
-                <div className="text-center text-muted-foreground py-8">
-                  No hay pedidos para los filtros seleccionados
-                </div>
+                <div className="text-center text-muted-foreground py-8">No hay pedidos para los filtros seleccionados</div>
               )}
             </CardContent>
           </Card>
         )}
       </div>
 
+      {/* ---------------- Modal: Ver pedido ---------------- */}
+      <Dialog open={orderModalOpen} onOpenChange={setOrderModalOpen}>
+        <DialogContent className="max-w-3xl">
+          <DialogHeader>
+            <DialogTitle>Detalle del pedido</DialogTitle>
+            <DialogDescription>
+              {selectedOrder?.integrations?.name || selectedOrder?.integrations?.integration_type || "Integración"} · #
+              {selectedOrder?.external_order_id ?? "s/n"}
+            </DialogDescription>
+          </DialogHeader>
+
+          <ScrollArea className="max-h-[70vh] pr-4">
+            <div className="space-y-4">
+              <div className="grid gap-2 md:grid-cols-2">
+                <Card>
+                  <CardHeader>
+                    <CardTitle className="text-base">Cliente</CardTitle>
+                  </CardHeader>
+                  <CardContent className="text-sm space-y-1">
+                    <div>
+                      <b>Nombre:</b> {selectedOrder?.customer_name ?? "-"}
+                    </div>
+                    <div>
+                      <b>Email:</b> {selectedOrder?.customer_email ?? "-"}
+                    </div>
+                    <div>
+                      <b>WhatsApp:</b> {selectedOrder?.customer_phone ?? "-"}
+                    </div>
+                    <div>
+                      <b>Fecha:</b>{" "}
+                      {selectedOrder?.created_at ? new Date(selectedOrder.created_at).toLocaleString() : "-"}
+                    </div>
+                  </CardContent>
+                </Card>
+
+                <Card>
+                  <CardHeader>
+                    <CardTitle className="text-base">Resumen</CardTitle>
+                  </CardHeader>
+                  <CardContent className="text-sm space-y-1">
+                    <div>
+                      <b>Estado:</b> {selectedOrder?.status ?? "-"}
+                    </div>
+                    <div>
+                      <b>Ítems:</b> {selectedOrder?.items_count ?? "-"}
+                    </div>
+                    <div>
+                      <b>Total:</b> {formatMoney(selectedOrder?.total_amount, selectedOrder?.currency)}
+                    </div>
+                    <div>
+                      <b>Moneda:</b> {(selectedOrder?.currency ?? "-").toString()}
+                    </div>
+                  </CardContent>
+                </Card>
+              </div>
+
+              <Separator />
+
+              <div>
+                <div className="text-base font-semibold mb-2">Ítems</div>
+
+                {Array.isArray(selectedOrder?.order_data?.items) && selectedOrder!.order_data.items.length > 0 ? (
+                  <div className="space-y-2">
+                    {selectedOrder!.order_data.items.map((it: any, idx: number) => (
+                      <div key={idx} className="rounded-lg border p-3 text-sm">
+                        <div className="font-medium">{it.product ?? `Item ${idx + 1}`}</div>
+                        <div className="text-muted-foreground mt-1 flex flex-wrap gap-3">
+                          <span>
+                            Cant: <b>{it.qty ?? 1}</b>
+                          </span>
+                          <span>
+                            Unit: <b>{formatMoney(it.unit_price, selectedOrder?.currency)}</b>
+                          </span>
+                          <span>
+                            Subtotal: <b>{formatMoney(it.line_total, selectedOrder?.currency)}</b>
+                          </span>
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+                ) : (
+                  <div className="text-sm text-muted-foreground">No hay items en este pedido.</div>
+                )}
+              </div>
+
+              <Separator />
+
+              <div className="grid gap-2 md:grid-cols-2">
+                <Card>
+                  <CardHeader>
+                    <CardTitle className="text-base">Notas</CardTitle>
+                  </CardHeader>
+                  <CardContent className="text-sm text-muted-foreground whitespace-pre-wrap">
+                    {selectedOrder?.order_data?.notes ?? "-"}
+                  </CardContent>
+                </Card>
+
+                <Card>
+                  <CardHeader>
+                    <CardTitle className="text-base">Condiciones</CardTitle>
+                  </CardHeader>
+                  <CardContent className="text-sm space-y-1">
+                    <div>
+                      <b>Pago:</b> {selectedOrder?.order_data?.payment_terms ?? "-"}
+                    </div>
+                    <div>
+                      <b>Vencimiento:</b> {selectedOrder?.order_data?.due_date ?? "-"}
+                    </div>
+                    <div>
+                      <b>Extra:</b> {formatMoney(selectedOrder?.order_data?.extra_cost, selectedOrder?.currency)}
+                    </div>
+                  </CardContent>
+                </Card>
+              </div>
+            </div>
+          </ScrollArea>
+        </DialogContent>
+      </Dialog>
+
       {/* ---------------- Google Forms Modal ---------------- */}
       {configModal.open && configModal.type === "google_forms" && (
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 p-4">
           <div className="w-full max-w-2xl rounded-2xl bg-background shadow-lg border max-h-[85vh] overflow-y-auto">
-            {/* header */}
             <div className="p-5 flex items-start justify-between gap-4 border-b">
               <div>
                 <div className="text-xl font-semibold">Conectar Google Forms</div>
@@ -773,7 +845,6 @@ const countsByTypeDb = useMemo(() => {
               </Button>
             </div>
 
-            {/* body */}
             <div className="p-5 space-y-4">
               <div className="grid gap-4 md:grid-cols-2">
                 <Card>
@@ -805,21 +876,14 @@ const countsByTypeDb = useMemo(() => {
                   <CardContent className="space-y-2">
                     <input className="w-full rounded-md border bg-muted px-3 py-2 text-sm" value={gfSecret} readOnly />
                     <div className="flex gap-2">
-                      <Button
-                        variant="outline"
-                        className="w-full"
-                        onClick={() => copyToClipboard(gfSecret, "Secret")}
-                        disabled={!gfSecret}
-                      >
+                      <Button variant="outline" className="w-full" onClick={() => copyToClipboard(gfSecret, "Secret")} disabled={!gfSecret}>
                         Copiar Secret
                       </Button>
                       <Button variant="outline" onClick={() => setGfSecret(genSecret())}>
                         Regenerar
                       </Button>
                     </div>
-                    <div className="text-xs text-muted-foreground">
-                      Si regenerás el secret, el script viejo deja de funcionar.
-                    </div>
+                    <div className="text-xs text-muted-foreground">Si regenerás el secret, el script viejo deja de funcionar.</div>
                   </CardContent>
                 </Card>
               </div>
@@ -859,11 +923,7 @@ const countsByTypeDb = useMemo(() => {
                   </div>
                 )}
 
-                <textarea
-                  className="mt-3 w-full min-h-[180px] md:min-h-[220px] rounded-xl border bg-background p-3 font-mono text-xs"
-                  value={appsScript}
-                  readOnly
-                />
+                <textarea className="mt-3 w-full min-h-[180px] md:min-h-[220px] rounded-xl border bg-background p-3 font-mono text-xs" value={appsScript} readOnly />
               </div>
 
               <div className="flex flex-col-reverse gap-2 md:flex-row md:justify-end pt-2">

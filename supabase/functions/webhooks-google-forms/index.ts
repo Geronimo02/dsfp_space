@@ -8,6 +8,37 @@ const corsHeaders = {
   "Access-Control-Allow-Methods": "POST, OPTIONS",
 };
 
+
+function normalizeKey(s: string) {
+  return s.replace(/\s+/g, " ").trim().toLowerCase();
+}
+
+function pickItemField(
+  namedValues: Record<string, any>,
+  kind: "producto" | "cantidad" | "precio",
+  idx: number
+) {
+  const keys = Object.keys(namedValues ?? {});
+  const idxToken = `(item ${idx})`;
+
+  const k = keys.find((raw) => {
+    const key = normalizeKey(raw);
+
+    // tiene que ser el item correcto
+    if (!key.includes(idxToken)) return false;
+
+    // y el tipo de campo tiene que estar al INICIO de la key (evita "agregar otro producto")
+    if (kind === "producto") return key.startsWith("producto");
+    if (kind === "cantidad") return key.startsWith("cantidad");
+    if (kind === "precio") return key.startsWith("precio"); // matchea "precio unitario..."
+    return false;
+  });
+
+  if (!k) return null;
+  return pickFirst(namedValues, k);
+}
+
+
 function json(body: any, status = 200) {
   return new Response(JSON.stringify(body), {
     status,
@@ -100,15 +131,29 @@ function parseIntLike(input: any): number | null {
 }
 
 function safeIsoDate(input: any): string {
-  try {
-    if (!input) return new Date().toISOString();
-    const d = new Date(input);
-    if (Number.isNaN(d.getTime())) return new Date().toISOString();
-    return d.toISOString();
-  } catch {
-    return new Date().toISOString();
+  if (!input) return new Date().toISOString();
+
+  const s = String(input).trim();
+
+  // DD/MM/YYYY HH:mm:ss
+  const m = s.match(/^(\d{1,2})\/(\d{1,2})\/(\d{4})(?:\s+(\d{1,2}):(\d{2})(?::(\d{2}))?)?$/);
+  if (m) {
+    const dd = Number(m[1]);
+    const mm = Number(m[2]);
+    const yyyy = Number(m[3]);
+    const hh = Number(m[4] ?? 0);
+    const min = Number(m[5] ?? 0);
+    const ss = Number(m[6] ?? 0);
+    return new Date(Date.UTC(yyyy, mm - 1, dd, hh, min, ss)).toISOString();
   }
+
+  // ISO u otros formatos
+  const d = new Date(s);
+  if (!Number.isNaN(d.getTime())) return d.toISOString();
+
+  return new Date().toISOString();
 }
+
 
 type Item = {
   product: string;
@@ -216,47 +261,29 @@ Deno.serve(async (req) => {
   // ------------------------
   // Parse items (item1..item5)
   // ------------------------
-  const MAX_ITEMS = 5;
+  const MAX_ITEMS = 8;
+const items: Item[] = [];
 
-  const items: Item[] = [];
-  for (let i = 1; i <= MAX_ITEMS; i++) {
-    const product =
-      pickByTag(namedValues, `item${i}_product`) ??
-      pickByContains(namedValues, [`producto ${i}`, `producto${i}`]) ??
-      null;
+for (let i = 1; i <= MAX_ITEMS; i++) {
+  const product = pickItemField(namedValues, "producto", i);
+  if (!product) continue;
 
-    // si no hay product, asumimos que ese item no existe
-    if (!product) continue;
+  const qtyRaw = pickItemField(namedValues, "cantidad", i) ?? "1";
+  const qty = Math.max(1, parseIntLike(qtyRaw) ?? 1);
 
-    const qtyRaw =
-      pickByTag(namedValues, `item${i}_qty`) ??
-      pickByContains(namedValues, [`cantidad ${i}`, `qty ${i}`, `cantidad${i}`]) ??
-      "1";
+  const priceRaw = pickItemField(namedValues, "precio", i);
+  const unit_price = parseMoneyLike(priceRaw);
 
-    const qty = Math.max(1, parseIntLike(qtyRaw) ?? 1);
+  const line_total = unit_price !== null ? unit_price * qty : null;
 
-    const unitPriceRaw =
-      pickByTag(namedValues, `item${i}_price`) ??
-      pickByContains(namedValues, [`precio unitario ${i}`, `precio ${i}`, `price ${i}`]) ??
-      null;
+  items.push({
+    product: String(product),
+    qty,
+    unit_price,
+    line_total,
+  });
+}
 
-    const unit_price = parseMoneyLike(unitPriceRaw);
-
-    const line_total = unit_price !== null ? unit_price * qty : null;
-
-    const itemNotes =
-      pickByTag(namedValues, `item${i}_notes`) ??
-      pickByContains(namedValues, [`nota ${i}`, `notas ${i}`]) ??
-      null;
-
-    items.push({
-      product: String(product),
-      qty,
-      unit_price,
-      line_total,
-      notes: itemNotes,
-    });
-  }
 
   // Si por error no había tags, intentá un fallback mínimo con "Producto" y "Precio unitario"
   if (items.length === 0) {
