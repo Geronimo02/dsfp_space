@@ -179,6 +179,11 @@ const Integrations = () => {
     },
   });
 
+
+
+
+
+
   // ---- derivaciones de integraciones activas (sirve para: panel / query / filtros)
   const activeIntegrationTypes = useMemo(() => {
     return new Set(
@@ -201,6 +206,8 @@ const Integrations = () => {
     google_forms: true,
   });
 
+
+  
   // si un módulo deja de estar activo, apago su filtro automáticamente
   useEffect(() => {
     setOrderTypeFilter((prev) => {
@@ -238,7 +245,7 @@ const {
       .sort()
       .join(","),
   ],
-  enabled: !!companyId && hasAnyActiveIntegration && hasSelectedTypes,
+   enabled: !!companyId,
   initialPageParam: 0 as number,
   queryFn: async ({ pageParam }) => {
     if (!companyId) return [];
@@ -313,6 +320,38 @@ const filteredOrders = useMemo(() => {
     return selectedTypes.has(t);
   });
 }, [allOrders, selectedTypes]);
+
+
+ const { data: countsRows, isLoading: isLoadingCounts } = useQuery({
+  queryKey: ["integration_orders_counts", companyId],
+  enabled: !!companyId,
+  queryFn: async () => {
+    const { data, error } = await (supabase as any).rpc("integration_orders_counts", {
+      p_company_id: companyId,
+    });
+
+    if (error) throw error;
+
+    return (data as unknown) as { integration_type: string; total: number }[];
+  },
+});
+
+const countsByTypeDb = useMemo(() => {
+  const base: Record<IntegrationType, number> = {
+    mercadolibre: 0,
+    tiendanube: 0,
+    woocommerce: 0,
+    google_forms: 0,
+  };
+
+  (countsRows ?? []).forEach((r) => {
+    const t = r.integration_type as IntegrationType;
+    if (t in base) base[t] = Number(r.total ?? 0);
+  });
+
+  return base;
+}, [countsRows]);
+
 
 
   // -------------------- Mutations --------------------
@@ -587,7 +626,7 @@ const filteredOrders = useMemo(() => {
           : t;
 
       const on = orderTypeFilter[t];
-      const count = countsByType[t] ?? 0;
+      const countLabel = isLoadingCounts ? "—" : String(countsByTypeDb[t] ?? 0);
 
       return (
         <Badge
@@ -597,7 +636,7 @@ const filteredOrders = useMemo(() => {
           onClick={() => setOrderTypeFilter((p) => ({ ...p, [t]: !p[t] }))}
           title="Click para filtrar"
         >
-          {label} <span className="ml-2 opacity-80">({count})</span>
+          {label} <span className="ml-2 opacity-80">({countLabel})</span>
         </Badge>
       );
     })}
