@@ -50,8 +50,6 @@ type ConfigModalState =
   | { open: false }
   | { open: true; type: "google_forms"; integrationId: string; integrationName: string };
 
-
-  
 const genSecret = () =>
   Array.from(crypto.getRandomValues(new Uint8Array(24)))
     .map((b) => b.toString(16).padStart(2, "0"))
@@ -63,18 +61,12 @@ const getFunctionsBaseUrl = () => {
   return url ? `${String(url).replace(/\/$/, "")}/functions/v1` : "";
 };
 
-const buildGoogleFormsWebhookUrl = () => {
-  const base = getFunctionsBaseUrl();
-  return base ? `${base}/webhooks-google-forms` : "";
-};
-
-
-
 function isGoogleFormsModal(
   m: ConfigModalState
 ): m is { open: true; type: "google_forms"; integrationId: string; integrationName: string } {
   return (m as any)?.open === true && (m as any)?.type === "google_forms";
 }
+
 const secretCacheKey = (integrationId: string) => `gf_secret_${integrationId}`;
 
 const loadCachedSecret = (integrationId: string) => {
@@ -92,7 +84,6 @@ const saveCachedSecret = (integrationId: string, secret: string) => {
     // ignore
   }
 };
-
 
 const buildAppsScript = (webhookUrl: string, secret: string) => `
 // 1) Google Form → Responses → Link to Sheets
@@ -179,45 +170,54 @@ const Integrations = () => {
   const [gfSecret, setGfSecret] = useState<string>("");
   const [showInstructions, setShowInstructions] = useState<boolean>(true);
 
+  // Carga secret guardado para Google Forms (DB) y fallback a cache local; NO lo regeneres salvo que no exista
   useEffect(() => {
-  const run = async () => {
-    if (!isGoogleFormsModal(configModal)) return;
+    const run = async () => {
+      if (!isGoogleFormsModal(configModal)) return;
 
-    const base = import.meta.env.VITE_SUPABASE_URL?.replace(/\/$/, "");
-    if (base) {
-      setGfWebhookUrl(`${base}/functions/v1/webhooks-google-forms?integrationId=${configModal.integrationId}`);
-    }
-
-    try {
-      const { data, error } = await supabase.functions.invoke("integrations-get-credentials", {
-        body: { integrationId: configModal.integrationId },
-      });
-
-      if (error) throw error;
-
-      const saved = data?.webhookSecret ?? null;
-
-      if (saved) {
-        setGfSecret(saved);
-      } else {
-        // si no hay guardado, generás uno pero NO lo cambiás luego solo
-        setGfSecret((prev) => prev || genSecret());
+      const base = import.meta.env.VITE_SUPABASE_URL?.replace(/\/$/, "");
+      if (base) {
+        setGfWebhookUrl(`${base}/functions/v1/webhooks-google-forms?integrationId=${configModal.integrationId}`);
       }
-    } catch (e) {
-      // fallback solo si no tenías nada ya seteado
-      setGfSecret((prev) => prev || genSecret());
-    }
 
-    setShowInstructions(true);
-  };
+      // 1) cache local primero (UX instantáneo)
+      const cached = loadCachedSecret(configModal.integrationId);
+      if (cached) setGfSecret(cached);
 
-  run();
-}, [configModal.open, isGoogleFormsModal(configModal) ? configModal.integrationId : null]);
+      try {
+        // 2) DB (source of truth)
+        const { data, error } = await supabase.functions.invoke("integrations-get-credentials", {
+          body: { integrationId: configModal.integrationId },
+        });
+        if (error) throw error;
 
+        const saved = data?.webhookSecret ?? null;
 
+        if (saved) {
+          setGfSecret(saved);
+          saveCachedSecret(configModal.integrationId, saved);
+        } else {
+          // 3) si NO hay guardado, generá UNA vez (y cachealo) pero no lo cambies solo
+          setGfSecret((prev) => {
+            const next = prev || cached || genSecret();
+            saveCachedSecret(configModal.integrationId, next);
+            return next;
+          });
+        }
+      } catch (e) {
+        // si falla DB, asegurar que quede algún secret estable
+        setGfSecret((prev) => {
+          const next = prev || cached || genSecret();
+          saveCachedSecret(configModal.integrationId, next);
+          return next;
+        });
+      }
 
+      setShowInstructions(true);
+    };
 
-
+    run();
+  }, [configModal.open, isGoogleFormsModal(configModal) ? configModal.integrationId : null]);
 
   const appsScript = useMemo(() => buildAppsScript(gfWebhookUrl, gfSecret), [gfWebhookUrl, gfSecret]);
 
@@ -252,7 +252,7 @@ const Integrations = () => {
         type: "mercadolibre" as const,
         name: "Mercado Libre",
         icon: ShoppingCart,
-        description: "Sincroniza pedidos y genera facturas automáticamente",
+        description: "Conectá tu cuenta de Mercado Libre y sincronizá pedidos",
       },
       {
         type: "tiendanube" as const,
@@ -354,7 +354,7 @@ const Integrations = () => {
         .sort()
         .join(","),
     ],
-    enabled: !!companyId && hasAnyActiveIntegration && hasSelectedTypes, // ✅ bloquea query si no hay activas o no hay filtros
+    enabled: !!companyId && hasAnyActiveIntegration && hasSelectedTypes,
     initialPageParam: 0 as number,
     queryFn: async ({ pageParam }) => {
       if (!companyId) return [];
@@ -389,7 +389,6 @@ const Integrations = () => {
         .range(from, to);
 
       if (error) throw error;
-      // ✅ evita el error de TS cuando los tipos no están regenerados
       return (data ?? []) as unknown as IntegrationOrderRow[];
     },
     getNextPageParam: (lastPage, allPages) => {
@@ -459,6 +458,10 @@ const Integrations = () => {
     return (integrations ?? []).find((i) => i.integration_type === type) ?? null;
   };
 
+  /**
+   * Requires UNIQUE constraint: (company_id, integration_type)
+   * alter table public.integrations add constraint integrations_company_type_unique unique (company_id, integration_type);
+   */
   const ensureIntegrationRow = async (type: IntegrationType) => {
     if (!companyId) throw new Error("No companyId");
     const { data, error } = await supabase
@@ -486,11 +489,33 @@ const Integrations = () => {
     return data as IntegrationRow;
   };
 
+  // ✅ MercadoLibre: arranca OAuth (Edge Function integrations-ml-start)
+  const startMercadoLibreOAuth = async (integrationId: string) => {
+    try {
+      const { data, error } = await supabase.functions.invoke("integrations-ml-start", {
+        body: { integrationId },
+      });
+      if (error) throw error;
+      if (!data?.url) throw new Error("No URL de autorización (revisá integrations-ml-start)");
+      window.location.href = data.url;
+    } catch (e: any) {
+      console.error(e);
+      toast.error(e?.message ?? "No se pudo iniciar OAuth de Mercado Libre");
+    }
+  };
+
   const onConfigure = async (type: IntegrationType) => {
     try {
       const row = await ensureIntegrationRow(type);
 
-      if (type === "mercadolibre" || type === "tiendanube") {
+      if (type === "mercadolibre") {
+        // 👇 ahora MercadoLibre se conecta con OAuth ML (no usamos integrations-start acá)
+        await startMercadoLibreOAuth(row.id);
+        return;
+      }
+
+      if (type === "tiendanube") {
+        // dejalo como estaba si ya lo tenías armado con integrations-start
         const { data, error } = await supabase.functions.invoke("integrations-start", {
           body: { integrationId: row.id, type },
         });
@@ -553,13 +578,13 @@ const Integrations = () => {
       if (upErr) throw upErr;
 
       toast.success("Google Forms configurado (secret guardado)");
-      // ✅ cache local para que NO cambie al refrescar
-if (isGoogleFormsModal(configModal)) {
-  saveCachedSecret(configModal.integrationId, gfSecret);
-}
 
-queryClient.invalidateQueries({ queryKey: ["integrations", companyId] });
-setConfigModal({ open: false });
+      if (isGoogleFormsModal(configModal)) {
+        saveCachedSecret(configModal.integrationId, gfSecret);
+      }
+
+      queryClient.invalidateQueries({ queryKey: ["integrations", companyId] });
+      setConfigModal({ open: false });
     } catch (e: any) {
       console.error(e);
       toast.error(e?.message ?? "No se pudo guardar (falta deploy de Edge Function integrations-save-credentials)");
@@ -665,12 +690,7 @@ setConfigModal({ open: false });
                         <BarChart3 className="mr-2 h-4 w-4" />
                         Ver Logs
                       </Button>
-                      <Button
-                        variant="outline"
-                        className="w-full"
-                        size="sm"
-                        onClick={() => onConfigure(integration.type)}
-                      >
+                      <Button variant="outline" className="w-full" size="sm" onClick={() => onConfigure(integration.type)}>
                         <Settings className="mr-2 h-4 w-4" />
                         Configuración
                       </Button>
@@ -881,21 +901,11 @@ setConfigModal({ open: false });
                           </span>
                           <span>
                             Unit:{" "}
-                            <b>
-                              {formatMoney(
-                                it.unit_price,
-                                selectedOrder?.currency ?? selectedOrder?.order_data?.currency
-                              )}
-                            </b>
+                            <b>{formatMoney(it.unit_price, selectedOrder?.currency ?? selectedOrder?.order_data?.currency)}</b>
                           </span>
                           <span>
                             Subtotal:{" "}
-                            <b>
-                              {formatMoney(
-                                it.line_total,
-                                selectedOrder?.currency ?? selectedOrder?.order_data?.currency
-                              )}
-                            </b>
+                            <b>{formatMoney(it.line_total, selectedOrder?.currency ?? selectedOrder?.order_data?.currency)}</b>
                           </span>
                         </div>
                       </div>
@@ -941,7 +951,6 @@ setConfigModal({ open: false });
               </div>
 
               <Separator />
-
             </div>
           </ScrollArea>
         </DialogContent>
@@ -954,9 +963,16 @@ setConfigModal({ open: false });
             <div className="p-5 flex items-start justify-between gap-4 border-b">
               <div>
                 <div className="text-xl font-semibold">Conectar Google Forms</div>
-                <div className="text-sm text-muted-foreground mt-1">Copiá y pegá. Esto conecta tu Form con RetailSnap sin OAuth.</div>
+                <div className="text-sm text-muted-foreground mt-1">
+                  Copiá y pegá. Esto conecta tu Form con RetailSnap sin OAuth.
+                </div>
               </div>
-              <Button variant="outline" onClick={() => setConfigModal({ open: false })}>
+              <Button
+                variant="outline"
+                onClick={() => {
+                  setConfigModal({ open: false });
+                }}
+              >
                 Cerrar
               </Button>
             </div>
@@ -1000,13 +1016,15 @@ setConfigModal({ open: false });
                       >
                         Copiar Secret
                       </Button>
-                      <Button variant="outline"
-  onClick={() => {
-    if (!isGoogleFormsModal(configModal)) return;
-    const s = genSecret();
-    setGfSecret(s);
-    saveCachedSecret(configModal.integrationId, s);
-  }}>
+                      <Button
+                        variant="outline"
+                        onClick={() => {
+                          if (!isGoogleFormsModal(configModal)) return;
+                          const s = genSecret();
+                          setGfSecret(s);
+                          saveCachedSecret(configModal.integrationId, s);
+                        }}
+                      >
                         Regenerar
                       </Button>
                     </div>
