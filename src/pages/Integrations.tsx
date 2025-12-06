@@ -66,6 +66,13 @@ const buildGoogleFormsWebhookUrl = () => {
   return base ? `${base}/webhooks-google-forms` : "";
 };
 
+
+function isGoogleFormsModal(
+  m: ConfigModalState
+): m is { open: true; type: "google_forms"; integrationId: string; integrationName: string } {
+  return (m as any)?.open === true && (m as any)?.type === "google_forms";
+}
+
 const buildAppsScript = (webhookUrl: string, secret: string) => `
 // 1) Google Form → Responses → Link to Sheets
 // 2) En la Sheet: Extensions → Apps Script
@@ -153,16 +160,16 @@ const Integrations = () => {
 
 useEffect(() => {
   const run = async () => {
-    if (!configModal.open) return;
-    if (configModal.type !== "google_forms") return;
+    if (!isGoogleFormsModal(configModal)) return;
 
+    // webhook url
     const base = import.meta.env.VITE_SUPABASE_URL?.replace(/\/$/, "");
     if (base) {
       setGfWebhookUrl(`${base}/functions/v1/webhooks-google-forms?integrationId=${configModal.integrationId}`);
     }
 
     try {
-      // 1) Traer secret guardado
+      // Traer secret guardado
       const { data, error } = await (supabase as any)
         .from("integration_credentials")
         .select("credentials")
@@ -171,12 +178,15 @@ useEffect(() => {
 
       if (error) throw error;
 
-      const savedSecret = data?.credentials?.webhookSecret ?? null;
+      const saved = data?.credentials?.webhookSecret ?? null;
 
-      // 2) Si existe, usarlo. Si no, generar uno.
-      setGfSecret(savedSecret || genSecret());
+      if (saved) {
+        setGfSecret(saved);
+      } else {
+        setGfSecret(genSecret());
+      }
     } catch (e) {
-      // fallback si falla la query
+      // si falla la DB, fallback
       setGfSecret(genSecret());
     }
 
@@ -184,7 +194,11 @@ useEffect(() => {
   };
 
   run();
-}, [configModal.open]);
+}, [
+  configModal.open,
+  isGoogleFormsModal(configModal) ? configModal.integrationId : null,
+]);
+
 
 
 
