@@ -50,6 +50,8 @@ type ConfigModalState =
   | { open: false }
   | { open: true; type: "google_forms"; integrationId: string; integrationName: string };
 
+
+  
 const genSecret = () =>
   Array.from(crypto.getRandomValues(new Uint8Array(24)))
     .map((b) => b.toString(16).padStart(2, "0"))
@@ -67,12 +69,12 @@ const buildGoogleFormsWebhookUrl = () => {
 };
 
 
+
 function isGoogleFormsModal(
   m: ConfigModalState
 ): m is { open: true; type: "google_forms"; integrationId: string; integrationName: string } {
   return (m as any)?.open === true && (m as any)?.type === "google_forms";
 }
-
 const secretCacheKey = (integrationId: string) => `gf_secret_${integrationId}`;
 
 const loadCachedSecret = (integrationId: string) => {
@@ -539,9 +541,13 @@ const Integrations = () => {
       if (upErr) throw upErr;
 
       toast.success("Google Forms configurado (secret guardado)");
-      saveCachedSecret(configModal.integrationId, gfSecret);
-      queryClient.invalidateQueries({ queryKey: ["integrations", companyId] });
-      setConfigModal({ open: false });
+      // ✅ cache local para que NO cambie al refrescar
+if (isGoogleFormsModal(configModal)) {
+  saveCachedSecret(configModal.integrationId, gfSecret);
+}
+
+queryClient.invalidateQueries({ queryKey: ["integrations", companyId] });
+setConfigModal({ open: false });
     } catch (e: any) {
       console.error(e);
       toast.error(e?.message ?? "No se pudo guardar (falta deploy de Edge Function integrations-save-credentials)");
