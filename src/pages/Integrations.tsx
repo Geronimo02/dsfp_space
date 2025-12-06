@@ -942,14 +942,6 @@ setConfigModal({ open: false });
 
               <Separator />
 
-              <details>
-                <summary className="cursor-pointer select-none text-sm text-muted-foreground">
-                  Ver JSON completo (order_data)
-                </summary>
-                <pre className="mt-2 whitespace-pre-wrap rounded-xl border bg-muted p-3 overflow-x-auto text-xs">
-                  {JSON.stringify(selectedOrder?.order_data ?? {}, null, 2)}
-                </pre>
-              </details>
             </div>
           </ScrollArea>
         </DialogContent>
