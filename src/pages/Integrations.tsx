@@ -151,20 +151,41 @@ const Integrations = () => {
   const [gfSecret, setGfSecret] = useState<string>("");
   const [showInstructions, setShowInstructions] = useState<boolean>(true);
 
- useEffect(() => {
-  if (!configModal.open) return;
+useEffect(() => {
+  const run = async () => {
+    if (!configModal.open) return;
+    if (configModal.type !== "google_forms") return;
 
-  // acá TS ya sabe que es { open: true; ... }
-  if (configModal.type !== "google_forms") return;
+    const base = import.meta.env.VITE_SUPABASE_URL?.replace(/\/$/, "");
+    if (base) {
+      setGfWebhookUrl(`${base}/functions/v1/webhooks-google-forms?integrationId=${configModal.integrationId}`);
+    }
 
-  const base = import.meta.env.VITE_SUPABASE_URL?.replace(/\/$/, "");
-  if (base) {
-    setGfWebhookUrl(`${base}/functions/v1/webhooks-google-forms?integrationId=${configModal.integrationId}`);
-  }
+    try {
+      // 1) Traer secret guardado
+      const { data, error } = await (supabase as any)
+        .from("integration_credentials")
+        .select("credentials")
+        .eq("integration_id", configModal.integrationId)
+        .maybeSingle();
 
-  setGfSecret((prev) => prev || genSecret());
-  setShowInstructions(true);
+      if (error) throw error;
+
+      const savedSecret = data?.credentials?.webhookSecret ?? null;
+
+      // 2) Si existe, usarlo. Si no, generar uno.
+      setGfSecret(savedSecret || genSecret());
+    } catch (e) {
+      // fallback si falla la query
+      setGfSecret(genSecret());
+    }
+
+    setShowInstructions(true);
+  };
+
+  run();
 }, [configModal.open]);
+
 
 
   const appsScript = useMemo(() => buildAppsScript(gfWebhookUrl, gfSecret), [gfWebhookUrl, gfSecret]);
