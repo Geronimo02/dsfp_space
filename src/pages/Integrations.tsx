@@ -132,6 +132,14 @@ async function copyToClipboard(text: string, label: string) {
   toast.success(`${label} copiado`);
 }
 
+const labelForType = (t: IntegrationType) => {
+  if (t === "google_forms") return "Google Forms";
+  if (t === "mercadolibre") return "Mercado Libre";
+  if (t === "tiendanube") return "Tienda Nube";
+  if (t === "woocommerce") return "WooCommerce";
+  return t;
+};
+
 const Integrations = () => {
   const { currentCompany } = useCompany();
   const queryClient = useQueryClient();
@@ -165,12 +173,17 @@ const Integrations = () => {
     setOrderModalOpen(true);
   };
 
+  const closeOrder = (open: boolean) => {
+    setOrderModalOpen(open);
+    if (!open) setSelectedOrder(null);
+  };
+
   const formatMoney = (amount: any, currency?: string | null) => {
     const n = typeof amount === "string" ? Number(amount) : amount;
     if (n === null || n === undefined || Number.isNaN(n)) return "-";
     const cur = (currency ?? "ARS").toUpperCase();
     try {
-      return new Intl.NumberFormat("es-AR", { style: "currency", currency: cur }).format(n);
+      return new Intl.NumberFormat("es-AR", { style: "currency", currency: cur, maximumFractionDigits: 2 }).format(n);
     } catch {
       return `${n} ${cur}`;
     }
@@ -178,10 +191,30 @@ const Integrations = () => {
 
   const integrationTypes = useMemo(
     () => [
-      { type: "mercadolibre" as const, name: "Mercado Libre", icon: ShoppingCart, description: "Sincroniza pedidos y genera facturas automáticamente" },
-      { type: "tiendanube" as const, name: "Tienda Nube", icon: Store, description: "Conecta tu tienda online con tu sistema" },
-      { type: "woocommerce" as const, name: "WooCommerce", icon: Store, description: "Integración con tu tienda WordPress" },
-      { type: "google_forms" as const, name: "Google Forms", icon: FileText, description: "Crea clientes y presupuestos desde formularios" },
+      {
+        type: "mercadolibre" as const,
+        name: "Mercado Libre",
+        icon: ShoppingCart,
+        description: "Sincroniza pedidos y genera facturas automáticamente",
+      },
+      {
+        type: "tiendanube" as const,
+        name: "Tienda Nube",
+        icon: Store,
+        description: "Conecta tu tienda online con tu sistema",
+      },
+      {
+        type: "woocommerce" as const,
+        name: "WooCommerce",
+        icon: Store,
+        description: "Integración con tu tienda WordPress",
+      },
+      {
+        type: "google_forms" as const,
+        name: "Google Forms",
+        icon: FileText,
+        description: "Crea clientes y presupuestos desde formularios",
+      },
     ],
     []
   );
@@ -194,7 +227,9 @@ const Integrations = () => {
       if (!companyId) return [];
       const { data, error } = await supabase
         .from("integrations")
-        .select("id, company_id, integration_type, name, active, config, last_sync_at, sync_frequency, auto_invoice, auto_email, created_at, updated_at")
+        .select(
+          "id, company_id, integration_type, name, active, config, last_sync_at, sync_frequency, auto_invoice, auto_email, created_at, updated_at"
+        )
         .eq("company_id", companyId)
         .order("created_at", { ascending: false });
 
@@ -233,12 +268,6 @@ const Integrations = () => {
     });
   }, [activeIntegrationTypes]);
 
-  const hasSelectedTypes = useMemo(() => {
-    return (Object.keys(orderTypeFilter) as IntegrationType[]).some(
-      (t) => orderTypeFilter[t] && activeIntegrationTypes.has(t)
-    );
-  }, [orderTypeFilter, activeIntegrationTypes]);
-
   const selectedTypes = useMemo(() => {
     const selected = new Set<IntegrationType>();
     (Object.keys(orderTypeFilter) as IntegrationType[]).forEach((t) => {
@@ -246,6 +275,8 @@ const Integrations = () => {
     });
     return selected;
   }, [orderTypeFilter, activeIntegrationTypes]);
+
+  const hasSelectedTypes = useMemo(() => selectedTypes.size > 0, [selectedTypes]);
 
   // ---- Orders infinite query (pages de 15)
   const PAGE_SIZE = 15;
@@ -266,7 +297,7 @@ const Integrations = () => {
         .sort()
         .join(","),
     ],
-    enabled: !!companyId && hasAnyActiveIntegration, // performance: si no hay activas, ni consulta
+    enabled: !!companyId && hasAnyActiveIntegration && hasSelectedTypes, // ✅ bloquea query si no hay activas o no hay filtros
     initialPageParam: 0 as number,
     queryFn: async ({ pageParam }) => {
       if (!companyId) return [];
@@ -301,6 +332,7 @@ const Integrations = () => {
         .range(from, to);
 
       if (error) throw error;
+      // ✅ evita el error de TS cuando los tipos no están regenerados
       return (data ?? []) as unknown as IntegrationOrderRow[];
     },
     getNextPageParam: (lastPage, allPages) => {
@@ -386,7 +418,9 @@ const Integrations = () => {
         },
         { onConflict: "company_id,integration_type" }
       )
-      .select("id, company_id, integration_type, name, active, config, last_sync_at, sync_frequency, auto_invoice, auto_email, created_at, updated_at")
+      .select(
+        "id, company_id, integration_type, name, active, config, last_sync_at, sync_frequency, auto_invoice, auto_email, created_at, updated_at"
+      )
       .single();
 
     if (error) throw error;
@@ -569,7 +603,12 @@ const Integrations = () => {
                         <BarChart3 className="mr-2 h-4 w-4" />
                         Ver Logs
                       </Button>
-                      <Button variant="outline" className="w-full" size="sm" onClick={() => onConfigure(integration.type)}>
+                      <Button
+                        variant="outline"
+                        className="w-full"
+                        size="sm"
+                        onClick={() => onConfigure(integration.type)}
+                      >
                         <Settings className="mr-2 h-4 w-4" />
                         Configuración
                       </Button>
@@ -595,17 +634,6 @@ const Integrations = () => {
                 {(Object.keys(orderTypeFilter) as IntegrationType[])
                   .filter((t) => activeIntegrationTypes.has(t))
                   .map((t) => {
-                    const label =
-                      t === "google_forms"
-                        ? "Google Forms"
-                        : t === "mercadolibre"
-                        ? "Mercado Libre"
-                        : t === "tiendanube"
-                        ? "Tienda Nube"
-                        : t === "woocommerce"
-                        ? "WooCommerce"
-                        : t;
-
                     const on = orderTypeFilter[t];
                     const countLabel = isLoadingCounts ? "—" : String(countsByTypeDb[t] ?? 0);
 
@@ -617,7 +645,7 @@ const Integrations = () => {
                         onClick={() => setOrderTypeFilter((p) => ({ ...p, [t]: !p[t] }))}
                         title="Click para filtrar"
                       >
-                        {label} <span className="ml-2 opacity-80">({countLabel})</span>
+                        {labelForType(t)} <span className="ml-2 opacity-80">({countLabel})</span>
                       </Badge>
                     );
                   })}
@@ -658,7 +686,9 @@ const Integrations = () => {
               </div>
 
               {!hasSelectedTypes ? (
-                <div className="text-center text-muted-foreground py-8">Seleccioná al menos una integración para ver pedidos.</div>
+                <div className="text-center text-muted-foreground py-8">
+                  Seleccioná al menos una integración para ver pedidos.
+                </div>
               ) : isLoadingOrders ? (
                 <div className="text-center text-muted-foreground py-8">Cargando pedidos...</div>
               ) : filteredOrders.length > 0 ? (
@@ -703,7 +733,9 @@ const Integrations = () => {
                   </div>
                 </div>
               ) : (
-                <div className="text-center text-muted-foreground py-8">No hay pedidos para los filtros seleccionados</div>
+                <div className="text-center text-muted-foreground py-8">
+                  No hay pedidos para los filtros seleccionados
+                </div>
               )}
             </CardContent>
           </Card>
@@ -711,13 +743,14 @@ const Integrations = () => {
       </div>
 
       {/* ---------------- Modal: Ver pedido ---------------- */}
-      <Dialog open={orderModalOpen} onOpenChange={setOrderModalOpen}>
+      <Dialog open={orderModalOpen} onOpenChange={closeOrder}>
         <DialogContent className="max-w-3xl">
           <DialogHeader>
             <DialogTitle>Detalle del pedido</DialogTitle>
             <DialogDescription>
-              {selectedOrder?.integrations?.name || selectedOrder?.integrations?.integration_type || "Integración"} · #
-              {selectedOrder?.external_order_id ?? "s/n"}
+              {(selectedOrder?.integrations?.name || selectedOrder?.integrations?.integration_type || "Integración") +
+                " · #" +
+                (selectedOrder?.external_order_id ?? "s/n")}
             </DialogDescription>
           </DialogHeader>
 
@@ -754,13 +787,17 @@ const Integrations = () => {
                       <b>Estado:</b> {selectedOrder?.status ?? "-"}
                     </div>
                     <div>
-                      <b>Ítems:</b> {selectedOrder?.items_count ?? "-"}
+                      <b>Ítems:</b> {selectedOrder?.items_count ?? selectedOrder?.order_data?.totals?.items_count ?? "-"}
                     </div>
                     <div>
-                      <b>Total:</b> {formatMoney(selectedOrder?.total_amount, selectedOrder?.currency)}
+                      <b>Total:</b>{" "}
+                      {formatMoney(
+                        selectedOrder?.total_amount ?? selectedOrder?.order_data?.totals?.total_amount,
+                        selectedOrder?.currency ?? selectedOrder?.order_data?.currency
+                      )}
                     </div>
                     <div>
-                      <b>Moneda:</b> {(selectedOrder?.currency ?? "-").toString()}
+                      <b>Moneda:</b> {(selectedOrder?.currency ?? selectedOrder?.order_data?.currency ?? "-").toString()}
                     </div>
                   </CardContent>
                 </Card>
@@ -781,10 +818,22 @@ const Integrations = () => {
                             Cant: <b>{it.qty ?? 1}</b>
                           </span>
                           <span>
-                            Unit: <b>{formatMoney(it.unit_price, selectedOrder?.currency)}</b>
+                            Unit:{" "}
+                            <b>
+                              {formatMoney(
+                                it.unit_price,
+                                selectedOrder?.currency ?? selectedOrder?.order_data?.currency
+                              )}
+                            </b>
                           </span>
                           <span>
-                            Subtotal: <b>{formatMoney(it.line_total, selectedOrder?.currency)}</b>
+                            Subtotal:{" "}
+                            <b>
+                              {formatMoney(
+                                it.line_total,
+                                selectedOrder?.currency ?? selectedOrder?.order_data?.currency
+                              )}
+                            </b>
                           </span>
                         </div>
                       </div>
@@ -819,11 +868,26 @@ const Integrations = () => {
                       <b>Vencimiento:</b> {selectedOrder?.order_data?.due_date ?? "-"}
                     </div>
                     <div>
-                      <b>Extra:</b> {formatMoney(selectedOrder?.order_data?.extra_cost, selectedOrder?.currency)}
+                      <b>Extra:</b>{" "}
+                      {formatMoney(
+                        selectedOrder?.order_data?.extra_cost,
+                        selectedOrder?.currency ?? selectedOrder?.order_data?.currency
+                      )}
                     </div>
                   </CardContent>
                 </Card>
               </div>
+
+              <Separator />
+
+              <details>
+                <summary className="cursor-pointer select-none text-sm text-muted-foreground">
+                  Ver JSON completo (order_data)
+                </summary>
+                <pre className="mt-2 whitespace-pre-wrap rounded-xl border bg-muted p-3 overflow-x-auto text-xs">
+                  {JSON.stringify(selectedOrder?.order_data ?? {}, null, 2)}
+                </pre>
+              </details>
             </div>
           </ScrollArea>
         </DialogContent>
@@ -836,9 +900,7 @@ const Integrations = () => {
             <div className="p-5 flex items-start justify-between gap-4 border-b">
               <div>
                 <div className="text-xl font-semibold">Conectar Google Forms</div>
-                <div className="text-sm text-muted-foreground mt-1">
-                  Copiá y pegá. Esto conecta tu Form con RetailSnap sin OAuth.
-                </div>
+                <div className="text-sm text-muted-foreground mt-1">Copiá y pegá. Esto conecta tu Form con RetailSnap sin OAuth.</div>
               </div>
               <Button variant="outline" onClick={() => setConfigModal({ open: false })}>
                 Cerrar
@@ -876,7 +938,12 @@ const Integrations = () => {
                   <CardContent className="space-y-2">
                     <input className="w-full rounded-md border bg-muted px-3 py-2 text-sm" value={gfSecret} readOnly />
                     <div className="flex gap-2">
-                      <Button variant="outline" className="w-full" onClick={() => copyToClipboard(gfSecret, "Secret")} disabled={!gfSecret}>
+                      <Button
+                        variant="outline"
+                        className="w-full"
+                        onClick={() => copyToClipboard(gfSecret, "Secret")}
+                        disabled={!gfSecret}
+                      >
                         Copiar Secret
                       </Button>
                       <Button variant="outline" onClick={() => setGfSecret(genSecret())}>
@@ -923,7 +990,11 @@ const Integrations = () => {
                   </div>
                 )}
 
-                <textarea className="mt-3 w-full min-h-[180px] md:min-h-[220px] rounded-xl border bg-background p-3 font-mono text-xs" value={appsScript} readOnly />
+                <textarea
+                  className="mt-3 w-full min-h-[180px] md:min-h-[220px] rounded-xl border bg-background p-3 font-mono text-xs"
+                  value={appsScript}
+                  readOnly
+                />
               </div>
 
               <div className="flex flex-col-reverse gap-2 md:flex-row md:justify-end pt-2">
