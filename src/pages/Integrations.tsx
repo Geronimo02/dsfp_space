@@ -151,16 +151,21 @@ const Integrations = () => {
   const [gfSecret, setGfSecret] = useState<string>("");
   const [showInstructions, setShowInstructions] = useState<boolean>(true);
 
-  useEffect(() => {
-    if (configModal.open && configModal.type === "google_forms") {
-      const base = import.meta.env.VITE_SUPABASE_URL?.replace(/\/$/, "");
-      if (base) {
-        setGfWebhookUrl(`${base}/functions/v1/webhooks-google-forms?integrationId=${configModal.integrationId}`);
-      }
-      setGfSecret((prev) => prev || genSecret());
-      setShowInstructions(true);
-    }
-  }, [configModal]);
+ useEffect(() => {
+  if (!configModal.open) return;
+
+  // acá TS ya sabe que es { open: true; ... }
+  if (configModal.type !== "google_forms") return;
+
+  const base = import.meta.env.VITE_SUPABASE_URL?.replace(/\/$/, "");
+  if (base) {
+    setGfWebhookUrl(`${base}/functions/v1/webhooks-google-forms?integrationId=${configModal.integrationId}`);
+  }
+
+  setGfSecret((prev) => prev || genSecret());
+  setShowInstructions(true);
+}, [configModal.open]);
+
 
   const appsScript = useMemo(() => buildAppsScript(gfWebhookUrl, gfSecret), [gfWebhookUrl, gfSecret]);
 
