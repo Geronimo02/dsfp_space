@@ -73,6 +73,25 @@ function isGoogleFormsModal(
   return (m as any)?.open === true && (m as any)?.type === "google_forms";
 }
 
+const secretCacheKey = (integrationId: string) => `gf_secret_${integrationId}`;
+
+const loadCachedSecret = (integrationId: string) => {
+  try {
+    return localStorage.getItem(secretCacheKey(integrationId));
+  } catch {
+    return null;
+  }
+};
+
+const saveCachedSecret = (integrationId: string, secret: string) => {
+  try {
+    localStorage.setItem(secretCacheKey(integrationId), secret);
+  } catch {
+    // ignore
+  }
+};
+
+
 const buildAppsScript = (webhookUrl: string, secret: string) => `
 // 1) Google Form → Responses → Link to Sheets
 // 2) En la Sheet: Extensions → Apps Script
@@ -158,46 +177,30 @@ const Integrations = () => {
   const [gfSecret, setGfSecret] = useState<string>("");
   const [showInstructions, setShowInstructions] = useState<boolean>(true);
 
-useEffect(() => {
-  const run = async () => {
-    if (!isGoogleFormsModal(configModal)) return;
+  useEffect(() => {
+  if (!isGoogleFormsModal(configModal)) return;
 
-    // webhook url
-    const base = import.meta.env.VITE_SUPABASE_URL?.replace(/\/$/, "");
-    if (base) {
-      setGfWebhookUrl(`${base}/functions/v1/webhooks-google-forms?integrationId=${configModal.integrationId}`);
-    }
+  // webhook url
+  const base = import.meta.env.VITE_SUPABASE_URL?.replace(/\/$/, "");
+  if (base) {
+    setGfWebhookUrl(`${base}/functions/v1/webhooks-google-forms?integrationId=${configModal.integrationId}`);
+  }
 
-    try {
-      // Traer secret guardado
-      const { data, error } = await (supabase as any)
-        .from("integration_credentials")
-        .select("credentials")
-        .eq("integration_id", configModal.integrationId)
-        .maybeSingle();
+  // 1) si ya hay secret en state, no lo pises
+  setGfSecret((prev) => {
+    if (prev && prev.length >= 16) return prev;
 
-      if (error) throw error;
+    // 2) si hay cache, usarlo
+    const cached = loadCachedSecret(configModal.integrationId);
+    if (cached && cached.length >= 16) return cached;
 
-      const saved = data?.credentials?.webhookSecret ?? null;
+    // 3) sino generar uno nuevo
+    return genSecret();
+  });
 
-      if (saved) {
-        setGfSecret(saved);
-      } else {
-        setGfSecret(genSecret());
-      }
-    } catch (e) {
-      // si falla la DB, fallback
-      setGfSecret(genSecret());
-    }
+  setShowInstructions(true);
+}, [configModal.open, isGoogleFormsModal(configModal) ? configModal.integrationId : null]);
 
-    setShowInstructions(true);
-  };
-
-  run();
-}, [
-  configModal.open,
-  isGoogleFormsModal(configModal) ? configModal.integrationId : null,
-]);
 
 
 
@@ -536,6 +539,7 @@ useEffect(() => {
       if (upErr) throw upErr;
 
       toast.success("Google Forms configurado (secret guardado)");
+      saveCachedSecret(configModal.integrationId, gfSecret);
       queryClient.invalidateQueries({ queryKey: ["integrations", companyId] });
       setConfigModal({ open: false });
     } catch (e: any) {
@@ -986,7 +990,13 @@ useEffect(() => {
                       >
                         Copiar Secret
                       </Button>
-                      <Button variant="outline" onClick={() => setGfSecret(genSecret())}>
+                      <Button variant="outline"
+  onClick={() => {
+    if (!isGoogleFormsModal(configModal)) return;
+    const s = genSecret();
+    setGfSecret(s);
+    saveCachedSecret(configModal.integrationId, s);
+  }}>
                         Regenerar
                       </Button>
                     </div>
