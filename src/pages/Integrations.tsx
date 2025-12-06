@@ -1,4 +1,4 @@
-import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
+import { useQuery, useMutation, useQueryClient, useInfiniteQuery } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
 import { useCompany } from "@/contexts/CompanyContext";
 import { Layout } from "@/components/layout/Layout";
@@ -7,7 +7,7 @@ import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Switch } from "@/components/ui/switch";
 import { toast } from "sonner";
-import { useMemo, useState, useEffect} from "react";
+import { useMemo, useState, useEffect } from "react";
 import { Settings, ShoppingCart, Store, FileText, BarChart3 } from "lucide-react";
 
 type IntegrationType = "mercadolibre" | "tiendanube" | "woocommerce" | "google_forms";
@@ -47,7 +47,6 @@ const genSecret = () =>
     .join("");
 
 const getFunctionsBaseUrl = () => {
-  // Vite: VITE_SUPABASE_URL
   const url =
     (import.meta as any)?.env?.VITE_SUPABASE_URL ||
     (import.meta as any)?.env?.PUBLIC_SUPABASE_URL ||
@@ -57,7 +56,6 @@ const getFunctionsBaseUrl = () => {
 
 const buildGoogleFormsWebhookUrl = () => {
   const base = getFunctionsBaseUrl();
-  // Debe existir esta edge function: webhooks-google-forms
   return base ? `${base}/webhooks-google-forms` : "";
 };
 
@@ -101,7 +99,11 @@ async function copyToClipboard(text: string, label: string) {
 
 const Integrations = () => {
   console.log("VITE_SUPABASE_URL =", import.meta.env.VITE_SUPABASE_URL);
-console.log("VITE_SUPABASE_ANON_KEY starts =", (import.meta.env.VITE_SUPABASE_ANON_KEY ?? "").slice(0, 12));
+  console.log(
+    "VITE_SUPABASE_ANON_KEY starts =",
+    (import.meta.env.VITE_SUPABASE_ANON_KEY ?? "").slice(0, 12)
+  );
+
   const { currentCompany } = useCompany();
   const queryClient = useQueryClient();
 
@@ -114,21 +116,19 @@ console.log("VITE_SUPABASE_ANON_KEY starts =", (import.meta.env.VITE_SUPABASE_AN
   const [showInstructions, setShowInstructions] = useState<boolean>(true);
 
   useEffect(() => {
-  if (configModal.open && configModal.type === "google_forms") {
-    const base = import.meta.env.VITE_SUPABASE_URL?.replace(/\/$/, "");
-    if (base) {
-      setGfWebhookUrl(`${base}/functions/v1/webhooks-google-forms?integrationId=${configModal.integrationId}`);
+    if (configModal.open && configModal.type === "google_forms") {
+      const base = import.meta.env.VITE_SUPABASE_URL?.replace(/\/$/, "");
+      if (base) {
+        setGfWebhookUrl(
+          `${base}/functions/v1/webhooks-google-forms?integrationId=${configModal.integrationId}`
+        );
+      }
+      setGfSecret((prev) => prev || genSecret());
+      setShowInstructions(true);
     }
-    setGfSecret((prev) => prev || genSecret());
-    setShowInstructions(true);
-  }
-}, [configModal]);
+  }, [configModal]);
 
-
-  const appsScript = useMemo(
-    () => buildAppsScript(gfWebhookUrl, gfSecret),
-    [gfWebhookUrl, gfSecret]
-  );
+  const appsScript = useMemo(() => buildAppsScript(gfWebhookUrl, gfSecret), [gfWebhookUrl, gfSecret]);
 
   const integrationTypes = useMemo(
     () => [
@@ -160,7 +160,7 @@ console.log("VITE_SUPABASE_ANON_KEY starts =", (import.meta.env.VITE_SUPABASE_AN
     []
   );
 
-  // ---- Queries
+  // -------------------- Queries --------------------
   const { data: integrations, isLoading: isLoadingIntegrations } = useQuery({
     queryKey: ["integrations", companyId],
     enabled: !!companyId,
@@ -179,37 +179,143 @@ console.log("VITE_SUPABASE_ANON_KEY starts =", (import.meta.env.VITE_SUPABASE_AN
     },
   });
 
-  const { data: integrationOrders, isLoading: isLoadingOrders } = useQuery({
-    queryKey: ["integration_orders", companyId],
-    enabled: !!companyId,
-    queryFn: async () => {
-      if (!companyId) return [];
-      const { data, error } = await supabase
-        .from("integration_orders")
-        .select(
-          `
-          id,
-          external_order_id,
-          customer_name,
-          customer_email,
-          status,
-          created_at,
-          integrations (
-            integration_type,
-            name
-          )
-        `
-        )
-        .eq("company_id", companyId)
-        .order("created_at", { ascending: false })
-        .limit(10);
+  // ---- derivaciones de integraciones activas (sirve para: panel / query / filtros)
+  const activeIntegrationTypes = useMemo(() => {
+    return new Set(
+      (integrations ?? [])
+        .filter((i) => i.active)
+        .map((i) => i.integration_type as IntegrationType)
+    );
+  }, [integrations]);
 
-      if (error) throw error;
-      return (data ?? []) as IntegrationOrderRow[];
-    },
+  const hasAnyActiveIntegration = useMemo(
+    () => activeIntegrationTypes.size > 0,
+    [activeIntegrationTypes]
+  );
+
+  // ---- filtros por tipo en el panel de pedidos
+  const [orderTypeFilter, setOrderTypeFilter] = useState<Record<IntegrationType, boolean>>({
+    mercadolibre: true,
+    tiendanube: true,
+    woocommerce: true,
+    google_forms: true,
   });
 
-  // ---- Mutations
+  // si un módulo deja de estar activo, apago su filtro automáticamente
+  useEffect(() => {
+    setOrderTypeFilter((prev) => {
+      const next = { ...prev };
+      (Object.keys(next) as IntegrationType[]).forEach((t) => {
+        if (!activeIntegrationTypes.has(t)) next[t] = false;
+      });
+      return next;
+    });
+  }, [activeIntegrationTypes]);
+
+  const hasSelectedTypes = useMemo(() => {
+    return (Object.keys(orderTypeFilter) as IntegrationType[]).some(
+      (t) => orderTypeFilter[t] && activeIntegrationTypes.has(t)
+    );
+  }, [orderTypeFilter, activeIntegrationTypes]);
+
+  // ---- Orders query (performance: solo corre si hay integraciones activas y algún filtro seleccionado)
+  const PAGE_SIZE = 15;
+
+const {
+  data: ordersPages,
+  isLoading: isLoadingOrders,
+  isFetchingNextPage,
+  fetchNextPage,
+  hasNextPage,
+} = useInfiniteQuery({
+  queryKey: [
+    "integration_orders",
+    companyId,
+    // cache distinto si cambian tipos activos o filtros seleccionados
+    [...activeIntegrationTypes].sort().join(","),
+    (Object.keys(orderTypeFilter) as IntegrationType[])
+      .filter((t) => orderTypeFilter[t])
+      .sort()
+      .join(","),
+  ],
+  enabled: !!companyId && hasAnyActiveIntegration && hasSelectedTypes,
+  initialPageParam: 0 as number,
+  queryFn: async ({ pageParam }) => {
+    if (!companyId) return [];
+
+    const from = pageParam as number;
+    const to = from + PAGE_SIZE - 1;
+
+    const { data, error } = await supabase
+      .from("integration_orders")
+      .select(
+        `
+        id,
+        external_order_id,
+        customer_name,
+        customer_email,
+        status,
+        created_at,
+        integrations (
+          integration_type,
+          name
+        )
+      `
+      )
+      .eq("company_id", companyId)
+      .order("created_at", { ascending: false })
+      .range(from, to);
+
+    if (error) throw error;
+    return (data ?? []) as IntegrationOrderRow[];
+  },
+  getNextPageParam: (lastPage, allPages) => {
+    // si viene una página con menos de PAGE_SIZE, ya no hay más
+    if (!lastPage || lastPage.length < PAGE_SIZE) return undefined;
+    return allPages.length * PAGE_SIZE;
+  },
+});
+
+
+
+  const selectedTypes = useMemo(() => {
+    const selected = new Set<IntegrationType>();
+    (Object.keys(orderTypeFilter) as IntegrationType[]).forEach((t) => {
+      if (orderTypeFilter[t] && activeIntegrationTypes.has(t)) selected.add(t);
+    });
+    return selected;
+  }, [orderTypeFilter, activeIntegrationTypes]);
+
+  const allOrders = useMemo(() => {
+  const pages = ordersPages?.pages ?? [];
+  return pages.flat();
+}, [ordersPages]);
+
+const countsByType = useMemo(() => {
+  const counts: Record<IntegrationType, number> = {
+    mercadolibre: 0,
+    tiendanube: 0,
+    woocommerce: 0,
+    google_forms: 0,
+  };
+
+  for (const o of allOrders) {
+    const t = (o.integrations?.integration_type ?? "") as IntegrationType;
+    if (t in counts) counts[t] += 1;
+  }
+  return counts;
+}, [allOrders]);
+
+
+const filteredOrders = useMemo(() => {
+  return allOrders.filter((o) => {
+    const t = (o.integrations?.integration_type ?? "") as IntegrationType;
+    return selectedTypes.has(t);
+  });
+}, [allOrders, selectedTypes]);
+
+
+  // -------------------- Mutations --------------------
   const toggleMutation = useMutation({
     mutationFn: async ({ id, active }: { id: string; active: boolean }) => {
       const { error } = await supabase.from("integrations").update({ active }).eq("id", id);
@@ -217,12 +323,13 @@ console.log("VITE_SUPABASE_ANON_KEY starts =", (import.meta.env.VITE_SUPABASE_AN
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["integrations", companyId] });
+      queryClient.invalidateQueries({ queryKey: ["integration_orders", companyId] });
       toast.success("Integración actualizada");
     },
     onError: () => toast.error("Error al actualizar la integración"),
   });
 
-  // ---- Helpers
+  // -------------------- Helpers --------------------
   const getIntegrationStatus = (type: IntegrationType) => {
     return (integrations ?? []).find((i) => i.integration_type === type) ?? null;
   };
@@ -255,9 +362,7 @@ console.log("VITE_SUPABASE_ANON_KEY starts =", (import.meta.env.VITE_SUPABASE_AN
 
     if (error) throw error;
 
-    // refresh list to reflect newly created row
     queryClient.invalidateQueries({ queryKey: ["integrations", companyId] });
-
     return data as IntegrationRow;
   };
 
@@ -265,8 +370,6 @@ console.log("VITE_SUPABASE_ANON_KEY starts =", (import.meta.env.VITE_SUPABASE_AN
     try {
       const row = await ensureIntegrationRow(type);
 
-
-      // OAuth flows (need edge function "integrations-start")
       if (type === "mercadolibre" || type === "tiendanube") {
         const { data, error } = await supabase.functions.invoke("integrations-start", {
           body: { integrationId: row.id, type },
@@ -277,13 +380,11 @@ console.log("VITE_SUPABASE_ANON_KEY starts =", (import.meta.env.VITE_SUPABASE_AN
         return;
       }
 
-      // WooCommerce: implement modal later if you want (keys)
       if (type === "woocommerce") {
         toast.info("WooCommerce: falta agregar modal de keys (storeUrl, consumerKey, consumerSecret).");
         return;
       }
 
-      // Google Forms: open friendly modal with copy/paste instructions
       if (type === "google_forms") {
         setConfigModal({
           open: true,
@@ -307,13 +408,13 @@ console.log("VITE_SUPABASE_ANON_KEY starts =", (import.meta.env.VITE_SUPABASE_AN
     if (!configModal.open) return;
 
     try {
-      // 1) Store secret securely (integration_credentials). Requires edge function.
       const { data: { session } } = await supabase.auth.getSession();
       console.log("session?", !!session, session?.user?.id);
       if (!session) {
         toast.error("No estás logueado (no hay sesión). Iniciá sesión y reintentá.");
         return;
       }
+
       const { error: fnErr } = await supabase.functions.invoke("integrations-save-credentials", {
         body: {
           integrationId: configModal.integrationId,
@@ -323,7 +424,6 @@ console.log("VITE_SUPABASE_ANON_KEY starts =", (import.meta.env.VITE_SUPABASE_AN
       });
       if (fnErr) throw fnErr;
 
-      // 2) Store NON-sensitive config (webhookUrl) for UI display
       const { error: upErr } = await supabase
         .from("integrations")
         .update({
@@ -345,22 +445,21 @@ console.log("VITE_SUPABASE_ANON_KEY starts =", (import.meta.env.VITE_SUPABASE_AN
     }
   };
 
- const verifyGoogleFormsWebhook = async () => {
-  try {
-    const { data, error } = await supabase.functions.invoke("webhooks-google-forms", {
-      body: { _ping: true },
-    });
+  const verifyGoogleFormsWebhook = async () => {
+    try {
+      const { data, error } = await supabase.functions.invoke("webhooks-google-forms", {
+        body: { _ping: true },
+      });
 
-    if (error) throw error;
-    toast.success(data?.message ?? "Endpoint OK");
-  } catch (e: any) {
-    console.error(e);
-    toast.error(e?.message ?? "No se pudo verificar el endpoint");
-  }
-};
+      if (error) throw error;
+      toast.success(data?.message ?? "Endpoint OK");
+    } catch (e: any) {
+      console.error(e);
+      toast.error(e?.message ?? "No se pudo verificar el endpoint");
+    }
+  };
 
-
-
+  // -------------------- Loading --------------------
   if (isLoadingIntegrations) {
     return (
       <Layout>
@@ -421,9 +520,7 @@ console.log("VITE_SUPABASE_ANON_KEY starts =", (import.meta.env.VITE_SUPABASE_AN
                     {status && (
                       <Switch
                         checked={status.active}
-                        onCheckedChange={(checked) =>
-                          toggleMutation.mutate({ id: status.id, active: checked })
-                        }
+                        onCheckedChange={(checked) => toggleMutation.mutate({ id: status.id, active: checked })}
                       />
                     )}
                   </div>
@@ -464,191 +561,264 @@ console.log("VITE_SUPABASE_ANON_KEY starts =", (import.meta.env.VITE_SUPABASE_AN
           })}
         </div>
 
-        {(integrations?.length ?? 0) > 0 && (
+        {/* ---------------- Pedidos Sincronizados ---------------- */}
+        {hasAnyActiveIntegration && (
           <Card className="mt-6">
             <CardHeader>
               <CardTitle>Pedidos Sincronizados</CardTitle>
               <CardDescription>Últimos pedidos recibidos desde las integraciones</CardDescription>
             </CardHeader>
+
             <CardContent>
-              {isLoadingOrders ? (
+              {/* Filtros (solo aparecen para integraciones activas) */}
+              <div className="mb-4 flex flex-wrap items-center gap-2">
+                {(Object.keys(orderTypeFilter) as IntegrationType[])
+    .filter((t) => activeIntegrationTypes.has(t))
+    .map((t) => {
+      const label =
+        t === "google_forms"
+          ? "Google Forms"
+          : t === "mercadolibre"
+          ? "Mercado Libre"
+          : t === "tiendanube"
+          ? "Tienda Nube"
+          : t === "woocommerce"
+          ? "WooCommerce"
+          : t;
+
+      const on = orderTypeFilter[t];
+      const count = countsByType[t] ?? 0;
+
+      return (
+        <Badge
+          key={t}
+          variant={on ? "default" : "outline"}
+          className="cursor-pointer select-none px-3 py-1.5 text-sm"
+          onClick={() => setOrderTypeFilter((p) => ({ ...p, [t]: !p[t] }))}
+          title="Click para filtrar"
+        >
+          {label} <span className="ml-2 opacity-80">({count})</span>
+        </Badge>
+      );
+    })}
+
+  <div className="ml-auto flex gap-2">
+    <Button
+      type="button"
+      variant="outline"
+      size="sm"
+      onClick={() =>
+        setOrderTypeFilter((p) => {
+          const next = { ...p };
+          (Object.keys(next) as IntegrationType[]).forEach((t) => {
+            next[t] = activeIntegrationTypes.has(t);
+          });
+          return next;
+        })
+      }
+    >
+      Ver todos
+    </Button>
+
+    <Button
+      type="button"
+      variant="outline"
+      size="sm"
+      onClick={() =>
+        setOrderTypeFilter((p) => {
+          const next = { ...p };
+          (Object.keys(next) as IntegrationType[]).forEach((t) => (next[t] = false));
+          return next;
+        })
+      }
+    >
+      Limpiar
+    </Button>
+  </div>
+              </div>
+
+              {!hasSelectedTypes ? (
+                <div className="text-center text-muted-foreground py-8">
+                  Seleccioná al menos una integración para ver pedidos.
+                </div>
+              ) : isLoadingOrders ? (
                 <div className="text-center text-muted-foreground py-8">Cargando pedidos...</div>
-              ) : (integrationOrders?.length ?? 0) > 0 ? (
+              ) : filteredOrders.length > 0 ? (
                 <div className="space-y-3">
-                  {integrationOrders!.map((o) => (
+                  {filteredOrders.map((o) => (
                     <div key={o.id} className="flex items-center justify-between rounded-lg border p-3">
                       <div className="space-y-1">
                         <div className="font-medium">
                           {o.customer_name || "Cliente sin nombre"}{" "}
                           <span className="text-muted-foreground">· #{o.external_order_id ?? "s/n"}</span>
                         </div>
+
                         <div className="text-sm text-muted-foreground">
                           {o.integrations?.name || o.integrations?.integration_type || "Integración"}
                           {o.customer_email ? ` · ${o.customer_email}` : ""}
                         </div>
+
                         <div className="text-xs text-muted-foreground">
                           {o.created_at ? new Date(o.created_at).toLocaleString() : ""}
                         </div>
                       </div>
+
                       <Badge variant={o.status === "processed" ? "default" : "secondary"}>
                         {o.status || "unknown"}
                       </Badge>
                     </div>
                   ))}
+                  <div className="pt-4 flex justify-center">
+                  {hasNextPage ? (
+                    <Button variant="outline" onClick={() => fetchNextPage()} disabled={isFetchingNextPage}>
+                      {isFetchingNextPage ? "Cargando..." : "Cargar más"}
+                    </Button>
+                  ) : (
+                    <div className="text-xs text-muted-foreground py-2">No hay más pedidos</div>
+                  )}
+                </div>
+
                 </div>
               ) : (
-                <div className="text-center text-muted-foreground py-8">No hay pedidos sincronizados aún</div>
+                <div className="text-center text-muted-foreground py-8">
+                  No hay pedidos para los filtros seleccionados
+                </div>
               )}
             </CardContent>
           </Card>
         )}
       </div>
 
-      {/* ---------------- Google Forms Modal (auto URL + auto secret) ---------------- */}
-{configModal.open && configModal.type === "google_forms" && (
-  <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 p-4">
-    <div className="w-full max-w-2xl rounded-2xl bg-background shadow-lg border max-h-[85vh] overflow-y-auto">
-      {/* header */}
-      <div className="p-5 flex items-start justify-between gap-4 border-b">
-        <div>
-          <div className="text-xl font-semibold">Conectar Google Forms</div>
-          <div className="text-sm text-muted-foreground mt-1">
-            Copiá y pegá. Esto conecta tu Form con RetailSnap sin OAuth.
-          </div>
-        </div>
-        <Button variant="outline" onClick={() => setConfigModal({ open: false })}>
-          Cerrar
-        </Button>
-      </div>
-
-      {/* body */}
-      <div className="p-5 space-y-4">
-        <div className="grid gap-4 md:grid-cols-2">
-          <Card>
-            <CardHeader>
-              <CardTitle className="text-base">1) Webhook URL</CardTitle>
-              <CardDescription>
-                Ya viene lista (incluye tu <b>integrationId</b>). Solo copiá y pegá.
-              </CardDescription>
-            </CardHeader>
-            <CardContent className="space-y-2">
-              <input
-                className="w-full rounded-md border bg-muted px-3 py-2 text-sm"
-                value={gfWebhookUrl}
-                readOnly
-              />
-              <Button
-                variant="outline"
-                className="w-full"
-                onClick={() => copyToClipboard(gfWebhookUrl, "Webhook URL")}
-                disabled={!gfWebhookUrl}
-              >
-                Copiar Webhook URL
-              </Button>
-              <div className="text-xs text-muted-foreground">
-                Esta URL es única para tu empresa/integración.
-              </div>
-            </CardContent>
-          </Card>
-
-          <Card>
-            <CardHeader>
-              <CardTitle className="text-base">2) Secret</CardTitle>
-              <CardDescription>
-                Se genera automáticamente. Sirve para que nadie mande data falsa.
-              </CardDescription>
-            </CardHeader>
-            <CardContent className="space-y-2">
-              <input
-                className="w-full rounded-md border bg-muted px-3 py-2 text-sm"
-                value={gfSecret}
-                readOnly
-              />
-              <div className="flex gap-2">
-                <Button
-                  variant="outline"
-                  className="w-full"
-                  onClick={() => copyToClipboard(gfSecret, "Secret")}
-                  disabled={!gfSecret}
-                >
-                  Copiar Secret
-                </Button>
-                <Button variant="outline" onClick={() => setGfSecret(genSecret())}>
-                  Regenerar
-                </Button>
-              </div>
-              <div className="text-xs text-muted-foreground">
-                Si regenerás el secret, el script viejo deja de funcionar.
-              </div>
-            </CardContent>
-          </Card>
-        </div>
-
-        <div>
-          <div className="flex items-center justify-between gap-2">
-            <div className="text-base font-semibold">3) Código Apps Script</div>
-            <div className="flex gap-2">
-              <Button variant="outline" onClick={() => setShowInstructions((s) => !s)}>
-                {showInstructions ? "Ocultar instrucciones" : "Ver instrucciones"}
-              </Button>
-              <Button variant="outline" onClick={() => copyToClipboard(appsScript, "Código Apps Script")}>
-                Copiar código
-              </Button>
-            </div>
-          </div>
-
-          {showInstructions && (
-            <div className="mt-3 rounded-xl border p-3 text-sm text-muted-foreground space-y-2">
+      {/* ---------------- Google Forms Modal ---------------- */}
+      {configModal.open && configModal.type === "google_forms" && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 p-4">
+          <div className="w-full max-w-2xl rounded-2xl bg-background shadow-lg border max-h-[85vh] overflow-y-auto">
+            {/* header */}
+            <div className="p-5 flex items-start justify-between gap-4 border-b">
               <div>
-                <b>Pasos rápidos:</b>
+                <div className="text-xl font-semibold">Conectar Google Forms</div>
+                <div className="text-sm text-muted-foreground mt-1">
+                  Copiá y pegá. Esto conecta tu Form con RetailSnap sin OAuth.
+                </div>
               </div>
-              <ol className="list-decimal pl-5 space-y-1">
-                <li>
-                  En tu Google Form: <b>Responses</b> → <b>Link to Sheets</b>.
-                </li>
-                <li>
-                  En la Sheet: <b>Extensions → Apps Script</b>.
-                </li>
-                <li>Pegá el código (botón “Copiar código”).</li>
-                <li>
-                  En Apps Script: <b>Triggers</b> → Add Trigger (onFormSubmit / From spreadsheet / On form submit).
-                </li>
-                <li>Google te pedirá autorización la primera vez.</li>
-                <li>Probá enviando una respuesta al Form.</li>
-              </ol>
+              <Button variant="outline" onClick={() => setConfigModal({ open: false })}>
+                Cerrar
+              </Button>
             </div>
-          )}
 
-          <textarea
-            className="mt-3 w-full min-h-[180px] md:min-h-[220px] rounded-xl border bg-background p-3 font-mono text-xs"
-            value={appsScript}
-            readOnly
-          />
-        </div>
+            {/* body */}
+            <div className="p-5 space-y-4">
+              <div className="grid gap-4 md:grid-cols-2">
+                <Card>
+                  <CardHeader>
+                    <CardTitle className="text-base">1) Webhook URL</CardTitle>
+                    <CardDescription>
+                      Ya viene lista (incluye tu <b>integrationId</b>). Solo copiá y pegá.
+                    </CardDescription>
+                  </CardHeader>
+                  <CardContent className="space-y-2">
+                    <input className="w-full rounded-md border bg-muted px-3 py-2 text-sm" value={gfWebhookUrl} readOnly />
+                    <Button
+                      variant="outline"
+                      className="w-full"
+                      onClick={() => copyToClipboard(gfWebhookUrl, "Webhook URL")}
+                      disabled={!gfWebhookUrl}
+                    >
+                      Copiar Webhook URL
+                    </Button>
+                    <div className="text-xs text-muted-foreground">Esta URL es única para tu empresa/integración.</div>
+                  </CardContent>
+                </Card>
 
-        <div className="flex flex-col-reverse gap-2 md:flex-row md:justify-end pt-2">
-          <Button variant="outline" onClick={verifyGoogleFormsWebhook}>
-            Verificar endpoint
-          </Button>
-          <Button onClick={saveGoogleFormsCredentials}>Guardar integración</Button>
-        </div>
+                <Card>
+                  <CardHeader>
+                    <CardTitle className="text-base">2) Secret</CardTitle>
+                    <CardDescription>Se genera automáticamente. Sirve para que nadie mande data falsa.</CardDescription>
+                  </CardHeader>
+                  <CardContent className="space-y-2">
+                    <input className="w-full rounded-md border bg-muted px-3 py-2 text-sm" value={gfSecret} readOnly />
+                    <div className="flex gap-2">
+                      <Button
+                        variant="outline"
+                        className="w-full"
+                        onClick={() => copyToClipboard(gfSecret, "Secret")}
+                        disabled={!gfSecret}
+                      >
+                        Copiar Secret
+                      </Button>
+                      <Button variant="outline" onClick={() => setGfSecret(genSecret())}>
+                        Regenerar
+                      </Button>
+                    </div>
+                    <div className="text-xs text-muted-foreground">
+                      Si regenerás el secret, el script viejo deja de funcionar.
+                    </div>
+                  </CardContent>
+                </Card>
+              </div>
 
-        <div className="text-xs text-muted-foreground">
-          <div>
-            “Guardar integración” requiere deploy de <b>integrations-save-credentials</b>.
+              <div>
+                <div className="flex items-center justify-between gap-2">
+                  <div className="text-base font-semibold">3) Código Apps Script</div>
+                  <div className="flex gap-2">
+                    <Button variant="outline" onClick={() => setShowInstructions((s) => !s)}>
+                      {showInstructions ? "Ocultar instrucciones" : "Ver instrucciones"}
+                    </Button>
+                    <Button variant="outline" onClick={() => copyToClipboard(appsScript, "Código Apps Script")}>
+                      Copiar código
+                    </Button>
+                  </div>
+                </div>
+
+                {showInstructions && (
+                  <div className="mt-3 rounded-xl border p-3 text-sm text-muted-foreground space-y-2">
+                    <div>
+                      <b>Pasos rápidos:</b>
+                    </div>
+                    <ol className="list-decimal pl-5 space-y-1">
+                      <li>
+                        En tu Google Form: <b>Responses</b> → <b>Link to Sheets</b>.
+                      </li>
+                      <li>
+                        En la Sheet: <b>Extensions → Apps Script</b>.
+                      </li>
+                      <li>Pegá el código (botón “Copiar código”).</li>
+                      <li>
+                        En Apps Script: <b>Triggers</b> → Add Trigger (onFormSubmit / From spreadsheet / On form submit).
+                      </li>
+                      <li>Google te pedirá autorización la primera vez.</li>
+                      <li>Probá enviando una respuesta al Form.</li>
+                    </ol>
+                  </div>
+                )}
+
+                <textarea
+                  className="mt-3 w-full min-h-[180px] md:min-h-[220px] rounded-xl border bg-background p-3 font-mono text-xs"
+                  value={appsScript}
+                  readOnly
+                />
+              </div>
+
+              <div className="flex flex-col-reverse gap-2 md:flex-row md:justify-end pt-2">
+                <Button variant="outline" onClick={verifyGoogleFormsWebhook}>
+                  Verificar endpoint
+                </Button>
+                <Button onClick={saveGoogleFormsCredentials}>Guardar integración</Button>
+              </div>
+
+              <div className="text-xs text-muted-foreground">
+                <div>
+                  “Guardar integración” requiere deploy de <b>integrations-save-credentials</b>.
+                </div>
+                <div>
+                  “Verificar endpoint” requiere deploy de <b>webhooks-google-forms</b>.
+                </div>
+              </div>
+            </div>
           </div>
-          <div>
-            “Verificar endpoint” requiere deploy de <b>webhooks-google-forms</b>.
-          </div>
         </div>
-      </div>
-    </div>
-  </div>
-)}
-
-
+      )}
     </Layout>
-    
   );
 };
 
