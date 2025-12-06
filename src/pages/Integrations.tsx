@@ -180,28 +180,40 @@ const Integrations = () => {
   const [showInstructions, setShowInstructions] = useState<boolean>(true);
 
   useEffect(() => {
-  if (!isGoogleFormsModal(configModal)) return;
+  const run = async () => {
+    if (!isGoogleFormsModal(configModal)) return;
 
-  // webhook url
-  const base = import.meta.env.VITE_SUPABASE_URL?.replace(/\/$/, "");
-  if (base) {
-    setGfWebhookUrl(`${base}/functions/v1/webhooks-google-forms?integrationId=${configModal.integrationId}`);
-  }
+    const base = import.meta.env.VITE_SUPABASE_URL?.replace(/\/$/, "");
+    if (base) {
+      setGfWebhookUrl(`${base}/functions/v1/webhooks-google-forms?integrationId=${configModal.integrationId}`);
+    }
 
-  // 1) si ya hay secret en state, no lo pises
-  setGfSecret((prev) => {
-    if (prev && prev.length >= 16) return prev;
+    try {
+      const { data, error } = await supabase.functions.invoke("integrations-get-credentials", {
+        body: { integrationId: configModal.integrationId },
+      });
 
-    // 2) si hay cache, usarlo
-    const cached = loadCachedSecret(configModal.integrationId);
-    if (cached && cached.length >= 16) return cached;
+      if (error) throw error;
 
-    // 3) sino generar uno nuevo
-    return genSecret();
-  });
+      const saved = data?.webhookSecret ?? null;
 
-  setShowInstructions(true);
+      if (saved) {
+        setGfSecret(saved);
+      } else {
+        // si no hay guardado, generás uno pero NO lo cambiás luego solo
+        setGfSecret((prev) => prev || genSecret());
+      }
+    } catch (e) {
+      // fallback solo si no tenías nada ya seteado
+      setGfSecret((prev) => prev || genSecret());
+    }
+
+    setShowInstructions(true);
+  };
+
+  run();
 }, [configModal.open, isGoogleFormsModal(configModal) ? configModal.integrationId : null]);
+
 
 
 
