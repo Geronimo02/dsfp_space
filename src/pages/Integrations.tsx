@@ -516,7 +516,7 @@ const Integrations = () => {
 
       if (type === "tiendanube") {
         // dejalo como estaba si ya lo tenías armado con integrations-start
-        const { data, error } = await supabase.functions.invoke("integrations-start", {
+        const { data, error } = await supabase.functions.invoke("integrations-ml-start", {
           body: { integrationId: row.id, type },
         });
         if (error) throw error;
