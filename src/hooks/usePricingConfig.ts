@@ -397,10 +397,7 @@ export const useCalculatePriceManual = () => {
     billingCycle: 'monthly' | 'annual',
     invoiceVolume: number
   ): PriceCalculation => {
-    console.log('🧮 calculatePrice called with:', { selectedModuleIds, billingCycle, invoiceVolume, hasConfig: !!config, hasModules: !!modules });
-    
     if (!config || !modules) {
-      console.warn('⚠️ Missing config or modules!', { config, modules });
       return {
         total_price: 0,
         base_price: 0,
@@ -422,8 +419,6 @@ export const useCalculatePriceManual = () => {
       billingCycle === 'annual'
         ? config.base_package_price_annual
         : config.base_package_price_monthly;
-    
-    console.log('💰 Base price:', basePrice, 'from config:', config);
 
     // Precio de módulos adicionales (no base)
     const modulesPrice = selectedModuleIds.reduce((total, moduleId) => {
@@ -431,13 +426,10 @@ export const useCalculatePriceManual = () => {
       if (module) {
         const price =
           billingCycle === 'annual' ? module.price_annual : module.price_monthly;
-        console.log(`  ➕ Adding module ${module.name}: ${price} (total so far: ${total + price})`);
         return total + price;
       }
       return total;
     }, 0);
-    
-    console.log('🔧 Total modules price:', modulesPrice);
 
     // Precio por volumen
     const volumeTier = config.invoice_volume_tiers.find(
