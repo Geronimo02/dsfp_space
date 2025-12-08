@@ -21,7 +21,7 @@ interface CompanyModuleSelectorProps {
 
 export function CompanyModuleSelector({ companyId, onModulesChange }: CompanyModuleSelectorProps) {
   const { data: allModules } = usePlatformModules();
-  const { data: companyModules, isLoading } = useCompanyModules(companyId);
+  const { data: companyModules, isLoading, refetch } = useCompanyModules(companyId);
   const toggleModule = useToggleCompanyModule();
   const calculatePrice = useCalculatePrice();
 
@@ -30,20 +30,20 @@ export function CompanyModuleSelector({ companyId, onModulesChange }: CompanyMod
   const [priceBreakdown, setPriceBreakdown] = useState<any>(null);
 
   const handleToggleModule = async (moduleId: string, currentStatus: boolean) => {
-    await toggleModule.mutateAsync(
-      {
+    try {
+      await toggleModule.mutateAsync({
         companyId,
         moduleId,
         active: !currentStatus,
-      },
-      {
-        onSuccess: () => {
-          onModulesChange?.();
-          // Recalcular precio
-          handleCalculatePrice();
-        },
-      }
-    );
+      });
+      // Refetch inmediato para reflejar cambios
+      await refetch();
+      onModulesChange?.();
+      // Recalcular precio
+      handleCalculatePrice();
+    } catch (error) {
+      console.error("Error toggling module:", error);
+    }
   };
 
   const handleCalculatePrice = async () => {
@@ -70,7 +70,8 @@ export function CompanyModuleSelector({ companyId, onModulesChange }: CompanyMod
     );
   }
 
-  const activeModuleIds = companyModules?.map((cm) => cm.module_id) || [];
+  // Solo incluir módulos activos en activeModuleIds
+  const activeModuleIds = companyModules?.filter((cm) => cm.active)?.map((cm) => cm.module_id) || [];
   const baseModules = allModules?.filter((m) => m.is_base_module) || [];
   const additionalModules = allModules?.filter((m) => !m.is_base_module) || [];
 

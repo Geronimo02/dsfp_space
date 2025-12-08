@@ -197,7 +197,7 @@ export const useDeleteModule = () => {
   });
 };
 
-// Hook para obtener módulos de una empresa
+// Hook para obtener módulos de una empresa (TODOS, no solo activos)
 export const useCompanyModules = (companyId: string | undefined) => {
   return useQuery({
     queryKey: ['companyModules', companyId],
@@ -210,8 +210,7 @@ export const useCompanyModules = (companyId: string | undefined) => {
           *,
           platform_modules(*)
         `)
-        .eq('company_id', companyId)
-        .eq('active', true);
+        .eq('company_id', companyId);
 
       if (error) throw error;
       return data as CompanyModule[];
@@ -285,7 +284,10 @@ export const useToggleCompanyModule = () => {
       return data;
     },
     onSuccess: (_, variables) => {
+      // Invalidar todos los queries relacionados
       queryClient.invalidateQueries({ queryKey: ['companyModules', variables.companyId] });
+      queryClient.invalidateQueries({ queryKey: ['company_modules_enhanced', variables.companyId] });
+      queryClient.invalidateQueries({ queryKey: ['activeModules', variables.companyId] });
       toast({
         title: 'Módulo actualizado',
         description: 'El estado del módulo se ha actualizado correctamente',

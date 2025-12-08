@@ -2941,7 +2941,13 @@ export default function PlatformAdmin() {
           </DialogHeader>
           
           {selectedCompanyForModules && (
-            <CompanyModuleSelector companyId={selectedCompanyForModules.id} />
+            <CompanyModuleSelector 
+              companyId={selectedCompanyForModules.id} 
+              onModulesChange={() => {
+                // Refrescar datos de empresas si es necesario
+                queryClient.invalidateQueries({ queryKey: ['platform-companies'] });
+              }}
+            />
           )}
           
           <DialogFooter>
