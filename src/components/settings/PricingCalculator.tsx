@@ -43,19 +43,6 @@ export function PricingCalculator() {
   };
 
   const calculation = calculatePrice(selectedModules, billingCycle, invoiceVolume);
-  
-  // Debug: Log para verificar el cálculo
-  console.log('🔍 DEBUG PRICING:', {
-    selectedModules,
-    selectedModulesCount: selectedModules.length,
-    additionalModulesCount: selectedModules.filter(id => {
-      const m = modules?.find(mod => mod.id === id);
-      return m && !m.is_base_module;
-    }).length,
-    calculation,
-    billingCycle,
-    invoiceVolume
-  });
 
   const baseModules = modules?.filter((m) => m.is_base_module) || [];
   const additionalModules = modules?.filter((m) => !m.is_base_module) || [];
