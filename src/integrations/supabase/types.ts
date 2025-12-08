@@ -1455,6 +1455,309 @@ export type Database = {
           },
         ]
       }
+      customer_support_calls: {
+        Row: {
+          call_type: string
+          company_id: string
+          created_at: string | null
+          customer_id: string | null
+          duration_seconds: number | null
+          handled_by: string | null
+          id: string
+          notes: string | null
+          phone_number: string
+          ticket_id: string | null
+        }
+        Insert: {
+          call_type: string
+          company_id: string
+          created_at?: string | null
+          customer_id?: string | null
+          duration_seconds?: number | null
+          handled_by?: string | null
+          id?: string
+          notes?: string | null
+          phone_number: string
+          ticket_id?: string | null
+        }
+        Update: {
+          call_type?: string
+          company_id?: string
+          created_at?: string | null
+          customer_id?: string | null
+          duration_seconds?: number | null
+          handled_by?: string | null
+          id?: string
+          notes?: string | null
+          phone_number?: string
+          ticket_id?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "customer_support_calls_company_id_fkey"
+            columns: ["company_id"]
+            isOneToOne: false
+            referencedRelation: "companies"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "customer_support_calls_customer_id_fkey"
+            columns: ["customer_id"]
+            isOneToOne: false
+            referencedRelation: "customer_pos_view"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "customer_support_calls_customer_id_fkey"
+            columns: ["customer_id"]
+            isOneToOne: false
+            referencedRelation: "customers"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "customer_support_calls_ticket_id_fkey"
+            columns: ["ticket_id"]
+            isOneToOne: false
+            referencedRelation: "customer_support_tickets"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      customer_support_emails: {
+        Row: {
+          body: string
+          company_id: string
+          created_at: string | null
+          customer_id: string | null
+          from_email: string
+          id: string
+          sent_at: string | null
+          subject: string
+          ticket_id: string | null
+          to_email: string
+        }
+        Insert: {
+          body: string
+          company_id: string
+          created_at?: string | null
+          customer_id?: string | null
+          from_email: string
+          id?: string
+          sent_at?: string | null
+          subject: string
+          ticket_id?: string | null
+          to_email: string
+        }
+        Update: {
+          body?: string
+          company_id?: string
+          created_at?: string | null
+          customer_id?: string | null
+          from_email?: string
+          id?: string
+          sent_at?: string | null
+          subject?: string
+          ticket_id?: string | null
+          to_email?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "customer_support_emails_company_id_fkey"
+            columns: ["company_id"]
+            isOneToOne: false
+            referencedRelation: "companies"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "customer_support_emails_customer_id_fkey"
+            columns: ["customer_id"]
+            isOneToOne: false
+            referencedRelation: "customer_pos_view"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "customer_support_emails_customer_id_fkey"
+            columns: ["customer_id"]
+            isOneToOne: false
+            referencedRelation: "customers"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "customer_support_emails_ticket_id_fkey"
+            columns: ["ticket_id"]
+            isOneToOne: false
+            referencedRelation: "customer_support_tickets"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      customer_support_integrations: {
+        Row: {
+          company_id: string
+          config: Json
+          created_at: string | null
+          id: string
+          integration_type: string
+          is_active: boolean | null
+          send_on_message_received: boolean | null
+          send_on_status_changed: boolean | null
+          send_on_ticket_created: boolean | null
+          updated_at: string | null
+        }
+        Insert: {
+          company_id: string
+          config?: Json
+          created_at?: string | null
+          id?: string
+          integration_type: string
+          is_active?: boolean | null
+          send_on_message_received?: boolean | null
+          send_on_status_changed?: boolean | null
+          send_on_ticket_created?: boolean | null
+          updated_at?: string | null
+        }
+        Update: {
+          company_id?: string
+          config?: Json
+          created_at?: string | null
+          id?: string
+          integration_type?: string
+          is_active?: boolean | null
+          send_on_message_received?: boolean | null
+          send_on_status_changed?: boolean | null
+          send_on_ticket_created?: boolean | null
+          updated_at?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "customer_support_integrations_company_id_fkey"
+            columns: ["company_id"]
+            isOneToOne: false
+            referencedRelation: "companies"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      customer_support_messages: {
+        Row: {
+          attachments: Json | null
+          created_at: string | null
+          id: string
+          is_internal: boolean | null
+          message: string
+          sender_id: string | null
+          sender_type: string
+          sent_via: string | null
+          ticket_id: string
+        }
+        Insert: {
+          attachments?: Json | null
+          created_at?: string | null
+          id?: string
+          is_internal?: boolean | null
+          message: string
+          sender_id?: string | null
+          sender_type: string
+          sent_via?: string | null
+          ticket_id: string
+        }
+        Update: {
+          attachments?: Json | null
+          created_at?: string | null
+          id?: string
+          is_internal?: boolean | null
+          message?: string
+          sender_id?: string | null
+          sender_type?: string
+          sent_via?: string | null
+          ticket_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "customer_support_messages_ticket_id_fkey"
+            columns: ["ticket_id"]
+            isOneToOne: false
+            referencedRelation: "customer_support_tickets"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      customer_support_tickets: {
+        Row: {
+          assigned_to: string | null
+          category: string
+          closed_at: string | null
+          company_id: string
+          created_at: string | null
+          created_by: string | null
+          customer_id: string | null
+          description: string
+          id: string
+          priority: string
+          resolved_at: string | null
+          status: string
+          subject: string
+          ticket_number: string
+          updated_at: string | null
+        }
+        Insert: {
+          assigned_to?: string | null
+          category: string
+          closed_at?: string | null
+          company_id: string
+          created_at?: string | null
+          created_by?: string | null
+          customer_id?: string | null
+          description: string
+          id?: string
+          priority?: string
+          resolved_at?: string | null
+          status?: string
+          subject: string
+          ticket_number: string
+          updated_at?: string | null
+        }
+        Update: {
+          assigned_to?: string | null
+          category?: string
+          closed_at?: string | null
+          company_id?: string
+          created_at?: string | null
+          created_by?: string | null
+          customer_id?: string | null
+          description?: string
+          id?: string
+          priority?: string
+          resolved_at?: string | null
+          status?: string
+          subject?: string
+          ticket_number?: string
+          updated_at?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "customer_support_tickets_company_id_fkey"
+            columns: ["company_id"]
+            isOneToOne: false
+            referencedRelation: "companies"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "customer_support_tickets_customer_id_fkey"
+            columns: ["customer_id"]
+            isOneToOne: false
+            referencedRelation: "customer_pos_view"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "customer_support_tickets_customer_id_fkey"
+            columns: ["customer_id"]
+            isOneToOne: false
+            referencedRelation: "customers"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       customers: {
         Row: {
           address: string | null
@@ -2082,52 +2385,73 @@ export type Database = {
       }
       integration_orders: {
         Row: {
-          company_id: string | null
+          attempts: number
+          company_id: string
           created_at: string | null
+          currency: string | null
           customer_email: string | null
           customer_name: string
           customer_phone: string | null
           error_message: string | null
+          external_created_at: string | null
           external_order_id: string
           id: string
           integration_id: string
+          items_count: number | null
+          last_attempt_at: string | null
           order_data: Json
           processed_at: string | null
           quotation_id: string | null
+          retry_after: string | null
           sale_id: string | null
           status: string | null
+          total_amount: number | null
         }
         Insert: {
-          company_id?: string | null
+          attempts?: number
+          company_id: string
           created_at?: string | null
+          currency?: string | null
           customer_email?: string | null
           customer_name: string
           customer_phone?: string | null
           error_message?: string | null
+          external_created_at?: string | null
           external_order_id: string
           id?: string
           integration_id: string
+          items_count?: number | null
+          last_attempt_at?: string | null
           order_data: Json
           processed_at?: string | null
           quotation_id?: string | null
+          retry_after?: string | null
           sale_id?: string | null
           status?: string | null
+          total_amount?: number | null
         }
         Update: {
-          company_id?: string | null
+          attempts?: number
+          company_id?: string
           created_at?: string | null
+          currency?: string | null
           customer_email?: string | null
           customer_name?: string
           customer_phone?: string | null
           error_message?: string | null
+          external_created_at?: string | null
           external_order_id?: string
           id?: string
           integration_id?: string
+          items_count?: number | null
+          last_attempt_at?: string | null
           order_data?: Json
           processed_at?: string | null
           quotation_id?: string | null
+          retry_after?: string | null
           sale_id?: string | null
           status?: string | null
+          total_amount?: number | null
         }
         Relationships: [
           {
@@ -3071,6 +3395,106 @@ export type Database = {
           updated_at?: string | null
         }
         Relationships: []
+      }
+      platform_support_messages: {
+        Row: {
+          attachments: Json | null
+          created_at: string | null
+          id: string
+          is_internal: boolean | null
+          message: string
+          sender_id: string | null
+          sender_type: string
+          ticket_id: string
+        }
+        Insert: {
+          attachments?: Json | null
+          created_at?: string | null
+          id?: string
+          is_internal?: boolean | null
+          message: string
+          sender_id?: string | null
+          sender_type: string
+          ticket_id: string
+        }
+        Update: {
+          attachments?: Json | null
+          created_at?: string | null
+          id?: string
+          is_internal?: boolean | null
+          message?: string
+          sender_id?: string | null
+          sender_type?: string
+          ticket_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "platform_support_messages_ticket_id_fkey"
+            columns: ["ticket_id"]
+            isOneToOne: false
+            referencedRelation: "platform_support_tickets"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      platform_support_tickets: {
+        Row: {
+          assigned_admin_id: string | null
+          category: string
+          closed_at: string | null
+          company_id: string
+          created_at: string | null
+          created_by: string | null
+          description: string
+          id: string
+          priority: string
+          resolved_at: string | null
+          status: string
+          subject: string
+          ticket_number: string | null
+          updated_at: string | null
+        }
+        Insert: {
+          assigned_admin_id?: string | null
+          category: string
+          closed_at?: string | null
+          company_id: string
+          created_at?: string | null
+          created_by?: string | null
+          description: string
+          id?: string
+          priority?: string
+          resolved_at?: string | null
+          status?: string
+          subject: string
+          ticket_number?: string | null
+          updated_at?: string | null
+        }
+        Update: {
+          assigned_admin_id?: string | null
+          category?: string
+          closed_at?: string | null
+          company_id?: string
+          created_at?: string | null
+          created_by?: string | null
+          description?: string
+          id?: string
+          priority?: string
+          resolved_at?: string | null
+          status?: string
+          subject?: string
+          ticket_number?: string | null
+          updated_at?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "platform_support_tickets_company_id_fkey"
+            columns: ["company_id"]
+            isOneToOne: false
+            referencedRelation: "companies"
+            referencedColumns: ["id"]
+          },
+        ]
       }
       pos_afip: {
         Row: {
@@ -5633,8 +6057,10 @@ export type Database = {
         Returns: string
       }
       generate_credit_note_number: { Args: never; Returns: string }
+      generate_customer_support_ticket_number: { Args: never; Returns: string }
       generate_delivery_number: { Args: never; Returns: string }
       generate_expense_number: { Args: never; Returns: string }
+      generate_platform_ticket_number: { Args: never; Returns: string }
       generate_quotation_number: { Args: never; Returns: string }
       generate_reservation_number: { Args: never; Returns: string }
       generate_return_number: { Args: never; Returns: string }
@@ -5747,6 +6173,13 @@ export type Database = {
           _user_id: string
         }
         Returns: boolean
+      }
+      integration_orders_counts: {
+        Args: { p_company_id: string }
+        Returns: {
+          integration_type: string
+          total: number
+        }[]
       }
       is_platform_admin: { Args: { _user_id: string }; Returns: boolean }
       setup_accountant_permissions: {

@@ -692,7 +692,7 @@ export default function Dashboard() {
                             <div className="flex justify-between items-center">
                               <span className="text-sm font-semibold">Total General (ARS)</span>
                               <span className="text-lg font-bold">
-                                ${inventoryByCurrency.reduce((acc: number, item: any) => acc + item.valueInARS, 0).toFixed(2)}
+                                ${Number(inventoryByCurrency.reduce((acc: number, item: any) => acc + (item.valueInARS || 0), 0)).toFixed(2)}
                               </span>
                             </div>
                           </div>
