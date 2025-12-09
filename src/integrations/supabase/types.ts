@@ -1110,6 +1110,7 @@ export type Database = {
           company_id: string
           created_at: string | null
           id: string
+          platform_admin: boolean | null
           role: Database["public"]["Enums"]["app_role"]
           user_id: string
         }
@@ -1118,6 +1119,7 @@ export type Database = {
           company_id: string
           created_at?: string | null
           id?: string
+          platform_admin?: boolean | null
           role: Database["public"]["Enums"]["app_role"]
           user_id: string
         }
@@ -1126,6 +1128,7 @@ export type Database = {
           company_id?: string
           created_at?: string | null
           id?: string
+          platform_admin?: boolean | null
           role?: Database["public"]["Enums"]["app_role"]
           user_id?: string
         }
@@ -6147,16 +6150,16 @@ export type Database = {
       }
       has_permission:
         | {
+            Args: { _module: string; _permission: string; _user_id: string }
+            Returns: boolean
+          }
+        | {
             Args: {
               _company_id?: string
               _module: string
               _permission: string
               _user_id: string
             }
-            Returns: boolean
-          }
-        | {
-            Args: { _module: string; _permission: string; _user_id: string }
             Returns: boolean
           }
       has_role: {
