@@ -6184,7 +6184,9 @@ export type Database = {
           total: number
         }[]
       }
+      is_company_admin: { Args: { company_uuid: string }; Returns: boolean }
       is_platform_admin: { Args: { _user_id: string }; Returns: boolean }
+      is_platform_admin_secure: { Args: never; Returns: boolean }
       setup_accountant_permissions: {
         Args: { company_uuid: string }
         Returns: undefined
@@ -6197,10 +6199,9 @@ export type Database = {
         }
         Returns: boolean
       }
-      user_belongs_to_company: {
-        Args: { _company_id: string; _user_id: string }
-        Returns: boolean
-      }
+      user_belongs_to_company:
+        | { Args: { _company_id: string; _user_id: string }; Returns: boolean }
+        | { Args: { company_uuid: string }; Returns: boolean }
       user_has_company_access: {
         Args: { target_company_id: string; user_id: string }
         Returns: boolean
