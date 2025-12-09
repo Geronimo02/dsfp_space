@@ -1,6 +1,10 @@
 import "https://deno.land/x/xhr@0.1.0/mod.ts";
 import { serve } from "https://deno.land/std@0.168.0/http/server.ts";
-import { createClient } from 'https://esm.sh/@supabase/supabase-js@2.7.1';
+import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
+
+const openAIApiKey = Deno.env.get('OPENAI_API_KEY');
+const supabaseUrl = Deno.env.get('SUPABASE_URL')!;
+const supabaseServiceKey = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')!;
 
 const corsHeaders = {
   'Access-Control-Allow-Origin': '*',
@@ -13,16 +17,58 @@ serve(async (req) => {
   }
 
   try {
+    // Get the authorization header
+    const authHeader = req.headers.get('authorization');
+    if (!authHeader) {
+      console.error('No authorization header provided');
+      return new Response(JSON.stringify({ error: 'No autorizado' }), {
+        status: 401,
+        headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+      });
+    }
+
+    // Create Supabase client with user's token
+    const supabaseClient = createClient(supabaseUrl, supabaseServiceKey, {
+      global: { headers: { Authorization: authHeader } },
+    });
+
+    // Verify the user
+    const { data: { user }, error: authError } = await supabaseClient.auth.getUser(
+      authHeader.replace('Bearer ', '')
+    );
+
+    if (authError || !user) {
+      console.error('Auth error:', authError);
+      return new Response(JSON.stringify({ error: 'No autorizado' }), {
+        status: 401,
+        headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+      });
+    }
+
     const { query, type, companyId, context } = await req.json();
+
+    // Verify user belongs to the company
+    if (companyId) {
+      const { data: membership, error: membershipError } = await supabaseClient
+        .from('company_users')
+        .select('id')
+        .eq('user_id', user.id)
+        .eq('company_id', companyId)
+        .eq('active', true)
+        .maybeSingle();
+
+      if (membershipError || !membership) {
+        console.error('User does not belong to company:', companyId);
+        return new Response(JSON.stringify({ error: 'Acceso denegado a esta empresa' }), {
+          status: 403,
+          headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+        });
+      }
+    }
     
-    const openAIApiKey = Deno.env.get('OPENAI_API_KEY');
     if (!openAIApiKey) {
       throw new Error('OPENAI_API_KEY no configurada');
     }
-
-    const supabaseUrl = Deno.env.get('SUPABASE_URL')!;
-    const supabaseKey = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')!;
-    const supabase = createClient(supabaseUrl, supabaseKey);
 
     let systemPrompt = '';
     let dataContext = '';
@@ -35,7 +81,7 @@ Tu trabajo es interpretar consultas en lenguaje natural y proporcionar respuesta
 Responde de forma concisa y profesional en español.`;
 
       // Obtener ventas recientes
-      const { data: sales } = await supabase
+      const { data: sales } = await supabaseClient
         .from('sales')
         .select('*, sale_items(*)')
         .eq('company_id', companyId)
@@ -43,7 +89,7 @@ Responde de forma concisa y profesional en español.`;
         .limit(50);
 
       // Obtener productos
-      const { data: products } = await supabase
+      const { data: products } = await supabaseClient
         .from('products')
         .select('*')
         .eq('company_id', companyId);
@@ -59,12 +105,12 @@ Enfócate en identificar oportunidades de mejora, productos con bajo stock, tend
 Proporciona recomendaciones específicas y prácticas en español.`;
 
       // Obtener datos para análisis
-      const { data: products } = await supabase
+      const { data: products } = await supabaseClient
         .from('products')
         .select('*')
         .eq('company_id', companyId);
 
-      const { data: sales } = await supabase
+      const { data: sales } = await supabaseClient
         .from('sales')
         .select('*, sale_items(*)')
         .eq('company_id', companyId)
