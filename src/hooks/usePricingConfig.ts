@@ -251,6 +251,7 @@ export const useToggleCompanyModule = () => {
           .from('company_modules')
           .update({
             active,
+            status: active ? 'active' : 'suspended',
             activated_at: active ? new Date().toISOString() : undefined,
             deactivated_at: !active ? new Date().toISOString() : null,
             updated_at: new Date().toISOString(),
@@ -262,6 +263,8 @@ export const useToggleCompanyModule = () => {
         
         data = result.data;
         error = result.error;
+        
+        console.log('Module update result:', { companyId, moduleId, active, data, error });
       } else {
         // Insert new record
         const result = await supabase
@@ -270,6 +273,7 @@ export const useToggleCompanyModule = () => {
             company_id: companyId,
             module_id: moduleId,
             active,
+            status: active ? 'active' : 'suspended',
             activated_at: active ? new Date().toISOString() : null,
             deactivated_at: !active ? new Date().toISOString() : null,
           })
@@ -278,16 +282,22 @@ export const useToggleCompanyModule = () => {
         
         data = result.data;
         error = result.error;
+        
+        console.log('Module insert result:', { companyId, moduleId, active, data, error });
       }
 
       if (error) throw error;
       return data;
     },
     onSuccess: (_, variables) => {
+      console.log('Module toggle success, invalidating queries for company:', variables.companyId);
       // Invalidar todos los queries relacionados
       queryClient.invalidateQueries({ queryKey: ['companyModules', variables.companyId] });
       queryClient.invalidateQueries({ queryKey: ['company_modules_enhanced', variables.companyId] });
       queryClient.invalidateQueries({ queryKey: ['activeModules', variables.companyId] });
+      // También invalidar sin ID específico para forzar refetch global
+      queryClient.invalidateQueries({ queryKey: ['activeModules'] });
+      queryClient.invalidateQueries({ queryKey: ['platform-companies'] });
       toast({
         title: 'Módulo actualizado',
         description: 'El estado del módulo se ha actualizado correctamente',
