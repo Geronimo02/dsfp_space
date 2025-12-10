@@ -14,6 +14,8 @@ export const useActiveModules = () => {
         return [];
       }
 
+      console.log('Fetching active modules for company:', currentCompany.id);
+
       const { data, error } = await supabase
         .from('company_modules')
         .select(`
@@ -23,22 +25,30 @@ export const useActiveModules = () => {
         .eq('company_id', currentCompany.id)
         .eq('active', true);
 
-      if (error) throw error;
+      if (error) {
+        console.error('Error fetching active modules:', error);
+        throw error;
+      }
 
       // Retornar array de códigos de módulos activos
-      return data?.map((cm: any) => cm.platform_modules?.code).filter(Boolean) || [];
+      const modules = data?.map((cm: any) => cm.platform_modules?.code).filter(Boolean) || [];
+      console.log('Active modules:', modules);
+      return modules;
     },
     enabled: !!currentCompany?.id,
     // Mantener datos frescos
-    staleTime: 1000 * 30, // 30 segundos
+    staleTime: 1000 * 10, // 10 segundos - más frecuente para cambios de admin
+    refetchOnWindowFocus: true,
   });
 
   // Suscribirse a cambios en tiempo real de company_modules
   useEffect(() => {
     if (!currentCompany?.id) return;
 
+    console.log('Setting up realtime subscription for company_modules:', currentCompany.id);
+
     const channel = supabase
-      .channel(`company_modules_${currentCompany.id}`)
+      .channel(`company_modules_realtime_${currentCompany.id}`)
       .on(
         'postgres_changes',
         {
@@ -47,14 +57,18 @@ export const useActiveModules = () => {
           table: 'company_modules',
           filter: `company_id=eq.${currentCompany.id}`,
         },
-        () => {
+        (payload) => {
+          console.log('Realtime change detected on company_modules:', payload);
           // Invalidar y refetch cuando hay cambios
           queryClient.invalidateQueries({ queryKey: ['activeModules', currentCompany.id] });
         }
       )
-      .subscribe();
+      .subscribe((status) => {
+        console.log('Realtime subscription status:', status);
+      });
 
     return () => {
+      console.log('Cleaning up realtime subscription for company:', currentCompany.id);
       supabase.removeChannel(channel);
     };
   }, [currentCompany?.id, queryClient]);
