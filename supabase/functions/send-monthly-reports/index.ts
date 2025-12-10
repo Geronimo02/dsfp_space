@@ -22,12 +22,66 @@ const handler = async (req: Request): Promise<Response> => {
   }
 
   try {
+    // Create client with user's JWT for authentication
+    const authHeader = req.headers.get("Authorization");
+    if (!authHeader) {
+      return new Response(
+        JSON.stringify({ error: "No autorizado - Token no proporcionado" }),
+        { status: 401, headers: { "Content-Type": "application/json", ...corsHeaders } }
+      );
+    }
+
+    const supabaseClient = createClient(
+      Deno.env.get("SUPABASE_URL") ?? "",
+      Deno.env.get("SUPABASE_ANON_KEY") ?? "",
+      { global: { headers: { Authorization: authHeader } } }
+    );
+
+    // Verify user is authenticated
+    const { data: { user }, error: authError } = await supabaseClient.auth.getUser();
+    if (authError || !user) {
+      console.error("Authentication error:", authError);
+      return new Response(
+        JSON.stringify({ error: "No autorizado - Token inválido" }),
+        { status: 401, headers: { "Content-Type": "application/json", ...corsHeaders } }
+      );
+    }
+
+    const { companyId, month, recipientEmail, recipientName }: MonthlyReportRequest = await req.json();
+
+    // Verify user belongs to the requested company with admin or manager role
+    const { data: companyUser, error: companyError } = await supabaseClient
+      .from("company_users")
+      .select("role")
+      .eq("company_id", companyId)
+      .eq("user_id", user.id)
+      .eq("active", true)
+      .single();
+
+    if (companyError || !companyUser) {
+      console.error("Company access error:", companyError);
+      return new Response(
+        JSON.stringify({ error: "No autorizado - No tiene acceso a esta empresa" }),
+        { status: 403, headers: { "Content-Type": "application/json", ...corsHeaders } }
+      );
+    }
+
+    // Only admin and manager roles can send reports
+    const allowedRoles = ["admin", "manager"];
+    if (!allowedRoles.includes(companyUser.role)) {
+      return new Response(
+        JSON.stringify({ error: "No autorizado - Se requiere rol de administrador o gerente" }),
+        { status: 403, headers: { "Content-Type": "application/json", ...corsHeaders } }
+      );
+    }
+
+    console.log(`Usuario ${user.id} (${companyUser.role}) generando reporte para empresa ${companyId}`);
+
+    // Use admin client for data access after authorization is verified
     const supabaseAdmin = createClient(
       Deno.env.get("SUPABASE_URL") ?? "",
       Deno.env.get("SUPABASE_SERVICE_ROLE_KEY") ?? ""
     );
-
-    const { companyId, month, recipientEmail, recipientName }: MonthlyReportRequest = await req.json();
 
     console.log(`Generando reporte mensual para ${month} - Empresa: ${companyId}`);
 
