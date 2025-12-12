@@ -45,9 +45,11 @@ import {
   Star,
   PackageCheck,
   LogOut,
+  Plus,
 } from "lucide-react";
 import { useActiveModules } from "@/hooks/useActiveModules";
 import { usePermissions } from "@/hooks/usePermissions";
+import { usePlatformAdmin } from "@/hooks/usePlatformAdmin";
 import { useState, useMemo } from "react";
 import { Collapsible, CollapsibleContent, CollapsibleTrigger } from "@/components/ui/collapsible";
 import { Input } from "@/components/ui/input";
@@ -55,6 +57,7 @@ import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { supabase } from "@/integrations/supabase/client";
 import { toast } from "sonner";
+import { AvailableModulesDialog } from "./AvailableModulesDialog";
 
 interface NavItem {
   title: string;
@@ -72,9 +75,11 @@ export function Sidebar() {
   const navigate = useNavigate();
   const activeModules = useActiveModules();
   const { hasPermission, isAdmin } = usePermissions();
+  const { isPlatformAdmin } = usePlatformAdmin();
   
   const [openSections, setOpenSections] = useState<string[]>([]);
   const [searchQuery, setSearchQuery] = useState("");
+  const [showModulesDialog, setShowModulesDialog] = useState(false);
   const [favorites, setFavorites] = useState<string[]>(() => {
     const saved = localStorage.getItem('sidebar-favorites');
     return saved ? JSON.parse(saved) : ['/pos', '/sales', '/products'];
@@ -107,10 +112,14 @@ export function Sidebar() {
   };
 
   // Helper function to check if module is active
+  // Solo platform admins ven todo, los admins de empresa ven solo sus módulos
   const hasModule = (moduleName: string) => {
-    // Si no hay datos o es admin, mostrar todo
-    if (!activeModules.data || isAdmin) return true;
-    if (activeModules.data.length === 0) return true;
+    // Platform admins ven todo
+    if (isPlatformAdmin) return true;
+    
+    // Si no hay datos cargados aún, no mostrar nada extra
+    if (!activeModules.data) return false;
+    if (activeModules.data.length === 0) return false;
     
     // Mapeo de nombres de módulos a códigos
     const moduleMap: Record<string, string[]> = {
@@ -510,8 +519,8 @@ export function Sidebar() {
   ];
 
   const isNavItemVisible = (item: NavItem) => {
-    // Admin ve todo
-    if (isAdmin) return true;
+    // Platform admin ve todo
+    if (isPlatformAdmin) return true;
     
     // Si tiene módulo, verificar que esté activo
     if (item.module && !hasModule(item.module)) return false;
@@ -727,6 +736,21 @@ export function Sidebar() {
           return null;
         })}
       </nav>
+
+      {/* Botón + Funcionalidades - Solo visible si no es platform admin */}
+      {!isPlatformAdmin && (
+        <div className="px-3 pb-2">
+          <Button
+            onClick={() => setShowModulesDialog(true)}
+            variant="outline"
+            className="w-full flex items-center gap-2 px-3 py-2.5 text-sm rounded-lg border-dashed border-primary/50 text-primary hover:bg-primary/5 hover:border-primary transition-all"
+          >
+            <Plus className="w-4 h-4" />
+            <span className="font-medium">Más Funcionalidades</span>
+          </Button>
+        </div>
+      )}
+
       {/* AI Assistant - Botón especial al final */}
       <div className="p-3 border-t bg-gradient-to-r from-sidebar to-sidebar/95 space-y-2">
         <Link
@@ -755,6 +779,13 @@ export function Sidebar() {
           <span className="font-medium">Cerrar Sesión</span>
         </Button>
       </div>
+
+      {/* Dialog de módulos disponibles */}
+      <AvailableModulesDialog
+        open={showModulesDialog}
+        onOpenChange={setShowModulesDialog}
+        activeModules={activeModules.data || []}
+      />
     </div>
   );
 }
