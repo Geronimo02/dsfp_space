@@ -90,7 +90,7 @@ const MODULE_ICONS: Record<string, any> = {
 };
 
 // Módulos base que siempre están activos y no se muestran como disponibles
-const BASE_MODULES = ['dashboard', 'products', 'customers', 'settings', 'reports'];
+const BASE_MODULES = ['dashboard', 'pos', 'products', 'sales', 'customers', 'settings', 'reports'];
 
 interface AvailableModulesDialogProps {
   open: boolean;
@@ -116,18 +116,25 @@ export function AvailableModulesDialog({
       const { data, error } = await supabase
         .from('platform_modules')
         .select('id, code, name, description')
+        .eq('is_active', true)
         .order('name');
       
       if (error) throw error;
+      console.log('[AvailableModulesDialog] All platform modules:', data?.length);
       return data || [];
     },
     enabled: open,
   });
 
-  // Filtrar módulos que NO están activos y no son base
-  const unavailableModules = (allModules || []).filter(
-    module => !activeModules.includes(module.code) && !BASE_MODULES.includes(module.code)
-  );
+  // Filtrar módulos que NO están activos para la empresa actual y no son base
+  const unavailableModules = (allModules || []).filter(module => {
+    const isActive = activeModules.includes(module.code);
+    const isBase = BASE_MODULES.includes(module.code);
+    return !isActive && !isBase;
+  });
+  
+  console.log('[AvailableModulesDialog] Active modules from company:', activeModules);
+  console.log('[AvailableModulesDialog] Unavailable modules to show:', unavailableModules.length);
 
   const toggleModule = (code: string) => {
     setSelectedModules(prev => 
