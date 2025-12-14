@@ -12,49 +12,85 @@ import {
   MessageSquare,
   Send,
   CheckCircle,
-  Sparkles
+  Sparkles,
+  FileText,
+  Users,
+  CreditCard,
+  Banknote,
+  BarChart3,
+  Shield,
+  Zap,
+  Bell,
+  Tag,
+  Truck,
+  Calendar,
+  Receipt,
+  Plug,
+  AlertCircle,
+  Store,
+  Lock,
+  Activity,
+  Warehouse,
+  ArrowLeftRight,
+  PackageOpen,
+  TrendingDown,
+  BookOpen,
+  LayoutDashboard,
+  ShoppingCart,
+  Settings
 } from "lucide-react";
 import { toast } from "sonner";
+import { useQuery } from "@tanstack/react-query";
+import { supabase } from "@/integrations/supabase/client";
+import { Skeleton } from "@/components/ui/skeleton";
 
-interface AvailableModule {
-  code: string;
-  name: string;
-  description: string;
-  icon: any;
-}
+// Mapeo de códigos de módulos a íconos
+const MODULE_ICONS: Record<string, any> = {
+  dashboard: LayoutDashboard,
+  pos: ShoppingCart,
+  products: Package,
+  sales: FileText,
+  customers: Users,
+  settings: Settings,
+  reports: BarChart3,
+  quotations: FileText,
+  delivery_notes: Truck,
+  returns: TrendingDown,
+  reservations: Calendar,
+  inventory_alerts: AlertCircle,
+  warehouses: Warehouse,
+  warehouse_stock: Package,
+  warehouse_transfers: ArrowLeftRight,
+  stock_reservations: PackageOpen,
+  purchases: ShoppingBag,
+  suppliers: Truck,
+  bank_accounts: Building2,
+  bank_movements: Building2,
+  card_movements: CreditCard,
+  retentions: Calculator,
+  cash_register: Receipt,
+  expenses: Receipt,
+  checks: Banknote,
+  technical_services: Wrench,
+  payroll: Calculator,
+  commissions: Calculator,
+  promotions: Tag,
+  afip: Store,
+  afip_pos_points: Store,
+  audit_logs: Shield,
+  access_logs: Activity,
+  monthly_closing: Lock,
+  bulk_operations: Zap,
+  notifications: Bell,
+  integrations: Plug,
+  accounts_receivable: Receipt,
+  accountant_reports: BookOpen,
+  advanced_reports: BarChart3,
+  ai_assistant: Sparkles,
+};
 
-const AVAILABLE_MODULES: AvailableModule[] = [
-  {
-    code: "inventory",
-    name: "Inventario Avanzado",
-    description: "Gestión de depósitos, transferencias, alertas de stock y reservas.",
-    icon: Package,
-  },
-  {
-    code: "purchases",
-    name: "Compras y Proveedores",
-    description: "Órdenes de compra, recepción de mercadería y gestión de proveedores.",
-    icon: ShoppingBag,
-  },
-  {
-    code: "finance",
-    name: "Finanzas",
-    description: "Cuentas bancarias, movimientos, tarjetas, cheques y retenciones.",
-    icon: Building2,
-  },
-  {
-    code: "technical_services",
-    name: "Servicios Técnicos",
-    description: "Gestión de reparaciones, órdenes de servicio y seguimiento.",
-    icon: Wrench,
-  },
-  {
-    code: "hr",
-    name: "Recursos Humanos",
-    description: "Liquidaciones de sueldo, empleados y comisiones.",
-    icon: Calculator,
-  },
-];
+// Módulos base que siempre están activos y no se muestran como disponibles
+const BASE_MODULES = ['dashboard', 'products', 'customers', 'settings', 'reports'];
 
 interface AvailableModulesDialogProps {
   open: boolean;
@@ -73,9 +109,24 @@ export function AvailableModulesDialog({
   const [sending, setSending] = useState(false);
   const [sent, setSent] = useState(false);
 
-  // Filtrar módulos que NO están activos
-  const unavailableModules = AVAILABLE_MODULES.filter(
-    module => !activeModules.includes(module.code)
+  // Obtener todos los módulos de la plataforma
+  const { data: allModules, isLoading } = useQuery({
+    queryKey: ['platform_modules_all'],
+    queryFn: async () => {
+      const { data, error } = await supabase
+        .from('platform_modules')
+        .select('id, code, name, description')
+        .order('name');
+      
+      if (error) throw error;
+      return data || [];
+    },
+    enabled: open,
+  });
+
+  // Filtrar módulos que NO están activos y no son base
+  const unavailableModules = (allModules || []).filter(
+    module => !activeModules.includes(module.code) && !BASE_MODULES.includes(module.code)
   );
 
   const toggleModule = (code: string) => {
@@ -116,6 +167,26 @@ export function AvailableModulesDialog({
     setSent(false);
     onOpenChange(false);
   };
+
+  if (isLoading) {
+    return (
+      <Dialog open={open} onOpenChange={handleClose}>
+        <DialogContent className="sm:max-w-lg">
+          <DialogHeader>
+            <DialogTitle className="flex items-center gap-2">
+              <Sparkles className="w-5 h-5 text-primary" />
+              Cargando módulos...
+            </DialogTitle>
+          </DialogHeader>
+          <div className="space-y-3">
+            {[1, 2, 3].map(i => (
+              <Skeleton key={i} className="h-20 w-full" />
+            ))}
+          </div>
+        </DialogContent>
+      </Dialog>
+    );
+  }
 
   if (unavailableModules.length === 0) {
     return (
@@ -162,7 +233,7 @@ export function AvailableModulesDialog({
           <>
             <div className="space-y-3 max-h-[300px] overflow-y-auto">
               {unavailableModules.map((module) => {
-                const Icon = module.icon;
+                const Icon = MODULE_ICONS[module.code] || Package;
                 const isSelected = selectedModules.includes(module.code);
                 
                 return (
