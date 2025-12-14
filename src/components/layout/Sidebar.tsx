@@ -112,29 +112,20 @@ export function Sidebar() {
   };
 
   // Helper function to check if module is active
-  // Solo platform admins ven todo, los admins de empresa ven solo sus módulos
+  // Solo platform admins ven todo, los admins de empresa ven solo sus módulos activos
   const hasModule = (moduleName: string) => {
-    // Platform admins ven todo
+    // Platform admins ven todo para poder navegar y gestionar
     if (isPlatformAdmin) return true;
     
-    // Si no hay datos cargados aún, no mostrar nada extra
-    if (!activeModules.data) return false;
-    if (activeModules.data.length === 0) return false;
+    // Si no hay datos cargados aún, solo mostrar módulos base
+    if (!activeModules.data || activeModules.data.length === 0) {
+      const baseModules = ['dashboard', 'products', 'customers', 'settings', 'reports'];
+      return baseModules.includes(moduleName);
+    }
     
-    // Mapeo de nombres de módulos a códigos
-    const moduleMap: Record<string, string[]> = {
-      'pos': ['pos'],
-      'sales': ['sales', 'quotations', 'delivery_notes', 'returns', 'reservations'],
-      'inventory': ['products', 'inventory', 'inventory_alerts', 'warehouses', 'warehouse_stock', 'warehouse_transfers', 'stock_reservations'],
-      'purchases': ['purchases', 'suppliers'],
-      'finance': ['cash_register', 'bank_accounts', 'bank_movements', 'card_movements', 'retentions', 'checks', 'expenses'],
-      'technical_services': ['technical_services'],
-      'hr': ['payroll', 'employees'],
-      'reports': ['reports', 'accountant_reports'],
-    };
-    
-    const moduleCodes = moduleMap[moduleName] || [moduleName];
-    return moduleCodes.some(code => activeModules.data.includes(code));
+    // Verificar si el código del módulo está en la lista de activos
+    // El moduleName viene del item.module en navItems
+    return activeModules.data.includes(moduleName);
   };
 
   const navItems: (NavItem | { section: string; items: NavItem[] })[] = [

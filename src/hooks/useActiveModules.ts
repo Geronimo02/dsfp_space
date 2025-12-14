@@ -14,7 +14,7 @@ export const useActiveModules = () => {
         return [];
       }
 
-      console.log('Fetching active modules for company:', currentCompany.id);
+      console.log('[useActiveModules] Fetching active modules for company:', currentCompany.id);
 
       const { data, error } = await supabase
         .from('company_modules')
@@ -26,26 +26,27 @@ export const useActiveModules = () => {
         .eq('active', true);
 
       if (error) {
-        console.error('Error fetching active modules:', error);
+        console.error('[useActiveModules] Error fetching active modules:', error);
         throw error;
       }
 
       // Retornar array de códigos de módulos activos
       const modules = data?.map((cm: any) => cm.platform_modules?.code).filter(Boolean) || [];
-      console.log('Active modules:', modules);
+      console.log('[useActiveModules] Active modules loaded:', modules);
       return modules;
     },
     enabled: !!currentCompany?.id,
     // Mantener datos frescos
-    staleTime: 1000 * 10, // 10 segundos - más frecuente para cambios de admin
+    staleTime: 1000 * 5, // 5 segundos - más frecuente para cambios de admin
     refetchOnWindowFocus: true,
+    refetchOnMount: true,
   });
 
   // Suscribirse a cambios en tiempo real de company_modules
   useEffect(() => {
     if (!currentCompany?.id) return;
 
-    console.log('Setting up realtime subscription for company_modules:', currentCompany.id);
+    console.log('[useActiveModules] Setting up realtime subscription for company_modules:', currentCompany.id);
 
     const channel = supabase
       .channel(`company_modules_realtime_${currentCompany.id}`)
@@ -58,17 +59,17 @@ export const useActiveModules = () => {
           filter: `company_id=eq.${currentCompany.id}`,
         },
         (payload) => {
-          console.log('Realtime change detected on company_modules:', payload);
-          // Invalidar y refetch cuando hay cambios
+          console.log('[useActiveModules] Realtime change detected:', payload);
+          // Invalidar y refetch inmediatamente cuando hay cambios
           queryClient.invalidateQueries({ queryKey: ['activeModules', currentCompany.id] });
         }
       )
       .subscribe((status) => {
-        console.log('Realtime subscription status:', status);
+        console.log('[useActiveModules] Realtime subscription status:', status);
       });
 
     return () => {
-      console.log('Cleaning up realtime subscription for company:', currentCompany.id);
+      console.log('[useActiveModules] Cleaning up realtime subscription');
       supabase.removeChannel(channel);
     };
   }, [currentCompany?.id, queryClient]);
