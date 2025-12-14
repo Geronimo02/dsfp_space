@@ -289,15 +289,30 @@ export const useToggleCompanyModule = () => {
       if (error) throw error;
       return data;
     },
-    onSuccess: (_, variables) => {
-      console.log('Module toggle success, invalidating queries for company:', variables.companyId);
-      // Invalidar todos los queries relacionados
-      queryClient.invalidateQueries({ queryKey: ['companyModules', variables.companyId] });
-      queryClient.invalidateQueries({ queryKey: ['company_modules_enhanced', variables.companyId] });
-      queryClient.invalidateQueries({ queryKey: ['activeModules', variables.companyId] });
+    onSuccess: (data, variables) => {
+      console.log('[useToggleCompanyModule] Success! Module toggled:', {
+        companyId: variables.companyId,
+        moduleId: variables.moduleId,
+        newActiveState: variables.active,
+        result: data
+      });
+      // Invalidar todos los queries relacionados con refetchType immediate
+      queryClient.invalidateQueries({ 
+        queryKey: ['companyModules', variables.companyId],
+        refetchType: 'active'
+      });
+      queryClient.invalidateQueries({ 
+        queryKey: ['company_modules_enhanced', variables.companyId],
+        refetchType: 'active'
+      });
+      queryClient.invalidateQueries({ 
+        queryKey: ['activeModules', variables.companyId],
+        refetchType: 'active'
+      });
       // También invalidar sin ID específico para forzar refetch global
-      queryClient.invalidateQueries({ queryKey: ['activeModules'] });
+      queryClient.invalidateQueries({ queryKey: ['activeModules'], refetchType: 'all' });
       queryClient.invalidateQueries({ queryKey: ['platform-companies'] });
+      queryClient.invalidateQueries({ queryKey: ['platform_modules_all'] });
       toast({
         title: 'Módulo actualizado',
         description: 'El estado del módulo se ha actualizado correctamente',

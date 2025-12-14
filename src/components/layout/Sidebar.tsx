@@ -119,7 +119,7 @@ export function Sidebar() {
     
     // Si no hay datos cargados aún, solo mostrar módulos base
     if (!activeModules.data || activeModules.data.length === 0) {
-      const baseModules = ['dashboard', 'products', 'customers', 'settings', 'reports'];
+      const baseModules = ['dashboard', 'pos', 'products', 'sales', 'customers', 'settings', 'reports'];
       return baseModules.includes(moduleName);
     }
     
