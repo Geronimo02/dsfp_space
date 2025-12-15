@@ -3,6 +3,9 @@ import { supabase } from '@/integrations/supabase/client';
 import { useCompany } from '@/contexts/CompanyContext';
 import { useEffect } from 'react';
 
+// Módulos base que siempre están activos para todas las empresas
+const BASE_MODULES = ['dashboard', 'pos', 'sales', 'products', 'customers'];
+
 export const useActiveModules = () => {
   const { currentCompany } = useCompany();
   const queryClient = useQueryClient();
@@ -11,7 +14,7 @@ export const useActiveModules = () => {
     queryKey: ['activeModules', currentCompany?.id],
     queryFn: async () => {
       if (!currentCompany?.id) {
-        return [];
+        return [...BASE_MODULES]; // Retornar base modules si no hay empresa
       }
 
       console.log('[useActiveModules] Fetching active modules for company:', currentCompany.id);
@@ -20,7 +23,7 @@ export const useActiveModules = () => {
         .from('company_modules')
         .select(`
           *,
-          platform_modules(code)
+          platform_modules(code, is_base)
         `)
         .eq('company_id', currentCompany.id)
         .eq('active', true);
@@ -30,14 +33,17 @@ export const useActiveModules = () => {
         throw error;
       }
 
-      // Retornar array de códigos de módulos activos
-      const modules = data?.map((cm: any) => cm.platform_modules?.code).filter(Boolean) || [];
-      console.log('[useActiveModules] Active modules loaded:', modules);
-      return modules;
+      // Obtener códigos de módulos activos de la empresa
+      const companyModules = data?.map((cm: any) => cm.platform_modules?.code).filter(Boolean) || [];
+      
+      // Combinar con módulos base (siempre activos)
+      const allActiveModules = [...new Set([...BASE_MODULES, ...companyModules])];
+      
+      console.log('[useActiveModules] Active modules loaded:', allActiveModules);
+      return allActiveModules;
     },
     enabled: !!currentCompany?.id,
-    // Mantener datos frescos
-    staleTime: 1000 * 5, // 5 segundos - más frecuente para cambios de admin
+    staleTime: 1000 * 5,
     refetchOnWindowFocus: true,
     refetchOnMount: true,
   });
@@ -60,7 +66,6 @@ export const useActiveModules = () => {
         },
         (payload) => {
           console.log('[useActiveModules] Realtime change detected:', payload);
-          // Invalidar y refetch inmediatamente cuando hay cambios
           queryClient.invalidateQueries({ queryKey: ['activeModules', currentCompany.id] });
         }
       )

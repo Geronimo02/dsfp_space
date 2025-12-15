@@ -3216,51 +3216,74 @@ export type Database = {
       }
       platform_modules: {
         Row: {
+          category: string | null
           code: string
           created_at: string | null
           dependencies: Json | null
           description: string | null
           display_order: number | null
+          icon: string | null
           id: string
           is_active: boolean | null
+          is_base: boolean | null
           is_base_module: boolean | null
           limits: Json | null
           name: string
+          parent_module_id: string | null
           price_annual: number
           price_monthly: number
+          route: string | null
           updated_at: string | null
         }
         Insert: {
+          category?: string | null
           code: string
           created_at?: string | null
           dependencies?: Json | null
           description?: string | null
           display_order?: number | null
+          icon?: string | null
           id?: string
           is_active?: boolean | null
+          is_base?: boolean | null
           is_base_module?: boolean | null
           limits?: Json | null
           name: string
+          parent_module_id?: string | null
           price_annual?: number
           price_monthly?: number
+          route?: string | null
           updated_at?: string | null
         }
         Update: {
+          category?: string | null
           code?: string
           created_at?: string | null
           dependencies?: Json | null
           description?: string | null
           display_order?: number | null
+          icon?: string | null
           id?: string
           is_active?: boolean | null
+          is_base?: boolean | null
           is_base_module?: boolean | null
           limits?: Json | null
           name?: string
+          parent_module_id?: string | null
           price_annual?: number
           price_monthly?: number
+          route?: string | null
           updated_at?: string | null
         }
-        Relationships: []
+        Relationships: [
+          {
+            foreignKeyName: "platform_modules_parent_module_id_fkey"
+            columns: ["parent_module_id"]
+            isOneToOne: false
+            referencedRelation: "platform_modules"
+            referencedColumns: ["id"]
+          },
+        ]
       }
       platform_notifications: {
         Row: {

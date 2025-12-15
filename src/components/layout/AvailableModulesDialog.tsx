@@ -37,12 +37,18 @@ import {
   BookOpen,
   LayoutDashboard,
   ShoppingCart,
-  Settings
+  Settings,
+  UserCheck,
+  FileCheck,
+  PackageCheck,
+  ChevronDown,
 } from "lucide-react";
 import { toast } from "sonner";
 import { useQuery } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
 import { Skeleton } from "@/components/ui/skeleton";
+import { Collapsible, CollapsibleContent, CollapsibleTrigger } from "@/components/ui/collapsible";
+import { cn } from "@/lib/utils";
 
 // Mapeo de códigos de módulos a íconos
 const MODULE_ICONS: Record<string, any> = {
@@ -53,7 +59,7 @@ const MODULE_ICONS: Record<string, any> = {
   customers: Users,
   settings: Settings,
   reports: BarChart3,
-  quotations: FileText,
+  quotations: FileCheck,
   delivery_notes: Truck,
   returns: TrendingDown,
   reservations: Calendar,
@@ -63,6 +69,9 @@ const MODULE_ICONS: Record<string, any> = {
   warehouse_transfers: ArrowLeftRight,
   stock_reservations: PackageOpen,
   purchases: ShoppingBag,
+  purchase_orders: FileCheck,
+  purchase_reception: PackageCheck,
+  purchase_returns: TrendingDown,
   suppliers: Truck,
   bank_accounts: Building2,
   bank_movements: Building2,
@@ -74,9 +83,10 @@ const MODULE_ICONS: Record<string, any> = {
   technical_services: Wrench,
   payroll: Calculator,
   commissions: Calculator,
+  employees: UserCheck,
   promotions: Tag,
   afip: Store,
-  afip_pos_points: Store,
+  pos_afip: Store,
   audit_logs: Shield,
   access_logs: Activity,
   monthly_closing: Lock,
@@ -85,12 +95,51 @@ const MODULE_ICONS: Record<string, any> = {
   integrations: Plug,
   accounts_receivable: Receipt,
   accountant_reports: BookOpen,
-  advanced_reports: BarChart3,
-  ai_assistant: Sparkles,
+  customer_support: UserCheck,
 };
 
-// Módulos base que siempre están activos y no se muestran como disponibles
-const BASE_MODULES = ['dashboard', 'pos', 'products', 'sales', 'customers', 'settings', 'reports'];
+// Mapeo de categorías a nombres legibles
+const CATEGORY_NAMES: Record<string, string> = {
+  dashboard: "Dashboard",
+  pos: "Punto de Venta",
+  ventas: "Ventas",
+  clientes: "Clientes",
+  inventario: "Inventario",
+  compras: "Compras",
+  finanzas: "Finanzas",
+  operaciones: "Operaciones",
+  rrhh: "RRHH",
+  reportes: "Reportes",
+  administracion: "Administración",
+  integraciones: "Integraciones",
+};
+
+// Mapeo de categorías a íconos
+const CATEGORY_ICONS: Record<string, any> = {
+  dashboard: LayoutDashboard,
+  pos: ShoppingCart,
+  ventas: FileText,
+  clientes: Users,
+  inventario: Package,
+  compras: ShoppingBag,
+  finanzas: Building2,
+  operaciones: Wrench,
+  rrhh: Calculator,
+  reportes: BarChart3,
+  administracion: Settings,
+  integraciones: Plug,
+};
+
+interface PlatformModule {
+  id: string;
+  code: string;
+  name: string;
+  description: string | null;
+  category: string | null;
+  is_base: boolean | null;
+  price_monthly: number | null;
+  display_order: number | null;
+}
 
 interface AvailableModulesDialogProps {
   open: boolean;
@@ -108,33 +157,47 @@ export function AvailableModulesDialog({
   const [message, setMessage] = useState("");
   const [sending, setSending] = useState(false);
   const [sent, setSent] = useState(false);
+  const [openCategories, setOpenCategories] = useState<string[]>([]);
 
-  // Obtener todos los módulos de la plataforma
+  // Obtener todos los módulos de la plataforma con categorías
   const { data: allModules, isLoading } = useQuery({
-    queryKey: ['platform_modules_all'],
+    queryKey: ['platform_modules_all_with_categories'],
     queryFn: async () => {
       const { data, error } = await supabase
         .from('platform_modules')
-        .select('id, code, name, description')
+        .select('id, code, name, description, category, is_base, price_monthly, display_order')
         .eq('is_active', true)
-        .order('name');
+        .order('category')
+        .order('display_order');
       
       if (error) throw error;
-      console.log('[AvailableModulesDialog] All platform modules:', data?.length);
-      return data || [];
+      return (data || []) as PlatformModule[];
     },
     enabled: open,
   });
 
-  // Filtrar módulos que NO están activos para la empresa actual y no son base
+  // Filtrar módulos que NO están activos y no son base
   const unavailableModules = (allModules || []).filter(module => {
     const isActive = activeModules.includes(module.code);
-    const isBase = BASE_MODULES.includes(module.code);
+    const isBase = module.is_base === true;
     return !isActive && !isBase;
   });
-  
-  console.log('[AvailableModulesDialog] Active modules from company:', activeModules);
-  console.log('[AvailableModulesDialog] Unavailable modules to show:', unavailableModules.length);
+
+  // Agrupar por categoría
+  const modulesByCategory = unavailableModules.reduce((acc, module) => {
+    const category = module.category || 'otros';
+    if (!acc[category]) acc[category] = [];
+    acc[category].push(module);
+    return acc;
+  }, {} as Record<string, PlatformModule[]>);
+
+  const toggleCategory = (category: string) => {
+    setOpenCategories(prev => 
+      prev.includes(category) 
+        ? prev.filter(c => c !== category)
+        : [...prev, category]
+    );
+  };
 
   const toggleModule = (code: string) => {
     setSelectedModules(prev => 
@@ -144,6 +207,13 @@ export function AvailableModulesDialog({
     );
   };
 
+  const calculateTotalPrice = () => {
+    return selectedModules.reduce((total, code) => {
+      const module = unavailableModules.find(m => m.code === code);
+      return total + (module?.price_monthly || 0);
+    }, 0);
+  };
+
   const handleContactSupport = async () => {
     if (selectedModules.length === 0) {
       toast.error("Selecciona al menos un módulo");
@@ -151,13 +221,11 @@ export function AvailableModulesDialog({
     }
 
     setSending(true);
-    // Simular envío - aquí se integraría con el sistema de tickets
     await new Promise(resolve => setTimeout(resolve, 1000));
     setSending(false);
     setSent(true);
     toast.success("Solicitud enviada correctamente");
     
-    // Reset después de un tiempo
     setTimeout(() => {
       setSent(false);
       setShowContactForm(false);
@@ -172,7 +240,13 @@ export function AvailableModulesDialog({
     setSelectedModules([]);
     setMessage("");
     setSent(false);
+    setOpenCategories([]);
     onOpenChange(false);
+  };
+
+  const formatPrice = (price: number | null) => {
+    if (!price || price === 0) return "Incluido";
+    return `$${price.toLocaleString('es-AR')}/mes`;
   };
 
   if (isLoading) {
@@ -187,7 +261,7 @@ export function AvailableModulesDialog({
           </DialogHeader>
           <div className="space-y-3">
             {[1, 2, 3].map(i => (
-              <Skeleton key={i} className="h-20 w-full" />
+              <Skeleton key={i} className="h-16 w-full" />
             ))}
           </div>
         </DialogContent>
@@ -218,14 +292,14 @@ export function AvailableModulesDialog({
 
   return (
     <Dialog open={open} onOpenChange={handleClose}>
-      <DialogContent className="sm:max-w-lg">
+      <DialogContent className="sm:max-w-2xl max-h-[80vh]">
         <DialogHeader>
           <DialogTitle className="flex items-center gap-2">
             <Sparkles className="w-5 h-5 text-primary" />
             Funcionalidades Adicionales
           </DialogTitle>
           <DialogDescription>
-            Mejora tu plan con estas funcionalidades. Selecciona las que te interesen y contacta con soporte.
+            Mejora tu plan con estas funcionalidades. Cada función tiene su propio precio.
           </DialogDescription>
         </DialogHeader>
 
@@ -238,43 +312,102 @@ export function AvailableModulesDialog({
           </div>
         ) : (
           <>
-            <div className="space-y-3 max-h-[300px] overflow-y-auto">
-              {unavailableModules.map((module) => {
-                const Icon = MODULE_ICONS[module.code] || Package;
-                const isSelected = selectedModules.includes(module.code);
+            <div className="space-y-2 max-h-[400px] overflow-y-auto pr-2">
+              {Object.entries(modulesByCategory).map(([category, modules]) => {
+                const CategoryIcon = CATEGORY_ICONS[category] || Package;
+                const isOpen = openCategories.includes(category);
+                const selectedInCategory = modules.filter(m => selectedModules.includes(m.code)).length;
                 
                 return (
-                  <div
-                    key={module.code}
-                    onClick={() => toggleModule(module.code)}
-                    className={`p-4 rounded-lg border cursor-pointer transition-all ${
-                      isSelected 
-                        ? "border-primary bg-primary/5 ring-2 ring-primary/20" 
-                        : "border-border hover:border-primary/50 hover:bg-muted/50"
-                    }`}
+                  <Collapsible
+                    key={category}
+                    open={isOpen}
+                    onOpenChange={() => toggleCategory(category)}
                   >
-                    <div className="flex items-start gap-3">
-                      <div className={`p-2 rounded-lg ${isSelected ? "bg-primary/10" : "bg-muted"}`}>
-                        <Icon className={`w-5 h-5 ${isSelected ? "text-primary" : "text-muted-foreground"}`} />
+                    <CollapsibleTrigger className="flex items-center justify-between w-full p-3 rounded-lg bg-muted/50 hover:bg-muted transition-colors">
+                      <div className="flex items-center gap-3">
+                        <CategoryIcon className="w-5 h-5 text-primary" />
+                        <span className="font-medium">
+                          {CATEGORY_NAMES[category] || category}
+                        </span>
+                        <Badge variant="secondary" className="text-xs">
+                          {modules.length} disponibles
+                        </Badge>
+                        {selectedInCategory > 0 && (
+                          <Badge variant="default" className="text-xs">
+                            {selectedInCategory} seleccionados
+                          </Badge>
+                        )}
                       </div>
-                      <div className="flex-1">
-                        <div className="flex items-center justify-between">
-                          <h4 className="font-medium">{module.name}</h4>
-                          {isSelected && (
-                            <Badge variant="default" className="text-xs">
-                              Seleccionado
-                            </Badge>
-                          )}
-                        </div>
-                        <p className="text-sm text-muted-foreground mt-1">
-                          {module.description}
-                        </p>
-                      </div>
-                    </div>
-                  </div>
+                      <ChevronDown className={cn(
+                        "w-4 h-4 transition-transform",
+                        isOpen && "rotate-180"
+                      )} />
+                    </CollapsibleTrigger>
+                    <CollapsibleContent className="pl-4 pt-2 space-y-2">
+                      {modules.map((module) => {
+                        const Icon = MODULE_ICONS[module.code] || Package;
+                        const isSelected = selectedModules.includes(module.code);
+                        
+                        return (
+                          <div
+                            key={module.code}
+                            onClick={() => toggleModule(module.code)}
+                            className={cn(
+                              "p-3 rounded-lg border cursor-pointer transition-all",
+                              isSelected 
+                                ? "border-primary bg-primary/5 ring-1 ring-primary/20" 
+                                : "border-border hover:border-primary/50 hover:bg-muted/50"
+                            )}
+                          >
+                            <div className="flex items-center gap-3">
+                              <div className={cn(
+                                "p-2 rounded-lg",
+                                isSelected ? "bg-primary/10" : "bg-muted"
+                              )}>
+                                <Icon className={cn(
+                                  "w-4 h-4",
+                                  isSelected ? "text-primary" : "text-muted-foreground"
+                                )} />
+                              </div>
+                              <div className="flex-1 min-w-0">
+                                <div className="flex items-center justify-between gap-2">
+                                  <h4 className="font-medium text-sm truncate">{module.name}</h4>
+                                  <Badge 
+                                    variant={module.price_monthly && module.price_monthly > 0 ? "outline" : "secondary"}
+                                    className="text-xs shrink-0"
+                                  >
+                                    {formatPrice(module.price_monthly)}
+                                  </Badge>
+                                </div>
+                                {module.description && (
+                                  <p className="text-xs text-muted-foreground mt-0.5 truncate">
+                                    {module.description}
+                                  </p>
+                                )}
+                              </div>
+                            </div>
+                          </div>
+                        );
+                      })}
+                    </CollapsibleContent>
+                  </Collapsible>
                 );
               })}
             </div>
+
+            {selectedModules.length > 0 && (
+              <div className="p-3 bg-primary/5 rounded-lg border border-primary/20">
+                <div className="flex items-center justify-between">
+                  <span className="text-sm font-medium">
+                    {selectedModules.length} módulos seleccionados
+                  </span>
+                  <span className="text-lg font-bold text-primary">
+                    +${calculateTotalPrice().toLocaleString('es-AR')}/mes
+                  </span>
+                </div>
+              </div>
+            )}
 
             {showContactForm && (
               <div className="space-y-3 pt-3 border-t">
@@ -295,7 +428,7 @@ export function AvailableModulesDialog({
                   className="flex-1"
                 >
                   <MessageSquare className="w-4 h-4 mr-2" />
-                  Contactar Soporte ({selectedModules.length} seleccionados)
+                  Solicitar Activación
                 </Button>
               ) : (
                 <>
