@@ -45,9 +45,12 @@ export function CompanyProvider({ children }: { children: React.ReactNode }) {
     try {
       const { data: { user } } = await supabase.auth.getUser();
       if (!user) {
+        console.log("No authenticated user found");
         setLoading(false);
         return;
       }
+
+      console.log("Fetching companies for user:", user.id);
 
       const { data, error } = await supabase
         .from('company_users')
@@ -73,10 +76,14 @@ export function CompanyProvider({ children }: { children: React.ReactNode }) {
         .eq('active', true)
         .order('created_at', { ascending: true });
 
-      if (error) throw error;
+      if (error) {
+        console.error("Error fetching company_users:", error);
+        throw error;
+      }
 
-  const companyUsers = data as CompanyUser[];
-  setUserCompanies(companyUsers);
+      console.log("Companies fetched:", data?.length || 0, "companies");
+      const companyUsers = data as CompanyUser[];
+      setUserCompanies(companyUsers);
 
       // Set current company from localStorage or first company
       const savedCompanyId = localStorage.getItem('currentCompanyId');

@@ -69,17 +69,7 @@ export default function PlatformAdmin() {
   const [planDialogOpen, setPlanDialogOpen] = useState(false);
   const [editingPlan, setEditingPlan] = useState<any>(null);
   const [isPaymentDialogOpen, setIsPaymentDialogOpen] = useState(false);
-  const [ticketStatusFilter, setTicketStatusFilter] = useState<string>("all");
-  const [ticketDialogOpen, setTicketDialogOpen] = useState(false);
-  const [selectedTicket, setSelectedTicket] = useState<any>(null);
-  const [ticketResponse, setTicketResponse] = useState("");
-  const [newTicket, setNewTicket] = useState({
-    company_id: "",
-    title: "",
-    description: "",
-    priority: "medium",
-    category: "general"
-  });
+  const [platformSupportStatusFilter, setPlatformSupportStatusFilter] = useState<string>("all");
   const [integrationStatusFilter, setIntegrationStatusFilter] = useState<string>("all");
   const [newPayment, setNewPayment] = useState({
     company_id: "",
@@ -325,20 +315,151 @@ export default function PlatformAdmin() {
     }
   });
 
-  // Fetch support tickets
-  const { data: tickets } = useQuery({
+  // Fetch support tickets (sistema antiguo)
+  // Fetch customer support tickets (nuevo sistema integrado)
+  // Estados para gestión de tickets de plataforma
+  const [selectedPlatformTicket, setSelectedPlatformTicket] = useState<any>(null);
+  const [platformTicketMessage, setPlatformTicketMessage] = useState("");
+
+  // Tickets de soporte de PLATAFORMA (empresas reportando problemas a admins)
+  const { data: platformSupportTickets, isLoading: platformTicketsLoading, error: platformTicketsError, refetch: refetchTickets } = useQuery({
     queryKey: ["platform-support-tickets"],
     queryFn: async () => {
-      const { data, error } = await supabase
-        .from("support_tickets")
-        .select(`
-          *,
-          companies (name)
-        `)
-        .order("created_at", { ascending: false });
+      console.log("🔍 INICIANDO: Fetching platform support tickets...");
+      try {
+        const { data, error } = await (supabase as any)
+          .from("platform_support_tickets")
+          .select(`
+            *,
+            companies!company_id (
+              name,
+              email
+            )
+          `)
+          .order("created_at", { ascending: false });
 
+        console.log("📊 Query ejecutada. Error?", error);
+        console.log("📊 Data recibida:", data);
+        
+        if (error) {
+          console.error("❌ Error fetching platform support tickets:", error);
+          console.error("Error details:", JSON.stringify(error, null, 2));
+          return [];
+        }
+        console.log("✅ Platform support tickets fetched:", data?.length || 0, "tickets");
+        return data || [];
+      } catch (err) {
+        console.error("❌ Exception:", err);
+        return [];
+      }
+    },
+    retry: 1,
+    staleTime: 30000, // 30 segundos
+    gcTime: 5 * 60 * 1000, // 5 minutos
+  });
+
+  // Mensajes del ticket seleccionado
+  const { data: platformTicketMessages } = useQuery({
+    queryKey: ["platform-ticket-messages", selectedPlatformTicket?.id],
+    queryFn: async () => {
+      if (!selectedPlatformTicket?.id) return [];
+      const { data, error } = await (supabase as any)
+        .from("platform_support_messages")
+        .select("*")
+        .eq("ticket_id", selectedPlatformTicket.id)
+        .order("created_at", { ascending: true });
       if (error) throw error;
       return data;
+    },
+    enabled: !!selectedPlatformTicket?.id,
+  });
+
+  // Mutation para responder ticket
+  const respondPlatformTicketMutation = useMutation({
+    mutationFn: async () => {
+      if (!selectedPlatformTicket?.id || !platformTicketMessage.trim()) return;
+      const { data: { user } } = await supabase.auth.getUser();
+      if (!user) throw new Error("Usuario no autenticado");
+
+      const { error } = await (supabase as any)
+        .from("platform_support_messages")
+        .insert([{
+          ticket_id: selectedPlatformTicket.id,
+          sender_type: "admin",
+          sender_id: user.id,
+          message: platformTicketMessage,
+        }]);
+
+      if (error) throw error;
+
+      // Retornar info para enviar notificación a la empresa
+      return {
+        ticketId: selectedPlatformTicket.id,
+        ticketNumber: selectedPlatformTicket.ticket_number,
+        companyId: selectedPlatformTicket.company_id,
+        companyEmail: selectedPlatformTicket.companies?.email,
+      };
+    },
+    onSuccess: (data) => {
+      queryClient.invalidateQueries({ queryKey: ["platform-ticket-messages"] });
+      setPlatformTicketMessage("");
+      
+      // Enviar notificación a la empresa (opcional - solo si hay email)
+      if (data?.companyEmail) {
+        try {
+          supabase.functions.invoke("notify-platform-support-ticket", {
+            body: {
+              ticket_id: data.ticketId,
+              type: "message_received",
+              send_email: true,
+              send_sms: false,
+            }
+          }).catch((err) => {
+            console.log("Notificación a empresa enviada (silenciosa)");
+          });
+        } catch (err) {
+          console.log("Error enviando notificación:", err);
+        }
+      }
+      
+      toast.success("Respuesta enviada");
+    },
+    onError: (error: any) => {
+      toast.error(error.message || "Error al enviar respuesta");
+    },
+  });
+
+  // Mutation para cambiar estado del ticket
+  const updatePlatformTicketStatusMutation = useMutation({
+    mutationFn: async ({ ticketId, status }: { ticketId: string, status: string }) => {
+      const updates: any = { status };
+      if (status === "resolved") updates.resolved_at = new Date().toISOString();
+      if (status === "closed") updates.closed_at = new Date().toISOString();
+
+      const { error } = await (supabase as any)
+        .from("platform_support_tickets")
+        .update(updates)
+        .eq("id", ticketId);
+
+      if (error) throw error;
+      return { ticketId, status, ...updates };
+    },
+    onSuccess: (data) => {
+      toast.success("Estado actualizado");
+      queryClient.invalidateQueries({ queryKey: ["platform-support-tickets"] });
+      // Actualizar el ticket seleccionado localmente
+      if (selectedPlatformTicket && selectedPlatformTicket.id === data.ticketId) {
+        setSelectedPlatformTicket({
+          ...selectedPlatformTicket,
+          status: data.status,
+          resolved_at: data.resolved_at,
+          closed_at: data.closed_at
+        });
+        // Si se cierra, deselecciona después de 1 segundo
+        if (data.status === "closed") {
+          setTimeout(() => setSelectedPlatformTicket(null), 1000);
+        }
+      }
     },
   });
 
@@ -594,119 +715,6 @@ export default function PlatformAdmin() {
   });
 
   // Create ticket
-  const createTicketMutation = useMutation({
-    mutationFn: async (ticket: typeof newTicket) => {
-      // First generate ticket number
-      const { data: ticketNumber, error: fnError } = await supabase
-        .rpc('generate_ticket_number');
-      
-      if (fnError) throw fnError;
-
-      const { error } = await supabase
-        .from("support_tickets")
-        .insert({
-          company_id: ticket.company_id,
-          title: ticket.title,
-          description: ticket.description,
-          priority: ticket.priority,
-          category: ticket.category,
-          ticket_number: ticketNumber,
-          status: "open"
-        });
-      
-      if (error) throw error;
-    },
-    onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ["platform-support-tickets"] });
-      setTicketDialogOpen(false);
-      setNewTicket({
-        company_id: "",
-        title: "",
-        description: "",
-        priority: "medium",
-        category: "general"
-      });
-      toast.success("Ticket creado exitosamente");
-    },
-    onError: (error) => {
-      toast.error("Error al crear el ticket: " + error.message);
-    },
-  });
-
-  // Update ticket
-  const updateTicketMutation = useMutation({
-    mutationFn: async ({ 
-      ticketId, 
-      status, 
-      priority,
-      assigned_to 
-    }: { 
-      ticketId: string; 
-      status?: string;
-      priority?: string;
-      assigned_to?: string;
-    }) => {
-      const updates: any = { 
-        updated_at: new Date().toISOString()
-      };
-      
-      if (status) {
-        updates.status = status;
-        if (status === "resolved") {
-          updates.resolved_at = new Date().toISOString();
-        }
-      }
-      if (priority) updates.priority = priority;
-      if (assigned_to) updates.assigned_to = assigned_to;
-
-      const { error } = await supabase
-        .from("support_tickets")
-        .update(updates)
-        .eq("id", ticketId);
-
-      if (error) throw error;
-    },
-    onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ["platform-support-tickets"] });
-      toast.success("Ticket actualizado");
-    },
-    onError: (error) => {
-      toast.error("Error al actualizar ticket");
-      console.error("Error:", error);
-    },
-  });
-
-  // Create ticket response
-  const createTicketResponseMutation = useMutation({
-    mutationFn: async ({ 
-      ticketId, 
-      message,
-      isInternal 
-    }: { 
-      ticketId: string; 
-      message: string;
-      isInternal?: boolean;
-    }) => {
-      const { error } = await supabase
-        .from("support_ticket_responses")
-        .insert({
-          ticket_id: ticketId,
-          message,
-          is_internal: isInternal || false
-        });
-
-      if (error) throw error;
-    },
-    onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ["platform-support-tickets"] });
-      setTicketResponse("");
-      toast.success("Respuesta agregada");
-    },
-    onError: (error) => {
-      toast.error("Error al agregar respuesta");
-      console.error("Error:", error);
-    },
-  });
 
   // Show loading while checking admin status
   if (adminLoading) {
@@ -1003,9 +1011,14 @@ export default function PlatformAdmin() {
                 <Rocket className="h-4 w-4" />
                 <span>Onboarding</span>
               </TabsTrigger>
-              <TabsTrigger value="tickets" className="w-full justify-start gap-2 data-[state=active]:bg-primary data-[state=active]:text-primary-foreground">
+              <TabsTrigger value="platform-support" className="w-full justify-start gap-2 data-[state=active]:bg-primary data-[state=active]:text-primary-foreground">
                 <Ticket className="h-4 w-4" />
-                <span>Tickets</span>
+                <span>Soporte</span>
+                {platformSupportTickets && platformSupportTickets.filter((t: any) => t.status === 'open').length > 0 && (
+                  <Badge variant="destructive" className="ml-auto">
+                    {platformSupportTickets.filter((t: any) => t.status === 'open').length}
+                  </Badge>
+                )}
               </TabsTrigger>
               <TabsTrigger value="notifications" className="w-full justify-start gap-2 data-[state=active]:bg-primary data-[state=active]:text-primary-foreground">
                 <Bell className="h-4 w-4" />
@@ -1178,294 +1191,350 @@ export default function PlatformAdmin() {
             </Card>
           </TabsContent>
 
-          {/* Support Tickets Tab */}
-          <TabsContent value="tickets" className="space-y-4">
-            <Card>
-              <CardHeader>
-                <div className="flex items-center justify-between">
-                  <div>
-                    <CardTitle>Sistema de Tickets de Soporte</CardTitle>
-                    <CardDescription>
-                      Gestiona consultas y tickets de las empresas
-                    </CardDescription>
+          {/* Platform Support Tab - Tickets de empresas a admins */}
+          <TabsContent value="platform-support" className="space-y-4">
+            <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
+              {/* Lista de Tickets */}
+              <Card className="lg:col-span-1">
+                <CardHeader>
+                  <CardTitle>Tickets de Soporte</CardTitle>
+                  <CardDescription>
+                    Problemas reportados por empresas
+                  </CardDescription>
+                  <div className="mt-4">
+                    <Select value={platformSupportStatusFilter} onValueChange={setPlatformSupportStatusFilter}>
+                      <SelectTrigger className="w-full">
+                        <SelectValue placeholder="Filtrar por estado" />
+                      </SelectTrigger>
+                      <SelectContent>
+                        <SelectItem value="all">Todos</SelectItem>
+                        <SelectItem value="open">Abiertos</SelectItem>
+                        <SelectItem value="in_progress">En Progreso</SelectItem>
+                        <SelectItem value="resolved">Resueltos</SelectItem>
+                        <SelectItem value="closed">Cerrados</SelectItem>
+                      </SelectContent>
+                    </Select>
                   </div>
-                  <Button onClick={() => {
-                    setNewTicket({
-                      company_id: "",
-                      title: "",
-                      description: "",
-                      priority: "medium",
-                      category: "general"
-                    });
-                    setTicketDialogOpen(true);
-                  }}>
-                    <Plus className="h-4 w-4 mr-2" />
-                    Nuevo Ticket
-                  </Button>
-                </div>
-                <div className="flex gap-4 mt-4">
-                  <Select value={ticketStatusFilter} onValueChange={setTicketStatusFilter}>
-                    <SelectTrigger className="w-[200px]">
-                      <SelectValue placeholder="Filtrar por estado" />
-                    </SelectTrigger>
-                    <SelectContent>
-                      <SelectItem value="all">Todos</SelectItem>
-                      <SelectItem value="open">Abiertos</SelectItem>
-                      <SelectItem value="in_progress">En proceso</SelectItem>
-                      <SelectItem value="resolved">Resueltos</SelectItem>
-                      <SelectItem value="closed">Cerrados</SelectItem>
-                    </SelectContent>
-                  </Select>
-                </div>
-              </CardHeader>
-              <CardContent>
-                <Table>
-                  <TableHeader>
-                    <TableRow>
-                      <TableHead>Número</TableHead>
-                      <TableHead>Empresa</TableHead>
-                      <TableHead>Título</TableHead>
-                      <TableHead>Estado</TableHead>
-                      <TableHead>Prioridad</TableHead>
-                      <TableHead>Categoría</TableHead>
-                      <TableHead>Creado</TableHead>
-                      <TableHead>Acciones</TableHead>
-                    </TableRow>
-                  </TableHeader>
-                  <TableBody>
-                    {tickets?.filter(ticket => ticketStatusFilter === "all" || ticket.status === ticketStatusFilter).map((ticket: any) => (
-                      <TableRow key={ticket.id}>
-                        <TableCell className="font-mono">{ticket.ticket_number}</TableCell>
-                        <TableCell>{ticket.companies?.name || "N/A"}</TableCell>
-                        <TableCell className="max-w-xs truncate">{ticket.title}</TableCell>
-                        <TableCell>
-                          <Badge 
-                            variant={
-                              ticket.status === "open" ? "default" : 
-                              ticket.status === "in_progress" ? "secondary" :
-                              ticket.status === "resolved" ? "default" :
-                              "outline"
-                            }
-                          >
-                            {ticket.status === "open" ? "Abierto" : 
-                             ticket.status === "in_progress" ? "En proceso" :
-                             ticket.status === "resolved" ? "Resuelto" :
-                             "Cerrado"}
-                          </Badge>
-                        </TableCell>
-                        <TableCell>
-                          <Badge 
-                            variant={
-                              ticket.priority === "urgent" ? "destructive" :
-                              ticket.priority === "high" ? "destructive" :
-                              ticket.priority === "medium" ? "secondary" :
-                              "outline"
-                            }
-                          >
-                            {ticket.priority === "urgent" ? "Urgente" :
-                             ticket.priority === "high" ? "Alta" :
-                             ticket.priority === "medium" ? "Media" :
-                             "Baja"}
-                          </Badge>
-                        </TableCell>
-                        <TableCell>
-                          <Badge variant="outline">
-                            {ticket.category === "technical" ? "Técnico" :
-                             ticket.category === "billing" ? "Facturación" :
-                             ticket.category === "feature_request" ? "Funcionalidad" :
-                             ticket.category === "bug" ? "Bug" :
-                             "General"}
-                          </Badge>
-                        </TableCell>
-                        <TableCell>{new Date(ticket.created_at).toLocaleDateString()}</TableCell>
-                        <TableCell>
-                          <Button
-                            variant="outline"
-                            size="sm"
-                            onClick={() => {
-                              setSelectedTicket(ticket);
-                              setTicketDialogOpen(true);
-                            }}
-                          >
-                            Ver detalle
-                          </Button>
-                        </TableCell>
-                      </TableRow>
-                    ))}
-                    {(!tickets || tickets.length === 0) && (
-                      <TableRow>
-                        <TableCell colSpan={8} className="text-center text-muted-foreground">
-                          No hay tickets disponibles
-                        </TableCell>
-                      </TableRow>
-                    )}
-                  </TableBody>
-                </Table>
-              </CardContent>
-            </Card>
+                </CardHeader>
+                <CardContent>
+                  <div className="grid grid-cols-3 gap-2 mb-4">
+                    <Card className="p-2">
+                      <div className="text-center">
+                        <div className="text-2xl font-bold text-red-600">
+                          {platformSupportTickets?.filter((t: any) => t.status === 'open').length || 0}
+                        </div>
+                        <div className="text-xs text-muted-foreground">Abiertos</div>
+                      </div>
+                    </Card>
+                    <Card className="p-2">
+                      <div className="text-center">
+                        <div className="text-2xl font-bold text-blue-600">
+                          {platformSupportTickets?.filter((t: any) => t.status === 'in_progress').length || 0}
+                        </div>
+                        <div className="text-xs text-muted-foreground">En Progreso</div>
+                      </div>
+                    </Card>
+                    <Card className="p-2">
+                      <div className="text-center">
+                        <div className="text-2xl font-bold text-green-600">
+                          {platformSupportTickets?.filter((t: any) => t.status === 'resolved').length || 0}
+                        </div>
+                        <div className="text-xs text-muted-foreground">Resueltos</div>
+                      </div>
+                    </Card>
+                  </div>
 
-            {/* Ticket Dialog */}
-            <Dialog open={ticketDialogOpen} onOpenChange={(open) => {
-              setTicketDialogOpen(open);
-              if (!open) {
-                setSelectedTicket(null);
-                setTicketResponse("");
-              }
-            }}>
-              <DialogContent className="max-w-2xl">
-                <DialogHeader>
-                  <DialogTitle>
-                    {selectedTicket ? `Ticket ${selectedTicket.ticket_number}` : "Nuevo Ticket"}
-                  </DialogTitle>
-                  <DialogDescription>
-                    {selectedTicket ? "Detalles y respuestas del ticket" : "Crear un nuevo ticket de soporte"}
-                  </DialogDescription>
-                </DialogHeader>
-                <div className="space-y-4">
-                  {selectedTicket ? (
-                    <>
-                      <div className="grid grid-cols-2 gap-4">
-                        <div>
-                          <Label>Estado</Label>
-                          <Select defaultValue={selectedTicket.status}>
-                            <SelectTrigger>
-                              <SelectValue />
-                            </SelectTrigger>
-                            <SelectContent>
-                              <SelectItem value="open">Abierto</SelectItem>
-                              <SelectItem value="in_progress">En proceso</SelectItem>
-                              <SelectItem value="resolved">Resuelto</SelectItem>
-                              <SelectItem value="closed">Cerrado</SelectItem>
-                            </SelectContent>
-                          </Select>
+                  <div className="space-y-2 max-h-[600px] overflow-y-auto border rounded p-2">
+                    {platformSupportTickets && platformSupportTickets.length > 0 ? (
+                      (() => {
+                        // Debug: Asegurar que el filtro sea válido
+                        const validFilter = platformSupportStatusFilter === 'all' ? 'all' : platformSupportStatusFilter;
+                        const filtered = platformSupportTickets
+                          .filter((t: any) => validFilter === 'all' || t.status === validFilter);
+                        console.log("🎯 TOTAL tickets:", platformSupportTickets.length);
+                        console.log("🔍 Filtro actual:", validFilter);
+                        console.log("✅ Tickets filtrados:", filtered.length);
+                        console.log("📊 Datos:", filtered.map(t => ({id: t.id, status: t.status, ticket_number: t.ticket_number})));
+                        return filtered.map((ticket: any) => (
+                        <div
+                          key={ticket.id}
+                          className={`p-3 border rounded-lg cursor-pointer transition-colors hover:bg-muted/50 ${
+                            selectedPlatformTicket?.id === ticket.id ? "bg-muted border-2 border-primary" : ""
+                          }`}
+                          onClick={() => {
+                            console.log("👆 Seleccionando ticket:", ticket.ticket_number, ticket.id);
+                            setSelectedPlatformTicket(ticket);
+                          }}
+                        >
+                          <div className="flex items-start justify-between mb-2">
+                            <div className="flex items-center gap-2">
+                              <span className="font-mono text-xs font-medium">{ticket.ticket_number}</span>
+                              <Badge variant={
+                                ticket.status === 'open' ? 'destructive' :
+                                ticket.status === 'in_progress' ? 'secondary' :
+                                'outline'
+                              } className="text-xs">
+                                {ticket.status === 'open' ? 'Abierto' :
+                                 ticket.status === 'in_progress' ? 'En Progreso' :
+                                 ticket.status === 'resolved' ? 'Resuelto' : 'Cerrado'}
+                              </Badge>
+                            </div>
+                            <Badge variant="outline" className="text-xs">
+                              {ticket.priority === 'urgent' ? '🔴' :
+                               ticket.priority === 'high' ? '🟠' :
+                               ticket.priority === 'medium' ? '🟡' : '🟢'}
+                            </Badge>
+                          </div>
+                          <div className="text-xs text-muted-foreground mb-1 flex items-center gap-1">
+                            <Building2 className="h-3 w-3" />
+                            {ticket.companies?.name}
+                          </div>
+                          <h4 className="font-medium text-sm line-clamp-1">{ticket.subject}</h4>
+                          <p className="text-xs text-muted-foreground line-clamp-2 mt-1">{ticket.description}</p>
                         </div>
-                        <div>
-                          <Label>Prioridad</Label>
-                          <Select defaultValue={selectedTicket.priority}>
-                            <SelectTrigger>
-                              <SelectValue />
-                            </SelectTrigger>
-                            <SelectContent>
-                              <SelectItem value="low">Baja</SelectItem>
-                              <SelectItem value="medium">Media</SelectItem>
-                              <SelectItem value="high">Alta</SelectItem>
-                              <SelectItem value="urgent">Urgente</SelectItem>
-                            </SelectContent>
-                          </Select>
+                      ));
+                      })()
+                    ) : (
+                      <div className="text-center py-12 text-muted-foreground">
+                        <Ticket className="h-12 w-12 mx-auto mb-2 opacity-50" />
+                        <p className="text-sm">No hay tickets reportados</p>
+                      </div>
+                    )}
+                  </div>
+                </CardContent>
+              </Card>
+
+              {/* Detalle del Ticket */}
+              <Card className="lg:col-span-2">
+                {selectedPlatformTicket ? (
+                  <>
+                    <CardHeader>
+                      <div className="flex items-start justify-between gap-4">
+                        <div className="flex-1">
+                          <div className="flex items-center gap-2 mb-2">
+                            <CardTitle className="text-lg">{selectedPlatformTicket.ticket_number}</CardTitle>
+                            <Select
+                              value={selectedPlatformTicket.status}
+                              onValueChange={(val) => {
+                                updatePlatformTicketStatusMutation.mutate({
+                                  ticketId: selectedPlatformTicket.id,
+                                  status: val
+                                });
+                              }}
+                            >
+                              <SelectTrigger className="w-[140px] h-8">
+                                <SelectValue />
+                              </SelectTrigger>
+                              <SelectContent>
+                                <SelectItem value="open">Abierto</SelectItem>
+                                <SelectItem value="in_progress">En Progreso</SelectItem>
+                                <SelectItem value="pending">Pendiente</SelectItem>
+                                <SelectItem value="resolved">Resuelto</SelectItem>
+                                <SelectItem value="closed">Cerrado</SelectItem>
+                              </SelectContent>
+                            </Select>
+                          </div>
+                          <CardDescription>{selectedPlatformTicket.subject}</CardDescription>
+                        </div>
+                        <Button 
+                          variant="outline" 
+                          size="sm"
+                          onClick={() => setSelectedPlatformTicket(null)}
+                          className="mt-1"
+                        >
+                          ✕ Cerrar
+                        </Button>
+                      </div>
+                      
+                      {/* Info de la Empresa */}
+                      <div className="mt-4 p-3 bg-muted rounded-lg">
+                        <div className="grid grid-cols-2 gap-3 text-sm">
+                          <div>
+                            <span className="text-muted-foreground">Empresa:</span>
+                            <div className="font-medium flex items-center gap-1">
+                              <Building2 className="h-3 w-3" />
+                              {selectedPlatformTicket.companies?.name}
+                            </div>
+                          </div>
+                          <div>
+                            <span className="text-muted-foreground">Email:</span>
+                            <div className="font-medium">{selectedPlatformTicket.companies?.email || 'No disponible'}</div>
+                          </div>
+                          <div>
+                            <span className="text-muted-foreground">Categoría:</span>
+                            <div className="font-medium">
+                              {selectedPlatformTicket.category === 'technical' ? '🔧 Técnico' :
+                               selectedPlatformTicket.category === 'billing' ? '💰 Facturación' :
+                               selectedPlatformTicket.category === 'feature_request' ? '✨ Nueva Función' :
+                               selectedPlatformTicket.category === 'bug' ? '🐛 Bug' :
+                               selectedPlatformTicket.category === 'account' ? '👤 Cuenta' : '📋 Otro'}
+                            </div>
+                          </div>
+                          <div>
+                            <span className="text-muted-foreground">Prioridad:</span>
+                            <div className="font-medium">
+                              {selectedPlatformTicket.priority === 'urgent' ? '🔴 Urgente' :
+                               selectedPlatformTicket.priority === 'high' ? '🟠 Alta' :
+                               selectedPlatformTicket.priority === 'medium' ? '🟡 Media' : '🟢 Baja'}
+                            </div>
+                          </div>
                         </div>
                       </div>
-                      <div>
-                        <Label>Título</Label>
-                        <Input value={selectedTicket.title} disabled />
+                    </CardHeader>
+                    <CardContent className="space-y-4">
+                      {/* Descripción Original */}
+                      <div className="p-4 bg-muted rounded-lg">
+                        <h4 className="text-sm font-medium mb-2">Descripción del Problema:</h4>
+                        <p className="text-sm">{selectedPlatformTicket.description}</p>
                       </div>
-                      <div>
-                        <Label>Descripción</Label>
-                        <Textarea value={selectedTicket.description} disabled rows={4} />
+
+                      {/* Mensajes */}
+                      <div className="space-y-3 max-h-[300px] overflow-y-auto border rounded-lg p-3">
+                        {platformTicketMessages && platformTicketMessages.length > 0 ? (
+                          platformTicketMessages.map((msg: any) => (
+                            <div
+                              key={msg.id}
+                              className={`flex ${msg.sender_type === 'admin' ? 'justify-end' : 'justify-start'}`}
+                            >
+                              <div
+                                className={`max-w-[80%] p-3 rounded-lg ${
+                                  msg.sender_type === 'admin'
+                                    ? 'bg-primary text-primary-foreground'
+                                    : 'bg-muted'
+                                }`}
+                              >
+                                <p className="text-sm">{msg.message}</p>
+                                <p className="text-xs opacity-70 mt-1">
+                                  {new Date(msg.created_at).toLocaleString('es-AR')}
+                                </p>
+                              </div>
+                            </div>
+                          ))
+                        ) : (
+                          <p className="text-sm text-muted-foreground text-center py-4">
+                            No hay mensajes todavía
+                          </p>
+                        )}
                       </div>
-                      <div>
-                        <Label>Agregar respuesta</Label>
-                        <Textarea 
-                          value={ticketResponse}
-                          onChange={(e) => setTicketResponse(e.target.value)}
-                          placeholder="Escribe una respuesta..."
-                          rows={3}
-                        />
-                      </div>
-                    </>
-                  ) : (
-                    <>
-                      <div>
-                        <Label>Empresa</Label>
-                        <Select value={newTicket.company_id} onValueChange={(value) => setNewTicket({...newTicket, company_id: value})}>
-                          <SelectTrigger>
-                            <SelectValue placeholder="Seleccionar empresa" />
-                          </SelectTrigger>
-                          <SelectContent>
-                            {companies?.map((company) => (
-                              <SelectItem key={company.id} value={company.id}>
-                                {company.name}
-                              </SelectItem>
-                            ))}
-                          </SelectContent>
-                        </Select>
-                      </div>
-                      <div className="grid grid-cols-2 gap-4">
-                        <div>
-                          <Label>Prioridad</Label>
-                          <Select value={newTicket.priority} onValueChange={(value) => setNewTicket({...newTicket, priority: value})}>
-                            <SelectTrigger>
-                              <SelectValue />
-                            </SelectTrigger>
-                            <SelectContent>
-                              <SelectItem value="low">Baja</SelectItem>
-                              <SelectItem value="medium">Media</SelectItem>
-                              <SelectItem value="high">Alta</SelectItem>
-                              <SelectItem value="urgent">Urgente</SelectItem>
-                            </SelectContent>
-                          </Select>
+
+                      {/* Responder */}
+                      {selectedPlatformTicket.status !== 'closed' && (
+                        <div className="space-y-3 p-4 bg-muted/30 rounded-lg">
+                          <Label>Responder a la Empresa</Label>
+                          <Textarea
+                            placeholder="Escribe tu respuesta..."
+                            value={platformTicketMessage}
+                            onChange={(e) => setPlatformTicketMessage(e.target.value)}
+                            className="min-h-[100px]"
+                          />
+                          
+                          {/* Botones de envío */}
+                          <div className="space-y-2">
+                            <div className="grid grid-cols-3 gap-2">
+                              <Button
+                                onClick={() => respondPlatformTicketMutation.mutate()}
+                                disabled={!platformTicketMessage.trim()}
+                                className="col-span-1"
+                              >
+                                <MessageSquare className="h-4 w-4 mr-2" />
+                                Enviar
+                              </Button>
+                              <Button
+                                variant="outline"
+                                size="sm"
+                                onClick={() => {
+                                  // Abrir Gmail con el mensaje pre-llenado
+                                  const email = selectedPlatformTicket.companies?.email;
+                                  const subject = `RE: Ticket ${selectedPlatformTicket.ticket_number} - ${selectedPlatformTicket.subject}`;
+                                  const body = `${platformTicketMessage}\n\n---\nTicket: ${selectedPlatformTicket.ticket_number}`;
+                                  const gmailUrl = `https://mail.google.com/mail/?view=cm&fs=1&to=${email}&su=${encodeURIComponent(subject)}&body=${encodeURIComponent(body)}`;
+                                  window.open(gmailUrl, '_blank');
+                                  toast.success("Gmail abierto");
+                                }}
+                                disabled={!platformTicketMessage.trim()}
+                              >
+                                📧
+                              </Button>
+                              <Button
+                                variant="outline"
+                                size="sm"
+                                onClick={() => {
+                                  // Abrir WhatsApp Web con el mensaje
+                                  const phone = selectedPlatformTicket.companies?.phone;
+                                  if (!phone) {
+                                    toast.error("No hay número de WhatsApp para esta empresa");
+                                    return;
+                                  }
+                                  const message = `${platformTicketMessage}\n\nTicket: ${selectedPlatformTicket.ticket_number}`;
+                                  const waUrl = `https://web.whatsapp.com/send?phone=${phone}&text=${encodeURIComponent(message)}`;
+                                  window.open(waUrl, '_blank');
+                                  toast.success("WhatsApp Web abierto");
+                                }}
+                                disabled={!platformTicketMessage.trim()}
+                              >
+                                💬
+                              </Button>
+                            </div>
+                            <p className="text-xs text-muted-foreground">
+                              Presiona "Enviar" para publicar en el sistema. 📧 y 💬 abren Gmail/WhatsApp Web con tu mensaje.
+                            </p>
+                          </div>
                         </div>
-                        <div>
-                          <Label>Categoría</Label>
-                          <Select value={newTicket.category} onValueChange={(value) => setNewTicket({...newTicket, category: value})}>
-                            <SelectTrigger>
-                              <SelectValue />
-                            </SelectTrigger>
-                            <SelectContent>
-                              <SelectItem value="technical">Técnico</SelectItem>
-                              <SelectItem value="billing">Facturación</SelectItem>
-                              <SelectItem value="feature_request">Funcionalidad</SelectItem>
-                              <SelectItem value="bug">Bug</SelectItem>
-                              <SelectItem value="general">General</SelectItem>
-                            </SelectContent>
-                          </Select>
+                      )}
+
+                      {/* Notificaciones Adicionales (cuando no hay respuesta activa) */}
+                      {selectedPlatformTicket.status !== 'closed' && (
+                        <div className="space-y-2 pt-4 border-t">
+                          <Label className="font-semibold text-sm">Contactar Directamente</Label>
+                          <p className="text-xs text-muted-foreground">
+                            Abre Gmail o WhatsApp Web para enviar un mensaje directo
+                          </p>
+                          <div className="grid grid-cols-2 gap-2">
+                            <Button
+                              variant="outline"
+                              size="sm"
+                              onClick={() => {
+                                const email = selectedPlatformTicket.companies?.email;
+                                const subject = `Ticket ${selectedPlatformTicket.ticket_number} - ${selectedPlatformTicket.subject}`;
+                                const body = `Hola,\n\nActualización sobre tu ticket ${selectedPlatformTicket.ticket_number}.\n\nSaludos,\nEquipo de Soporte`;
+                                const gmailUrl = `https://mail.google.com/mail/?view=cm&fs=1&to=${email}&su=${encodeURIComponent(subject)}&body=${encodeURIComponent(body)}`;
+                                window.open(gmailUrl, '_blank');
+                              }}
+                            >
+                              📧 Gmail
+                            </Button>
+                            <Button
+                              variant="outline"
+                              size="sm"
+                              onClick={() => {
+                                const phone = selectedPlatformTicket.companies?.phone;
+                                if (!phone) {
+                                  toast.error("No hay número de WhatsApp para esta empresa");
+                                  return;
+                                }
+                                const message = `Hola,\n\nActualización sobre tu ticket ${selectedPlatformTicket.ticket_number}.\n\nSaludos,\nEquipo de Soporte`;
+                                const waUrl = `https://web.whatsapp.com/send?phone=${phone}&text=${encodeURIComponent(message)}`;
+                                window.open(waUrl, '_blank');
+                              }}
+                            >
+                              💬 WhatsApp
+                            </Button>
+                          </div>
                         </div>
-                      </div>
-                      <div>
-                        <Label>Título</Label>
-                        <Input 
-                          value={newTicket.title}
-                          onChange={(e) => setNewTicket({...newTicket, title: e.target.value})}
-                          placeholder="Título del ticket"
-                        />
-                      </div>
-                      <div>
-                        <Label>Descripción</Label>
-                        <Textarea 
-                          value={newTicket.description}
-                          onChange={(e) => setNewTicket({...newTicket, description: e.target.value})}
-                          placeholder="Describe el problema o consulta..."
-                          rows={4}
-                        />
-                      </div>
-                    </>
-                  )}
-                </div>
-                <DialogFooter>
-                  <Button variant="outline" onClick={() => setTicketDialogOpen(false)}>
-                    Cancelar
-                  </Button>
-                  <Button onClick={() => {
-                    if (selectedTicket) {
-                      updateTicketMutation.mutate({
-                        ticketId: selectedTicket.id,
-                        status: selectedTicket.status,
-                        priority: selectedTicket.priority
-                      });
-                      if (ticketResponse.trim()) {
-                        createTicketResponseMutation.mutate({
-                          ticketId: selectedTicket.id,
-                          message: ticketResponse
-                        });
-                      }
-                    } else {
-                      createTicketMutation.mutate(newTicket);
-                    }
-                  }}>
-                    {selectedTicket ? "Guardar cambios" : "Crear ticket"}
-                  </Button>
-                </DialogFooter>
-              </DialogContent>
-            </Dialog>
+                      )}
+                    </CardContent>
+                  </>
+                ) : (
+                  <CardContent className="flex items-center justify-center h-[600px]">
+                    <div className="text-center text-muted-foreground">
+                      <Ticket className="h-12 w-12 mx-auto mb-4 opacity-50" />
+                      <p>Selecciona un ticket para ver los detalles</p>
+                      <p className="text-sm mt-2">Podrás ver info de la empresa y responder</p>
+                    </div>
+                  </CardContent>
+                )}
+              </Card>
+            </div>
           </TabsContent>
 
           {/* Companies Tab */}

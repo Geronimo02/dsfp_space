@@ -39,8 +39,11 @@ export default function CompanySetup() {
       const { data: { user } } = await supabase.auth.getUser();
       if (!user) throw new Error("Usuario no autenticado");
 
+      console.log("Creating company with data:", { companyName, taxId, phone, address });
+
       // Use the security definer function to create company with admin
-      const { data: company, error: companyError } = await supabase
+      // La función retorna UUID directamente
+      const { data: companyId, error: companyError } = await supabase
         .rpc("create_company_with_admin" as any, {
           company_name: companyName,
           company_tax_id: taxId || null,
@@ -48,17 +51,28 @@ export default function CompanySetup() {
           company_address: address || null,
         });
 
-      if (companyError) throw companyError;
+      if (companyError) {
+        console.error("Company creation error:", companyError);
+        console.error("Error details:", JSON.stringify(companyError, null, 2));
+        throw companyError;
+      }
 
+      if (!companyId) {
+        throw new Error("No se recibió el ID de la empresa");
+      }
+
+      console.log("Company created successfully with ID:", companyId);
       toast.success("Empresa creada exitosamente");
       
-      // Wait a bit for company_users to be created, then redirect
-      setTimeout(() => {
-        navigate("/");
-        window.location.reload();
-      }, 500);
+      // Esperar un momento para que se actualice la BD
+      await new Promise(resolve => setTimeout(resolve, 1000));
+      
+      // Forzar reload completo para que CompanyContext cargue la nueva empresa
+      window.location.href = "/";
     } catch (error: any) {
       console.error("Error creating company:", error);
+      console.error("Error message:", error.message);
+      console.error("Error details:", JSON.stringify(error, null, 2));
       toast.error(error.message || "Error al crear la empresa");
     } finally {
       setLoading(false);
