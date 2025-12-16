@@ -45,6 +45,8 @@ import {
   Star,
   PackageCheck,
   LogOut,
+  MessageCircle,
+  LifeBuoy,
   Plus,
 } from "lucide-react";
 import { useActiveModules } from "@/hooks/useActiveModules";
@@ -219,6 +221,12 @@ export function Sidebar() {
               title: "Atención al Cliente",
               href: "/customer-support",
               icon: UserCheck,
+              module: "customer_support",
+            },
+            {
+              title: "Atención al Cliente",
+              href: "/customer-support",
+              icon: MessageCircle,
               module: "customer_support",
             },
           ],
@@ -777,6 +785,16 @@ export function Sidebar() {
         >
           <Sparkles className="w-4 h-4" />
           <span className="font-semibold">Asistente IA</span>
+        </Link>
+        
+        <Link to="/platform-support">
+          <Button
+            variant="outline"
+            className="w-full flex items-center gap-3 px-3 py-2.5 text-sm rounded-lg border-blue-500/50 text-blue-600 hover:bg-blue-50 dark:hover:bg-blue-950 transition-all mb-2"
+          >
+            <LifeBuoy className="w-4 h-4" />
+            <span className="font-medium">Soporte</span>
+          </Button>
         </Link>
         
         <Button

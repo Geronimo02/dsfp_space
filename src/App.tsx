@@ -55,6 +55,9 @@ import Retentions from "./pages/Retentions";
 import Integrations from "./pages/Integrations";
 import Payroll from "./pages/Payroll";
 import PlatformAdmin from "./pages/PlatformAdmin";
+import CustomerSupport from "./pages/CustomerSupport";
+import CustomerSupportSettings from "./pages/CustomerSupportSettings";
+import PlatformSupport from "./pages/PlatformSupport";
 import ModuleNotAvailable from "./pages/ModuleNotAvailable";
 import NotFound from "./pages/NotFound";
 import { ModuleProtectedRoute } from "./components/ModuleProtectedRoute";
@@ -276,13 +279,21 @@ const App = () => (
           {/* AI */}
           <Route path="/ai-assistant" element={<ProtectedRoute><AIAssistantPage /></ProtectedRoute>} />
           
+          {/* Atención al Cliente */}
+          <Route path="/customer-support" element={<ProtectedRoute><ModuleProtectedRoute moduleCode="customer_support"><CustomerSupport /></ModuleProtectedRoute></ProtectedRoute>} />
+          <Route path="/customer-support/settings" element={<ProtectedRoute><ModuleProtectedRoute moduleCode="customer_support"><CustomerSupportSettings /></ModuleProtectedRoute></ProtectedRoute>} />
+          
+          {/* Soporte de Plataforma - siempre disponible para empresas */}
+          <Route path="/platform-support" element={<ProtectedRoute><PlatformSupport /></ProtectedRoute>} />
+          
           {/* Notificaciones - siempre disponible */}
           <Route path="/notification-settings" element={<ProtectedRoute><NotificationSettings /></ProtectedRoute>} />
-           <Route path="/admin/platform" element={<PlatformAdminRoute><PlatformAdmin /></PlatformAdminRoute>} />
-           <Route path="/ai-assistant" element={<ProtectedRoute><AIAssistantPage /></ProtectedRoute>} />
-           <Route path="/settings" element={<ProtectedRoute><Settings /></ProtectedRoute>} />
-           {/* ADD ALL CUSTOM ROUTES ABOVE THE CATCH-ALL "*" ROUTE */}
-           <Route path="*" element={<NotFound />} />
+          
+          {/* Admin de Plataforma */}
+          <Route path="/admin/platform" element={<PlatformAdminRoute><PlatformAdmin /></PlatformAdminRoute>} />
+          
+          {/* ADD ALL CUSTOM ROUTES ABOVE THE CATCH-ALL "*" ROUTE */}
+          <Route path="*" element={<NotFound />} />
         </Routes>
         </CompanyProvider>
       </BrowserRouter>

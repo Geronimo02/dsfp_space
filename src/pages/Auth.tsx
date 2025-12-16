@@ -43,8 +43,9 @@ export default function Auth() {
 
     const { data: { subscription } } = supabase.auth.onAuthStateChange(async (event, session) => {
       // Only redirect to home if user is already logged in and comes back to auth page
-      // Don't redirect on fresh login to avoid race condition with CompanyContext
-      if (session && (event === 'TOKEN_REFRESHED' || event === 'INITIAL_SESSION')) {
+      // Don't redirect on fresh signup/login to avoid race condition with CompanyContext
+      if (session && event === 'INITIAL_SESSION') {
+        // User already has a session, redirect to home
         navigate("/");
       }
     });
@@ -101,22 +102,21 @@ export default function Auth() {
 
       if (error) throw error;
       
-      if (data.user) {
+      if (data.user && data.session) {
+        // User is immediately logged in (email confirmation disabled or auto-confirm enabled)
         // Check user metadata to see if they were invited to a company
         const invitedToCompany = data.user.user_metadata?.invited_to_company;
         
         if (invitedToCompany) {
           // User was invited - they should already have company_users entry
-          // Let CompanyContext handle loading, just redirect
           toast.success("¡Cuenta confirmada! Redirigiendo...");
-          setTimeout(() => {
-            navigate("/");
-          }, 1000);
+          // Don't redirect immediately, let the auth listener handle it
         } else {
           // New user not invited - needs to create company
           setShowWelcomeModal(true);
         }
       } else {
+        // Email confirmation required
         toast.success("¡Cuenta creada! Revisa tu email para confirmar tu cuenta.");
       }
     } catch (error: any) {
