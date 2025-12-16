@@ -321,13 +321,15 @@ export default function PlatformAdmin() {
     queryFn: async () => {
       console.log("🔍 INICIANDO: Fetching platform support tickets...");
       try {
-        const { data, error } = await (supabase as any)
+      const { data, error } = await (supabase as any)
           .from("platform_support_tickets")
           .select(`
             *,
             companies!company_id (
               name,
-              email
+              email,
+              phone,
+              whatsapp_number
             )
           `)
           .order("created_at", { ascending: false });
@@ -1437,8 +1439,11 @@ export default function PlatformAdmin() {
                                 variant="outline"
                                 size="sm"
                                 onClick={() => {
-                                  // Abrir Gmail con el mensaje pre-llenado
                                   const email = selectedPlatformTicket.companies?.email;
+                                  if (!email) {
+                                    toast.error("Esta empresa no tiene email registrado");
+                                    return;
+                                  }
                                   const subject = `RE: Ticket ${selectedPlatformTicket.ticket_number} - ${selectedPlatformTicket.subject}`;
                                   const body = `${platformTicketMessage}\n\n---\nTicket: ${selectedPlatformTicket.ticket_number}`;
                                   const gmailUrl = `https://mail.google.com/mail/?view=cm&fs=1&to=${email}&su=${encodeURIComponent(subject)}&body=${encodeURIComponent(body)}`;
@@ -1453,14 +1458,15 @@ export default function PlatformAdmin() {
                                 variant="outline"
                                 size="sm"
                                 onClick={() => {
-                                  // Abrir WhatsApp Web con el mensaje
-                                  const phone = selectedPlatformTicket.companies?.phone;
+                                  const phone = selectedPlatformTicket.companies?.whatsapp_number || selectedPlatformTicket.companies?.phone;
                                   if (!phone) {
-                                    toast.error("No hay número de WhatsApp para esta empresa");
+                                    toast.error("Esta empresa no tiene número de teléfono registrado");
                                     return;
                                   }
+                                  // Limpiar el número para WhatsApp (solo números)
+                                  const cleanPhone = phone.replace(/[^0-9+]/g, '');
                                   const message = `${platformTicketMessage}\n\nTicket: ${selectedPlatformTicket.ticket_number}`;
-                                  const waUrl = `https://web.whatsapp.com/send?phone=${phone}&text=${encodeURIComponent(message)}`;
+                                  const waUrl = `https://web.whatsapp.com/send?phone=${cleanPhone}&text=${encodeURIComponent(message)}`;
                                   window.open(waUrl, '_blank');
                                   toast.success("WhatsApp Web abierto");
                                 }}
@@ -1489,6 +1495,10 @@ export default function PlatformAdmin() {
                               size="sm"
                               onClick={() => {
                                 const email = selectedPlatformTicket.companies?.email;
+                                if (!email) {
+                                  toast.error("Esta empresa no tiene email registrado");
+                                  return;
+                                }
                                 const subject = `Ticket ${selectedPlatformTicket.ticket_number} - ${selectedPlatformTicket.subject}`;
                                 const body = `Hola,\n\nActualización sobre tu ticket ${selectedPlatformTicket.ticket_number}.\n\nSaludos,\nEquipo de Soporte`;
                                 const gmailUrl = `https://mail.google.com/mail/?view=cm&fs=1&to=${email}&su=${encodeURIComponent(subject)}&body=${encodeURIComponent(body)}`;
@@ -1501,13 +1511,14 @@ export default function PlatformAdmin() {
                               variant="outline"
                               size="sm"
                               onClick={() => {
-                                const phone = selectedPlatformTicket.companies?.phone;
+                                const phone = selectedPlatformTicket.companies?.whatsapp_number || selectedPlatformTicket.companies?.phone;
                                 if (!phone) {
-                                  toast.error("No hay número de WhatsApp para esta empresa");
+                                  toast.error("Esta empresa no tiene número de teléfono registrado");
                                   return;
                                 }
+                                const cleanPhone = phone.replace(/[^0-9+]/g, '');
                                 const message = `Hola,\n\nActualización sobre tu ticket ${selectedPlatformTicket.ticket_number}.\n\nSaludos,\nEquipo de Soporte`;
-                                const waUrl = `https://web.whatsapp.com/send?phone=${phone}&text=${encodeURIComponent(message)}`;
+                                const waUrl = `https://web.whatsapp.com/send?phone=${cleanPhone}&text=${encodeURIComponent(message)}`;
                                 window.open(waUrl, '_blank');
                               }}
                             >
