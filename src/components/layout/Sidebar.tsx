@@ -47,9 +47,11 @@ import {
   LogOut,
   MessageCircle,
   LifeBuoy,
+  Plus,
 } from "lucide-react";
 import { useActiveModules } from "@/hooks/useActiveModules";
 import { usePermissions } from "@/hooks/usePermissions";
+import { usePlatformAdmin } from "@/hooks/usePlatformAdmin";
 import { useState, useMemo } from "react";
 import { Collapsible, CollapsibleContent, CollapsibleTrigger } from "@/components/ui/collapsible";
 import { Input } from "@/components/ui/input";
@@ -57,6 +59,7 @@ import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { supabase } from "@/integrations/supabase/client";
 import { toast } from "sonner";
+import { AvailableModulesDialog } from "./AvailableModulesDialog";
 
 interface NavItem {
   title: string;
@@ -74,9 +77,11 @@ export function Sidebar() {
   const navigate = useNavigate();
   const activeModules = useActiveModules();
   const { hasPermission, isAdmin } = usePermissions();
+  const { isPlatformAdmin } = usePlatformAdmin();
   
   const [openSections, setOpenSections] = useState<string[]>([]);
   const [searchQuery, setSearchQuery] = useState("");
+  const [showModulesDialog, setShowModulesDialog] = useState(false);
   const [favorites, setFavorites] = useState<string[]>(() => {
     const saved = localStorage.getItem('sidebar-favorites');
     return saved ? JSON.parse(saved) : ['/pos', '/sales', '/products'];
@@ -109,25 +114,20 @@ export function Sidebar() {
   };
 
   // Helper function to check if module is active
+  // Solo platform admins ven todo, los admins de empresa ven solo sus módulos activos
   const hasModule = (moduleName: string) => {
-    // Si no hay datos o es admin, mostrar todo
-    if (!activeModules.data || isAdmin) return true;
-    if (activeModules.data.length === 0) return true;
+    // Platform admins ven todo para poder navegar y gestionar
+    if (isPlatformAdmin) return true;
     
-    // Mapeo de nombres de módulos a códigos
-    const moduleMap: Record<string, string[]> = {
-      'pos': ['pos'],
-      'sales': ['sales', 'quotations', 'delivery_notes', 'returns', 'reservations'],
-      'inventory': ['products', 'inventory', 'inventory_alerts', 'warehouses', 'warehouse_stock', 'warehouse_transfers', 'stock_reservations'],
-      'purchases': ['purchases', 'suppliers'],
-      'finance': ['cash_register', 'bank_accounts', 'bank_movements', 'card_movements', 'retentions', 'checks', 'expenses'],
-      'technical_services': ['technical_services'],
-      'hr': ['payroll', 'employees'],
-      'reports': ['reports', 'accountant_reports'],
-    };
+    // Si no hay datos cargados aún, solo mostrar módulos base
+    if (!activeModules.data || activeModules.data.length === 0) {
+      const baseModules = ['dashboard', 'pos', 'products', 'sales', 'customers', 'settings', 'reports'];
+      return baseModules.includes(moduleName);
+    }
     
-    const moduleCodes = moduleMap[moduleName] || [moduleName];
-    return moduleCodes.some(code => activeModules.data.includes(code));
+    // Verificar si el código del módulo está en la lista de activos
+    // El moduleName viene del item.module en navItems
+    return activeModules.data.includes(moduleName);
   };
 
   const navItems: (NavItem | { section: string; items: NavItem[] })[] = [
@@ -139,6 +139,7 @@ export function Sidebar() {
           title: "Dashboard",
           href: "/",
           icon: LayoutDashboard,
+          module: "dashboard",
         },
         {
           title: "Punto de Venta",
@@ -163,30 +164,31 @@ export function Sidebar() {
               title: "Todas las Ventas",
               href: "/sales",
               icon: FileText,
+              module: "sales",
             },
             {
               title: "Presupuestos",
               href: "/quotations",
               icon: FileCheck,
-              module: "sales",
+              module: "quotations",
             },
             {
               title: "Remitos",
               href: "/delivery-notes",
               icon: Truck,
-              module: "sales",
+              module: "delivery_notes",
             },
             {
               title: "Devoluciones",
               href: "/returns",
               icon: TrendingDown,
-              module: "sales",
+              module: "returns",
             },
             {
               title: "Reservas",
               href: "/reservations",
               icon: Calendar,
-              module: "sales",
+              module: "reservations",
             },
           ],
         },
@@ -201,18 +203,25 @@ export function Sidebar() {
           title: "Clientes",
           href: "/customers",
           icon: Users,
-          module: "sales",
+          module: "customers",
           children: [
             {
               title: "Lista de Clientes",
               href: "/customers",
               icon: Users,
+              module: "customers",
             },
             {
               title: "Cuentas Corrientes",
               href: "/accounts-receivable",
               icon: Receipt,
-              module: "sales",
+              module: "accounts_receivable",
+            },
+            {
+              title: "Atención al Cliente",
+              href: "/customer-support",
+              icon: UserCheck,
+              module: "customer_support",
             },
             {
               title: "Atención al Cliente",
@@ -233,43 +242,44 @@ export function Sidebar() {
           title: "Inventario",
           href: "/products",
           icon: Package,
-          module: "inventory",
+          module: "products",
           children: [
             {
               title: "Productos",
               href: "/products",
               icon: Package,
+              module: "products",
             },
             {
               title: "Alertas de Inventario",
               href: "/inventory-alerts",
               icon: AlertCircle,
-              module: "inventory",
-              badge: 5, // Ejemplo: 5 productos con stock bajo
+              module: "inventory_alerts",
+              badge: 5,
             },
             {
               title: "Depósitos",
               href: "/warehouses",
               icon: Warehouse,
-              module: "inventory",
+              module: "warehouses",
             },
             {
               title: "Stock por Depósito",
               href: "/warehouse-stock",
               icon: PackageSearch,
-              module: "inventory",
+              module: "warehouse_stock",
             },
             {
               title: "Transferencias",
               href: "/warehouse-transfers",
               icon: ArrowLeftRight,
-              module: "inventory",
+              module: "warehouse_transfers",
             },
             {
               title: "Reservas de Stock",
               href: "/stock-reservations",
               icon: PackageOpen,
-              module: "inventory",
+              module: "stock_reservations",
             },
           ],
         },
@@ -290,30 +300,31 @@ export function Sidebar() {
               title: "Órdenes de Compra",
               href: "/purchase-orders",
               icon: FileCheck,
-              module: "purchases",
+              module: "purchase_orders",
             },
             {
               title: "Historial de Compras",
               href: "/purchases",
               icon: ShoppingBag,
+              module: "purchases",
             },
             {
               title: "Recepción de Mercadería",
               href: "/purchase-reception",
               icon: PackageCheck,
-              module: "purchases",
+              module: "purchase_reception",
             },
             {
               title: "Devoluciones a Proveedores",
               href: "/purchase-returns",
               icon: TrendingDown,
-              module: "purchases",
+              module: "purchase_returns",
             },
             {
               title: "Proveedores",
               href: "/suppliers",
               icon: Truck,
-              module: "purchases",
+              module: "suppliers",
             },
           ],
         },
@@ -328,30 +339,31 @@ export function Sidebar() {
           title: "Finanzas",
           href: "/bank-accounts",
           icon: Building2,
-          module: "finance",
+          module: "bank_accounts",
           children: [
             {
               title: "Cuentas Bancarias",
               href: "/bank-accounts",
               icon: Building2,
+              module: "bank_accounts",
             },
             {
               title: "Movimientos Bancarios",
               href: "/bank-movements",
               icon: TrendingUp,
-              module: "finance",
+              module: "bank_movements",
             },
             {
               title: "Movimientos de Tarjetas",
               href: "/card-movements",
               icon: CreditCard,
-              module: "finance",
+              module: "card_movements",
             },
             {
               title: "Retenciones",
               href: "/retentions",
               icon: Calculator,
-              module: "finance",
+              module: "retentions",
             },
           ],
         },
@@ -372,25 +384,25 @@ export function Sidebar() {
           title: "Gestión de Caja",
           href: "/cash-register",
           icon: DollarSign,
-          module: "finance",
+          module: "cash_register",
         },
         {
           title: "Gastos",
           href: "/expenses",
           icon: Receipt,
-          module: "finance",
+          module: "expenses",
         },
         {
           title: "Cheques",
           href: "/checks",
           icon: Banknote,
-          module: "finance",
+          module: "checks",
         },
         {
           title: "Promociones",
           href: "/promotions",
           icon: Tag,
-          module: "sales",
+          module: "promotions",
         },
       ],
     },
@@ -403,19 +415,19 @@ export function Sidebar() {
           title: "Liquidaciones",
           href: "/payroll",
           icon: Calculator,
-          module: "hr",
+          module: "payroll",
         },
         {
           title: "Comisiones",
           href: "/commissions",
           icon: BadgePercent,
-          module: "sales",
+          module: "commissions",
         },
         {
-          title: "Usuarios",
-          href: "/settings?tab=users",
+          title: "Empleados",
+          href: "/employees",
           icon: UserCircle,
-          permission: "admin",
+          module: "employees",
         },
       ],
     },
@@ -428,17 +440,19 @@ export function Sidebar() {
           title: "Reportes",
           href: "/reports",
           icon: BarChart3,
+          module: "reports",
           children: [
             {
               title: "Reportes",
               href: "/reports",
               icon: BarChart3,
+              module: "reports",
             },
             {
               title: "Reportes Contador",
               href: "/accountant-reports",
               icon: BookOpen,
-              module: "reports",
+              module: "accountant_reports",
             },
           ],
         },
@@ -459,43 +473,48 @@ export function Sidebar() {
               title: "Configuración",
               href: "/settings",
               icon: Settings,
+              module: "settings",
             },
             {
               title: "Puntos de Venta AFIP",
               href: "/pos-points",
               icon: Store,
-              module: "pos",
+              module: "pos_afip",
               permission: "admin",
             },
             {
               title: "Auditoría",
               href: "/audit-logs",
               icon: Shield,
+              module: "audit_logs",
               permission: "admin",
             },
             {
               title: "Logs de Acceso",
               href: "/access-logs",
               icon: Activity,
+              module: "access_logs",
               permission: "admin",
             },
             {
               title: "Cierre Mensual",
               href: "/monthly-closing",
               icon: Lock,
-              module: "finance",
+              module: "monthly_closing",
               permission: "admin",
             },
             {
               title: "Operaciones Masivas",
               href: "/bulk-operations",
               icon: Zap,
+              module: "bulk_operations",
               permission: "admin",
             },
             {
               title: "Notificaciones",
               href: "/notification-settings",
               icon: Bell,
+              module: "notifications",
               permission: "admin",
             },
           ],
@@ -511,6 +530,14 @@ export function Sidebar() {
           title: "Integraciones",
           href: "/integrations",
           icon: Plug,
+          module: "integrations",
+          permission: "admin",
+        },
+        {
+          title: "Facturación AFIP",
+          href: "/afip",
+          icon: Store,
+          module: "afip",
           permission: "admin",
         },
       ],
@@ -518,8 +545,8 @@ export function Sidebar() {
   ];
 
   const isNavItemVisible = (item: NavItem) => {
-    // Admin ve todo
-    if (isAdmin) return true;
+    // Platform admin ve todo
+    if (isPlatformAdmin) return true;
     
     // Si tiene módulo, verificar que esté activo
     if (item.module && !hasModule(item.module)) return false;
@@ -735,6 +762,21 @@ export function Sidebar() {
           return null;
         })}
       </nav>
+
+      {/* Botón + Funcionalidades - Solo visible si no es platform admin */}
+      {!isPlatformAdmin && (
+        <div className="px-3 pb-2">
+          <Button
+            onClick={() => setShowModulesDialog(true)}
+            variant="outline"
+            className="w-full flex items-center gap-2 px-3 py-2.5 text-sm rounded-lg border-dashed border-primary/50 text-primary hover:bg-primary/5 hover:border-primary transition-all"
+          >
+            <Plus className="w-4 h-4" />
+            <span className="font-medium">Más Funcionalidades</span>
+          </Button>
+        </div>
+      )}
+
       {/* AI Assistant - Botón especial al final */}
       <div className="p-3 border-t bg-gradient-to-r from-sidebar to-sidebar/95 space-y-2">
         <Link
@@ -773,6 +815,13 @@ export function Sidebar() {
           <span className="font-medium">Cerrar Sesión</span>
         </Button>
       </div>
+
+      {/* Dialog de módulos disponibles */}
+      <AvailableModulesDialog
+        open={showModulesDialog}
+        onOpenChange={setShowModulesDialog}
+        activeModules={activeModules.data || []}
+      />
     </div>
   );
 }

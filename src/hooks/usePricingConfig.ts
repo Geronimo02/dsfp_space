@@ -197,7 +197,7 @@ export const useDeleteModule = () => {
   });
 };
 
-// Hook para obtener módulos de una empresa
+// Hook para obtener módulos de una empresa (TODOS, no solo activos)
 export const useCompanyModules = (companyId: string | undefined) => {
   return useQuery({
     queryKey: ['companyModules', companyId],
@@ -210,8 +210,7 @@ export const useCompanyModules = (companyId: string | undefined) => {
           *,
           platform_modules(*)
         `)
-        .eq('company_id', companyId)
-        .eq('active', true);
+        .eq('company_id', companyId);
 
       if (error) throw error;
       return data as CompanyModule[];
@@ -252,6 +251,7 @@ export const useToggleCompanyModule = () => {
           .from('company_modules')
           .update({
             active,
+            status: active ? 'active' : 'suspended',
             activated_at: active ? new Date().toISOString() : undefined,
             deactivated_at: !active ? new Date().toISOString() : null,
             updated_at: new Date().toISOString(),
@@ -263,6 +263,8 @@ export const useToggleCompanyModule = () => {
         
         data = result.data;
         error = result.error;
+        
+        console.log('Module update result:', { companyId, moduleId, active, data, error });
       } else {
         // Insert new record
         const result = await supabase
@@ -271,6 +273,7 @@ export const useToggleCompanyModule = () => {
             company_id: companyId,
             module_id: moduleId,
             active,
+            status: active ? 'active' : 'suspended',
             activated_at: active ? new Date().toISOString() : null,
             deactivated_at: !active ? new Date().toISOString() : null,
           })
@@ -279,13 +282,37 @@ export const useToggleCompanyModule = () => {
         
         data = result.data;
         error = result.error;
+        
+        console.log('Module insert result:', { companyId, moduleId, active, data, error });
       }
 
       if (error) throw error;
       return data;
     },
-    onSuccess: (_, variables) => {
-      queryClient.invalidateQueries({ queryKey: ['companyModules', variables.companyId] });
+    onSuccess: (data, variables) => {
+      console.log('[useToggleCompanyModule] Success! Module toggled:', {
+        companyId: variables.companyId,
+        moduleId: variables.moduleId,
+        newActiveState: variables.active,
+        result: data
+      });
+      // Invalidar todos los queries relacionados con refetchType immediate
+      queryClient.invalidateQueries({ 
+        queryKey: ['companyModules', variables.companyId],
+        refetchType: 'active'
+      });
+      queryClient.invalidateQueries({ 
+        queryKey: ['company_modules_enhanced', variables.companyId],
+        refetchType: 'active'
+      });
+      queryClient.invalidateQueries({ 
+        queryKey: ['activeModules', variables.companyId],
+        refetchType: 'active'
+      });
+      // También invalidar sin ID específico para forzar refetch global
+      queryClient.invalidateQueries({ queryKey: ['activeModules'], refetchType: 'all' });
+      queryClient.invalidateQueries({ queryKey: ['platform-companies'] });
+      queryClient.invalidateQueries({ queryKey: ['platform_modules_all'] });
       toast({
         title: 'Módulo actualizado',
         description: 'El estado del módulo se ha actualizado correctamente',
@@ -395,10 +422,7 @@ export const useCalculatePriceManual = () => {
     billingCycle: 'monthly' | 'annual',
     invoiceVolume: number
   ): PriceCalculation => {
-    console.log('🧮 calculatePrice called with:', { selectedModuleIds, billingCycle, invoiceVolume, hasConfig: !!config, hasModules: !!modules });
-    
     if (!config || !modules) {
-      console.warn('⚠️ Missing config or modules!', { config, modules });
       return {
         total_price: 0,
         base_price: 0,
@@ -420,8 +444,6 @@ export const useCalculatePriceManual = () => {
       billingCycle === 'annual'
         ? config.base_package_price_annual
         : config.base_package_price_monthly;
-    
-    console.log('💰 Base price:', basePrice, 'from config:', config);
 
     // Precio de módulos adicionales (no base)
     const modulesPrice = selectedModuleIds.reduce((total, moduleId) => {
@@ -429,13 +451,10 @@ export const useCalculatePriceManual = () => {
       if (module) {
         const price =
           billingCycle === 'annual' ? module.price_annual : module.price_monthly;
-        console.log(`  ➕ Adding module ${module.name}: ${price} (total so far: ${total + price})`);
         return total + price;
       }
       return total;
     }, 0);
-    
-    console.log('🔧 Total modules price:', modulesPrice);
 
     // Precio por volumen
     const volumeTier = config.invoice_volume_tiers.find(

@@ -169,24 +169,18 @@ export default function PlatformAdmin() {
     },
   });
 
-  // Fetch audit logs (tabla no existe aún, comentada temporalmente)
+  // Fetch audit logs from existing audit_logs table
   const { data: auditLogs } = useQuery({
     queryKey: ["platform-audit-logs"],
     queryFn: async () => {
-      // TODO: Crear tabla platform_audit_logs
-      return [] as Array<{
-        id: string;
-        user_id: string | null;
-        user_email: string | null;
-        action: string;
-        entity_type: string | null;
-        entity_id: string | null;
-        description: string;
-        metadata: any;
-        ip_address: string | null;
-        user_agent: string | null;
-        created_at: string;
-      }>;
+      const { data, error } = await supabase
+        .from("audit_logs")
+        .select("*")
+        .order("created_at", { ascending: false })
+        .limit(100);
+      
+      if (error) throw error;
+      return data;
     },
   });
 
@@ -828,8 +822,8 @@ export default function PlatformAdmin() {
   const filteredAuditLogs = auditLogs?.filter(log => {
     const matchesSearch = !auditLogSearch || 
       log.user_email?.toLowerCase().includes(auditLogSearch.toLowerCase()) ||
-      log.entity_type?.toLowerCase().includes(auditLogSearch.toLowerCase()) ||
-      log.description?.toLowerCase().includes(auditLogSearch.toLowerCase());
+      log.table_name?.toLowerCase().includes(auditLogSearch.toLowerCase()) ||
+      log.user_name?.toLowerCase().includes(auditLogSearch.toLowerCase());
     
     const matchesAction = auditLogActionFilter === "all" || log.action === auditLogActionFilter;
     
@@ -2569,12 +2563,12 @@ export default function PlatformAdmin() {
                           </TableCell>
                           <TableCell>
                             <Badge variant="outline">
-                              {log.entity_type || "N/A"}
+                              {log.table_name || "N/A"}
                             </Badge>
                           </TableCell>
                           <TableCell className="max-w-md">
                             <p className="text-sm text-muted-foreground line-clamp-2">
-                              {log.description}
+                              {log.changed_fields?.join(", ") || "Sin cambios registrados"}
                             </p>
                           </TableCell>
                           <TableCell className="text-xs text-muted-foreground">
@@ -3016,7 +3010,13 @@ export default function PlatformAdmin() {
           </DialogHeader>
           
           {selectedCompanyForModules && (
-            <CompanyModuleSelector companyId={selectedCompanyForModules.id} />
+            <CompanyModuleSelector 
+              companyId={selectedCompanyForModules.id} 
+              onModulesChange={() => {
+                // Refrescar datos de empresas si es necesario
+                queryClient.invalidateQueries({ queryKey: ['platform-companies'] });
+              }}
+            />
           )}
           
           <DialogFooter>
