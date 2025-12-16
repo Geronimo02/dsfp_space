@@ -322,17 +322,17 @@ export default function PlatformAdmin() {
       console.log("🔍 INICIANDO: Fetching platform support tickets...");
       try {
       const { data, error } = await (supabase as any)
-          .from("platform_support_tickets")
-          .select(`
-            *,
-            companies!company_id (
-              name,
-              email,
-              phone,
-              whatsapp_number
-            )
-          `)
-          .order("created_at", { ascending: false });
+        .from("platform_support_tickets")
+        .select(`
+          *,
+          companies!platform_support_tickets_company_id_fkey (
+            name,
+            email,
+            phone,
+            whatsapp_number
+          )
+        `)
+        .order("created_at", { ascending: false });
 
         console.log("📊 Query ejecutada. Error?", error);
         console.log("📊 Data recibida:", data);
@@ -1463,12 +1463,12 @@ export default function PlatformAdmin() {
                                     toast.error("Esta empresa no tiene número de teléfono registrado");
                                     return;
                                   }
-                                  // Limpiar el número para WhatsApp (solo números)
-                                  const cleanPhone = phone.replace(/[^0-9+]/g, '');
+                                  // Limpiar el número para WhatsApp (solo dígitos en formato internacional)
+                                  const cleanPhone = phone.replace(/\D/g, "");
                                   const message = `${platformTicketMessage}\n\nTicket: ${selectedPlatformTicket.ticket_number}`;
-                                  const waUrl = `https://web.whatsapp.com/send?phone=${cleanPhone}&text=${encodeURIComponent(message)}`;
-                                  window.open(waUrl, '_blank');
-                                  toast.success("WhatsApp Web abierto");
+                                  const waUrl = `https://wa.me/${cleanPhone}?text=${encodeURIComponent(message)}`;
+                                  window.open(waUrl, "_blank", "noopener,noreferrer");
+                                  toast.success("WhatsApp abierto");
                                 }}
                                 disabled={!platformTicketMessage.trim()}
                               >
@@ -1516,10 +1516,10 @@ export default function PlatformAdmin() {
                                   toast.error("Esta empresa no tiene número de teléfono registrado");
                                   return;
                                 }
-                                const cleanPhone = phone.replace(/[^0-9+]/g, '');
+                                const cleanPhone = phone.replace(/\D/g, "");
                                 const message = `Hola,\n\nActualización sobre tu ticket ${selectedPlatformTicket.ticket_number}.\n\nSaludos,\nEquipo de Soporte`;
-                                const waUrl = `https://web.whatsapp.com/send?phone=${cleanPhone}&text=${encodeURIComponent(message)}`;
-                                window.open(waUrl, '_blank');
+                                const waUrl = `https://wa.me/${cleanPhone}?text=${encodeURIComponent(message)}`;
+                                window.open(waUrl, "_blank", "noopener,noreferrer");
                               }}
                             >
                               💬 WhatsApp
