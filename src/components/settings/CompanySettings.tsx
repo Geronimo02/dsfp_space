@@ -133,6 +133,12 @@ export function CompanySettings() {
     max_installments: 12,
     require_customer_document: false,
     autoprint_receipt: false,
+    // Campos integración AFIP
+    cuit: "",
+    afip_certificate: "",
+    afip_private_key: "",
+    afip_ambiente: "testing",
+    afip_enabled: false,
   });
 
   useEffect(() => {
@@ -162,17 +168,18 @@ export function CompanySettings() {
         loyalty_bronze_discount: Number(company.loyalty_bronze_discount) || 0,
         loyalty_silver_discount: Number(company.loyalty_silver_discount) || 5,
         loyalty_gold_discount: Number(company.loyalty_gold_discount) || 10,
-        // Nuevos campos fiscales
+        // Campos fiscales AFIP
         razon_social: company.razon_social || "",
         nombre_fantasia: company.nombre_fantasia || "",
         condicion_iva: company.condicion_iva || "responsable_inscripto",
         inicio_actividades: company.inicio_actividades || "",
         certificado_afip_url: company.certificado_afip_url || "",
+        clave_fiscal: company.clave_fiscal || "",
         max_discount_percentage: Number(company.max_discount_percentage) || 10,
         max_installments: Number(company.max_installments) || 12,
         require_customer_document: company.require_customer_document || false,
         autoprint_receipt: company.autoprint_receipt || false,
-        // Campos AFIP
+        // Campos integración AFIP
         cuit: company.cuit || "",
         afip_certificate: company.afip_certificate || "",
         afip_private_key: company.afip_private_key || "",
@@ -403,7 +410,7 @@ export function CompanySettings() {
           loyalty_silver_discount: data.loyalty_silver_discount,
           loyalty_gold_discount: data.loyalty_gold_discount,
           logo_url: data.logo_url || currentCompany.logo_url,
-          // Campos fiscales existentes en la BD
+          // Campos fiscales
           razon_social: data.razon_social || null,
           nombre_fantasia: data.nombre_fantasia || null,
           condicion_iva: data.condicion_iva || 'responsable_inscripto',
@@ -414,7 +421,13 @@ export function CompanySettings() {
           max_installments: data.max_installments || 12,
           require_customer_document: data.require_customer_document || false,
           autoprint_receipt: data.autoprint_receipt || false,
-        })
+          // Campos integración AFIP
+          cuit: data.cuit || null,
+          afip_certificate: data.afip_certificate || null,
+          afip_private_key: data.afip_private_key || null,
+          afip_ambiente: data.afip_ambiente || 'testing',
+          afip_enabled: data.afip_enabled || false,
+        } as any)
         .eq('id', currentCompany.id);
 
       if (error) throw error;
