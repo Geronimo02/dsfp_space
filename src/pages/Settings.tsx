@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { Layout } from "@/components/layout/Layout";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
@@ -15,6 +15,7 @@ import { supabase } from "@/integrations/supabase/client";
 import { toast } from "sonner";
 import { z } from "zod";
 import { format } from "date-fns";
+import { useCompany } from "@/contexts/CompanyContext";
 
 import { CompanySettings } from "@/components/settings/CompanySettings";
 import { PriceListsSettings } from "@/components/settings/PriceListsSettings";
@@ -44,6 +45,7 @@ const settingsSchema = z.object({
 
 export default function Settings() {
   const queryClient = useQueryClient();
+  const { currentCompany } = useCompany();
   const [formData, setFormData] = useState({
     company_name: "",
     tax_id: "",
@@ -90,52 +92,60 @@ export default function Settings() {
   });
 
   const { data: settings, isLoading } = useQuery({
-    queryKey: ["company-settings"],
+    queryKey: ["company-settings", currentCompany?.id],
     queryFn: async () => {
+      if (!currentCompany?.id) return null;
+      
       const { data, error } = await supabase
         .from("companies")
         .select("*")
+        .eq("id", currentCompany.id)
         .single();
       
       if (error) throw error;
       
-      // Update form with loaded data
+      return data;
+    },
+    enabled: !!currentCompany?.id,
+  });
+
+  // Update form when settings load
+  useEffect(() => {
+    if (settings) {
       setFormData({
-        company_name: data.name || "",
-        tax_id: data.tax_id || "",
-        address: data.address || "",
-        phone: data.phone || "",
-        email: data.email || "",
-        default_tax_rate: data.default_tax_rate?.toString() || "",
-        card_surcharge_rate: data.card_surcharge_rate?.toString() || "",
-        currency: data.currency || "USD",
-        receipt_footer: data.receipt_footer || "",
-        receipt_format: data.receipt_format || "thermal",
-        receipt_printer_name: data.receipt_printer_name || "",
-        whatsapp_number: data.whatsapp_number || "",
-        whatsapp_enabled: data.whatsapp_enabled || false,
-        low_stock_alert: data.low_stock_alert !== false,
-        loyalty_enabled: data.loyalty_enabled || false,
-        loyalty_points_per_currency: data.loyalty_points_per_currency?.toString() || "1",
-        loyalty_currency_per_point: data.loyalty_currency_per_point?.toString() || "0.01",
-        loyalty_bronze_threshold: data.loyalty_bronze_threshold?.toString() || "0",
-        loyalty_silver_threshold: data.loyalty_silver_threshold?.toString() || "10000",
-        loyalty_gold_threshold: data.loyalty_gold_threshold?.toString() || "50000",
-        loyalty_bronze_discount: data.loyalty_bronze_discount?.toString() || "0",
-        loyalty_silver_discount: data.loyalty_silver_discount?.toString() || "5",
-        loyalty_gold_discount: data.loyalty_gold_discount?.toString() || "10",
+        company_name: settings.name || "",
+        tax_id: settings.tax_id || "",
+        address: settings.address || "",
+        phone: settings.phone || "",
+        email: settings.email || "",
+        default_tax_rate: settings.default_tax_rate?.toString() || "",
+        card_surcharge_rate: settings.card_surcharge_rate?.toString() || "",
+        currency: settings.currency || "USD",
+        receipt_footer: settings.receipt_footer || "",
+        receipt_format: settings.receipt_format || "thermal",
+        receipt_printer_name: settings.receipt_printer_name || "",
+        whatsapp_number: settings.whatsapp_number || "",
+        whatsapp_enabled: settings.whatsapp_enabled || false,
+        low_stock_alert: settings.low_stock_alert !== false,
+        loyalty_enabled: settings.loyalty_enabled || false,
+        loyalty_points_per_currency: settings.loyalty_points_per_currency?.toString() || "1",
+        loyalty_currency_per_point: settings.loyalty_currency_per_point?.toString() || "0.01",
+        loyalty_bronze_threshold: settings.loyalty_bronze_threshold?.toString() || "0",
+        loyalty_silver_threshold: settings.loyalty_silver_threshold?.toString() || "10000",
+        loyalty_gold_threshold: settings.loyalty_gold_threshold?.toString() || "50000",
+        loyalty_bronze_discount: settings.loyalty_bronze_discount?.toString() || "0",
+        loyalty_silver_discount: settings.loyalty_silver_discount?.toString() || "5",
+        loyalty_gold_discount: settings.loyalty_gold_discount?.toString() || "10",
         current_password: "",
         new_password: "",
         confirm_password: "",
       });
-      
-      return data;
-    },
-  });
+    }
+  }, [settings]);
 
   const updateSettingsMutation = useMutation({
     mutationFn: async (data: any) => {
-      if (!settings?.id) throw new Error("No settings found");
+      if (!currentCompany?.id) throw new Error("No company selected");
       
       const { error } = await supabase
         .from("companies")
@@ -164,13 +174,13 @@ export default function Settings() {
           loyalty_silver_discount: parseFloat(data.loyalty_silver_discount) || 5,
           loyalty_gold_discount: parseFloat(data.loyalty_gold_discount) || 10,
         })
-        .eq("id", settings.id);
+        .eq("id", currentCompany.id);
       
       if (error) throw error;
     },
     onSuccess: () => {
       toast.success("Configuración actualizada exitosamente");
-      queryClient.invalidateQueries({ queryKey: ["company-settings"] });
+      queryClient.invalidateQueries({ queryKey: ["company-settings", currentCompany?.id] });
     },
     onError: (error: any) => {
       toast.error(error.message || "Error al actualizar configuración");
