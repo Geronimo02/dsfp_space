@@ -680,6 +680,10 @@ export type Database = {
         Row: {
           active: boolean | null
           address: string | null
+          afip_ambiente: string | null
+          afip_certificate: string | null
+          afip_enabled: boolean | null
+          afip_private_key: string | null
           autoprint_receipt: boolean | null
           backup_enabled: boolean | null
           base_price: number | null
@@ -689,6 +693,7 @@ export type Database = {
           clave_fiscal: string | null
           condicion_iva: string | null
           created_at: string | null
+          cuit: string | null
           currency: string | null
           default_tax_rate: number | null
           email: string | null
@@ -731,6 +736,10 @@ export type Database = {
         Insert: {
           active?: boolean | null
           address?: string | null
+          afip_ambiente?: string | null
+          afip_certificate?: string | null
+          afip_enabled?: boolean | null
+          afip_private_key?: string | null
           autoprint_receipt?: boolean | null
           backup_enabled?: boolean | null
           base_price?: number | null
@@ -740,6 +749,7 @@ export type Database = {
           clave_fiscal?: string | null
           condicion_iva?: string | null
           created_at?: string | null
+          cuit?: string | null
           currency?: string | null
           default_tax_rate?: number | null
           email?: string | null
@@ -782,6 +792,10 @@ export type Database = {
         Update: {
           active?: boolean | null
           address?: string | null
+          afip_ambiente?: string | null
+          afip_certificate?: string | null
+          afip_enabled?: boolean | null
+          afip_private_key?: string | null
           autoprint_receipt?: boolean | null
           backup_enabled?: boolean | null
           base_price?: number | null
@@ -791,6 +805,7 @@ export type Database = {
           clave_fiscal?: string | null
           condicion_iva?: string | null
           created_at?: string | null
+          cuit?: string | null
           currency?: string | null
           default_tax_rate?: number | null
           email?: string | null
