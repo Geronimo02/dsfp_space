@@ -4,7 +4,7 @@ import { useCompany } from '@/contexts/CompanyContext';
 import { useEffect } from 'react';
 
 // Módulos base que siempre están activos para todas las empresas
-const BASE_MODULES = ['dashboard', 'pos', 'sales', 'products', 'customers'];
+const BASE_MODULES = ['dashboard', 'pos', 'sales', 'products', 'customers', 'settings'];
 
 export const useActiveModules = () => {
   const { currentCompany } = useCompany();
