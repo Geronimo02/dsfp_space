@@ -2650,6 +2650,119 @@ export type Database = {
           },
         ]
       }
+      knowledge_base_articles: {
+        Row: {
+          category_id: string | null
+          company_id: string
+          content: string
+          created_at: string | null
+          created_by: string | null
+          helpful_count: number | null
+          id: string
+          is_featured: boolean | null
+          is_published: boolean | null
+          not_helpful_count: number | null
+          slug: string | null
+          tags: string[] | null
+          title: string
+          updated_at: string | null
+          view_count: number | null
+        }
+        Insert: {
+          category_id?: string | null
+          company_id: string
+          content: string
+          created_at?: string | null
+          created_by?: string | null
+          helpful_count?: number | null
+          id?: string
+          is_featured?: boolean | null
+          is_published?: boolean | null
+          not_helpful_count?: number | null
+          slug?: string | null
+          tags?: string[] | null
+          title: string
+          updated_at?: string | null
+          view_count?: number | null
+        }
+        Update: {
+          category_id?: string | null
+          company_id?: string
+          content?: string
+          created_at?: string | null
+          created_by?: string | null
+          helpful_count?: number | null
+          id?: string
+          is_featured?: boolean | null
+          is_published?: boolean | null
+          not_helpful_count?: number | null
+          slug?: string | null
+          tags?: string[] | null
+          title?: string
+          updated_at?: string | null
+          view_count?: number | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "knowledge_base_articles_category_id_fkey"
+            columns: ["category_id"]
+            isOneToOne: false
+            referencedRelation: "knowledge_base_categories"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "knowledge_base_articles_company_id_fkey"
+            columns: ["company_id"]
+            isOneToOne: false
+            referencedRelation: "companies"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      knowledge_base_categories: {
+        Row: {
+          company_id: string
+          created_at: string | null
+          description: string | null
+          icon: string | null
+          id: string
+          is_active: boolean | null
+          name: string
+          order_index: number | null
+          updated_at: string | null
+        }
+        Insert: {
+          company_id: string
+          created_at?: string | null
+          description?: string | null
+          icon?: string | null
+          id?: string
+          is_active?: boolean | null
+          name: string
+          order_index?: number | null
+          updated_at?: string | null
+        }
+        Update: {
+          company_id?: string
+          created_at?: string | null
+          description?: string | null
+          icon?: string | null
+          id?: string
+          is_active?: boolean | null
+          name?: string
+          order_index?: number | null
+          updated_at?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "knowledge_base_categories_company_id_fkey"
+            columns: ["company_id"]
+            isOneToOne: false
+            referencedRelation: "companies"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       loyalty_transactions: {
         Row: {
           company_id: string | null

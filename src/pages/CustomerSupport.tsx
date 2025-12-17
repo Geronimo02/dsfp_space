@@ -26,11 +26,13 @@ import {
   Calendar,
   Paperclip,
   Send,
-  Settings
+  Settings,
+  BookOpen
 } from "lucide-react";
 import { formatDistanceToNow } from "date-fns";
 import { es } from "date-fns/locale";
 import { useNavigate } from "react-router-dom";
+import { ArticleSuggestions } from "@/components/support/ArticleSuggestions";
 
 export default function CustomerSupport() {
   const { currentCompany } = useCompany();
@@ -235,9 +237,13 @@ export default function CustomerSupport() {
             </p>
           </div>
           <div className="flex gap-2">
+            <Button variant="outline" onClick={() => navigate("/customer-support/knowledge-base")}>
+              <BookOpen className="h-4 w-4 mr-2" />
+              Base de Conocimiento
+            </Button>
             <Button variant="outline" onClick={() => navigate("/customer-support/settings")}>
               <Settings className="h-4 w-4 mr-2" />
-              Configurar Notificaciones
+              Configurar
             </Button>
             <Dialog open={isNewTicketOpen} onOpenChange={setIsNewTicketOpen}>
               <DialogTrigger asChild>
@@ -313,6 +319,14 @@ export default function CustomerSupport() {
                     onChange={(e) => setTicketForm({...ticketForm, subject: e.target.value})}
                     placeholder="Descripción breve del problema..."
                   />
+                  {ticketForm.subject.length >= 3 && (
+                    <ArticleSuggestions 
+                      searchText={ticketForm.subject}
+                      onArticleSelect={(article) => {
+                        toast.info(`Artículo sugerido: ${article.title}`);
+                      }}
+                    />
+                  )}
                 </div>
                 <div className="space-y-2">
                   <Label>Descripción</Label>

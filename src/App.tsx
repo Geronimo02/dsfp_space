@@ -57,6 +57,7 @@ import Payroll from "./pages/Payroll";
 import PlatformAdmin from "./pages/PlatformAdmin";
 import CustomerSupport from "./pages/CustomerSupport";
 import CustomerSupportSettings from "./pages/CustomerSupportSettings";
+import KnowledgeBase from "./pages/KnowledgeBase";
 import PlatformSupport from "./pages/PlatformSupport";
 import ModuleNotAvailable from "./pages/ModuleNotAvailable";
 import NotFound from "./pages/NotFound";
@@ -282,6 +283,7 @@ const App = () => (
           {/* Atención al Cliente */}
           <Route path="/customer-support" element={<ProtectedRoute><ModuleProtectedRoute moduleCode="customer_support"><CustomerSupport /></ModuleProtectedRoute></ProtectedRoute>} />
           <Route path="/customer-support/settings" element={<ProtectedRoute><ModuleProtectedRoute moduleCode="customer_support"><CustomerSupportSettings /></ModuleProtectedRoute></ProtectedRoute>} />
+          <Route path="/customer-support/knowledge-base" element={<ProtectedRoute><ModuleProtectedRoute moduleCode="customer_support"><KnowledgeBase /></ModuleProtectedRoute></ProtectedRoute>} />
           
           {/* Soporte de Plataforma - siempre disponible para empresas */}
           <Route path="/platform-support" element={<ProtectedRoute><PlatformSupport /></ProtectedRoute>} />
