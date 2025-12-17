@@ -220,13 +220,13 @@ export function Sidebar() {
             {
               title: "Atención al Cliente",
               href: "/customer-support",
-              icon: UserCheck,
+              icon: MessageCircle,
               module: "customer_support",
             },
             {
-              title: "Atención al Cliente",
-              href: "/customer-support",
-              icon: MessageCircle,
+              title: "Base de Conocimiento",
+              href: "/customer-support/knowledge-base",
+              icon: BookOpen,
               module: "customer_support",
             },
           ],
