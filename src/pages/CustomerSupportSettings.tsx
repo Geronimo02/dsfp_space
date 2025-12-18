@@ -10,7 +10,9 @@ import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
 import { useCompany } from "@/contexts/CompanyContext";
 import { toast } from "sonner";
-import { Mail, MessageSquare, Phone, Save } from "lucide-react";
+import { Mail, MessageSquare, Phone, Save, Clock, FileText } from "lucide-react";
+import { ResponseTemplatesManager } from "@/components/support/ResponseTemplatesManager";
+import { SLASettingsManager } from "@/components/support/SLASettingsManager";
 
 export default function CustomerSupportSettings() {
   const { currentCompany } = useCompany();
@@ -124,21 +126,39 @@ export default function CustomerSupportSettings() {
           </p>
         </div>
 
-        <Tabs defaultValue="email">
-          <TabsList className="grid w-full grid-cols-3">
+        <Tabs defaultValue="sla">
+          <TabsList className="grid w-full grid-cols-5">
+            <TabsTrigger value="sla">
+              <Clock className="h-4 w-4 mr-2" />
+              SLA
+            </TabsTrigger>
+            <TabsTrigger value="templates">
+              <FileText className="h-4 w-4 mr-2" />
+              Plantillas
+            </TabsTrigger>
             <TabsTrigger value="email">
               <Mail className="h-4 w-4 mr-2" />
               Email
             </TabsTrigger>
             <TabsTrigger value="sms">
               <Phone className="h-4 w-4 mr-2" />
-              SMS (Twilio)
+              SMS
             </TabsTrigger>
             <TabsTrigger value="whatsapp">
               <MessageSquare className="h-4 w-4 mr-2" />
               WhatsApp
             </TabsTrigger>
           </TabsList>
+
+          {/* SLA Configuration */}
+          <TabsContent value="sla">
+            <SLASettingsManager />
+          </TabsContent>
+
+          {/* Templates Configuration */}
+          <TabsContent value="templates">
+            <ResponseTemplatesManager />
+          </TabsContent>
 
           {/* Email Configuration */}
           <TabsContent value="email">

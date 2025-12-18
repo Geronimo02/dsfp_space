@@ -9,6 +9,7 @@ import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog";
+import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
 import { useCompany } from "@/contexts/CompanyContext";
@@ -27,12 +28,15 @@ import {
   Paperclip,
   Send,
   Settings,
-  BookOpen
+  BookOpen,
+  FileText
 } from "lucide-react";
 import { formatDistanceToNow } from "date-fns";
 import { es } from "date-fns/locale";
 import { useNavigate } from "react-router-dom";
 import { ArticleSuggestions } from "@/components/support/ArticleSuggestions";
+import { SLAIndicator } from "@/components/support/SLAIndicator";
+import { ResponseTemplatesManager } from "@/components/support/ResponseTemplatesManager";
 
 export default function CustomerSupport() {
   const { currentCompany } = useCompany();
@@ -164,9 +168,18 @@ export default function CustomerSupport() {
         }]);
 
       if (error) throw error;
+
+      // Update first_response_at if this is the first agent response
+      if (!selectedTicket.first_response_at) {
+        await (supabase as any)
+          .from("customer_support_tickets")
+          .update({ first_response_at: new Date().toISOString() })
+          .eq("id", selectedTicket.id);
+      }
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["support-messages"] });
+      queryClient.invalidateQueries({ queryKey: ["support-tickets"] });
       setNewMessage("");
     },
     onError: (error: any) => {
@@ -436,9 +449,12 @@ export default function CustomerSupport() {
                         {getPriorityBadge(ticket.priority).label}
                       </Badge>
                     </div>
-                    <div className="text-xs text-muted-foreground flex items-center gap-1">
-                      <Calendar className="h-3 w-3" />
-                      {formatDistanceToNow(new Date(ticket.created_at), { addSuffix: true, locale: es })}
+                    <div className="flex items-center justify-between text-xs text-muted-foreground">
+                      <span className="flex items-center gap-1">
+                        <Calendar className="h-3 w-3" />
+                        {formatDistanceToNow(new Date(ticket.created_at), { addSuffix: true, locale: es })}
+                      </span>
+                      <SLAIndicator ticket={ticket} />
                     </div>
                   </div>
                 </Card>
@@ -477,7 +493,7 @@ export default function CustomerSupport() {
                       </SelectContent>
                     </Select>
                   </div>
-                  <div className="flex gap-4 text-sm text-muted-foreground mt-4">
+                  <div className="flex gap-4 text-sm text-muted-foreground mt-4 flex-wrap items-center">
                     <div className="flex items-center gap-1">
                       <User className="h-4 w-4" />
                       {selectedTicket.customers?.name}
@@ -494,6 +510,7 @@ export default function CustomerSupport() {
                         {selectedTicket.customers.phone}
                       </div>
                     )}
+                    <SLAIndicator ticket={selectedTicket} />
                   </div>
                 </CardHeader>
                 <CardContent>
@@ -542,30 +559,50 @@ export default function CustomerSupport() {
                           <span>Tu respuesta se enviará automáticamente por email al cliente: <strong>{selectedTicket.customers?.email}</strong></span>
                         </div>
                         <div className="flex gap-2">
-                          <Textarea
-                            placeholder="Escribe tu respuesta al cliente..."
-                            value={newMessage}
-                            onChange={(e) => setNewMessage(e.target.value)}
-                            className="min-h-[80px]"
-                            onKeyPress={(e) => {
-                              if (e.key === 'Enter' && e.ctrlKey && newMessage.trim()) {
-                                sendMessageMutation.mutate();
-                              }
-                            }}
-                          />
-                        </div>
-                        <div className="flex justify-between items-center">
-                          <span className="text-xs text-muted-foreground">Presiona Ctrl+Enter para enviar</span>
-                          <Button 
-                            onClick={() => sendMessageMutation.mutate()}
-                            disabled={!newMessage.trim()}
-                          >
-                            <Send className="h-4 w-4 mr-2" />
-                            Enviar Email
-                          </Button>
-                        </div>
+                      <div className="flex items-center gap-2 mb-2">
+                        <Popover>
+                          <PopoverTrigger asChild>
+                            <Button variant="outline" size="sm">
+                              <FileText className="h-4 w-4 mr-2" />
+                              Usar Plantilla
+                            </Button>
+                          </PopoverTrigger>
+                          <PopoverContent className="w-80" align="start">
+                            <ResponseTemplatesManager 
+                              mode="select"
+                              onSelectTemplate={(template) => {
+                                const customerName = selectedTicket?.customers?.name || 'Cliente';
+                                const content = template.content.replace('{nombre_cliente}', customerName);
+                                setNewMessage(prev => prev ? `${prev}\n\n${content}` : content);
+                              }}
+                            />
+                          </PopoverContent>
+                        </Popover>
                       </div>
-                    </TabsContent>
+                      <Textarea
+                        placeholder="Escribe tu respuesta al cliente..."
+                        value={newMessage}
+                        onChange={(e) => setNewMessage(e.target.value)}
+                        className="min-h-[80px]"
+                        onKeyPress={(e) => {
+                          if (e.key === 'Enter' && e.ctrlKey && newMessage.trim()) {
+                            sendMessageMutation.mutate();
+                          }
+                        }}
+                      />
+                    </div>
+                    <div className="flex justify-between items-center">
+                      <span className="text-xs text-muted-foreground">Presiona Ctrl+Enter para enviar</span>
+                      <Button 
+                        onClick={() => sendMessageMutation.mutate()}
+                        disabled={!newMessage.trim()}
+                      >
+                        <Send className="h-4 w-4 mr-2" />
+                        Enviar Email
+                      </Button>
+                    </div>
+                  </div>
+                </TabsContent>
 
                     <TabsContent value="calls">
                       <div className="text-center text-muted-foreground py-8">
