@@ -1700,6 +1700,109 @@ export type Database = {
           },
         ]
       }
+      customer_support_sla_settings: {
+        Row: {
+          company_id: string
+          created_at: string | null
+          default_resolution_hours: number | null
+          default_response_hours: number | null
+          high_priority_resolution_hours: number | null
+          high_priority_response_hours: number | null
+          id: string
+          low_priority_resolution_hours: number | null
+          low_priority_response_hours: number | null
+          medium_priority_resolution_hours: number | null
+          medium_priority_response_hours: number | null
+          updated_at: string | null
+        }
+        Insert: {
+          company_id: string
+          created_at?: string | null
+          default_resolution_hours?: number | null
+          default_response_hours?: number | null
+          high_priority_resolution_hours?: number | null
+          high_priority_response_hours?: number | null
+          id?: string
+          low_priority_resolution_hours?: number | null
+          low_priority_response_hours?: number | null
+          medium_priority_resolution_hours?: number | null
+          medium_priority_response_hours?: number | null
+          updated_at?: string | null
+        }
+        Update: {
+          company_id?: string
+          created_at?: string | null
+          default_resolution_hours?: number | null
+          default_response_hours?: number | null
+          high_priority_resolution_hours?: number | null
+          high_priority_response_hours?: number | null
+          id?: string
+          low_priority_resolution_hours?: number | null
+          low_priority_response_hours?: number | null
+          medium_priority_resolution_hours?: number | null
+          medium_priority_response_hours?: number | null
+          updated_at?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "customer_support_sla_settings_company_id_fkey"
+            columns: ["company_id"]
+            isOneToOne: true
+            referencedRelation: "companies"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      customer_support_templates: {
+        Row: {
+          category: string | null
+          company_id: string
+          content: string
+          created_at: string | null
+          created_by: string | null
+          id: string
+          is_active: boolean | null
+          name: string
+          subject: string | null
+          updated_at: string | null
+          usage_count: number | null
+        }
+        Insert: {
+          category?: string | null
+          company_id: string
+          content: string
+          created_at?: string | null
+          created_by?: string | null
+          id?: string
+          is_active?: boolean | null
+          name: string
+          subject?: string | null
+          updated_at?: string | null
+          usage_count?: number | null
+        }
+        Update: {
+          category?: string | null
+          company_id?: string
+          content?: string
+          created_at?: string | null
+          created_by?: string | null
+          id?: string
+          is_active?: boolean | null
+          name?: string
+          subject?: string | null
+          updated_at?: string | null
+          usage_count?: number | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "customer_support_templates_company_id_fkey"
+            columns: ["company_id"]
+            isOneToOne: false
+            referencedRelation: "companies"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       customer_support_tickets: {
         Row: {
           assigned_to: string | null
@@ -1710,9 +1813,14 @@ export type Database = {
           created_by: string | null
           customer_id: string | null
           description: string
+          first_response_at: string | null
           id: string
           priority: string
           resolved_at: string | null
+          sla_resolution_breached: boolean | null
+          sla_resolution_hours: number | null
+          sla_response_breached: boolean | null
+          sla_response_hours: number | null
           status: string
           subject: string
           ticket_number: string
@@ -1727,9 +1835,14 @@ export type Database = {
           created_by?: string | null
           customer_id?: string | null
           description: string
+          first_response_at?: string | null
           id?: string
           priority?: string
           resolved_at?: string | null
+          sla_resolution_breached?: boolean | null
+          sla_resolution_hours?: number | null
+          sla_response_breached?: boolean | null
+          sla_response_hours?: number | null
           status?: string
           subject: string
           ticket_number: string
@@ -1744,9 +1857,14 @@ export type Database = {
           created_by?: string | null
           customer_id?: string | null
           description?: string
+          first_response_at?: string | null
           id?: string
           priority?: string
           resolved_at?: string | null
+          sla_resolution_breached?: boolean | null
+          sla_resolution_hours?: number | null
+          sla_response_breached?: boolean | null
+          sla_response_hours?: number | null
           status?: string
           subject?: string
           ticket_number?: string
