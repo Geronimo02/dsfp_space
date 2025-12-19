@@ -558,39 +558,37 @@ export default function CustomerSupport() {
                           <Mail className="h-4 w-4" />
                           <span>Tu respuesta se enviará automáticamente por email al cliente: <strong>{selectedTicket.customers?.email}</strong></span>
                         </div>
-                        <div className="flex gap-2">
-                      <div className="flex items-center gap-2 mb-2">
-                        <Popover>
-                          <PopoverTrigger asChild>
-                            <Button variant="outline" size="sm">
-                              <FileText className="h-4 w-4 mr-2" />
-                              Usar Plantilla
-                            </Button>
-                          </PopoverTrigger>
-                          <PopoverContent className="w-80" align="start">
-                            <ResponseTemplatesManager 
-                              mode="select"
-                              onSelectTemplate={(template) => {
-                                const customerName = selectedTicket?.customers?.name || 'Cliente';
-                                const content = template.content.replace('{nombre_cliente}', customerName);
-                                setNewMessage(prev => prev ? `${prev}\n\n${content}` : content);
-                              }}
-                            />
-                          </PopoverContent>
-                        </Popover>
-                      </div>
-                      <Textarea
-                        placeholder="Escribe tu respuesta al cliente..."
-                        value={newMessage}
-                        onChange={(e) => setNewMessage(e.target.value)}
-                        className="min-h-[80px]"
-                        onKeyPress={(e) => {
-                          if (e.key === 'Enter' && e.ctrlKey && newMessage.trim()) {
-                            sendMessageMutation.mutate();
-                          }
-                        }}
-                      />
-                    </div>
+                        <div className="flex items-center gap-2 mb-2">
+                          <Popover>
+                            <PopoverTrigger asChild>
+                              <Button variant="outline" size="sm">
+                                <FileText className="h-4 w-4 mr-2" />
+                                Usar Plantilla
+                              </Button>
+                            </PopoverTrigger>
+                            <PopoverContent className="w-80" align="start">
+                              <ResponseTemplatesManager 
+                                mode="select"
+                                onSelectTemplate={(template) => {
+                                  const customerName = selectedTicket?.customers?.name || 'Cliente';
+                                  const content = template.content.replace('{nombre_cliente}', customerName);
+                                  setNewMessage(prev => prev ? `${prev}\n\n${content}` : content);
+                                }}
+                              />
+                            </PopoverContent>
+                          </Popover>
+                        </div>
+                        <Textarea
+                          placeholder="Escribe tu respuesta al cliente..."
+                          value={newMessage}
+                          onChange={(e) => setNewMessage(e.target.value)}
+                          className="min-h-[80px]"
+                          onKeyPress={(e) => {
+                            if (e.key === 'Enter' && e.ctrlKey && newMessage.trim()) {
+                              sendMessageMutation.mutate();
+                            }
+                          }}
+                        />
                     <div className="flex justify-between items-center">
                       <span className="text-xs text-muted-foreground">Presiona Ctrl+Enter para enviar</span>
                       <Button 
