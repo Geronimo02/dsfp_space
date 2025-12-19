@@ -38,6 +38,7 @@ import WarehouseTransfers from "./pages/WarehouseTransfers";
 import CompanySetup from "./pages/CompanySetup";
 import ResetPassword from "./pages/ResetPassword";
 import POSPoints from "./pages/POSPoints";
+import SignupFlowTester from "./pages/SignUpFlowTester";
 import NotificationSettings from "./pages/NotificationSettings";
 import Checks from "./pages/Checks";
 import MonthlyClosing from "./pages/MonthlyClosing";
@@ -205,6 +206,7 @@ const App = () => (
       <BrowserRouter>
         <CompanyProvider>
           <Routes>
+          <Route path="/dev/signup-tester" element={<SignupFlowTester />} />
           <Route path="/auth" element={<Auth />} />
           <Route path="/reset-password" element={<ResetPassword />} />
           <Route path="/company-setup" element={<AuthOnlyRoute><CompanySetup /></AuthOnlyRoute>} />
