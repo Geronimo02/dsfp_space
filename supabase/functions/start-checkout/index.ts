@@ -1,21 +1,34 @@
+// supabase/functions/start-checkout/index.ts
 import { corsHeaders } from "../_shared/cors.ts";
-import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
+import { createClient } from "https://esm.sh/@supabase/supabase-js@2.49.1";
 import Stripe from "https://esm.sh/stripe@14.21.0?target=deno";
 
 type Provider = "stripe" | "mercadopago";
 
+function json(payload: unknown, status = 200) {
+  return new Response(JSON.stringify(payload), {
+    status,
+    headers: { ...corsHeaders, "Content-Type": "application/json" },
+  });
+}
+
 export default async (req: Request) => {
-    if (req.method === "OPTIONS") {
-    return new Response("ok", { headers: corsHeaders });
+  // ✅ Preflight CORS
+  if (req.method === "OPTIONS") {
+    return new Response("ok", {
+      headers: {
+        "Access-Control-Allow-Origin": "*",
+        "Access-Control-Allow-Headers": "authorization, x-client-info, apikey, content-type",
+        "Access-Control-Allow-Methods": "POST, OPTIONS",
+      },
+    });
   }
+
   try {
     const { intent_id, success_url, cancel_url } = await req.json();
 
     if (!intent_id || !success_url || !cancel_url) {
-      return Response.json(
-        { error: "intent_id, success_url y cancel_url son requeridos" },
-        { status: 400 }
-      );
+      return json({ error: "intent_id, success_url y cancel_url son requeridos" }, 400);
     }
 
     const supabaseAdmin = createClient(
@@ -31,21 +44,21 @@ export default async (req: Request) => {
       .single();
 
     if (intentErr || !intent) {
-      return Response.json({ error: "Signup intent no encontrado" }, { status: 404 });
+      return json({ error: "Signup intent no encontrado" }, 404);
     }
 
     const provider: Provider = intent.provider;
 
     if (!["draft", "checkout_created"].includes(intent.status)) {
-      return Response.json(
-        { error: "El intent no está en un estado válido" },
-        { status: 409 }
-      );
+      return json({ error: "El intent no está en un estado válido" }, 409);
     }
 
     // 2) Branch por provider
     if (provider === "stripe") {
-      const stripe = new Stripe(Deno.env.get("STRIPE_SECRET_KEY")!, {
+      const stripeKey = Deno.env.get("STRIPE_SECRET_KEY");
+      if (!stripeKey) return json({ error: "STRIPE_SECRET_KEY no configurado" }, 500);
+
+      const stripe = new Stripe(stripeKey, {
         apiVersion: "2023-10-16",
       });
 
@@ -94,36 +107,29 @@ export default async (req: Request) => {
         })
         .eq("id", intent_id);
 
-      if (updErr) throw updErr;
+      if (updErr) return json({ error: String(updErr.message ?? updErr) }, 500);
 
-      return Response.json({ checkout_url: session.url, provider: "stripe" });
+      return json({ checkout_url: session.url, provider: "stripe" }, 200);
     }
 
     if (provider === "mercadopago") {
       const mpToken = Deno.env.get("MP_ACCESS_TOKEN");
-      if (!mpToken) {
-        return Response.json({ error: "MP_ACCESS_TOKEN no configurado" }, { status: 500 });
-      }
+      if (!mpToken) return json({ error: "MP_ACCESS_TOKEN no configurado" }, 500);
 
-      // Validar monto ARS (Mercado Pago AR normalmente opera en ARS)
+      // Validar monto ARS
       if (!intent.amount_ars) {
-        return Response.json(
-          { error: "intent.amount_ars es requerido para Mercado Pago" },
-          { status: 400 }
-        );
+        return json({ error: "intent.amount_ars es requerido para Mercado Pago" }, 400);
       }
 
-      // 2.1) Crear preapproval_plan (plan de suscripción)
-      // Nota: MP requiere frecuencia y monto; esto crea “el plan” que después el pagador acepta.
+      // 2.1) Crear preapproval_plan
       const planPayload = {
         reason: `Suscripción ${intent.plan_id}`,
-        external_reference: intent.id, // clave para relacionar
+        external_reference: intent.id,
         auto_recurring: {
           frequency: 1,
           frequency_type: "months",
           transaction_amount: Number(intent.amount_ars),
           currency_id: "ARS",
-          // free_trial: { frequency: 7, frequency_type: "days" } // MP soporta trial en planes
           free_trial: { frequency: 7, frequency_type: "days" },
         },
         back_url: success_url,
@@ -140,12 +146,12 @@ export default async (req: Request) => {
 
       if (!planRes.ok) {
         const errTxt = await planRes.text();
-        return Response.json({ error: `MP plan error: ${errTxt}` }, { status: 502 });
+        return json({ error: `MP plan error: ${errTxt}` }, 502);
       }
 
       const mpPlan = await planRes.json();
 
-      // 2.2) Crear preapproval (link de checkout para que el usuario autorice la suscripción)
+      // 2.2) Crear preapproval
       const preapprovalPayload = {
         preapproval_plan_id: mpPlan.id,
         reason: planPayload.reason,
@@ -165,18 +171,14 @@ export default async (req: Request) => {
 
       if (!preRes.ok) {
         const errTxt = await preRes.text();
-        return Response.json({ error: `MP preapproval error: ${errTxt}` }, { status: 502 });
+        return json({ error: `MP preapproval error: ${errTxt}` }, 502);
       }
 
       const mpPre = await preRes.json();
 
-      // init_point suele venir como URL de aprobación
       const checkoutUrl = mpPre.init_point || mpPre.sandbox_init_point;
       if (!checkoutUrl) {
-        return Response.json(
-          { error: "MP no devolvió init_point/sandbox_init_point" },
-          { status: 502 }
-        );
+        return json({ error: "MP no devolvió init_point/sandbox_init_point" }, 502);
       }
 
       // Persistir IDs MP en intent
@@ -189,13 +191,13 @@ export default async (req: Request) => {
         })
         .eq("id", intent_id);
 
-      if (updErr) throw updErr;
+      if (updErr) return json({ error: String(updErr.message ?? updErr) }, 500);
 
-      return Response.json({ checkout_url: checkoutUrl, provider: "mercadopago" });
+      return json({ checkout_url: checkoutUrl, provider: "mercadopago" }, 200);
     }
 
-    return Response.json({ error: "Provider inválido" }, { status: 400 });
+    return json({ error: "Provider inválido" }, 400);
   } catch (e) {
-    return Response.json({ error: String(e) }, { status: 500 });
+    return json({ error: String(e) }, 500);
   }
 };

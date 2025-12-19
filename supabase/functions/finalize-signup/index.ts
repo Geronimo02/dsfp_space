@@ -1,18 +1,31 @@
+// supabase/functions/finalize-signup/index.ts
 import { corsHeaders } from "../_shared/cors.ts";
-import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
+import { createClient } from "https://esm.sh/@supabase/supabase-js@2.49.1";
+
+function json(payload: unknown, status = 200) {
+  return new Response(JSON.stringify(payload), {
+    status,
+    headers: { ...corsHeaders, "Content-Type": "application/json" },
+  });
+}
 
 export default async (req: Request) => {
-    if (req.method === "OPTIONS") {
-    return new Response("ok", { headers: corsHeaders });
+  // ✅ Preflight CORS
+  if (req.method === "OPTIONS") {
+    return new Response("ok", {
+      headers: {
+        "Access-Control-Allow-Origin": "*",
+        "Access-Control-Allow-Headers": "authorization, x-client-info, apikey, content-type",
+        "Access-Control-Allow-Methods": "POST, OPTIONS",
+      },
+    });
   }
+
   try {
     const { intent_id, password } = await req.json();
 
     if (!intent_id || !password) {
-      return Response.json(
-        { error: "intent_id y password son requeridos" },
-        { status: 400 }
-      );
+      return json({ error: "intent_id y password son requeridos" }, 400);
     }
 
     const supabaseAdmin = createClient(
@@ -28,17 +41,11 @@ export default async (req: Request) => {
       .single();
 
     if (intentErr || !intent) {
-      return Response.json(
-        { error: "Signup intent no encontrado" },
-        { status: 404 }
-      );
+      return json({ error: "Signup intent no encontrado" }, 404);
     }
 
     if (intent.status !== "paid_ready") {
-      return Response.json(
-        { error: "El pago aún no fue confirmado" },
-        { status: 409 }
-      );
+      return json({ error: "El pago aún no fue confirmado" }, 409);
     }
 
     // 2️⃣ Crear usuario Auth (admin)
@@ -53,7 +60,7 @@ export default async (req: Request) => {
       });
 
     if (userErr || !createdUser?.user) {
-      throw userErr ?? new Error("No se pudo crear el usuario");
+      return json({ error: String(userErr?.message ?? "No se pudo crear el usuario") }, 500);
     }
 
     const userId = createdUser.user.id;
@@ -62,10 +69,7 @@ export default async (req: Request) => {
     const { data: company, error: companyErr } = await supabaseAdmin
       .from("companies")
       .insert({
-        name:
-          intent.company_name ??
-          intent.full_name ??
-          "Nueva empresa",
+        name: intent.company_name ?? intent.full_name ?? "Nueva empresa",
         email: intent.email,
         active: true,
       })
@@ -73,16 +77,10 @@ export default async (req: Request) => {
       .single();
 
     if (companyErr || !company) {
-      throw companyErr ?? new Error("No se pudo crear la empresa");
+      return json({ error: String(companyErr?.message ?? "No se pudo crear la empresa") }, 500);
     }
 
     const companyId = company.id;
-
-    // ⚠️ A partir de acá se disparan automáticamente tus triggers:
-    // - onboarding
-    // - permisos
-    // - módulos base
-    // Todo OK.
 
     // 4️⃣ Asociar usuario a empresa como ADMIN (dueño)
     const { error: cuErr } = await supabaseAdmin
@@ -95,7 +93,7 @@ export default async (req: Request) => {
         platform_admin: false,
       });
 
-    if (cuErr) throw cuErr;
+    if (cuErr) return json({ error: String(cuErr.message ?? cuErr) }, 500);
 
     // 5️⃣ Crear suscripción (1 por empresa)
     const providerSubscriptionId =
@@ -126,7 +124,7 @@ export default async (req: Request) => {
         modules: intent.modules ?? [],
       });
 
-    if (subErr) throw subErr;
+    if (subErr) return json({ error: String(subErr.message ?? subErr) }, 500);
 
     // 6️⃣ Marcar intent como completado
     const { error: updErr } = await supabaseAdmin
@@ -134,16 +132,10 @@ export default async (req: Request) => {
       .update({ status: "completed" })
       .eq("id", intent_id);
 
-    if (updErr) throw updErr;
+    if (updErr) return json({ error: String(updErr.message ?? updErr) }, 500);
 
-    return Response.json({
-      ok: true,
-      redirect_to: "/auth",
-    });
+    return json({ ok: true, redirect_to: "/auth" }, 200);
   } catch (e) {
-    return Response.json(
-      { error: String(e) },
-      { status: 500 }
-    );
+    return json({ error: String(e) }, 500);
   }
 };

@@ -1,6 +1,17 @@
 // supabase/functions/create-intent/index.ts
-import { corsHeaders } from "../_shared/cors.ts";
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2.49.1";
+
+function json(payload: unknown, status = 200) {
+  return new Response(JSON.stringify(payload), {
+    status,
+    headers: {
+      "Access-Control-Allow-Origin": "*",
+      "Access-Control-Allow-Headers": "authorization, x-client-info, apikey, content-type",
+      "Access-Control-Allow-Methods": "POST, OPTIONS",
+      "Content-Type": "application/json",
+    },
+  });
+}
 
 function round2(n: number): number {
   return Math.round(n * 100) / 100;
@@ -18,7 +29,7 @@ async function fetchWithTimeout(url: string, ms: number): Promise<Response> {
 
 async function getUsdToArsRate(): Promise<number> {
   const res = await fetchWithTimeout(
-    "https://api.exchangerate.host/latest?base=USD&symbols=ARS",
+    "https://api.exchangerate.host/latest?base=USD&symbols=ARS&access_key=8af9f03e0afadcdfaa4b697cde3be02d",
     8000
   );
   if (!res.ok) throw new Error(`FX HTTP ${res.status}`);
@@ -31,26 +42,28 @@ async function getUsdToArsRate(): Promise<number> {
 }
 
 export default async (req: Request) => {
-    if (req.method === "OPTIONS") {
-    return new Response("ok", { headers: corsHeaders });
+  // ✅ Preflight CORS
+  if (req.method === "OPTIONS") {
+    return new Response("ok", {
+      headers: {
+        "Access-Control-Allow-Origin": "*",
+        "Access-Control-Allow-Headers": "authorization, x-client-info, apikey, content-type",
+        "Access-Control-Allow-Methods": "POST, OPTIONS",
+      },
+    });
   }
+
   try {
     const body = await req.json();
     const { email, full_name, company_name, plan_id, modules, provider } = body;
 
     if (!email || !plan_id || !provider) {
-      return Response.json(
-        { error: "email, plan_id y provider son requeridos" },
-        { status: 400 }
-      );
+      return json({ error: "email, plan_id y provider son requeridos" }, 400);
     }
 
     const providerNorm = String(provider);
     if (!["stripe", "mercadopago"].includes(providerNorm)) {
-      return Response.json(
-        { error: "provider inválido (stripe | mercadopago)" },
-        { status: 400 }
-      );
+      return json({ error: "provider inválido (stripe | mercadopago)" }, 400);
     }
 
     const supabaseAdmin = createClient(
@@ -66,7 +79,7 @@ export default async (req: Request) => {
       .single();
 
     if (planErr || !plan || !plan.active) {
-      return Response.json({ error: "Plan inválido o inactivo" }, { status: 400 });
+      return json({ error: "Plan inválido o inactivo" }, 400);
     }
 
     // 2) calcular total USD (server-side)
@@ -75,7 +88,7 @@ export default async (req: Request) => {
     const amount_usd = round2(Number(plan.price) + modulesPrice);
 
     if (!isFinite(amount_usd) || amount_usd <= 0) {
-      return Response.json({ error: "amount_usd inválido" }, { status: 400 });
+      return json({ error: "amount_usd inválido" }, 400);
     }
 
     // 3) FX solo para Mercado Pago
@@ -90,7 +103,7 @@ export default async (req: Request) => {
       amount_ars = round2(amount_usd * fx);
 
       if (!isFinite(amount_ars) || amount_ars <= 0) {
-        return Response.json({ error: "amount_ars inválido" }, { status: 400 });
+        return json({ error: "amount_ars inválido" }, 400);
       }
     }
 
@@ -113,10 +126,12 @@ export default async (req: Request) => {
       .select("id")
       .single();
 
-    if (insErr) throw insErr;
+    if (insErr) {
+      return json({ error: String(insErr.message ?? insErr) }, 500);
+    }
 
-    return Response.json({ intent_id: intent.id });
+    return json({ intent_id: intent.id }, 200);
   } catch (e) {
-    return Response.json({ error: String(e) }, { status: 500 });
+    return json({ error: String(e) }, 500);
   }
 };
