@@ -241,6 +241,7 @@ export default function CustomerSupport() {
 
   return (
     <Layout>
+      <div className="space-y-6">
         {/* Header */}
         <div className="flex justify-between items-center">
           <div>
@@ -361,6 +362,7 @@ export default function CustomerSupport() {
               </div>
             </DialogContent>
           </Dialog>
+          </div>
         </div>
 
         {/* Stats Cards */}
