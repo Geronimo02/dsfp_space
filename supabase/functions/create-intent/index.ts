@@ -1,4 +1,5 @@
 // supabase/functions/create-intent/index.ts
+import { corsHeaders } from "../_shared/cors.ts";
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2.49.1";
 
 function round2(n: number): number {
@@ -30,6 +31,9 @@ async function getUsdToArsRate(): Promise<number> {
 }
 
 export default async (req: Request) => {
+    if (req.method === "OPTIONS") {
+    return new Response("ok", { headers: corsHeaders });
+  }
   try {
     const body = await req.json();
     const { email, full_name, company_name, plan_id, modules, provider } = body;

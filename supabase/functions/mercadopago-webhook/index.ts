@@ -1,3 +1,4 @@
+import { corsHeaders } from "../_shared/cors.ts";
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
 
 type MpTopic =
@@ -46,6 +47,9 @@ async function fetchMpResource(topic: MpTopic, id: string, token: string) {
 }
 
 export default async (req: Request) => {
+    if (req.method === "OPTIONS") {
+    return new Response("ok", { headers: corsHeaders });
+  }
   try {
     const mpToken = Deno.env.get("MP_ACCESS_TOKEN");
     if (!mpToken) {

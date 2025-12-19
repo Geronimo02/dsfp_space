@@ -1,9 +1,13 @@
+import { corsHeaders } from "../_shared/cors.ts";
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
 import Stripe from "https://esm.sh/stripe@14.21.0?target=deno";
 
 type Provider = "stripe" | "mercadopago";
 
 export default async (req: Request) => {
+    if (req.method === "OPTIONS") {
+    return new Response("ok", { headers: corsHeaders });
+  }
   try {
     const { intent_id, success_url, cancel_url } = await req.json();
 
