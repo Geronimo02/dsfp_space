@@ -3712,51 +3712,84 @@ export type Database = {
       platform_support_tickets: {
         Row: {
           assigned_admin_id: string | null
+          auto_priority_reason: string | null
           category: string
           closed_at: string | null
           company_id: string
           created_at: string | null
           created_by: string | null
           description: string
+          escalated_at: string | null
+          escalated_to: string | null
+          first_response_at: string | null
           id: string
           priority: string
           resolved_at: string | null
+          sla_resolution_breached: boolean | null
+          sla_resolution_hours: number | null
+          sla_response_breached: boolean | null
+          sla_response_hours: number | null
           status: string
           subject: string
+          subscription_plan: string | null
           ticket_number: string | null
           updated_at: string | null
+          waiting_for_customer: boolean | null
+          waiting_since: string | null
         }
         Insert: {
           assigned_admin_id?: string | null
+          auto_priority_reason?: string | null
           category: string
           closed_at?: string | null
           company_id: string
           created_at?: string | null
           created_by?: string | null
           description: string
+          escalated_at?: string | null
+          escalated_to?: string | null
+          first_response_at?: string | null
           id?: string
           priority?: string
           resolved_at?: string | null
+          sla_resolution_breached?: boolean | null
+          sla_resolution_hours?: number | null
+          sla_response_breached?: boolean | null
+          sla_response_hours?: number | null
           status?: string
           subject: string
+          subscription_plan?: string | null
           ticket_number?: string | null
           updated_at?: string | null
+          waiting_for_customer?: boolean | null
+          waiting_since?: string | null
         }
         Update: {
           assigned_admin_id?: string | null
+          auto_priority_reason?: string | null
           category?: string
           closed_at?: string | null
           company_id?: string
           created_at?: string | null
           created_by?: string | null
           description?: string
+          escalated_at?: string | null
+          escalated_to?: string | null
+          first_response_at?: string | null
           id?: string
           priority?: string
           resolved_at?: string | null
+          sla_resolution_breached?: boolean | null
+          sla_resolution_hours?: number | null
+          sla_response_breached?: boolean | null
+          sla_response_hours?: number | null
           status?: string
           subject?: string
+          subscription_plan?: string | null
           ticket_number?: string | null
           updated_at?: string | null
+          waiting_for_customer?: boolean | null
+          waiting_since?: string | null
         }
         Relationships: [
           {
@@ -6414,6 +6447,24 @@ export type Database = {
             referencedColumns: ["id"]
           },
         ]
+      }
+      platform_support_metrics: {
+        Row: {
+          avg_resolution_hours: number | null
+          avg_response_hours: number | null
+          category: string | null
+          closed_tickets: number | null
+          date: string | null
+          in_progress_tickets: number | null
+          open_tickets: number | null
+          priority: string | null
+          resolved_tickets: number | null
+          sla_resolution_breached: number | null
+          sla_response_breached: number | null
+          total_tickets: number | null
+          waiting_for_customer: number | null
+        }
+        Relationships: []
       }
     }
     Functions: {
