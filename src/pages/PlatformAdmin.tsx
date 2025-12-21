@@ -1213,7 +1213,7 @@ export default function PlatformAdmin() {
                   </div>
                 </CardHeader>
                 <CardContent>
-                  <div className="grid grid-cols-3 gap-2 mb-4">
+                  <div className="grid grid-cols-2 gap-2 mb-4">
                     <Card className="p-2">
                       <div className="text-center">
                         <div className="text-2xl font-bold text-red-600">
@@ -1232,6 +1232,14 @@ export default function PlatformAdmin() {
                     </Card>
                     <Card className="p-2">
                       <div className="text-center">
+                        <div className="text-2xl font-bold text-yellow-600">
+                          {platformSupportTickets?.filter((t: any) => t.waiting_for_customer).length || 0}
+                        </div>
+                        <div className="text-xs text-muted-foreground">Esperando</div>
+                      </div>
+                    </Card>
+                    <Card className="p-2">
+                      <div className="text-center">
                         <div className="text-2xl font-bold text-green-600">
                           {platformSupportTickets?.filter((t: any) => t.status === 'resolved').length || 0}
                         </div>
@@ -1239,6 +1247,17 @@ export default function PlatformAdmin() {
                       </div>
                     </Card>
                   </div>
+                  {/* SLA Breaches */}
+                  {(platformSupportTickets?.filter((t: any) => t.sla_response_breached || t.sla_resolution_breached).length || 0) > 0 && (
+                    <div className="p-2 mb-4 bg-destructive/10 border border-destructive/20 rounded-lg">
+                      <div className="flex items-center gap-2 text-destructive">
+                        <AlertCircle className="h-4 w-4" />
+                        <span className="text-sm font-medium">
+                          {platformSupportTickets?.filter((t: any) => t.sla_response_breached || t.sla_resolution_breached).length} SLA incumplidos
+                        </span>
+                      </div>
+                    </div>
+                  )}
 
                   <div className="space-y-2 max-h-[600px] overflow-y-auto border rounded p-2">
                     {platformSupportTickets && platformSupportTickets.length > 0 ? (
@@ -1263,7 +1282,7 @@ export default function PlatformAdmin() {
                           }}
                         >
                           <div className="flex items-start justify-between mb-2">
-                            <div className="flex items-center gap-2">
+                            <div className="flex items-center gap-2 flex-wrap">
                               <span className="font-mono text-xs font-medium">{ticket.ticket_number}</span>
                               <Badge variant={
                                 ticket.status === 'open' ? 'destructive' :
@@ -1274,6 +1293,16 @@ export default function PlatformAdmin() {
                                  ticket.status === 'in_progress' ? 'En Progreso' :
                                  ticket.status === 'resolved' ? 'Resuelto' : 'Cerrado'}
                               </Badge>
+                              {ticket.waiting_for_customer && (
+                                <Badge variant="outline" className="text-xs bg-yellow-500/10 text-yellow-600 border-yellow-500/30">
+                                  ⏳ Esperando
+                                </Badge>
+                              )}
+                              {(ticket.sla_response_breached || ticket.sla_resolution_breached) && (
+                                <Badge variant="destructive" className="text-xs">
+                                  ⚠️ SLA
+                                </Badge>
+                              )}
                             </div>
                             <Badge variant="outline" className="text-xs">
                               {ticket.priority === 'urgent' ? '🔴' :
@@ -1284,6 +1313,9 @@ export default function PlatformAdmin() {
                           <div className="text-xs text-muted-foreground mb-1 flex items-center gap-1">
                             <Building2 className="h-3 w-3" />
                             {ticket.companies?.name}
+                            {ticket.auto_priority_reason && (
+                              <span className="ml-2 text-yellow-600">{ticket.subscription_plan === 'annual' ? '⭐' : ''}</span>
+                            )}
                           </div>
                           <h4 className="font-medium text-sm line-clamp-1">{ticket.subject}</h4>
                           <p className="text-xs text-muted-foreground line-clamp-2 mt-1">{ticket.description}</p>
@@ -1372,8 +1404,56 @@ export default function PlatformAdmin() {
                               {selectedPlatformTicket.priority === 'urgent' ? '🔴 Urgente' :
                                selectedPlatformTicket.priority === 'high' ? '🟠 Alta' :
                                selectedPlatformTicket.priority === 'medium' ? '🟡 Media' : '🟢 Baja'}
+                              {selectedPlatformTicket.auto_priority_reason && (
+                                <span className="ml-2 text-xs text-yellow-600">
+                                  ({selectedPlatformTicket.auto_priority_reason})
+                                </span>
+                              )}
                             </div>
                           </div>
+                        </div>
+                        {/* SLA Info */}
+                        <div className="grid grid-cols-2 gap-3 text-sm mt-3 pt-3 border-t">
+                          <div>
+                            <span className="text-muted-foreground">SLA Respuesta:</span>
+                            <div className={`font-medium flex items-center gap-1 ${selectedPlatformTicket.sla_response_breached ? 'text-destructive' : ''}`}>
+                              <Clock className="h-3 w-3" />
+                              {selectedPlatformTicket.sla_response_hours || 24}h
+                              {selectedPlatformTicket.first_response_at && (
+                                <span className="text-green-600 ml-1">✓</span>
+                              )}
+                              {selectedPlatformTicket.sla_response_breached && (
+                                <span className="text-destructive ml-1">⚠️</span>
+                              )}
+                            </div>
+                          </div>
+                          <div>
+                            <span className="text-muted-foreground">SLA Resolución:</span>
+                            <div className={`font-medium flex items-center gap-1 ${selectedPlatformTicket.sla_resolution_breached ? 'text-destructive' : ''}`}>
+                              <Clock className="h-3 w-3" />
+                              {selectedPlatformTicket.sla_resolution_hours || 72}h
+                              {selectedPlatformTicket.resolved_at && (
+                                <span className="text-green-600 ml-1">✓</span>
+                              )}
+                              {selectedPlatformTicket.sla_resolution_breached && (
+                                <span className="text-destructive ml-1">⚠️</span>
+                              )}
+                            </div>
+                          </div>
+                          {selectedPlatformTicket.waiting_for_customer && (
+                            <div className="col-span-2">
+                              <Badge variant="outline" className="bg-yellow-500/10 text-yellow-600 border-yellow-500/30">
+                                ⏳ Esperando respuesta del cliente desde {new Date(selectedPlatformTicket.waiting_since).toLocaleDateString('es-AR')}
+                              </Badge>
+                            </div>
+                          )}
+                          {selectedPlatformTicket.escalated_at && (
+                            <div className="col-span-2">
+                              <Badge variant="destructive">
+                                🔺 Escalado: {selectedPlatformTicket.escalated_to || 'Supervisor'}
+                              </Badge>
+                            </div>
+                          )}
                         </div>
                       </div>
                     </CardHeader>
