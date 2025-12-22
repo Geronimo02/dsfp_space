@@ -52,6 +52,7 @@ import { CompanyModuleSelector } from "@/components/settings/CompanyModuleSelect
 import { CustomPricingManager } from "@/components/settings/CustomPricingManager";
 import { ModuleLimitsManager } from "@/components/settings/ModuleLimitsManager";
 import { ModuleAuditLog } from "@/components/settings/ModuleAuditLog";
+import { PlatformAdminHeader, PlatformAdminStats, PlatformAdminNav } from "@/components/platformAdmin";
 
 export default function PlatformAdmin() {
   const { isPlatformAdmin, isLoading: adminLoading } = usePlatformAdmin();
@@ -323,39 +324,33 @@ export default function PlatformAdmin() {
   const { data: platformSupportTickets, isLoading: platformTicketsLoading, error: platformTicketsError, refetch: refetchTickets } = useQuery({
     queryKey: ["platform-support-tickets"],
     queryFn: async () => {
-      console.log("🔍 INICIANDO: Fetching platform support tickets...");
       try {
-      const { data, error } = await (supabase as any)
-        .from("platform_support_tickets")
-        .select(`
-          *,
-          companies!platform_support_tickets_company_id_fkey (
-            name,
-            email,
-            phone,
-            whatsapp_number
-          )
-        `)
-        .order("created_at", { ascending: false });
+        const { data, error } = await (supabase as any)
+          .from("platform_support_tickets")
+          .select(`
+            *,
+            companies!platform_support_tickets_company_id_fkey (
+              name,
+              email,
+              phone,
+              whatsapp_number
+            )
+          `)
+          .order("created_at", { ascending: false });
 
-        console.log("📊 Query ejecutada. Error?", error);
-        console.log("📊 Data recibida:", data);
-        
         if (error) {
-          console.error("❌ Error fetching platform support tickets:", error);
-          console.error("Error details:", JSON.stringify(error, null, 2));
+          console.error("Error fetching platform support tickets:", error);
           return [];
         }
-        console.log("✅ Platform support tickets fetched:", data?.length || 0, "tickets");
         return data || [];
       } catch (err) {
-        console.error("❌ Exception:", err);
+        console.error("Exception fetching tickets:", err);
         return [];
       }
     },
     retry: 1,
-    staleTime: 30000, // 30 segundos
-    gcTime: 5 * 60 * 1000, // 5 minutos
+    staleTime: 30000,
+    gcTime: 5 * 60 * 1000,
   });
 
   // Mensajes del ticket seleccionado
@@ -406,20 +401,14 @@ export default function PlatformAdmin() {
       
       // Enviar notificación a la empresa (opcional - solo si hay email)
       if (data?.companyEmail) {
-        try {
-          supabase.functions.invoke("notify-platform-support-ticket", {
-            body: {
-              ticket_id: data.ticketId,
-              type: "message_received",
-              send_email: true,
-              send_sms: false,
-            }
-          }).catch((err) => {
-            console.log("Notificación a empresa enviada (silenciosa)");
-          });
-        } catch (err) {
-          console.log("Error enviando notificación:", err);
-        }
+        supabase.functions.invoke("notify-platform-support-ticket", {
+          body: {
+            ticket_id: data.ticketId,
+            type: "message_received",
+            send_email: true,
+            send_sms: false,
+          }
+        }).catch(() => {});
       }
       
       toast.success("Respuesta enviada");
@@ -866,24 +855,7 @@ export default function PlatformAdmin() {
 
   return (
     <div className="min-h-screen bg-background">
-      {/* Header with logout */}
-      <div className="border-b bg-card">
-        <div className="container mx-auto px-6 py-4 flex items-center justify-between">
-          <div className="flex items-center gap-3">
-            <div className="w-10 h-10 rounded-lg bg-primary flex items-center justify-center">
-              <ShoppingCart className="w-6 h-6 text-primary-foreground" />
-            </div>
-            <div>
-              <h1 className="text-xl font-bold">RetailSnap</h1>
-              <p className="text-xs text-muted-foreground">Panel de Administración</p>
-            </div>
-          </div>
-          <Button variant="outline" onClick={handleLogout}>
-            <LogOut className="h-4 w-4 mr-2" />
-            Cerrar Sesión
-          </Button>
-        </div>
-      </div>
+      <PlatformAdminHeader onLogout={handleLogout} />
 
       <div className="container mx-auto p-6 space-y-6">
         <div>
@@ -893,173 +865,13 @@ export default function PlatformAdmin() {
           </p>
         </div>
 
-        {/* Stats Overview */}
-        {stats && (
-          <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-6">
-            <Card>
-              <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-                <CardTitle className="text-sm font-medium">Total Empresas</CardTitle>
-                <Building2 className="h-4 w-4 text-muted-foreground" />
-              </CardHeader>
-              <CardContent>
-                <div className="text-2xl font-bold">{stats.totalCompanies}</div>
-                <p className="text-xs text-muted-foreground">
-                  {stats.activeCompanies} activas
-                </p>
-              </CardContent>
-            </Card>
-            
-            <Card>
-              <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-                <CardTitle className="text-sm font-medium">Empresas Activas</CardTitle>
-                <CheckCircle2 className="h-4 w-4 text-green-500" />
-              </CardHeader>
-              <CardContent>
-                <div className="text-2xl font-bold">{stats.activeCompanies}</div>
-                <p className="text-xs text-muted-foreground">
-                  {Math.round((stats.activeCompanies / stats.totalCompanies) * 100)}% del total
-                </p>
-              </CardContent>
-            </Card>
-            
-            <Card>
-              <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-                <CardTitle className="text-sm font-medium">Notificaciones</CardTitle>
-                <Bell className="h-4 w-4 text-muted-foreground" />
-              </CardHeader>
-              <CardContent>
-                <div className="text-2xl font-bold">{stats.unreadNotifications}</div>
-                <p className="text-xs text-muted-foreground">
-                  Sin leer
-                </p>
-              </CardContent>
-            </Card>
-            
-            <Card>
-              <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-                <CardTitle className="text-sm font-medium">Feedback Pendiente</CardTitle>
-                <MessageSquare className="h-4 w-4 text-muted-foreground" />
-              </CardHeader>
-              <CardContent>
-                <div className="text-2xl font-bold">{stats.pendingFeedback}</div>
-                <p className="text-xs text-muted-foreground">
-                  Requiere atención
-                </p>
-              </CardContent>
-            </Card>
-            
-            <Card>
-              <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-                <CardTitle className="text-sm font-medium">Ingresos Totales</CardTitle>
-                <DollarSign className="h-4 w-4 text-green-500" />
-              </CardHeader>
-              <CardContent>
-                <div className="text-2xl font-bold">${stats.totalRevenue.toLocaleString()}</div>
-                <p className="text-xs text-muted-foreground">
-                  Cobrado
-                </p>
-              </CardContent>
-            </Card>
-            
-            <Card>
-              <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-                <CardTitle className="text-sm font-medium">Pendiente</CardTitle>
-                <Clock className="h-4 w-4 text-yellow-500" />
-              </CardHeader>
-              <CardContent>
-                <div className="text-2xl font-bold">${stats.pendingRevenue.toLocaleString()}</div>
-                <p className="text-xs text-muted-foreground">
-                  Por cobrar
-                </p>
-              </CardContent>
-            </Card>
-          </div>
-        )}
+        <PlatformAdminStats stats={stats} />
 
         <Tabs defaultValue="companies" className="flex gap-6">
-          <Card className="w-64 flex-shrink-0 h-fit sticky top-6">
-            <CardHeader className="pb-3">
-              <CardTitle className="text-sm font-medium">Navegación</CardTitle>
-            </CardHeader>
-            <CardContent className="p-2">
-              <TabsList className="flex flex-col h-auto w-full space-y-1 bg-transparent p-0">
-              <TabsTrigger value="companies" className="w-full justify-start gap-2 data-[state=active]:bg-primary data-[state=active]:text-primary-foreground">
-                <Building2 className="h-4 w-4" />
-                <span>Empresas</span>
-              </TabsTrigger>
-              <TabsTrigger value="pricing" className="w-full justify-start gap-2 data-[state=active]:bg-primary data-[state=active]:text-primary-foreground">
-                <Package className="h-4 w-4" />
-                <span>Precios</span>
-              </TabsTrigger>
-              <TabsTrigger value="calculator" className="w-full justify-start gap-2 data-[state=active]:bg-primary data-[state=active]:text-primary-foreground">
-                <Calculator className="h-4 w-4" />
-                <span>Cotizador</span>
-              </TabsTrigger>
-              <TabsTrigger value="module-limits" className="w-full justify-start gap-2 data-[state=active]:bg-primary data-[state=active]:text-primary-foreground">
-                <Settings className="h-4 w-4" />
-                <span>Límites de Módulos</span>
-              </TabsTrigger>
-              <TabsTrigger value="module-audit" className="w-full justify-start gap-2 data-[state=active]:bg-primary data-[state=active]:text-primary-foreground">
-                <Activity className="h-4 w-4" />
-                <span>Auditoría de Módulos</span>
-              </TabsTrigger>
-              <TabsTrigger value="usage" className="w-full justify-start gap-2 data-[state=active]:bg-primary data-[state=active]:text-primary-foreground">
-                <TrendingUp className="h-4 w-4" />
-                <span>Métricas</span>
-              </TabsTrigger>
-              <TabsTrigger value="onboarding" className="w-full justify-start gap-2 data-[state=active]:bg-primary data-[state=active]:text-primary-foreground">
-                <Rocket className="h-4 w-4" />
-                <span>Onboarding</span>
-              </TabsTrigger>
-              <TabsTrigger value="platform-support" className="w-full justify-start gap-2 data-[state=active]:bg-primary data-[state=active]:text-primary-foreground">
-                <Ticket className="h-4 w-4" />
-                <span>Soporte</span>
-                {platformSupportTickets && platformSupportTickets.filter((t: any) => t.status === 'open').length > 0 && (
-                  <Badge variant="destructive" className="ml-auto">
-                    {platformSupportTickets.filter((t: any) => t.status === 'open').length}
-                  </Badge>
-                )}
-              </TabsTrigger>
-              <TabsTrigger value="notifications" className="w-full justify-start gap-2 data-[state=active]:bg-primary data-[state=active]:text-primary-foreground">
-                <Bell className="h-4 w-4" />
-                <span>Notificaciones</span>
-                {stats && stats.unreadNotifications > 0 && (
-                  <Badge variant="destructive" className="ml-auto">
-                    {stats.unreadNotifications}
-                  </Badge>
-                )}
-              </TabsTrigger>
-              <TabsTrigger value="feedback" className="w-full justify-start gap-2 data-[state=active]:bg-primary data-[state=active]:text-primary-foreground">
-                <MessageSquare className="h-4 w-4" />
-                <span>Feedback</span>
-              </TabsTrigger>
-              <TabsTrigger value="payments" className="w-full justify-start gap-2 data-[state=active]:bg-primary data-[state=active]:text-primary-foreground">
-                <DollarSign className="h-4 w-4" />
-                <span>Pagos</span>
-              </TabsTrigger>
-              <TabsTrigger value="analytics" className="w-full justify-start gap-2 data-[state=active]:bg-primary data-[state=active]:text-primary-foreground">
-                <BarChart3 className="h-4 w-4" />
-                <span>Analytics</span>
-              </TabsTrigger>
-              <TabsTrigger value="users" className="w-full justify-start gap-2 data-[state=active]:bg-primary data-[state=active]:text-primary-foreground">
-                <Users className="h-4 w-4" />
-                <span>Usuarios</span>
-              </TabsTrigger>
-              <TabsTrigger value="plans" className="w-full justify-start gap-2 data-[state=active]:bg-primary data-[state=active]:text-primary-foreground">
-                <Settings className="h-4 w-4" />
-                <span>Planes</span>
-              </TabsTrigger>
-              <TabsTrigger value="audit" className="w-full justify-start gap-2 data-[state=active]:bg-primary data-[state=active]:text-primary-foreground">
-                <FileText className="h-4 w-4" />
-                <span>Auditoría</span>
-              </TabsTrigger>
-              <TabsTrigger value="integrations" className="w-full justify-start gap-2 data-[state=active]:bg-primary data-[state=active]:text-primary-foreground">
-                <Plug className="h-4 w-4" />
-                <span>Integraciones</span>
-              </TabsTrigger>
-            </TabsList>
-            </CardContent>
-          </Card>
+          <PlatformAdminNav 
+            openTicketsCount={platformSupportTickets?.filter((t: any) => t.status === 'open').length || 0}
+            unreadNotificationsCount={stats?.unreadNotifications || 0}
+          />
 
           <div className="flex-1 min-w-0">
 
@@ -1266,24 +1078,16 @@ export default function PlatformAdmin() {
                   <div className="space-y-2 max-h-[600px] overflow-y-auto border rounded p-2">
                     {platformSupportTickets && platformSupportTickets.length > 0 ? (
                       (() => {
-                        // Debug: Asegurar que el filtro sea válido
                         const validFilter = platformSupportStatusFilter === 'all' ? 'all' : platformSupportStatusFilter;
                         const filtered = platformSupportTickets
                           .filter((t: any) => validFilter === 'all' || t.status === validFilter);
-                        console.log("🎯 TOTAL tickets:", platformSupportTickets.length);
-                        console.log("🔍 Filtro actual:", validFilter);
-                        console.log("✅ Tickets filtrados:", filtered.length);
-                        console.log("📊 Datos:", filtered.map(t => ({id: t.id, status: t.status, ticket_number: t.ticket_number})));
                         return filtered.map((ticket: any) => (
                         <div
                           key={ticket.id}
                           className={`p-3 border rounded-lg cursor-pointer transition-colors hover:bg-muted/50 ${
                             selectedPlatformTicket?.id === ticket.id ? "bg-muted border-2 border-primary" : ""
                           }`}
-                          onClick={() => {
-                            console.log("👆 Seleccionando ticket:", ticket.ticket_number, ticket.id);
-                            setSelectedPlatformTicket(ticket);
-                          }}
+                          onClick={() => setSelectedPlatformTicket(ticket)}
                         >
                           <div className="flex items-start justify-between mb-2">
                             <div className="flex items-center gap-2 flex-wrap">
