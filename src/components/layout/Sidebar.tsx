@@ -582,29 +582,29 @@ export function Sidebar() {
         >
           <CollapsibleTrigger
             className={cn(
-              "flex items-center justify-between w-full gap-3 px-4 py-3 text-sm rounded-lg transition-all",
+              "flex items-center justify-between w-full gap-2 px-2 py-1.5 text-sm rounded-md transition-all",
               hasActiveRoute
                 ? "bg-gradient-to-r from-primary/20 to-primary/10 text-primary font-medium border-l-2 border-primary"
                 : "text-sidebar-foreground hover:bg-sidebar-accent/50 hover:text-sidebar-accent-foreground"
             )}
           >
-            <div className="flex items-center gap-3 flex-1">
-              <Icon className="w-5 h-5 shrink-0" />
-              <span className="truncate">{item.title}</span>
+            <div className="flex items-center gap-2.5 flex-1">
+              <Icon className="w-4 h-4 shrink-0" />
+              <span className="truncate text-sm">{item.title}</span>
               {item.badge && item.badge > 0 && (
-                <Badge variant="destructive" className="ml-auto text-[10px] h-5 px-1.5">
+                <Badge variant="destructive" className="ml-auto text-[10px] h-4 px-1">
                   {item.badge}
                 </Badge>
               )}
             </div>
             <ChevronDown
               className={cn(
-                "w-4 h-4 transition-transform shrink-0",
+                "w-3.5 h-3.5 transition-transform shrink-0",
                 isOpen && "transform rotate-180"
               )}
             />
           </CollapsibleTrigger>
-          <CollapsibleContent className="pl-8 space-y-1 mt-2">
+          <CollapsibleContent className="pl-6 space-y-0.5 mt-0.5">
             {item.children.map((child) => renderNavItem(child, true, false))}
           </CollapsibleContent>
         </Collapsible>
@@ -616,17 +616,17 @@ export function Sidebar() {
         key={item.href}
         to={item.href}
         className={cn(
-          "flex items-center gap-3 px-4 py-3 text-sm rounded-lg transition-all group relative",
+          "flex items-center gap-2.5 px-2 py-1.5 text-sm rounded-md transition-all group relative",
           isActive
             ? "bg-gradient-to-r from-primary/20 to-primary/10 text-primary font-medium border-l-2 border-primary"
             : "text-sidebar-foreground hover:bg-sidebar-accent/50 hover:text-sidebar-accent-foreground",
-          isChild && !isFavoritesList && "pl-4"
+          isChild && !isFavoritesList && "pl-2"
         )}
       >
-        <Icon className="w-5 h-5 shrink-0" />
-        <span className="truncate flex-1">{item.title}</span>
+        <Icon className="w-4 h-4 shrink-0" />
+        <span className="truncate flex-1 text-sm">{item.title}</span>
         {item.badge && item.badge > 0 && (
-          <Badge variant="destructive" className="text-[10px] h-5 px-1.5">
+          <Badge variant="destructive" className="text-[10px] h-4 px-1">
             {item.badge}
           </Badge>
         )}
@@ -634,14 +634,14 @@ export function Sidebar() {
           variant="ghost"
           size="icon"
           className={cn(
-            "h-6 w-6 opacity-0 group-hover:opacity-100 transition-opacity",
+            "h-5 w-5 opacity-0 group-hover:opacity-100 transition-opacity",
             isFavorite && "opacity-100"
           )}
           onClick={(e) => toggleFavorite(item.href, e)}
         >
           <Star
             className={cn(
-              "w-3.5 h-3.5",
+              "w-3 h-3",
               isFavorite && "fill-yellow-400 text-yellow-400"
             )}
           />
@@ -702,49 +702,49 @@ export function Sidebar() {
   }, [favorites, navItems]);
 
   return (
-    <UISidebar collapsible="offcanvas" className="border-r border-sidebar-border w-72">
+    <UISidebar collapsible="offcanvas" className="border-r border-sidebar-border w-64">
       <div className="flex flex-col h-full bg-gradient-to-b from-sidebar to-sidebar/95">
-        {/* Header */}
-        <div className="p-5 border-b bg-gradient-to-r from-primary/10 to-primary/5">
-          <div className="flex items-center gap-4">
-            <div className="p-2.5 rounded-xl bg-primary/10">
-              <ShoppingCart className="w-6 h-6 text-primary" />
+        {/* Header - Más compacto */}
+        <div className="px-4 py-3 border-b bg-gradient-to-r from-primary/10 to-primary/5">
+          <div className="flex items-center gap-3">
+            <div className="p-2 rounded-lg bg-primary/10">
+              <ShoppingCart className="w-5 h-5 text-primary" />
             </div>
             <div>
-              <span className="text-xl font-bold text-foreground">RetailSnap</span>
-              <p className="text-xs text-muted-foreground">Sistema POS</p>
+              <span className="text-lg font-bold text-foreground">RetailSnap</span>
+              <p className="text-[10px] text-muted-foreground">Sistema POS</p>
             </div>
           </div>
         </div>
 
-        {/* Search Bar */}
-        <div className="p-4 border-b">
+        {/* Search Bar - Más compacto */}
+        <div className="px-3 py-2 border-b">
           <div className="relative">
             <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground" />
             <Input
               placeholder="Buscar módulo..."
               value={searchQuery}
               onChange={(e) => setSearchQuery(e.target.value)}
-              className="pl-10 h-10 bg-sidebar-accent/50 border-sidebar-accent"
+              className="pl-9 h-8 text-sm bg-sidebar-accent/50 border-sidebar-accent"
             />
           </div>
         </div>
 
-        {/* Favorites Section */}
+        {/* Favorites Section - Más compacto */}
         {favoriteItems.length > 0 && !searchQuery && (
-          <div className="px-4 pt-4 pb-3 border-b">
-            <h3 className="px-4 mb-3 text-xs font-semibold text-muted-foreground uppercase tracking-wider flex items-center gap-2">
-              <Star className="w-3.5 h-3.5 fill-yellow-400 text-yellow-400" />
+          <div className="px-3 py-2 border-b">
+            <h3 className="px-2 mb-1.5 text-[10px] font-semibold text-muted-foreground uppercase tracking-wider flex items-center gap-1.5">
+              <Star className="w-3 h-3 fill-yellow-400 text-yellow-400" />
               Favoritos
             </h3>
-            <div className="space-y-1">
+            <div className="space-y-0.5">
               {favoriteItems.map((item) => renderNavItem(item, false, true))}
             </div>
           </div>
         )}
 
-        {/* Navigation */}
-        <nav className="flex-1 overflow-y-auto p-4 space-y-8">
+        {/* Navigation - Más espacio y scroll suave */}
+        <nav className="flex-1 overflow-y-auto px-3 py-2 space-y-4 sidebar-scroll">
           {filteredNavItems.map((section) => {
             if ("section" in section) {
               const visibleItems = section.items.filter(isNavItemVisible);
@@ -752,10 +752,10 @@ export function Sidebar() {
 
               return (
                 <div key={section.section}>
-                  <h3 className="px-4 mb-3 text-xs font-semibold text-muted-foreground uppercase tracking-wider">
+                  <h3 className="px-2 mb-1.5 text-[10px] font-semibold text-muted-foreground uppercase tracking-wider">
                     {section.section}
                   </h3>
-                  <div className="space-y-1">{section.items.map((item) => renderNavItem(item))}</div>
+                  <div className="space-y-0.5">{section.items.map((item) => renderNavItem(item))}</div>
                 </div>
               );
             }
@@ -765,55 +765,60 @@ export function Sidebar() {
 
         {/* Botón + Funcionalidades - Solo visible si no es platform admin */}
         {!isPlatformAdmin && (
-          <div className="px-4 pb-3">
+          <div className="px-3 py-2 border-t">
             <Button
               onClick={() => setShowModulesDialog(true)}
-              variant="outline"
-              className="w-full flex items-center gap-3 px-4 py-3 text-sm rounded-lg border-dashed border-primary/50 text-primary hover:bg-primary/5 hover:border-primary transition-all"
+              variant="ghost"
+              size="sm"
+              className="w-full flex items-center gap-2 px-2 py-1.5 text-xs rounded-md border-dashed border border-primary/50 text-primary hover:bg-primary/5 hover:border-primary transition-all"
             >
-              <Plus className="w-5 h-5" />
+              <Plus className="w-3.5 h-3.5" />
               <span className="font-medium">Más Funcionalidades</span>
             </Button>
           </div>
         )}
 
-        {/* AI Assistant - Botón especial al final */}
-        <div className="p-4 border-t bg-gradient-to-r from-sidebar to-sidebar/95 space-y-3">
+        {/* Footer - Más compacto */}
+        <div className="px-3 py-2 border-t bg-gradient-to-r from-sidebar to-sidebar/95 space-y-1.5">
           <Link
             to="/ai-assistant"
-            className="flex items-center gap-3 px-4 py-3 text-sm rounded-lg transition-all bg-gradient-to-r from-purple-500 to-pink-500 text-white hover:from-purple-600 hover:to-pink-600 shadow-lg hover:shadow-xl transform hover:scale-[1.02]"
+            className="flex items-center gap-2 px-3 py-2 text-xs rounded-md transition-all bg-gradient-to-r from-purple-500 to-pink-500 text-white hover:from-purple-600 hover:to-pink-600 shadow-md hover:shadow-lg"
           >
-            <Sparkles className="w-5 h-5" />
+            <Sparkles className="w-4 h-4" />
             <span className="font-semibold">Asistente IA</span>
           </Link>
 
-          <Link to="/platform-support">
-            <Button
-              variant="outline"
-              className="w-full flex items-center gap-3 px-4 py-3 text-sm rounded-lg border-blue-500/50 text-blue-600 hover:bg-blue-50 dark:hover:bg-blue-950 transition-all mb-3"
-            >
-              <LifeBuoy className="w-5 h-5" />
-              <span className="font-medium">Soporte</span>
-            </Button>
-          </Link>
+          <div className="flex gap-1.5">
+            <Link to="/platform-support" className="flex-1">
+              <Button
+                variant="outline"
+                size="sm"
+                className="w-full flex items-center gap-2 px-2 py-1.5 text-xs rounded-md border-blue-500/50 text-blue-600 hover:bg-blue-50 dark:hover:bg-blue-950 transition-all"
+              >
+                <LifeBuoy className="w-3.5 h-3.5" />
+                <span>Soporte</span>
+              </Button>
+            </Link>
 
-          <Button
-            onClick={async () => {
-              const { error } = await supabase.auth.signOut();
-              if (error) {
-                toast.error("Error al cerrar sesión");
-                console.error(error);
-              } else {
-                toast.success("Sesión cerrada correctamente");
-                navigate("/auth");
-              }
-            }}
-            variant="outline"
-            className="w-full flex items-center gap-3 px-4 py-3 text-sm rounded-lg border-destructive/50 text-destructive hover:bg-destructive hover:text-destructive-foreground transition-all"
-          >
-            <LogOut className="w-5 h-5" />
-            <span className="font-medium">Cerrar Sesión</span>
-          </Button>
+            <Button
+              onClick={async () => {
+                const { error } = await supabase.auth.signOut();
+                if (error) {
+                  toast.error("Error al cerrar sesión");
+                  console.error(error);
+                } else {
+                  toast.success("Sesión cerrada correctamente");
+                  navigate("/auth");
+                }
+              }}
+              variant="outline"
+              size="sm"
+              className="flex-1 flex items-center gap-2 px-2 py-1.5 text-xs rounded-md border-destructive/50 text-destructive hover:bg-destructive hover:text-destructive-foreground transition-all"
+            >
+              <LogOut className="w-3.5 h-3.5" />
+              <span>Salir</span>
+            </Button>
+          </div>
         </div>
 
         {/* Dialog de módulos disponibles */}
