@@ -10,10 +10,11 @@ import { Switch } from "@/components/ui/switch";
 import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Badge } from "@/components/ui/badge";
+import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
 import { toast } from "sonner";
 import { useCompany } from "@/contexts/CompanyContext";
 import { usePermissions } from "@/hooks/usePermissions";
-import { Receipt, Plus, Edit, Trash2, AlertCircle, CheckCircle2 } from "lucide-react";
+import { Receipt, Plus, Edit, Trash2, AlertCircle, CheckCircle2, Clock, AlertTriangle } from "lucide-react";
 import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle } from "@/components/ui/alert-dialog";
 
 interface POSAfip {
@@ -206,6 +207,10 @@ export default function POSPoints() {
             <h1 className="text-3xl font-bold flex items-center gap-2">
               <Receipt className="h-8 w-8" />
               Puntos de Venta AFIP
+              <Badge variant="secondary" className="ml-2 flex items-center gap-1">
+                <Clock className="h-3 w-3" />
+                Beta
+              </Badge>
             </h1>
             <p className="text-muted-foreground mt-1">
               Gestiona los puntos de venta para facturación electrónica
@@ -218,6 +223,15 @@ export default function POSPoints() {
             </Button>
           )}
         </div>
+
+        <Alert className="border-amber-500/50 bg-amber-500/10">
+          <AlertTriangle className="h-4 w-4 text-amber-500" />
+          <AlertTitle className="text-amber-600">Integración AFIP en Desarrollo</AlertTitle>
+          <AlertDescription className="text-amber-600/80">
+            La emisión real de comprobantes electrónicos con CAE de AFIP estará disponible próximamente. 
+            Actualmente puedes configurar tus puntos de venta y preparar la integración.
+          </AlertDescription>
+        </Alert>
 
         {/* Stats Cards */}
         <div className="grid gap-4 md:grid-cols-3">

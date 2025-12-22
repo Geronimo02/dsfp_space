@@ -8,7 +8,7 @@ import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Switch } from "@/components/ui/switch";
 import { toast } from "sonner";
-import { Settings, ShoppingCart, Store, FileText, BarChart3 } from "lucide-react";
+import { Settings, ShoppingCart, Store, FileText, BarChart3, Clock } from "lucide-react";
 
 const Integrations = () => {
   const { currentCompany } = useCompany();
@@ -54,24 +54,28 @@ const Integrations = () => {
       name: "Mercado Libre",
       icon: ShoppingCart,
       description: "Sincroniza pedidos y genera facturas automáticamente",
+      comingSoon: true,
     },
     {
       type: "tiendanube",
       name: "Tienda Nube",
       icon: Store,
       description: "Conecta tu tienda online con tu sistema",
+      comingSoon: true,
     },
     {
       type: "woocommerce",
       name: "WooCommerce",
       icon: Store,
       description: "Integración con tu tienda WordPress",
+      comingSoon: true,
     },
     {
       type: "google_forms",
       name: "Google Forms",
       icon: FileText,
       description: "Crea clientes y presupuestos desde formularios",
+      comingSoon: true,
     },
   ];
 
@@ -114,7 +118,7 @@ const Integrations = () => {
           const Icon = integration.icon;
 
           return (
-            <Card key={integration.type}>
+            <Card key={integration.type} className={integration.comingSoon ? "opacity-75" : ""}>
               <CardHeader>
                 <div className="flex items-start justify-between">
                   <div className="flex items-center gap-3">
@@ -122,15 +126,23 @@ const Integrations = () => {
                       <Icon className="h-6 w-6 text-primary" />
                     </div>
                     <div>
-                      <CardTitle className="text-lg">{integration.name}</CardTitle>
-                      {status && (
+                      <CardTitle className="text-lg flex items-center gap-2">
+                        {integration.name}
+                        {integration.comingSoon && (
+                          <Badge variant="secondary" className="text-xs flex items-center gap-1">
+                            <Clock className="h-3 w-3" />
+                            Próximamente
+                          </Badge>
+                        )}
+                      </CardTitle>
+                      {status && !integration.comingSoon && (
                         <Badge variant={status.active ? "default" : "secondary"} className="mt-1">
                           {status.active ? "Activo" : "Inactivo"}
                         </Badge>
                       )}
                     </div>
                   </div>
-                  {status && (
+                  {status && !integration.comingSoon && (
                     <Switch
                       checked={status.active}
                       onCheckedChange={(checked) =>
@@ -144,7 +156,12 @@ const Integrations = () => {
                 <CardDescription className="mb-4">
                   {integration.description}
                 </CardDescription>
-                {!status ? (
+                {integration.comingSoon ? (
+                  <Button variant="outline" className="w-full" disabled>
+                    <Clock className="mr-2 h-4 w-4" />
+                    Disponible Pronto
+                  </Button>
+                ) : !status ? (
                   <Button variant="outline" className="w-full">
                     Configurar
                   </Button>

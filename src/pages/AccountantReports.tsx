@@ -9,7 +9,9 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Calendar } from "@/components/ui/calendar";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
-import { Calendar as CalendarIcon, Send, Download, Mail } from "lucide-react";
+import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
+import { Badge } from "@/components/ui/badge";
+import { Calendar as CalendarIcon, Send, Download, Mail, Clock, AlertTriangle } from "lucide-react";
 import { format, startOfMonth, endOfMonth } from "date-fns";
 import { es } from "date-fns/locale";
 import { cn } from "@/lib/utils";
@@ -98,12 +100,29 @@ const AccountantReports = () => {
   return (
     <Layout>
       <div className="container mx-auto p-6 space-y-6">
-        <div>
-          <h1 className="text-3xl font-bold">Reportes para Contador</h1>
-          <p className="text-muted-foreground">
-            Envíe reportes contables mensuales automáticamente a su contador
-          </p>
+        <div className="flex items-center justify-between">
+          <div>
+            <h1 className="text-3xl font-bold flex items-center gap-2">
+              Reportes para Contador
+              <Badge variant="secondary" className="ml-2 flex items-center gap-1">
+                <Clock className="h-3 w-3" />
+                Beta
+              </Badge>
+            </h1>
+            <p className="text-muted-foreground">
+              Envíe reportes contables mensuales automáticamente a su contador
+            </p>
+          </div>
         </div>
+
+        <Alert className="border-amber-500/50 bg-amber-500/10">
+          <AlertTriangle className="h-4 w-4 text-amber-500" />
+          <AlertTitle className="text-amber-600">Funcionalidades Próximas</AlertTitle>
+          <AlertDescription className="text-amber-600/80">
+            Próximamente: programación de envío automático mensual, formatos CITI Ventas/Compras AFIP, 
+            integración con sistemas contables y generación de archivos F.2002.
+          </AlertDescription>
+        </Alert>
 
         <div className="grid gap-6 md:grid-cols-2">
           {/* Configuración de envío */}
