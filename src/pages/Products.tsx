@@ -1101,34 +1101,35 @@ export default function Products() {
   return (
     <Layout>
       <div className="space-y-6">
-        <div className="flex justify-between items-center">
+        <div className="flex flex-col sm:flex-row justify-between gap-4">
           <div>
-            <h1 className="text-3xl font-bold text-foreground">Productos</h1>
-            <p className="text-muted-foreground">Gestiona tu inventario con control de depósitos</p>
+            <h1 className="text-xl sm:text-3xl font-bold text-foreground">Productos</h1>
+            <p className="text-xs sm:text-sm text-muted-foreground">Gestiona tu inventario</p>
           </div>
-          <div className="flex gap-2">
+          <div className="flex flex-wrap gap-2">
             {canEdit && (
               <Button 
                 variant="outline" 
+                size="sm"
                 onClick={() => setIsCurrencyAdjustDialogOpen(true)}
                 className="border-blue-500/50 text-blue-600 hover:bg-blue-50 dark:hover:bg-blue-950"
               >
-                <DollarSign className="mr-2 h-4 w-4" />
-                Ajustar por Cotización
+                <DollarSign className="h-4 w-4 sm:mr-2" />
+                <span className="hidden sm:inline">Ajustar Cotización</span>
               </Button>
             )}
             {canExport && (
-              <Button variant="outline" onClick={handleExportCSV}>
-                <Download className="mr-2 h-4 w-4" />
-                Exportar CSV
+              <Button variant="outline" size="sm" onClick={handleExportCSV}>
+                <Download className="h-4 w-4 sm:mr-2" />
+                <span className="hidden sm:inline">Exportar CSV</span>
               </Button>
             )}
             {canCreate && (
               <Dialog open={isImportDialogOpen} onOpenChange={setIsImportDialogOpen}>
                 <DialogTrigger asChild>
-                  <Button variant="outline">
-                    <Upload className="mr-2 h-4 w-4" />
-                    Importar CSV
+                  <Button variant="outline" size="sm">
+                    <Upload className="h-4 w-4 sm:mr-2" />
+                    <span className="hidden sm:inline">Importar CSV</span>
                   </Button>
                 </DialogTrigger>
               <DialogContent>
@@ -1168,9 +1169,10 @@ export default function Products() {
           {canCreate && (
             <Dialog open={isDialogOpen} onOpenChange={setIsDialogOpen}>
               <DialogTrigger asChild>
-                <Button size="default" className="gap-2">
+                <Button size="sm" className="gap-1 sm:gap-2">
                   <Plus className="h-4 w-4" />
-                  Agregar Producto
+                  <span className="hidden sm:inline">Agregar Producto</span>
+                  <span className="sm:hidden">Agregar</span>
                 </Button>
               </DialogTrigger>
             <DialogContent className="max-w-3xl max-h-[90vh] overflow-y-auto">
@@ -1657,23 +1659,23 @@ export default function Products() {
               />
             </div>
           </CardHeader>
-          <CardContent>
+          <CardContent className="p-2 sm:p-6 overflow-x-auto">
             <Table>
               <TableHeader>
                 <TableRow>
-                  <TableHead className="w-12" onClick={(e) => e.stopPropagation()}>
+                  <TableHead className="w-10 sm:w-12" onClick={(e) => e.stopPropagation()}>
                     <Checkbox
                       checked={products && products.length > 0 && selectedProducts.size === products.length}
                       onCheckedChange={handleSelectAll}
                     />
                   </TableHead>
-                  <TableHead className="w-12"></TableHead>
-                  <TableHead>Nombre</TableHead>
-                  <TableHead>Categoría</TableHead>
-                  <TableHead>Precio</TableHead>
-                  <TableHead>Stock Total</TableHead>
-                  <TableHead>Estado</TableHead>
-                  <TableHead className="text-right">Acciones</TableHead>
+                  <TableHead className="w-8 sm:w-12 hidden sm:table-cell"></TableHead>
+                  <TableHead className="min-w-[120px]">Nombre</TableHead>
+                  <TableHead className="hidden md:table-cell">Categoría</TableHead>
+                  <TableHead className="min-w-[80px]">Precio</TableHead>
+                  <TableHead className="hidden sm:table-cell">Stock</TableHead>
+                  <TableHead className="hidden lg:table-cell">Estado</TableHead>
+                  <TableHead className="text-right min-w-[80px]">Acc.</TableHead>
                 </TableRow>
               </TableHeader>
               <TableBody>
@@ -1690,7 +1692,7 @@ export default function Products() {
                             onCheckedChange={(checked) => handleSelectProduct(product.id, checked as boolean)}
                           />
                         </TableCell>
-                        <TableCell>
+                        <TableCell className="hidden sm:table-cell">
                           <Button
                             variant="ghost"
                             size="icon"
@@ -1705,95 +1707,70 @@ export default function Products() {
                           </Button>
                         </TableCell>
                         <TableCell>
-                          <div className="flex items-center gap-3">
+                          <div className="flex items-center gap-2 sm:gap-3">
                             {product.image_url ? (
                               <img 
                                 src={product.image_url} 
                                 alt={product.name}
-                                className="w-10 h-10 object-cover rounded border"
+                                className="w-8 h-8 sm:w-10 sm:h-10 object-cover rounded border"
                               />
                             ) : (
-                              <div className="w-10 h-10 bg-muted rounded border flex items-center justify-center">
-                                <Package className="h-5 w-5 text-muted-foreground" />
+                              <div className="w-8 h-8 sm:w-10 sm:h-10 bg-muted rounded border flex items-center justify-center">
+                                <Package className="h-4 w-4 sm:h-5 sm:w-5 text-muted-foreground" />
                               </div>
                             )}
-                            <div>
-                              <div className="flex items-center gap-2">
-                                <span className="font-medium">{product.name}</span>
+                            <div className="min-w-0">
+                              <div className="flex items-center gap-1 sm:gap-2">
+                                <span className="font-medium text-xs sm:text-sm truncate">{product.name}</span>
                                 {product.is_combo && (
-                                  <Badge variant="outline" className="text-xs gap-1">
+                                  <Badge variant="outline" className="text-xs gap-1 hidden sm:flex">
                                     <PackageOpen className="h-3 w-3" />
                                     Combo
                                   </Badge>
                                 )}
                               </div>
                               {product.sku && (
-                                <span className="text-xs text-muted-foreground">SKU: {product.sku}</span>
+                                <span className="text-xs text-muted-foreground hidden sm:block">SKU: {product.sku}</span>
                               )}
                             </div>
                           </div>
                         </TableCell>
-                        <TableCell>
-                          <span className="text-muted-foreground">{product.category || "—"}</span>
+                        <TableCell className="hidden md:table-cell">
+                          <span className="text-muted-foreground text-xs sm:text-sm">{product.category || "—"}</span>
                         </TableCell>
                         <TableCell>
-                          <div className="flex flex-col gap-1">
-                            <span className="font-semibold text-green-600 dark:text-green-500">
-                              {(product as any).currency || 'ARS'} ${Number(product.price).toFixed(2)}
+                          <div className="flex flex-col">
+                            <span className="font-semibold text-green-600 dark:text-green-500 text-xs sm:text-sm">
+                              ${Number(product.price).toFixed(0)}
                             </span>
-                            {(product as any).currency && (product as any).currency !== 'ARS' && convertToARS(product.price, (product as any).currency) && (
-                              <span className="text-xs text-muted-foreground">
-                                ≈ ARS ${convertToARS(product.price, (product as any).currency)?.toFixed(2)}
-                              </span>
-                            )}
                           </div>
                         </TableCell>
-                        <TableCell>
-                          <div className="flex items-center gap-2">
-                            <span className={`font-semibold ${
-                              product.stock <= (product.min_stock || 0) 
-                                ? 'text-red-600 dark:text-red-500' 
-                                : product.stock <= (product.min_stock || 0) * 1.5
-                                ? 'text-yellow-600 dark:text-yellow-500'
-                                : 'text-green-600 dark:text-green-500'
-                            }`}>
-                              {product.stock}
-                            </span>
-                            {productWarehouseStock.length > 0 && (
-                              <div className="flex gap-1">
-                                {productWarehouseStock.slice(0, 3).map((ws: any) => (
-                                  <Badge
-                                    key={ws.id}
-                                    variant="outline"
-                                    className="text-xs"
-                                  >
-                                    {ws.warehouses.code}: {ws.stock}
-                                  </Badge>
-                                ))}
-                                {productWarehouseStock.length > 3 && (
-                                  <Badge variant="outline" className="text-xs">
-                                    +{productWarehouseStock.length - 3}
-                                  </Badge>
-                                )}
-                              </div>
-                            )}
-                          </div>
+                        <TableCell className="hidden sm:table-cell">
+                          <span className={`font-semibold text-xs sm:text-sm ${
+                            product.stock <= (product.min_stock || 0) 
+                              ? 'text-red-600 dark:text-red-500' 
+                              : product.stock <= (product.min_stock || 0) * 1.5
+                              ? 'text-yellow-600 dark:text-yellow-500'
+                              : 'text-green-600 dark:text-green-500'
+                          }`}>
+                            {product.stock}
+                          </span>
                         </TableCell>
-                        <TableCell>
+                        <TableCell className="hidden lg:table-cell">
                           {product.stock <= (product.min_stock || 0) ? (
-                            <Badge variant="destructive" className="flex items-center gap-1 w-fit">
+                            <Badge variant="destructive" className="flex items-center gap-1 w-fit text-xs">
                               <AlertCircle className="h-3 w-3" />
-                              Stock Bajo
+                              Bajo
                             </Badge>
                           ) : product.stock <= (product.min_stock || 0) * 1.5 ? (
-                            <Badge variant="secondary" className="flex items-center gap-1 w-fit">
+                            <Badge variant="secondary" className="flex items-center gap-1 w-fit text-xs">
                               <Info className="h-3 w-3" />
-                              Stock Medio
+                              Medio
                             </Badge>
                           ) : (
-                            <Badge variant="default" className="flex items-center gap-1 w-fit bg-green-600 hover:bg-green-700">
+                            <Badge variant="default" className="flex items-center gap-1 w-fit bg-green-600 hover:bg-green-700 text-xs">
                               <CheckCircle2 className="h-3 w-3" />
-                              Disponible
+                              OK
                             </Badge>
                           )}
                         </TableCell>
