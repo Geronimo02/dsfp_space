@@ -44,6 +44,7 @@ import {
 import { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip as RechartsTooltip, ResponsiveContainer, LineChart, Line } from "recharts";
 import { exportToExcel, exportToPDF, formatCurrency, formatDate } from "@/lib/exportUtils";
 import { usePlatformAdmin } from "@/hooks/usePlatformAdmin";
+import { usePlatformAdminRealtime } from "@/hooks/usePlatformAdminRealtime";
 import { useNavigate, Navigate } from "react-router-dom";
 import { PricingConfiguration } from "@/components/settings/PricingConfiguration";
 import { PricingCalculator } from "@/components/settings/PricingCalculator";
@@ -56,6 +57,9 @@ export default function PlatformAdmin() {
   const { isPlatformAdmin, isLoading: adminLoading } = usePlatformAdmin();
   const navigate = useNavigate();
   const queryClient = useQueryClient();
+  
+  // Enable realtime for platform admin to receive new tickets and messages
+  usePlatformAdminRealtime({ enabled: isPlatformAdmin });
   
   // State for filters and dialogs
   const [companySearch, setCompanySearch] = useState("");
