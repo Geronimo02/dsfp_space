@@ -152,27 +152,30 @@ export default function Warehouses() {
   return (
     <Layout>
       <div className="space-y-6 animate-fade-in">
-        <div className="flex justify-between items-center">
+        <div className="flex flex-col sm:flex-row sm:justify-between sm:items-center gap-4">
           <div className="flex items-center gap-3">
-            <Building2 className="h-8 w-8 text-primary" />
-            <h1 className="text-3xl font-bold">Depósitos</h1>
+            <Building2 className="h-6 w-6 md:h-8 md:w-8 text-primary" />
+            <h1 className="text-2xl md:text-3xl font-bold">Depósitos</h1>
           </div>
-          <div className="flex gap-2">
+          <div className="flex flex-wrap gap-2">
             <Button
               onClick={() => navigate("/warehouse-transfers")}
               variant="outline"
-              className="hover:scale-105 transition-transform"
+              size="sm"
+              className="flex-1 sm:flex-none text-xs sm:text-sm"
             >
-              <ArrowLeftRight className="mr-2 h-4 w-4" />
-              Transferencias
+              <ArrowLeftRight className="mr-1 sm:mr-2 h-4 w-4" />
+              <span className="hidden xs:inline">Transferencias</span>
+              <span className="xs:hidden">Transf.</span>
             </Button>
             <Button
               onClick={() => navigate("/warehouse-stock")}
               variant="outline"
-              className="hover:scale-105 transition-transform"
+              size="sm"
+              className="flex-1 sm:flex-none text-xs sm:text-sm"
             >
-              <Package className="mr-2 h-4 w-4" />
-              Stock por Depósito
+              <Package className="mr-1 sm:mr-2 h-4 w-4" />
+              Stock
             </Button>
             <Dialog open={dialogOpen} onOpenChange={setDialogOpen}>
               <TooltipProvider>
@@ -317,22 +320,23 @@ export default function Warehouses() {
           </div>
         </div>
 
-        <Card className="p-6">
+        <Card className="p-2 sm:p-6 overflow-x-auto">
           {isLoading ? (
             <div className="text-center py-8">Cargando...</div>
           ) : (
-            <Table>
-              <TableHeader>
-                <TableRow>
-                  <TableHead>Código</TableHead>
-                  <TableHead>Nombre</TableHead>
-                  <TableHead>Dirección</TableHead>
-                  <TableHead>Encargado</TableHead>
-                  <TableHead>Teléfono</TableHead>
-                  <TableHead>Estado</TableHead>
-                  <TableHead>Acciones</TableHead>
-                </TableRow>
-              </TableHeader>
+            <div className="overflow-x-auto">
+              <Table>
+                <TableHeader>
+                  <TableRow>
+                    <TableHead className="min-w-[100px]">Código</TableHead>
+                    <TableHead className="min-w-[120px]">Nombre</TableHead>
+                    <TableHead className="hidden md:table-cell">Dirección</TableHead>
+                    <TableHead className="hidden lg:table-cell">Encargado</TableHead>
+                    <TableHead className="hidden lg:table-cell">Teléfono</TableHead>
+                    <TableHead>Estado</TableHead>
+                    <TableHead>Acciones</TableHead>
+                  </TableRow>
+                </TableHeader>
               <TableBody>
                 {warehouses?.map((warehouse, index) => (
                   <TableRow key={warehouse.id} className="animate-fade-in" style={{ animationDelay: `${index * 50}ms` }}>
@@ -416,6 +420,7 @@ export default function Warehouses() {
                 ))}
               </TableBody>
             </Table>
+            </div>
           )}
         </Card>
       </div>

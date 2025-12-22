@@ -174,28 +174,28 @@ const AFIPBilling = () => {
 
   return (
     <Layout>
-      <div className="container mx-auto p-6 space-y-6">
+      <div className="space-y-4 md:space-y-6">
         {/* Header */}
-        <div className="flex items-center justify-between">
+        <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3">
           <div className="flex items-center gap-2">
-            <FileText className="h-8 w-8" />
+            <FileText className="h-6 w-6 md:h-8 md:w-8" />
             <div>
-              <h1 className="text-3xl font-bold">Facturación AFIP</h1>
-              <p className="text-sm text-muted-foreground">
-                Ambiente: {afipAmbiente === "testing" ? "Homologación (Testing)" : "Producción"}
+              <h1 className="text-2xl md:text-3xl font-bold">Facturación AFIP</h1>
+              <p className="text-xs md:text-sm text-muted-foreground">
+                {afipAmbiente === "testing" ? "Homologación" : "Producción"}
               </p>
             </div>
           </div>
           {afipAmbiente === "testing" && (
-            <Badge variant="outline" className="text-yellow-600 border-yellow-600">
+            <Badge variant="outline" className="text-yellow-600 border-yellow-600 self-start sm:self-auto">
               <AlertCircle className="h-3 w-3 mr-1" />
-              MODO PRUEBAS
+              PRUEBAS
             </Badge>
           )}
         </div>
 
         {/* Stats Cards */}
-        <div className="grid gap-4 md:grid-cols-5">
+        <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-5 gap-3 md:gap-4">
           <Card>
             <CardHeader className="pb-2">
               <CardDescription>Total Comprobantes</CardDescription>
@@ -295,20 +295,21 @@ const AFIPBilling = () => {
                     <p className="text-sm">Los comprobantes se generan desde el punto de venta</p>
                   </div>
                 ) : (
-                  <Table>
-                    <TableHeader>
-                      <TableRow>
-                        <TableHead>Fecha</TableHead>
-                        <TableHead>Tipo</TableHead>
-                        <TableHead>Número</TableHead>
-                        <TableHead>Cliente</TableHead>
-                        <TableHead className="text-right">Importe</TableHead>
-                        <TableHead>CAE</TableHead>
-                        <TableHead>Vto. CAE</TableHead>
-                        <TableHead>Estado</TableHead>
-                        <TableHead className="text-right">Acciones</TableHead>
-                      </TableRow>
-                    </TableHeader>
+                  <div className="overflow-x-auto">
+                    <Table>
+                      <TableHeader>
+                        <TableRow>
+                          <TableHead className="min-w-[80px]">Fecha</TableHead>
+                          <TableHead className="min-w-[80px]">Tipo</TableHead>
+                          <TableHead className="min-w-[100px]">Número</TableHead>
+                          <TableHead className="hidden sm:table-cell">Cliente</TableHead>
+                          <TableHead className="text-right min-w-[90px]">Importe</TableHead>
+                          <TableHead className="hidden md:table-cell">CAE</TableHead>
+                          <TableHead className="hidden lg:table-cell">Vto. CAE</TableHead>
+                          <TableHead>Estado</TableHead>
+                          <TableHead className="text-right">Acc.</TableHead>
+                        </TableRow>
+                      </TableHeader>
                     <TableBody>
                       {filteredComprobantes.map((comprobante: any) => (
                         <TableRow key={comprobante.id}>
@@ -352,8 +353,9 @@ const AFIPBilling = () => {
                           </TableCell>
                         </TableRow>
                       ))}
-                    </TableBody>
-                  </Table>
+                      </TableBody>
+                    </Table>
+                  </div>
                 )}
               </CardContent>
             </Card>
