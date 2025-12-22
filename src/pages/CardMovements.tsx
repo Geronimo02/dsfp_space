@@ -130,11 +130,11 @@ export default function CardMovements() {
 
   return (
     <Layout>
-      <div className="space-y-6">
-        <div className="flex items-center justify-between">
+      <div className="space-y-4 md:space-y-6">
+        <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3">
           <div>
-            <h1 className="text-3xl font-bold">Movimientos de Tarjetas</h1>
-            <p className="text-muted-foreground">
+            <h1 className="text-2xl md:text-3xl font-bold">Movimientos de Tarjetas</h1>
+            <p className="text-sm text-muted-foreground">
               Seguimiento de acreditaciones y comisiones
             </p>
           </div>
@@ -293,56 +293,56 @@ export default function CardMovements() {
           </AlertDescription>
         </Alert>
 
-        <div className="grid gap-4 md:grid-cols-3">
-          <div className="p-6 bg-card rounded-lg border">
+        <div className="grid gap-3 grid-cols-2 md:grid-cols-3">
+          <div className="p-4 md:p-6 bg-card rounded-lg border">
             <div className="flex items-center gap-2 mb-2">
               <Clock className="h-5 w-5 text-orange-600" />
               <p className="text-sm font-medium text-muted-foreground">
                 Pendientes de Acreditación
               </p>
             </div>
-            <p className="text-2xl font-bold">{pendingMovements.length}</p>
-            <p className="text-sm text-muted-foreground mt-1">
+            <p className="text-xl md:text-2xl font-bold">{pendingMovements.length}</p>
+            <p className="text-xs md:text-sm text-muted-foreground mt-1">
               ${totalPending.toFixed(2)}
             </p>
           </div>
 
-          <div className="p-6 bg-card rounded-lg border">
+          <div className="p-4 md:p-6 bg-card rounded-lg border">
             <div className="flex items-center gap-2 mb-2">
-              <CheckCircle2 className="h-5 w-5 text-green-600" />
-              <p className="text-sm font-medium text-muted-foreground">
+              <CheckCircle2 className="h-4 w-4 md:h-5 md:w-5 text-green-600" />
+              <p className="text-xs md:text-sm font-medium text-muted-foreground">
                 Acreditados
               </p>
             </div>
-            <p className="text-2xl font-bold">{accreditedMovements.length}</p>
+            <p className="text-xl md:text-2xl font-bold">{accreditedMovements.length}</p>
           </div>
 
-          <div className="p-6 bg-card rounded-lg border">
+          <div className="p-4 md:p-6 bg-card rounded-lg border col-span-2 md:col-span-1">
             <div className="flex items-center gap-2 mb-2">
-              <CreditCard className="h-5 w-5 text-red-600" />
-              <p className="text-sm font-medium text-muted-foreground">
+              <CreditCard className="h-4 w-4 md:h-5 md:w-5 text-red-600" />
+              <p className="text-xs md:text-sm font-medium text-muted-foreground">
                 Total Comisiones
               </p>
             </div>
-            <p className="text-2xl font-bold text-red-600">
+            <p className="text-xl md:text-2xl font-bold text-red-600">
               ${totalCommissions.toFixed(2)}
             </p>
           </div>
         </div>
 
-        <div className="border rounded-lg">
+        <div className="border rounded-lg overflow-x-auto">
           <Table>
             <TableHeader>
               <TableRow>
-                <TableHead>Fecha Venta</TableHead>
-                <TableHead>Tarjeta</TableHead>
-                <TableHead>Acreditación</TableHead>
-                <TableHead className="text-right">Monto Bruto</TableHead>
-                <TableHead className="text-right">Comisión</TableHead>
-                <TableHead className="text-right">Monto Neto</TableHead>
-                <TableHead>Cuotas</TableHead>
+                <TableHead className="min-w-[80px]">Fecha</TableHead>
+                <TableHead className="min-w-[90px]">Tarjeta</TableHead>
+                <TableHead className="hidden md:table-cell">Acreditación</TableHead>
+                <TableHead className="text-right min-w-[80px]">Bruto</TableHead>
+                <TableHead className="text-right hidden sm:table-cell">Comisión</TableHead>
+                <TableHead className="text-right min-w-[80px]">Neto</TableHead>
+                <TableHead className="hidden lg:table-cell">Cuotas</TableHead>
                 <TableHead>Estado</TableHead>
-                <TableHead>Acciones</TableHead>
+                <TableHead>Acc.</TableHead>
               </TableRow>
             </TableHeader>
             <TableBody>
@@ -361,39 +361,39 @@ export default function CardMovements() {
               ) : (
                 movements?.map((movement: any) => (
                   <TableRow key={movement.id}>
-                    <TableCell>
-                      {format(new Date(movement.sale_date), "dd/MM/yyyy")}
+                    <TableCell className="text-xs sm:text-sm">
+                      {format(new Date(movement.sale_date), "dd/MM/yy")}
                     </TableCell>
                     <TableCell>
-                      <div className="flex items-center gap-2">
-                        <CreditCard className="h-4 w-4" />
+                      <div className="flex items-center gap-1 sm:gap-2">
+                        <CreditCard className="h-3 w-3 sm:h-4 sm:w-4" />
                         <div>
-                          <div className="font-medium capitalize">
+                          <div className="font-medium capitalize text-xs sm:text-sm">
                             {movement.card_brand}
                           </div>
-                          <div className="text-xs text-muted-foreground">
+                          <div className="text-xs text-muted-foreground hidden sm:block">
                             {movement.card_type === "credit" ? "Crédito" : "Débito"}
                           </div>
                         </div>
                       </div>
                     </TableCell>
-                    <TableCell>
+                    <TableCell className="hidden md:table-cell">
                       {format(new Date(movement.accreditation_date), "dd/MM/yyyy")}
                     </TableCell>
-                    <TableCell className="text-right font-mono">
+                    <TableCell className="text-right font-mono text-xs sm:text-sm">
                       ${movement.gross_amount.toFixed(2)}
                     </TableCell>
-                    <TableCell className="text-right font-mono text-red-600">
+                    <TableCell className="text-right font-mono text-red-600 hidden sm:table-cell text-xs">
                       -{movement.commission_percentage}%
                       <br />
                       <span className="text-xs">
                         (${movement.commission_amount.toFixed(2)})
                       </span>
                     </TableCell>
-                    <TableCell className="text-right font-mono font-bold">
+                    <TableCell className="text-right font-mono font-bold text-xs sm:text-sm">
                       ${movement.net_amount.toFixed(2)}
                     </TableCell>
-                    <TableCell>{movement.installments}x</TableCell>
+                    <TableCell className="hidden lg:table-cell">{movement.installments}x</TableCell>
                     <TableCell>
                       <Badge
                         variant={movement.status === "accredited" ? "default" : "secondary"}

@@ -165,11 +165,11 @@ export default function BankMovements() {
 
   return (
     <Layout>
-      <div className="space-y-6">
-        <div className="flex items-center justify-between">
+      <div className="space-y-4 md:space-y-6">
+        <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3">
           <div>
-            <h1 className="text-3xl font-bold">Movimientos Bancarios</h1>
-            <p className="text-muted-foreground">
+            <h1 className="text-2xl md:text-3xl font-bold">Movimientos Bancarios</h1>
+            <p className="text-sm text-muted-foreground">
               Registra y concilia movimientos bancarios
             </p>
           </div>
@@ -298,18 +298,18 @@ export default function BankMovements() {
           </Dialog>
         </div>
 
-        <div className="border rounded-lg">
+        <div className="border rounded-lg overflow-x-auto">
           <Table>
             <TableHeader>
               <TableRow>
-                <TableHead>Fecha</TableHead>
-                <TableHead>Cuenta</TableHead>
-                <TableHead>Tipo</TableHead>
-                <TableHead>Referencia</TableHead>
-                <TableHead>Descripción</TableHead>
-                <TableHead className="text-right">Monto</TableHead>
-                <TableHead>Estado</TableHead>
-                <TableHead>Acciones</TableHead>
+                <TableHead className="min-w-[90px]">Fecha</TableHead>
+                <TableHead className="min-w-[100px]">Cuenta</TableHead>
+                <TableHead className="min-w-[100px]">Tipo</TableHead>
+                <TableHead className="hidden md:table-cell">Referencia</TableHead>
+                <TableHead className="hidden lg:table-cell">Descripción</TableHead>
+                <TableHead className="text-right min-w-[90px]">Monto</TableHead>
+                <TableHead className="min-w-[80px]">Estado</TableHead>
+                <TableHead>Acc.</TableHead>
               </TableRow>
             </TableHeader>
             <TableBody>
@@ -328,24 +328,24 @@ export default function BankMovements() {
               ) : (
                 movements?.map((movement: any) => (
                   <TableRow key={movement.id}>
-                    <TableCell>
-                      {format(new Date(movement.movement_date), "dd/MM/yyyy HH:mm")}
+                    <TableCell className="text-xs sm:text-sm">
+                      {format(new Date(movement.movement_date), "dd/MM/yy")}
                     </TableCell>
                     <TableCell>
-                      {movement.bank_account?.bank_name}
+                      <span className="text-xs sm:text-sm">{movement.bank_account?.bank_name}</span>
                       <br />
-                      <span className="text-xs text-muted-foreground">
+                      <span className="text-xs text-muted-foreground hidden sm:inline">
                         {movement.bank_account?.account_number}
                       </span>
                     </TableCell>
                     <TableCell>
-                      <div className="flex items-center gap-2">
+                      <div className="flex items-center gap-1 sm:gap-2">
                         {getMovementIcon(movement.movement_type)}
-                        {getMovementTypeLabel(movement.movement_type)}
+                        <span className="text-xs sm:text-sm">{getMovementTypeLabel(movement.movement_type)}</span>
                       </div>
                     </TableCell>
-                    <TableCell>{movement.reference || "-"}</TableCell>
-                    <TableCell className="max-w-xs truncate">
+                    <TableCell className="hidden md:table-cell">{movement.reference || "-"}</TableCell>
+                    <TableCell className="hidden lg:table-cell max-w-xs truncate">
                       {movement.description || "-"}
                     </TableCell>
                     <TableCell className="text-right font-mono">

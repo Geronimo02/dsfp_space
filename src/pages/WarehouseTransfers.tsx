@@ -264,11 +264,11 @@ export default function WarehouseTransfers() {
 
   return (
     <Layout>
-      <div className="space-y-6 animate-fade-in">
-        <div className="flex justify-between items-center">
-          <div className="flex items-center gap-3">
-            <ArrowLeftRight className="h-8 w-8 text-primary" />
-            <h1 className="text-3xl font-bold">Transferencias entre Depósitos</h1>
+      <div className="space-y-4 md:space-y-6 animate-fade-in">
+        <div className="flex flex-col sm:flex-row sm:justify-between sm:items-center gap-3">
+          <div className="flex items-center gap-2 md:gap-3">
+            <ArrowLeftRight className="h-6 w-6 md:h-8 md:w-8 text-primary" />
+            <h1 className="text-2xl md:text-3xl font-bold">Transferencias entre Depósitos</h1>
           </div>
           <Dialog open={dialogOpen} onOpenChange={setDialogOpen}>
             <DialogTrigger asChild>
@@ -390,44 +390,45 @@ export default function WarehouseTransfers() {
           </Dialog>
         </div>
 
-        <Card className="p-6">
+        <Card className="p-2 sm:p-6">
           {isLoading ? (
             <div className="text-center py-8">Cargando...</div>
           ) : (
-            <Table>
-              <TableHeader>
-                <TableRow>
-                  <TableHead>Número</TableHead>
-                  <TableHead>Fecha</TableHead>
-                  <TableHead>Origen</TableHead>
-                  <TableHead>Destino</TableHead>
-                  <TableHead>Solicitado por</TableHead>
-                  <TableHead>Estado</TableHead>
-                  <TableHead>Acciones</TableHead>
-                </TableRow>
-              </TableHeader>
+            <div className="overflow-x-auto">
+              <Table>
+                <TableHeader>
+                  <TableRow>
+                    <TableHead className="min-w-[100px]">Número</TableHead>
+                    <TableHead className="hidden sm:table-cell">Fecha</TableHead>
+                    <TableHead>Origen</TableHead>
+                    <TableHead>Destino</TableHead>
+                    <TableHead className="hidden md:table-cell">Solicitado por</TableHead>
+                    <TableHead>Estado</TableHead>
+                    <TableHead>Acciones</TableHead>
+                  </TableRow>
+                </TableHeader>
               <TableBody>
                 {transfers?.map((transfer, index) => (
                   <TableRow key={transfer.id} className="animate-fade-in" style={{ animationDelay: `${index * 50}ms` }}>
                     <TableCell>
-                      <code className="font-mono text-sm">{transfer.transfer_number}</code>
+                      <code className="font-mono text-xs sm:text-sm">{transfer.transfer_number}</code>
                     </TableCell>
-                    <TableCell>
+                    <TableCell className="hidden sm:table-cell">
                       {format(new Date(transfer.transfer_date), "dd/MM/yyyy HH:mm")}
                     </TableCell>
                     <TableCell>
-                      <Badge variant="outline">{transfer.from_warehouse.code}</Badge>
-                      <div className="text-sm text-muted-foreground mt-1">
+                      <Badge variant="outline" className="text-xs">{transfer.from_warehouse.code}</Badge>
+                      <div className="text-xs text-muted-foreground mt-1 hidden sm:block">
                         {transfer.from_warehouse.name}
                       </div>
                     </TableCell>
                     <TableCell>
-                      <Badge variant="outline">{transfer.to_warehouse.code}</Badge>
-                      <div className="text-sm text-muted-foreground mt-1">
+                      <Badge variant="outline" className="text-xs">{transfer.to_warehouse.code}</Badge>
+                      <div className="text-xs text-muted-foreground mt-1 hidden sm:block">
                         {transfer.to_warehouse.name}
                       </div>
                     </TableCell>
-                    <TableCell>-</TableCell>
+                    <TableCell className="hidden md:table-cell">-</TableCell>
                     <TableCell>{getStatusBadge(transfer.status)}</TableCell>
                     <TableCell>
                       <div className="flex gap-2">
@@ -469,7 +470,8 @@ export default function WarehouseTransfers() {
                   </TableRow>
                 ))}
               </TableBody>
-            </Table>
+              </Table>
+            </div>
           )}
         </Card>
       </div>
