@@ -112,6 +112,22 @@ const Integrations = () => {
           <h1 className="text-2xl md:text-3xl font-bold">Integraciones</h1>
         </div>
 
+        {/* Coming Soon Banner */}
+        <Card className="border-primary/20 bg-primary/5">
+          <CardContent className="flex items-center gap-4 py-4">
+            <div className="p-3 bg-primary/10 rounded-full">
+              <Clock className="h-6 w-6 text-primary" />
+            </div>
+            <div>
+              <h3 className="font-semibold text-lg">Integraciones Próximamente</h3>
+              <p className="text-muted-foreground text-sm">
+                Estamos trabajando para conectar tu sistema con las plataformas más populares. 
+                Pronto podrás sincronizar pedidos, productos e inventario automáticamente.
+              </p>
+            </div>
+          </CardContent>
+        </Card>
+
         <div className="grid gap-4 md:gap-6 sm:grid-cols-2 lg:grid-cols-3">
         {integrationTypes.map((integration) => {
           const status = getIntegrationStatus(integration.type);
