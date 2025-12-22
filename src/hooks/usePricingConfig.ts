@@ -90,10 +90,19 @@ export const useUpdatePricingConfig = () => {
         invoice_volume_tiers: config.invoice_volume_tiers as unknown as any,
       };
       
+      // First get the actual config ID
+      const { data: currentConfig } = await supabase
+        .from('platform_pricing_config')
+        .select('id')
+        .limit(1)
+        .single();
+      
+      if (!currentConfig) throw new Error('No pricing config found');
+      
       const { data, error } = await supabase
         .from('platform_pricing_config')
         .update(updateData)
-        .eq('id', '00000000-0000-0000-0000-000000000001')
+        .eq('id', currentConfig.id)
         .select()
         .single();
 

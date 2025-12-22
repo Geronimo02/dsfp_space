@@ -76,7 +76,7 @@ export default function PlatformAdmin() {
   const [planDialogOpen, setPlanDialogOpen] = useState(false);
   const [editingPlan, setEditingPlan] = useState<any>(null);
   const [isPaymentDialogOpen, setIsPaymentDialogOpen] = useState(false);
-  const [platformSupportStatusFilter, setPlatformSupportStatusFilter] = useState<string>("all");
+  const [platformSupportStatusFilter, setPlatformSupportStatusFilter] = useState<string>("active");
   const [integrationStatusFilter, setIntegrationStatusFilter] = useState<string>("all");
   const [newPayment, setNewPayment] = useState({
     company_id: "",
@@ -1032,61 +1032,85 @@ export default function PlatformAdmin() {
             <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
               {/* Lista de Tickets */}
               <Card className="lg:col-span-1">
-                <CardHeader>
+                <CardHeader className="pb-3">
                   <CardTitle>Tickets de Soporte</CardTitle>
                   <CardDescription>
                     Problemas reportados por empresas
                   </CardDescription>
-                  <div className="mt-4">
-                    <Select value={platformSupportStatusFilter} onValueChange={setPlatformSupportStatusFilter}>
-                      <SelectTrigger className="w-full">
-                        <SelectValue placeholder="Filtrar por estado" />
-                      </SelectTrigger>
-                      <SelectContent>
-                        <SelectItem value="all">Todos</SelectItem>
-                        <SelectItem value="open">Abiertos</SelectItem>
-                        <SelectItem value="in_progress">En Progreso</SelectItem>
-                        <SelectItem value="resolved">Resueltos</SelectItem>
-                        <SelectItem value="closed">Cerrados</SelectItem>
-                      </SelectContent>
-                    </Select>
+                  
+                  {/* Tabs para separar activos de históricos */}
+                  <div className="flex gap-1 mt-4 p-1 bg-muted rounded-lg">
+                    <Button 
+                      variant={platformSupportStatusFilter === 'active' ? 'default' : 'ghost'}
+                      size="sm"
+                      className="flex-1"
+                      onClick={() => setPlatformSupportStatusFilter('active')}
+                    >
+                      🔥 Activos ({platformSupportTickets?.filter((t: any) => 
+                        ['open', 'in_progress', 'pending'].includes(t.status)
+                      ).length || 0})
+                    </Button>
+                    <Button 
+                      variant={platformSupportStatusFilter === 'history' ? 'default' : 'ghost'}
+                      size="sm"
+                      className="flex-1"
+                      onClick={() => setPlatformSupportStatusFilter('history')}
+                    >
+                      📋 Historial ({platformSupportTickets?.filter((t: any) => 
+                        ['resolved', 'closed'].includes(t.status)
+                      ).length || 0})
+                    </Button>
                   </div>
+
+                  {/* Filtro adicional dentro de la pestaña activa */}
+                  {platformSupportStatusFilter === 'active' && (
+                    <div className="flex gap-1 mt-2">
+                      <Badge 
+                        variant="destructive" 
+                        className="cursor-pointer hover:bg-destructive/80"
+                        onClick={() => setPlatformSupportStatusFilter('open')}
+                      >
+                        Abiertos ({platformSupportTickets?.filter((t: any) => t.status === 'open').length || 0})
+                      </Badge>
+                      <Badge 
+                        variant="secondary" 
+                        className="cursor-pointer hover:bg-secondary/80"
+                        onClick={() => setPlatformSupportStatusFilter('in_progress')}
+                      >
+                        En Progreso ({platformSupportTickets?.filter((t: any) => t.status === 'in_progress').length || 0})
+                      </Badge>
+                    </div>
+                  )}
                 </CardHeader>
                 <CardContent>
-                  <div className="grid grid-cols-2 gap-2 mb-4">
-                    <Card className="p-2">
-                      <div className="text-center">
-                        <div className="text-2xl font-bold text-red-600">
-                          {platformSupportTickets?.filter((t: any) => t.status === 'open').length || 0}
-                        </div>
-                        <div className="text-xs text-muted-foreground">Abiertos</div>
+                  {/* Stats rápidos */}
+                  <div className="grid grid-cols-4 gap-1 mb-4">
+                    <div className="text-center p-2 bg-red-500/10 rounded">
+                      <div className="text-lg font-bold text-red-600">
+                        {platformSupportTickets?.filter((t: any) => t.status === 'open').length || 0}
                       </div>
-                    </Card>
-                    <Card className="p-2">
-                      <div className="text-center">
-                        <div className="text-2xl font-bold text-blue-600">
-                          {platformSupportTickets?.filter((t: any) => t.status === 'in_progress').length || 0}
-                        </div>
-                        <div className="text-xs text-muted-foreground">En Progreso</div>
+                      <div className="text-[10px] text-muted-foreground">Abiertos</div>
+                    </div>
+                    <div className="text-center p-2 bg-blue-500/10 rounded">
+                      <div className="text-lg font-bold text-blue-600">
+                        {platformSupportTickets?.filter((t: any) => t.status === 'in_progress').length || 0}
                       </div>
-                    </Card>
-                    <Card className="p-2">
-                      <div className="text-center">
-                        <div className="text-2xl font-bold text-yellow-600">
-                          {platformSupportTickets?.filter((t: any) => t.waiting_for_customer).length || 0}
-                        </div>
-                        <div className="text-xs text-muted-foreground">Esperando</div>
+                      <div className="text-[10px] text-muted-foreground">Progreso</div>
+                    </div>
+                    <div className="text-center p-2 bg-yellow-500/10 rounded">
+                      <div className="text-lg font-bold text-yellow-600">
+                        {platformSupportTickets?.filter((t: any) => t.waiting_for_customer).length || 0}
                       </div>
-                    </Card>
-                    <Card className="p-2">
-                      <div className="text-center">
-                        <div className="text-2xl font-bold text-green-600">
-                          {platformSupportTickets?.filter((t: any) => t.status === 'resolved').length || 0}
-                        </div>
-                        <div className="text-xs text-muted-foreground">Resueltos</div>
+                      <div className="text-[10px] text-muted-foreground">Esperando</div>
+                    </div>
+                    <div className="text-center p-2 bg-green-500/10 rounded">
+                      <div className="text-lg font-bold text-green-600">
+                        {platformSupportTickets?.filter((t: any) => t.status === 'resolved').length || 0}
                       </div>
-                    </Card>
+                      <div className="text-[10px] text-muted-foreground">Resueltos</div>
+                    </div>
                   </div>
+                  
                   {/* SLA Breaches */}
                   {(platformSupportTickets?.filter((t: any) => t.sla_response_breached || t.sla_resolution_breached).length || 0) > 0 && (
                     <div className="p-2 mb-4 bg-destructive/10 border border-destructive/20 rounded-lg">
@@ -1099,12 +1123,32 @@ export default function PlatformAdmin() {
                     </div>
                   )}
 
-                  <div className="space-y-2 max-h-[600px] overflow-y-auto border rounded p-2">
+                  <div className="space-y-2 max-h-[500px] overflow-y-auto border rounded p-2">
                     {platformSupportTickets && platformSupportTickets.length > 0 ? (
                       (() => {
-                        const validFilter = platformSupportStatusFilter === 'all' ? 'all' : platformSupportStatusFilter;
-                        const filtered = platformSupportTickets
-                          .filter((t: any) => validFilter === 'all' || t.status === validFilter);
+                        let filtered = platformSupportTickets;
+                        
+                        // Filtrar según la pestaña seleccionada
+                        if (platformSupportStatusFilter === 'active') {
+                          filtered = filtered.filter((t: any) => ['open', 'in_progress', 'pending'].includes(t.status));
+                        } else if (platformSupportStatusFilter === 'history') {
+                          filtered = filtered.filter((t: any) => ['resolved', 'closed'].includes(t.status));
+                        } else if (platformSupportStatusFilter === 'open') {
+                          filtered = filtered.filter((t: any) => t.status === 'open');
+                        } else if (platformSupportStatusFilter === 'in_progress') {
+                          filtered = filtered.filter((t: any) => t.status === 'in_progress');
+                        } else if (platformSupportStatusFilter !== 'all') {
+                          filtered = filtered.filter((t: any) => t.status === platformSupportStatusFilter);
+                        }
+                        
+                        if (filtered.length === 0) {
+                          return (
+                            <div className="text-center py-8 text-muted-foreground">
+                              <p className="text-sm">No hay tickets en esta categoría</p>
+                            </div>
+                          );
+                        }
+                        
                         return filtered.map((ticket: any) => (
                         <div
                           key={ticket.id}
@@ -1119,11 +1163,12 @@ export default function PlatformAdmin() {
                               <Badge variant={
                                 ticket.status === 'open' ? 'destructive' :
                                 ticket.status === 'in_progress' ? 'secondary' :
+                                ticket.status === 'resolved' ? 'default' :
                                 'outline'
                               } className="text-xs">
                                 {ticket.status === 'open' ? 'Abierto' :
                                  ticket.status === 'in_progress' ? 'En Progreso' :
-                                 ticket.status === 'resolved' ? 'Resuelto' : 'Cerrado'}
+                                 ticket.status === 'resolved' ? '✓ Resuelto' : '✓ Cerrado'}
                               </Badge>
                               {ticket.waiting_for_customer && (
                                 <Badge variant="outline" className="text-xs bg-yellow-500/10 text-yellow-600 border-yellow-500/30">
@@ -1151,6 +1196,51 @@ export default function PlatformAdmin() {
                           </div>
                           <h4 className="font-medium text-sm line-clamp-1">{ticket.subject}</h4>
                           <p className="text-xs text-muted-foreground line-clamp-2 mt-1">{ticket.description}</p>
+                          
+                          {/* Botones de acción rápida */}
+                          {ticket.status !== 'closed' && (
+                            <div className="flex gap-1 mt-2 pt-2 border-t" onClick={(e) => e.stopPropagation()}>
+                              {ticket.status === 'open' && (
+                                <Button 
+                                  variant="outline" 
+                                  size="sm" 
+                                  className="h-6 text-xs flex-1"
+                                  onClick={() => updatePlatformTicketStatusMutation.mutate({
+                                    ticketId: ticket.id,
+                                    status: 'in_progress'
+                                  })}
+                                >
+                                  ▶ Tomar
+                                </Button>
+                              )}
+                              {ticket.status !== 'resolved' && ticket.status !== 'closed' && (
+                                <Button 
+                                  variant="outline" 
+                                  size="sm" 
+                                  className="h-6 text-xs flex-1 text-green-600 hover:text-green-700"
+                                  onClick={() => updatePlatformTicketStatusMutation.mutate({
+                                    ticketId: ticket.id,
+                                    status: 'resolved'
+                                  })}
+                                >
+                                  ✓ Resolver
+                                </Button>
+                              )}
+                              {ticket.status === 'resolved' && (
+                                <Button 
+                                  variant="outline" 
+                                  size="sm" 
+                                  className="h-6 text-xs flex-1"
+                                  onClick={() => updatePlatformTicketStatusMutation.mutate({
+                                    ticketId: ticket.id,
+                                    status: 'closed'
+                                  })}
+                                >
+                                  📁 Archivar
+                                </Button>
+                              )}
+                            </div>
+                          )}
                         </div>
                       ));
                       })()
