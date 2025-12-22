@@ -54,6 +54,7 @@ import CardMovements from "./pages/CardMovements";
 import Retentions from "./pages/Retentions";
 import Integrations from "./pages/Integrations";
 import Payroll from "./pages/Payroll";
+import AFIPBilling from "./pages/AFIPBilling";
 import PlatformAdmin from "./pages/PlatformAdmin";
 import CustomerSupport from "./pages/CustomerSupport";
 import CustomerSupportSettings from "./pages/CustomerSupportSettings";
@@ -269,7 +270,8 @@ const App = () => (
           <Route path="/bulk-operations" element={<ProtectedRoute><ModuleProtectedRoute moduleCode="bulk_operations"><BulkOperations /></ModuleProtectedRoute></ProtectedRoute>} />
           
           {/* AFIP & Facturación */}
-          <Route path="/pos-points" element={<ProtectedRoute><ModuleProtectedRoute moduleCode="afip_pos_points"><POSPoints /></ModuleProtectedRoute></ProtectedRoute>} />
+          <Route path="/afip" element={<ProtectedRoute><ModuleProtectedRoute moduleCode="afip"><AFIPBilling /></ModuleProtectedRoute></ProtectedRoute>} />
+          <Route path="/pos-points" element={<ProtectedRoute><ModuleProtectedRoute moduleCode="pos_afip"><POSPoints /></ModuleProtectedRoute></ProtectedRoute>} />
           
           {/* RRHH */}
           <Route path="/payroll" element={<ProtectedRoute><ModuleProtectedRoute moduleCode="payroll"><Payroll /></ModuleProtectedRoute></ProtectedRoute>} />
