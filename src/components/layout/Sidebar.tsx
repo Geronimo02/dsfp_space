@@ -57,6 +57,7 @@ import { Collapsible, CollapsibleContent, CollapsibleTrigger } from "@/component
 import { Input } from "@/components/ui/input";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
+import { Sidebar as UISidebar } from "@/components/ui/sidebar";
 import { supabase } from "@/integrations/supabase/client";
 import { toast } from "sonner";
 import { AvailableModulesDialog } from "./AvailableModulesDialog";
@@ -701,127 +702,127 @@ export function Sidebar() {
   }, [favorites, navItems]);
 
   return (
-    <div className="flex flex-col h-full border-r bg-gradient-to-b from-sidebar to-sidebar/95">
-      {/* Header */}
-      <div className="p-4 border-b bg-gradient-to-r from-primary/10 to-primary/5">
-        <div className="flex items-center gap-3">
-          <div className="p-2 rounded-lg bg-primary/10">
-            <ShoppingCart className="w-5 h-5 text-primary" />
-          </div>
-          <div>
-            <span className="text-lg font-bold text-foreground">RetailSnap</span>
-            <p className="text-[10px] text-muted-foreground">Sistema POS</p>
-          </div>
-        </div>
-      </div>
-
-      {/* Search Bar */}
-      <div className="p-3 border-b">
-        <div className="relative">
-          <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground" />
-          <Input
-            placeholder="Buscar módulo..."
-            value={searchQuery}
-            onChange={(e) => setSearchQuery(e.target.value)}
-            className="pl-9 h-9 bg-sidebar-accent/50 border-sidebar-accent"
-          />
-        </div>
-      </div>
-
-      {/* Favorites Section */}
-      {favoriteItems.length > 0 && !searchQuery && (
-        <div className="px-3 pt-3 pb-2 border-b">
-          <h3 className="px-3 mb-2 text-xs font-semibold text-muted-foreground uppercase tracking-wider flex items-center gap-2">
-            <Star className="w-3 h-3 fill-yellow-400 text-yellow-400" />
-            Favoritos
-          </h3>
-          <div className="space-y-1">
-            {favoriteItems.map((item) => renderNavItem(item, false, true))}
+    <UISidebar collapsible="offcanvas" className="border-r border-sidebar-border">
+      <div className="flex flex-col h-full bg-gradient-to-b from-sidebar to-sidebar/95">
+        {/* Header */}
+        <div className="p-4 border-b bg-gradient-to-r from-primary/10 to-primary/5">
+          <div className="flex items-center gap-3">
+            <div className="p-2 rounded-lg bg-primary/10">
+              <ShoppingCart className="w-5 h-5 text-primary" />
+            </div>
+            <div>
+              <span className="text-lg font-bold text-foreground">RetailSnap</span>
+              <p className="text-[10px] text-muted-foreground">Sistema POS</p>
+            </div>
           </div>
         </div>
-      )}
 
-      {/* Navigation */}
-      <nav className="flex-1 overflow-y-auto p-3 space-y-6 scrollbar-thin scrollbar-thumb-sidebar-accent scrollbar-track-transparent">
-        {filteredNavItems.map((section) => {
-          if ("section" in section) {
-            const visibleItems = section.items.filter(isNavItemVisible);
-            if (visibleItems.length === 0) return null;
+        {/* Search Bar */}
+        <div className="p-3 border-b">
+          <div className="relative">
+            <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground" />
+            <Input
+              placeholder="Buscar módulo..."
+              value={searchQuery}
+              onChange={(e) => setSearchQuery(e.target.value)}
+              className="pl-9 h-9 bg-sidebar-accent/50 border-sidebar-accent"
+            />
+          </div>
+        </div>
 
-            return (
-              <div key={section.section}>
-                <h3 className="px-3 mb-2 text-xs font-semibold text-muted-foreground uppercase tracking-wider">
-                  {section.section}
-                </h3>
-                <div className="space-y-1">
-                  {section.items.map((item) => renderNavItem(item))}
+        {/* Favorites Section */}
+        {favoriteItems.length > 0 && !searchQuery && (
+          <div className="px-3 pt-3 pb-2 border-b">
+            <h3 className="px-3 mb-2 text-xs font-semibold text-muted-foreground uppercase tracking-wider flex items-center gap-2">
+              <Star className="w-3 h-3 fill-yellow-400 text-yellow-400" />
+              Favoritos
+            </h3>
+            <div className="space-y-1">
+              {favoriteItems.map((item) => renderNavItem(item, false, true))}
+            </div>
+          </div>
+        )}
+
+        {/* Navigation */}
+        <nav className="flex-1 overflow-y-auto p-3 space-y-6">
+          {filteredNavItems.map((section) => {
+            if ("section" in section) {
+              const visibleItems = section.items.filter(isNavItemVisible);
+              if (visibleItems.length === 0) return null;
+
+              return (
+                <div key={section.section}>
+                  <h3 className="px-3 mb-2 text-xs font-semibold text-muted-foreground uppercase tracking-wider">
+                    {section.section}
+                  </h3>
+                  <div className="space-y-1">{section.items.map((item) => renderNavItem(item))}</div>
                 </div>
-              </div>
-            );
-          }
-          return null;
-        })}
-      </nav>
+              );
+            }
+            return null;
+          })}
+        </nav>
 
-      {/* Botón + Funcionalidades - Solo visible si no es platform admin */}
-      {!isPlatformAdmin && (
-        <div className="px-3 pb-2">
-          <Button
-            onClick={() => setShowModulesDialog(true)}
-            variant="outline"
-            className="w-full flex items-center gap-2 px-3 py-2.5 text-sm rounded-lg border-dashed border-primary/50 text-primary hover:bg-primary/5 hover:border-primary transition-all"
+        {/* Botón + Funcionalidades - Solo visible si no es platform admin */}
+        {!isPlatformAdmin && (
+          <div className="px-3 pb-2">
+            <Button
+              onClick={() => setShowModulesDialog(true)}
+              variant="outline"
+              className="w-full flex items-center gap-2 px-3 py-2.5 text-sm rounded-lg border-dashed border-primary/50 text-primary hover:bg-primary/5 hover:border-primary transition-all"
+            >
+              <Plus className="w-4 h-4" />
+              <span className="font-medium">Más Funcionalidades</span>
+            </Button>
+          </div>
+        )}
+
+        {/* AI Assistant - Botón especial al final */}
+        <div className="p-3 border-t bg-gradient-to-r from-sidebar to-sidebar/95 space-y-2">
+          <Link
+            to="/ai-assistant"
+            className="flex items-center gap-3 px-3 py-2.5 text-sm rounded-lg transition-all bg-gradient-to-r from-purple-500 to-pink-500 text-white hover:from-purple-600 hover:to-pink-600 shadow-lg hover:shadow-xl transform hover:scale-[1.02]"
           >
-            <Plus className="w-4 h-4" />
-            <span className="font-medium">Más Funcionalidades</span>
+            <Sparkles className="w-4 h-4" />
+            <span className="font-semibold">Asistente IA</span>
+          </Link>
+
+          <Link to="/platform-support">
+            <Button
+              variant="outline"
+              className="w-full flex items-center gap-3 px-3 py-2.5 text-sm rounded-lg border-blue-500/50 text-blue-600 hover:bg-blue-50 dark:hover:bg-blue-950 transition-all mb-2"
+            >
+              <LifeBuoy className="w-4 h-4" />
+              <span className="font-medium">Soporte</span>
+            </Button>
+          </Link>
+
+          <Button
+            onClick={async () => {
+              const { error } = await supabase.auth.signOut();
+              if (error) {
+                toast.error("Error al cerrar sesión");
+                console.error(error);
+              } else {
+                toast.success("Sesión cerrada correctamente");
+                navigate("/auth");
+              }
+            }}
+            variant="outline"
+            className="w-full flex items-center gap-3 px-3 py-2.5 text-sm rounded-lg border-destructive/50 text-destructive hover:bg-destructive hover:text-destructive-foreground transition-all"
+          >
+            <LogOut className="w-4 h-4" />
+            <span className="font-medium">Cerrar Sesión</span>
           </Button>
         </div>
-      )}
 
-      {/* AI Assistant - Botón especial al final */}
-      <div className="p-3 border-t bg-gradient-to-r from-sidebar to-sidebar/95 space-y-2">
-        <Link
-          to="/ai-assistant"
-          className="flex items-center gap-3 px-3 py-2.5 text-sm rounded-lg transition-all bg-gradient-to-r from-purple-500 to-pink-500 text-white hover:from-purple-600 hover:to-pink-600 shadow-lg hover:shadow-xl transform hover:scale-[1.02]"
-        >
-          <Sparkles className="w-4 h-4" />
-          <span className="font-semibold">Asistente IA</span>
-        </Link>
-        
-        <Link to="/platform-support">
-          <Button
-            variant="outline"
-            className="w-full flex items-center gap-3 px-3 py-2.5 text-sm rounded-lg border-blue-500/50 text-blue-600 hover:bg-blue-50 dark:hover:bg-blue-950 transition-all mb-2"
-          >
-            <LifeBuoy className="w-4 h-4" />
-            <span className="font-medium">Soporte</span>
-          </Button>
-        </Link>
-        
-        <Button
-          onClick={async () => {
-            const { error } = await supabase.auth.signOut();
-            if (error) {
-              toast.error("Error al cerrar sesión");
-              console.error(error);
-            } else {
-              toast.success("Sesión cerrada correctamente");
-              navigate("/auth");
-            }
-          }}
-          variant="outline"
-          className="w-full flex items-center gap-3 px-3 py-2.5 text-sm rounded-lg border-destructive/50 text-destructive hover:bg-destructive hover:text-destructive-foreground transition-all"
-        >
-          <LogOut className="w-4 h-4" />
-          <span className="font-medium">Cerrar Sesión</span>
-        </Button>
+        {/* Dialog de módulos disponibles */}
+        <AvailableModulesDialog
+          open={showModulesDialog}
+          onOpenChange={setShowModulesDialog}
+          activeModules={activeModules.data || []}
+        />
       </div>
-
-      {/* Dialog de módulos disponibles */}
-      <AvailableModulesDialog
-        open={showModulesDialog}
-        onOpenChange={setShowModulesDialog}
-        activeModules={activeModules.data || []}
-      />
-    </div>
+    </UISidebar>
   );
 }
