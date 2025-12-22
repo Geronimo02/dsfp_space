@@ -373,15 +373,13 @@ export default function BulkOperations() {
 
   return (
     <Layout>
-      <div className="space-y-6">
-        <div className="flex justify-between items-center">
-          <div>
-            <h1 className="text-3xl font-bold">Operaciones Masivas</h1>
-            <p className="text-muted-foreground">Ejecuta cambios en múltiples registros y envía comunicaciones masivas</p>
-          </div>
+      <div className="space-y-4 md:space-y-6">
+        <div>
+          <h1 className="text-2xl md:text-3xl font-bold">Operaciones Masivas</h1>
+          <p className="text-sm md:text-base text-muted-foreground">Ejecuta cambios en múltiples registros</p>
         </div>
 
-        <div className="grid gap-6 md:grid-cols-3">
+        <div className="grid grid-cols-2 md:grid-cols-3 gap-3 md:gap-6">
           <Card>
             <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
               <CardTitle className="text-sm font-medium">Operaciones Completadas</CardTitle>
@@ -420,23 +418,23 @@ export default function BulkOperations() {
           </Card>
         </div>
 
-        <Tabs value={activeTab} onValueChange={setActiveTab} className="space-y-6">
-          <TabsList className="grid w-full grid-cols-4">
-            <TabsTrigger value="products" className="flex items-center gap-2">
+        <Tabs value={activeTab} onValueChange={setActiveTab} className="space-y-4 md:space-y-6">
+          <TabsList className="w-full flex flex-wrap h-auto gap-1 p-1">
+            <TabsTrigger value="products" className="flex-1 min-w-[80px] text-xs sm:text-sm flex items-center gap-1 sm:gap-2">
               <Package className="h-4 w-4" />
-              Productos
+              <span className="hidden sm:inline">Productos</span>
             </TabsTrigger>
-            <TabsTrigger value="emails" className="flex items-center gap-2">
+            <TabsTrigger value="emails" className="flex-1 min-w-[80px] text-xs sm:text-sm flex items-center gap-1 sm:gap-2">
               <Mail className="h-4 w-4" />
-              Emails Masivos
+              <span className="hidden sm:inline">Emails</span>
             </TabsTrigger>
-            <TabsTrigger value="messages" className="flex items-center gap-2">
+            <TabsTrigger value="messages" className="flex-1 min-w-[80px] text-xs sm:text-sm flex items-center gap-1 sm:gap-2">
               <MessageSquare className="h-4 w-4" />
-              Mensajes
+              <span className="hidden sm:inline">Mensajes</span>
             </TabsTrigger>
-            <TabsTrigger value="history" className="flex items-center gap-2">
+            <TabsTrigger value="history" className="flex-1 min-w-[80px] text-xs sm:text-sm flex items-center gap-1 sm:gap-2">
               <TrendingUp className="h-4 w-4" />
-              Historial
+              <span className="hidden sm:inline">Historial</span>
             </TabsTrigger>
           </TabsList>
 

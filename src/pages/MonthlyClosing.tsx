@@ -518,12 +518,12 @@ const MonthlyClosing = () => {
 
   return (
     <Layout>
-      <div className="space-y-6">
-        <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
+      <div className="space-y-4 md:space-y-6">
+        <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3">
           <div>
-            <h1 className="text-3xl font-bold">Cierre Mensual</h1>
-            <p className="text-muted-foreground">
-              Proceso guiado para el cierre contable del mes
+            <h1 className="text-2xl md:text-3xl font-bold">Cierre Mensual</h1>
+            <p className="text-sm md:text-base text-muted-foreground">
+              Proceso de cierre contable
             </p>
           </div>
 

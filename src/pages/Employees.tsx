@@ -200,28 +200,26 @@ const Employees = () => {
   return (
     <Layout>
       <div className="container mx-auto p-6">
-        <div className="flex items-center justify-between mb-6">
-          <div className="flex items-center gap-2">
-            <Users className="h-8 w-8" />
-            <h1 className="text-3xl font-bold">Empleados</h1>
-          </div>
+        <div className="flex items-center gap-2 mb-4 md:mb-6">
+          <Users className="h-6 w-6 md:h-8 md:w-8" />
+          <h1 className="text-2xl md:text-3xl font-bold">Empleados</h1>
         </div>
 
-        <Tabs defaultValue="list" className="space-y-6">
-          <TabsList>
-            <TabsTrigger value="list">
-              <Users className="mr-2 h-4 w-4" />
-              Lista de Empleados
+        <Tabs defaultValue="list" className="space-y-4 md:space-y-6">
+          <TabsList className="w-full flex flex-wrap h-auto gap-1 p-1">
+            <TabsTrigger value="list" className="flex-1 min-w-[100px] text-xs sm:text-sm">
+              <Users className="mr-1 sm:mr-2 h-4 w-4" />
+              <span className="hidden sm:inline">Lista</span>
             </TabsTrigger>
             {isAdmin && (
               <>
-                <TabsTrigger value="roles">
-                  <UserCog className="mr-2 h-4 w-4" />
-                  Asignación de Roles
+                <TabsTrigger value="roles" className="flex-1 min-w-[80px] text-xs sm:text-sm">
+                  <UserCog className="mr-1 sm:mr-2 h-4 w-4" />
+                  <span className="hidden sm:inline">Roles</span>
                 </TabsTrigger>
-                <TabsTrigger value="permissions">
-                  <Shield className="mr-2 h-4 w-4" />
-                  Permisos por Rol
+                <TabsTrigger value="permissions" className="flex-1 min-w-[80px] text-xs sm:text-sm">
+                  <Shield className="mr-1 sm:mr-2 h-4 w-4" />
+                  <span className="hidden sm:inline">Permisos</span>
                 </TabsTrigger>
               </>
             )}
@@ -394,17 +392,17 @@ const Employees = () => {
                   )}
                 </div>
               </CardHeader>
-              <CardContent>
+              <CardContent className="overflow-x-auto p-2 sm:p-6">
                 {employees && employees.length > 0 ? (
                   <Table>
                     <TableHeader>
                       <TableRow>
-                        <TableHead>Nombre</TableHead>
-                        <TableHead>Documento</TableHead>
-                        <TableHead>Posición</TableHead>
-                        <TableHead>Departamento</TableHead>
-                        <TableHead>Fecha Ingreso</TableHead>
-                        <TableHead>Salario Base</TableHead>
+                        <TableHead className="min-w-[120px]">Nombre</TableHead>
+                        <TableHead className="hidden sm:table-cell">Documento</TableHead>
+                        <TableHead className="hidden md:table-cell">Posición</TableHead>
+                        <TableHead className="hidden lg:table-cell">Departamento</TableHead>
+                        <TableHead className="hidden lg:table-cell">Ingreso</TableHead>
+                        <TableHead className="hidden md:table-cell">Salario</TableHead>
                         <TableHead>Estado</TableHead>
                         <TableHead>Acciones</TableHead>
                       </TableRow>

@@ -43,6 +43,7 @@ const settingsSchema = z.object({
   low_stock_alert: z.boolean(),
 });
 
+// Settings page with mobile responsive design
 export default function Settings() {
   const queryClient = useQueryClient();
   const { currentCompany } = useCompany();

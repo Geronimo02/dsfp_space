@@ -106,13 +106,13 @@ const Integrations = () => {
 
   return (
     <Layout>
-      <div className="container mx-auto p-6">
-        <div className="flex items-center gap-2 mb-6">
-          <Settings className="h-8 w-8" />
-          <h1 className="text-3xl font-bold">Integraciones</h1>
+      <div className="space-y-4 md:space-y-6">
+        <div className="flex items-center gap-2">
+          <Settings className="h-6 w-6 md:h-8 md:w-8" />
+          <h1 className="text-2xl md:text-3xl font-bold">Integraciones</h1>
         </div>
 
-      <div className="grid gap-6 md:grid-cols-2 lg:grid-cols-3">
+        <div className="grid gap-4 md:gap-6 sm:grid-cols-2 lg:grid-cols-3">
         {integrationTypes.map((integration) => {
           const status = getIntegrationStatus(integration.type);
           const Icon = integration.icon;
