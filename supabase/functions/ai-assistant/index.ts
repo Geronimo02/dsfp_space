@@ -366,13 +366,12 @@ Responde en español de forma profesional pero accesible.`;
         'Content-Type': 'application/json',
       },
       body: JSON.stringify({
-        model: 'gpt-4o-mini',
+        model: 'gpt-5-mini-2025-08-07',
         messages: [
           { role: 'system', content: systemPrompt },
           { role: 'user', content: `${dataContext}\n\n---\n\nConsulta del usuario: ${query}` }
         ],
-        max_tokens: 2000,
-        temperature: 0.7,
+        max_completion_tokens: 2000,
       }),
     });
 
