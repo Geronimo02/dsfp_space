@@ -194,11 +194,11 @@ export default function Promotions() {
 
   return (
     <Layout>
-      <div className="space-y-6">
-        <div className="flex justify-between items-center">
+      <div className="space-y-4 md:space-y-6">
+        <div className="flex flex-col sm:flex-row sm:justify-between sm:items-center gap-3">
           <div>
-            <h1 className="text-3xl font-bold text-foreground">Promociones y Descuentos</h1>
-            <p className="text-muted-foreground">Gestión de cupones y ofertas</p>
+            <h1 className="text-2xl md:text-3xl font-bold text-foreground">Promociones y Descuentos</h1>
+            <p className="text-sm text-muted-foreground">Gestión de cupones y ofertas</p>
           </div>
           {canCreate && (
             <Dialog open={isDialogOpen} onOpenChange={(open) => {
@@ -368,45 +368,45 @@ export default function Promotions() {
               />
             </div>
           </CardHeader>
-          <CardContent>
+          <CardContent className="p-2 sm:p-6 overflow-x-auto">
             <Table>
               <TableHeader>
                 <TableRow>
-                  <TableHead>Código</TableHead>
-                  <TableHead>Nombre</TableHead>
+                  <TableHead className="min-w-[80px]">Código</TableHead>
+                  <TableHead className="hidden sm:table-cell">Nombre</TableHead>
                   <TableHead>Tipo</TableHead>
                   <TableHead>Valor</TableHead>
-                  <TableHead>Usos</TableHead>
-                  <TableHead>Válido Hasta</TableHead>
+                  <TableHead className="hidden md:table-cell">Usos</TableHead>
+                  <TableHead className="hidden lg:table-cell">Válido Hasta</TableHead>
                   <TableHead>Estado</TableHead>
-                  <TableHead className="text-right">Acciones</TableHead>
+                  <TableHead className="text-right">Acc.</TableHead>
                 </TableRow>
               </TableHeader>
               <TableBody>
                 {promotions?.map((promo) => (
                   <TableRow key={promo.id}>
-                    <TableCell className="font-mono font-bold">{promo.code}</TableCell>
-                    <TableCell>{promo.name}</TableCell>
+                    <TableCell className="font-mono font-bold text-xs sm:text-sm">{promo.code}</TableCell>
+                    <TableCell className="hidden sm:table-cell">{promo.name}</TableCell>
                     <TableCell>
-                      <Badge variant="outline" className="gap-1">
+                      <Badge variant="outline" className="gap-1 text-xs">
                         {getTypeIcon(promo.type)}
-                        {getTypeLabel(promo.type)}
+                        <span className="hidden sm:inline">{getTypeLabel(promo.type)}</span>
                       </Badge>
                     </TableCell>
-                    <TableCell className="font-semibold text-primary">
+                    <TableCell className="font-semibold text-primary text-xs sm:text-sm">
                       {promo.type === "percentage" ? `${promo.value}%` : `$${promo.value}`}
                     </TableCell>
-                    <TableCell>
+                    <TableCell className="hidden md:table-cell">
                       {promo.current_uses}/{promo.max_uses || "∞"}
                     </TableCell>
-                    <TableCell>
+                    <TableCell className="hidden lg:table-cell">
                       {promo.end_date 
                         ? format(new Date(promo.end_date), "dd/MM/yyyy", { locale: es })
                         : "Sin límite"
                       }
                     </TableCell>
                     <TableCell>
-                      <Badge variant={promo.active ? "default" : "secondary"}>
+                      <Badge variant={promo.active ? "default" : "secondary"} className="text-xs">
                         {promo.active ? "Activa" : "Inactiva"}
                       </Badge>
                     </TableCell>

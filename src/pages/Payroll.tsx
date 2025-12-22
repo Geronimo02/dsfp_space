@@ -317,9 +317,9 @@ const Payroll = () => {
 
         {/* Tabs for Liquidations and Configuration */}
         <Tabs value={activeTab} onValueChange={setActiveTab}>
-          <TabsList>
-            <TabsTrigger value="liquidations">Liquidaciones</TabsTrigger>
-            {isAdmin && <TabsTrigger value="config">Configuración</TabsTrigger>}
+          <TabsList className="w-full flex flex-wrap h-auto gap-1 p-1">
+            <TabsTrigger value="liquidations" className="flex-1 text-xs sm:text-sm">Liquidaciones</TabsTrigger>
+            {isAdmin && <TabsTrigger value="config" className="flex-1 text-xs sm:text-sm">Configuración</TabsTrigger>}
           </TabsList>
           
           <TabsContent value="liquidations" className="space-y-6">
@@ -412,30 +412,30 @@ const Payroll = () => {
               Todas las liquidaciones de sueldo generadas
             </CardDescription>
           </CardHeader>
-          <CardContent>
+          <CardContent className="p-2 sm:p-6 overflow-x-auto">
             {liquidations && liquidations.length > 0 ? (
               <Table>
                 <TableHeader>
                   <TableRow>
-                    <TableHead>Empleado</TableHead>
-                    <TableHead>Período</TableHead>
-                    <TableHead className="text-right">Bruto</TableHead>
-                    <TableHead className="text-right">Deducciones</TableHead>
-                    <TableHead className="text-right">Neto</TableHead>
+                    <TableHead className="min-w-[120px]">Empleado</TableHead>
+                    <TableHead className="min-w-[100px]">Período</TableHead>
+                    <TableHead className="text-right hidden sm:table-cell">Bruto</TableHead>
+                    <TableHead className="text-right hidden md:table-cell">Deducciones</TableHead>
+                    <TableHead className="text-right min-w-[90px]">Neto</TableHead>
                     <TableHead>Estado</TableHead>
-                    <TableHead className="text-right">Acciones</TableHead>
+                    <TableHead className="text-right">Acc.</TableHead>
                   </TableRow>
                 </TableHeader>
                 <TableBody>
                   {liquidations.map((liquidation: any) => (
                     <TableRow key={liquidation.id}>
-                      <TableCell className="font-medium">
+                      <TableCell className="font-medium text-xs sm:text-sm">
                         {liquidation.employees?.first_name} {liquidation.employees?.last_name}
                       </TableCell>
-                      <TableCell>
-                        {months.find(m => m.value === String(liquidation.period_month))?.label} {liquidation.period_year}
+                      <TableCell className="text-xs sm:text-sm">
+                        {months.find(m => m.value === String(liquidation.period_month))?.label?.substring(0, 3)} {liquidation.period_year}
                       </TableCell>
-                      <TableCell className="text-right">
+                      <TableCell className="text-right hidden sm:table-cell">
                         ${liquidation.total_remunerative.toLocaleString()}
                       </TableCell>
                       <TableCell className="text-right text-destructive">

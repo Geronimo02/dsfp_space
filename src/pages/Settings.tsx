@@ -625,19 +625,21 @@ export default function Settings() {
 
   return (
     <Layout>
-      <div className="space-y-6">
+      <div className="space-y-4 md:space-y-6">
         <div>
-          <h1 className="text-3xl font-bold text-foreground">Configuración del Sistema</h1>
-          <p className="text-muted-foreground">Administra todos los ajustes globales del sistema</p>
+          <h1 className="text-2xl md:text-3xl font-bold text-foreground">Configuración del Sistema</h1>
+          <p className="text-sm text-muted-foreground">Administra todos los ajustes globales del sistema</p>
         </div>
 
         <Tabs defaultValue="company" className="w-full">
-          <TabsList className="grid w-full grid-cols-4">
-            <TabsTrigger value="company">Empresa</TabsTrigger>
-            <TabsTrigger value="price-lists">Listas de Precios</TabsTrigger>
-            <TabsTrigger value="ticket-design">Diseño de Tickets</TabsTrigger>
-            <TabsTrigger value="security">Seguridad</TabsTrigger>
-          </TabsList>
+          <div className="overflow-x-auto -mx-4 px-4">
+            <TabsList className="inline-flex w-auto min-w-full md:grid md:w-full md:grid-cols-4">
+              <TabsTrigger value="company" className="text-xs sm:text-sm">Empresa</TabsTrigger>
+              <TabsTrigger value="price-lists" className="text-xs sm:text-sm">Precios</TabsTrigger>
+              <TabsTrigger value="ticket-design" className="text-xs sm:text-sm">Tickets</TabsTrigger>
+              <TabsTrigger value="security" className="text-xs sm:text-sm">Seguridad</TabsTrigger>
+            </TabsList>
+          </div>
 
           {/* Company */}
           <TabsContent value="company">
