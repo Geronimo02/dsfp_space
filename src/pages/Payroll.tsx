@@ -21,6 +21,7 @@ import { ContributionRatesManager } from "@/components/payroll/ContributionRates
 
 const Payroll = () => {
   const { currentCompany } = useCompany();
+  const { hasPermission, isAdmin, loading: permissionsLoading } = usePermissions();
   const queryClient = useQueryClient();
   const [dialogOpen, setDialogOpen] = useState(false);
   const [selectedEmployee, setSelectedEmployee] = useState("");
@@ -28,6 +29,10 @@ const Payroll = () => {
   const [selectedYear, setSelectedYear] = useState("");
   const [showCalculator, setShowCalculator] = useState(false);
   const [calculatorSalary, setCalculatorSalary] = useState<number>(0);
+  const [activeTab, setActiveTab] = useState("liquidations");
+
+  const canCreate = hasPermission("employees", "create");
+  const canEdit = hasPermission("employees", "edit");
 
   const { data: liquidations, isLoading } = useQuery({
     queryKey: ["payroll_liquidations", currentCompany?.id],
@@ -233,128 +238,138 @@ const Payroll = () => {
               <Calculator className="mr-2 h-4 w-4" />
               Simulador
             </Button>
-            <Dialog open={dialogOpen} onOpenChange={setDialogOpen}>
-              <DialogTrigger asChild>
-                <Button>
-                  <Plus className="mr-2 h-4 w-4" />
-                  Nueva Liquidación
-                </Button>
-              </DialogTrigger>
-              <DialogContent>
-                <DialogHeader>
-                  <DialogTitle>Crear Nueva Liquidación</DialogTitle>
-                </DialogHeader>
-                <div className="space-y-4 py-4">
-                  <div className="space-y-2">
-                    <Label>Empleado</Label>
-                    <Select value={selectedEmployee} onValueChange={setSelectedEmployee}>
-                      <SelectTrigger>
-                        <SelectValue placeholder="Seleccionar empleado" />
-                      </SelectTrigger>
-                      <SelectContent>
-                        {employees?.map((emp) => (
-                          <SelectItem key={emp.id} value={emp.id}>
-                            {emp.first_name} {emp.last_name} - ${emp.base_salary?.toLocaleString()}
-                          </SelectItem>
-                        ))}
-                      </SelectContent>
-                    </Select>
-                  </div>
-
-                  <div className="grid grid-cols-2 gap-4">
-                    <div className="space-y-2">
-                      <Label>Mes</Label>
-                      <Select value={selectedMonth} onValueChange={setSelectedMonth}>
-                        <SelectTrigger>
-                          <SelectValue placeholder="Mes" />
-                        </SelectTrigger>
-                        <SelectContent>
-                          {months.map((month) => (
-                            <SelectItem key={month.value} value={month.value}>
-                              {month.label}
-                            </SelectItem>
-                          ))}
-                        </SelectContent>
-                      </Select>
-                    </div>
-
-                    <div className="space-y-2">
-                      <Label>Año</Label>
-                      <Select value={selectedYear} onValueChange={setSelectedYear}>
-                        <SelectTrigger>
-                          <SelectValue placeholder="Año" />
-                        </SelectTrigger>
-                        <SelectContent>
-                          {years.map((year) => (
-                            <SelectItem key={year} value={year.toString()}>
-                              {year}
-                            </SelectItem>
-                          ))}
-                        </SelectContent>
-                      </Select>
-                    </div>
-                  </div>
-
-                  <Button 
-                    onClick={() => createMutation.mutate()} 
-                    disabled={!selectedEmployee || !selectedMonth || !selectedYear || createMutation.isPending}
-                    className="w-full"
-                  >
-                    {createMutation.isPending ? "Calculando..." : "Crear y Calcular Liquidación"}
+            {canCreate && (
+              <Dialog open={dialogOpen} onOpenChange={setDialogOpen}>
+                <DialogTrigger asChild>
+                  <Button>
+                    <Plus className="mr-2 h-4 w-4" />
+                    Nueva Liquidación
                   </Button>
-                </div>
-              </DialogContent>
-            </Dialog>
+                </DialogTrigger>
+                <DialogContent>
+                  <DialogHeader>
+                    <DialogTitle>Crear Nueva Liquidación</DialogTitle>
+                  </DialogHeader>
+                  <div className="space-y-4 py-4">
+                    <div className="space-y-2">
+                      <Label>Empleado</Label>
+                      <Select value={selectedEmployee} onValueChange={setSelectedEmployee}>
+                        <SelectTrigger>
+                          <SelectValue placeholder="Seleccionar empleado" />
+                        </SelectTrigger>
+                        <SelectContent>
+                          {employees?.map((emp) => (
+                            <SelectItem key={emp.id} value={emp.id}>
+                              {emp.first_name} {emp.last_name} - ${emp.base_salary?.toLocaleString()}
+                            </SelectItem>
+                          ))}
+                        </SelectContent>
+                      </Select>
+                    </div>
+
+                    <div className="grid grid-cols-2 gap-4">
+                      <div className="space-y-2">
+                        <Label>Mes</Label>
+                        <Select value={selectedMonth} onValueChange={setSelectedMonth}>
+                          <SelectTrigger>
+                            <SelectValue placeholder="Mes" />
+                          </SelectTrigger>
+                          <SelectContent>
+                            {months.map((month) => (
+                              <SelectItem key={month.value} value={month.value}>
+                                {month.label}
+                              </SelectItem>
+                            ))}
+                          </SelectContent>
+                        </Select>
+                      </div>
+
+                      <div className="space-y-2">
+                        <Label>Año</Label>
+                        <Select value={selectedYear} onValueChange={setSelectedYear}>
+                          <SelectTrigger>
+                            <SelectValue placeholder="Año" />
+                          </SelectTrigger>
+                          <SelectContent>
+                            {years.map((year) => (
+                              <SelectItem key={year} value={year.toString()}>
+                                {year}
+                              </SelectItem>
+                            ))}
+                          </SelectContent>
+                        </Select>
+                      </div>
+                    </div>
+
+                    <Button 
+                      onClick={() => createMutation.mutate()} 
+                      disabled={!selectedEmployee || !selectedMonth || !selectedYear || createMutation.isPending}
+                      className="w-full"
+                    >
+                      {createMutation.isPending ? "Calculando..." : "Crear y Calcular Liquidación"}
+                    </Button>
+                  </div>
+                </DialogContent>
+              </Dialog>
+            )}
           </div>
         </div>
 
-        {/* Stats Cards */}
-        <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
-          <Card>
-            <CardContent className="pt-6">
-              <div className="flex items-center justify-between">
-                <div>
-                  <p className="text-sm text-muted-foreground">Por Aprobar</p>
-                  <p className="text-2xl font-bold">{totalPending}</p>
-                </div>
-                <Clock className="h-8 w-8 text-amber-500" />
-              </div>
-            </CardContent>
-          </Card>
-          <Card>
-            <CardContent className="pt-6">
-              <div className="flex items-center justify-between">
-                <div>
-                  <p className="text-sm text-muted-foreground">Aprobadas</p>
-                  <p className="text-2xl font-bold">{totalApproved}</p>
-                </div>
-                <CheckCircle className="h-8 w-8 text-blue-500" />
-              </div>
-            </CardContent>
-          </Card>
-          <Card>
-            <CardContent className="pt-6">
-              <div className="flex items-center justify-between">
-                <div>
-                  <p className="text-sm text-muted-foreground">Pagadas</p>
-                  <p className="text-2xl font-bold">{totalPaid}</p>
-                </div>
-                <DollarSign className="h-8 w-8 text-green-500" />
-              </div>
-            </CardContent>
-          </Card>
-          <Card>
-            <CardContent className="pt-6">
-              <div className="flex items-center justify-between">
-                <div>
-                  <p className="text-sm text-muted-foreground">Total Pagado</p>
-                  <p className="text-2xl font-bold">${totalAmount.toLocaleString()}</p>
-                </div>
-                <Users className="h-8 w-8 text-primary" />
-              </div>
-            </CardContent>
-          </Card>
-        </div>
+        {/* Tabs for Liquidations and Configuration */}
+        <Tabs value={activeTab} onValueChange={setActiveTab}>
+          <TabsList>
+            <TabsTrigger value="liquidations">Liquidaciones</TabsTrigger>
+            {isAdmin && <TabsTrigger value="config">Configuración</TabsTrigger>}
+          </TabsList>
+          
+          <TabsContent value="liquidations" className="space-y-6">
+            {/* Stats Cards */}
+            <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
+              <Card>
+                <CardContent className="pt-6">
+                  <div className="flex items-center justify-between">
+                    <div>
+                      <p className="text-sm text-muted-foreground">Por Aprobar</p>
+                      <p className="text-2xl font-bold">{totalPending}</p>
+                    </div>
+                    <Clock className="h-8 w-8 text-amber-500" />
+                  </div>
+                </CardContent>
+              </Card>
+              <Card>
+                <CardContent className="pt-6">
+                  <div className="flex items-center justify-between">
+                    <div>
+                      <p className="text-sm text-muted-foreground">Aprobadas</p>
+                      <p className="text-2xl font-bold">{totalApproved}</p>
+                    </div>
+                    <CheckCircle className="h-8 w-8 text-blue-500" />
+                  </div>
+                </CardContent>
+              </Card>
+              <Card>
+                <CardContent className="pt-6">
+                  <div className="flex items-center justify-between">
+                    <div>
+                      <p className="text-sm text-muted-foreground">Pagadas</p>
+                      <p className="text-2xl font-bold">{totalPaid}</p>
+                    </div>
+                    <DollarSign className="h-8 w-8 text-green-500" />
+                  </div>
+                </CardContent>
+              </Card>
+              <Card>
+                <CardContent className="pt-6">
+                  <div className="flex items-center justify-between">
+                    <div>
+                      <p className="text-sm text-muted-foreground">Total Pagado</p>
+                      <p className="text-2xl font-bold">${totalAmount.toLocaleString()}</p>
+                    </div>
+                    <Users className="h-8 w-8 text-primary" />
+                  </div>
+                </CardContent>
+              </Card>
+            </div>
 
         {/* Calculator */}
         {showCalculator && (
@@ -483,6 +498,16 @@ const Payroll = () => {
             )}
           </CardContent>
         </Card>
+          </TabsContent>
+          
+          {isAdmin && (
+            <TabsContent value="config" className="space-y-6">
+              {currentCompany && (
+                <ContributionRatesManager companyId={currentCompany.id} />
+              )}
+            </TabsContent>
+          )}
+        </Tabs>
       </div>
     </Layout>
   );

@@ -47,10 +47,15 @@ const initialFormData: EmployeeFormData = {
 
 const Employees = () => {
   const { currentCompany } = useCompany();
+  const { hasPermission, isAdmin, loading: permissionsLoading } = usePermissions();
   const queryClient = useQueryClient();
   const [dialogOpen, setDialogOpen] = useState(false);
   const [editingEmployee, setEditingEmployee] = useState<any>(null);
   const [formData, setFormData] = useState<EmployeeFormData>(initialFormData);
+
+  const canCreate = hasPermission("employees", "create");
+  const canEdit = hasPermission("employees", "edit");
+  const canDelete = hasPermission("employees", "delete");
 
   const { data: employees, isLoading } = useQuery({
     queryKey: ["employees", currentCompany?.id],
@@ -197,13 +202,14 @@ const Employees = () => {
             <Users className="h-8 w-8" />
             <h1 className="text-3xl font-bold">Empleados</h1>
           </div>
-          <Dialog open={dialogOpen} onOpenChange={setDialogOpen}>
-            <DialogTrigger asChild>
-              <Button onClick={handleOpenDialog}>
-                <Plus className="mr-2 h-4 w-4" />
-                Nuevo Empleado
-              </Button>
-            </DialogTrigger>
+          {canCreate && (
+            <Dialog open={dialogOpen} onOpenChange={setDialogOpen}>
+              <DialogTrigger asChild>
+                <Button onClick={handleOpenDialog}>
+                  <Plus className="mr-2 h-4 w-4" />
+                  Nuevo Empleado
+                </Button>
+              </DialogTrigger>
             <DialogContent className="max-w-2xl max-h-[90vh] overflow-y-auto">
               <DialogHeader>
                 <DialogTitle>
@@ -350,6 +356,7 @@ const Employees = () => {
               </div>
             </DialogContent>
           </Dialog>
+          )}
         </div>
 
         <Card>
@@ -398,24 +405,28 @@ const Employees = () => {
                       </TableCell>
                       <TableCell>
                         <div className="flex gap-2">
-                          <Button 
-                            variant="ghost" 
-                            size="sm"
-                            onClick={() => handleEdit(employee)}
-                          >
-                            <Edit className="h-4 w-4" />
-                          </Button>
-                          <Button
-                            variant="ghost"
-                            size="sm"
-                            onClick={() => {
-                              if (confirm("¿Está seguro de eliminar este empleado?")) {
-                                deleteMutation.mutate(employee.id);
-                              }
-                            }}
-                          >
-                            <Trash2 className="h-4 w-4" />
-                          </Button>
+                          {canEdit && (
+                            <Button 
+                              variant="ghost" 
+                              size="sm"
+                              onClick={() => handleEdit(employee)}
+                            >
+                              <Edit className="h-4 w-4" />
+                            </Button>
+                          )}
+                          {canDelete && (
+                            <Button
+                              variant="ghost"
+                              size="sm"
+                              onClick={() => {
+                                if (confirm("¿Está seguro de eliminar este empleado?")) {
+                                  deleteMutation.mutate(employee.id);
+                                }
+                              }}
+                            >
+                              <Trash2 className="h-4 w-4" />
+                            </Button>
+                          )}
                         </div>
                       </TableCell>
                     </TableRow>
