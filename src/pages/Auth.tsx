@@ -5,10 +5,9 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
-import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
-import { AlertDialog, AlertDialogAction, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle } from "@/components/ui/alert-dialog";
+import { AlertDialog, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle } from "@/components/ui/alert-dialog";
 import { toast } from "sonner";
-import { ShoppingCart, Building2 } from "lucide-react";
+import { ShoppingCart } from "lucide-react";
 import { z } from "zod";
 
 const authSchema = z.object({
@@ -18,7 +17,6 @@ const authSchema = z.object({
     .regex(/[A-Z]/, { message: "La contraseña debe contener al menos una mayúscula" })
     .regex(/[a-z]/, { message: "La contraseña debe contener al menos una minúscula" })
     .regex(/[0-9]/, { message: "La contraseña debe contener al menos un número" }),
-  fullName: z.string().trim().min(1, { message: "El nombre es requerido" }).optional(),
 });
 
 export default function Auth() {
@@ -26,8 +24,6 @@ export default function Auth() {
   const [isLoading, setIsLoading] = useState(false);
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
-  const [fullName, setFullName] = useState("");
-  const [showWelcomeModal, setShowWelcomeModal] = useState(false);
   const [showForgotPassword, setShowForgotPassword] = useState(false);
   const [resetEmail, setResetEmail] = useState("");
 
@@ -79,61 +75,7 @@ export default function Auth() {
     }
   };
 
-  const handleSignup = async (e: React.FormEvent) => {
-    e.preventDefault();
-    setIsLoading(true);
-
-    try {
-      authSchema.parse({ email, password, fullName });
-      
-      const redirectUrl = `${window.location.origin}/`;
-      
-      const { error, data } = await supabase.auth.signUp({
-        email,
-        password,
-        options: {
-          emailRedirectTo: redirectUrl,
-          data: {
-            full_name: fullName,
-          },
-        },
-      });
-
-      if (error) throw error;
-      
-      if (data.user) {
-        // Check user metadata to see if they were invited to a company
-        const invitedToCompany = data.user.user_metadata?.invited_to_company;
-        
-        if (invitedToCompany) {
-          // User was invited - they should already have company_users entry
-          // Let CompanyContext handle loading, just redirect
-          toast.success("¡Cuenta confirmada! Redirigiendo...");
-          setTimeout(() => {
-            navigate("/");
-          }, 1000);
-        } else {
-          // New user not invited - needs to create company
-          setShowWelcomeModal(true);
-        }
-      } else {
-        toast.success("¡Cuenta creada! Revisa tu email para confirmar tu cuenta.");
-      }
-    } catch (error: any) {
-      if (error instanceof z.ZodError) {
-        toast.error(error.errors[0].message);
-      } else {
-        toast.error(error.message || "Error al crear cuenta");
-      }
-    } finally {
-      setIsLoading(false);
-    }
-  };
-
-  const handleWelcomeComplete = () => {
-    setShowWelcomeModal(false);
-    navigate("/company-setup");
-  };
+  // Signup is now handled via the dedicated wizard route
 
   const handleForgotPassword = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -163,32 +105,6 @@ export default function Auth() {
 
   return (
     <>
-      <AlertDialog open={showWelcomeModal} onOpenChange={setShowWelcomeModal}>
-        <AlertDialogContent>
-          <AlertDialogHeader>
-            <div className="mx-auto mb-4 w-16 h-16 rounded-full bg-primary/10 flex items-center justify-center">
-              <Building2 className="w-8 h-8 text-primary" />
-            </div>
-            <AlertDialogTitle className="text-2xl text-center">
-              ¡Bienvenido a RetailSnap Pro!
-            </AlertDialogTitle>
-            <AlertDialogDescription className="text-center space-y-2">
-              <p className="text-base">
-                Tu cuenta ha sido creada exitosamente.
-              </p>
-              <p className="text-base">
-                Ahora necesitas configurar tu empresa para comenzar a usar el sistema.
-              </p>
-            </AlertDialogDescription>
-          </AlertDialogHeader>
-          <AlertDialogFooter>
-            <AlertDialogAction onClick={handleWelcomeComplete} className="w-full">
-              Configurar mi empresa
-            </AlertDialogAction>
-          </AlertDialogFooter>
-        </AlertDialogContent>
-      </AlertDialog>
-
       <div className="flex min-h-screen items-center justify-center bg-background p-4">
         <Card className="w-full max-w-md shadow-medium">
         <CardHeader className="space-y-4 text-center">
@@ -201,93 +117,51 @@ export default function Auth() {
           </div>
         </CardHeader>
         <CardContent>
-          <Tabs defaultValue="login" className="w-full">
-            <TabsList className="grid w-full grid-cols-2">
-              <TabsTrigger value="login">Iniciar Sesión</TabsTrigger>
-              <TabsTrigger value="signup">Registrarse</TabsTrigger>
-            </TabsList>
-            
-            <TabsContent value="login">
-              <form onSubmit={handleLogin} className="space-y-4">
-                <div className="space-y-2">
-                  <Label htmlFor="login-email">Email</Label>
-                  <Input
-                    id="login-email"
-                    type="email"
-                    placeholder="tu@email.com"
-                    value={email}
-                    onChange={(e) => setEmail(e.target.value)}
-                    required
-                  />
-                </div>
-                <div className="space-y-2">
-                  <Label htmlFor="login-password">Contraseña</Label>
-                  <Input
-                    id="login-password"
-                    type="password"
-                    placeholder="••••••••"
-                    value={password}
-                    onChange={(e) => setPassword(e.target.value)}
-                    required
-                  />
-                </div>
-                <Button type="submit" className="w-full" disabled={isLoading}>
-                  {isLoading ? "Iniciando sesión..." : "Iniciar Sesión"}
-                </Button>
-                <div className="text-center mt-2">
-                  <Button
-                    type="button"
-                    variant="link"
-                    className="text-sm text-muted-foreground"
-                    onClick={() => setShowForgotPassword(true)}
-                  >
-                    ¿Olvidaste tu contraseña?
-                  </Button>
-                </div>
-              </form>
-            </TabsContent>
-            
-            <TabsContent value="signup">
-              <form onSubmit={handleSignup} className="space-y-4">
-                <div className="space-y-2">
-                  <Label htmlFor="signup-name">Nombre Completo</Label>
-                  <Input
-                    id="signup-name"
-                    type="text"
-                    placeholder="Tu nombre"
-                    value={fullName}
-                    onChange={(e) => setFullName(e.target.value)}
-                    required
-                  />
-                </div>
-                <div className="space-y-2">
-                  <Label htmlFor="signup-email">Email</Label>
-                  <Input
-                    id="signup-email"
-                    type="email"
-                    placeholder="tu@email.com"
-                    value={email}
-                    onChange={(e) => setEmail(e.target.value)}
-                    required
-                  />
-                </div>
-                <div className="space-y-2">
-                  <Label htmlFor="signup-password">Contraseña</Label>
-                  <Input
-                    id="signup-password"
-                    type="password"
-                    placeholder="••••••••"
-                    value={password}
-                    onChange={(e) => setPassword(e.target.value)}
-                    required
-                  />
-                </div>
-                <Button type="submit" className="w-full" disabled={isLoading}>
-                  {isLoading ? "Creando cuenta..." : "Crear Cuenta"}
-                </Button>
-              </form>
-            </TabsContent>
-          </Tabs>
+          <form onSubmit={handleLogin} className="space-y-4">
+            <div className="space-y-2">
+              <Label htmlFor="login-email">Email</Label>
+              <Input
+                id="login-email"
+                type="email"
+                placeholder="tu@email.com"
+                value={email}
+                onChange={(e) => setEmail(e.target.value)}
+                required
+              />
+            </div>
+            <div className="space-y-2">
+              <Label htmlFor="login-password">Contraseña</Label>
+              <Input
+                id="login-password"
+                type="password"
+                placeholder="••••••••"
+                value={password}
+                onChange={(e) => setPassword(e.target.value)}
+                required
+              />
+            </div>
+            <Button type="submit" className="w-full" disabled={isLoading}>
+              {isLoading ? "Iniciando sesión..." : "Iniciar Sesión"}
+            </Button>
+            <div className="flex items-center justify-between mt-2">
+              <Button
+                type="button"
+                variant="link"
+                className="text-sm text-muted-foreground"
+                onClick={() => setShowForgotPassword(true)}
+              >
+                ¿Olvidaste tu contraseña?
+              </Button>
+              <Button
+                type="button"
+                variant="link"
+                className="text-sm"
+                onClick={() => navigate("/signup")}
+              >
+                ¿No tienes cuenta? Regístrate
+              </Button>
+            </div>
+          </form>
         </CardContent>
       </Card>
     </div>
