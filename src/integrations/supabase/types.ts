@@ -5511,6 +5511,8 @@ export type Database = {
         Row: {
           amount_ars: number | null
           amount_usd: number
+          billing_plan_id: string | null
+          company_name: string | null
           created_at: string
           email: string
           full_name: string | null
@@ -5519,14 +5521,18 @@ export type Database = {
           id: string
           modules: Json
           mp_preapproval_id: string | null
+          mp_preapproval_plan_id: string | null
           plan_id: string
           provider: string
           status: string
           stripe_checkout_session_id: string | null
+          trial_days: number | null
         }
         Insert: {
           amount_ars?: number | null
           amount_usd: number
+          billing_plan_id?: string | null
+          company_name?: string | null
           created_at?: string
           email: string
           full_name?: string | null
@@ -5535,14 +5541,18 @@ export type Database = {
           id?: string
           modules?: Json
           mp_preapproval_id?: string | null
+          mp_preapproval_plan_id?: string | null
           plan_id: string
           provider: string
           status: string
           stripe_checkout_session_id?: string | null
+          trial_days?: number | null
         }
         Update: {
           amount_ars?: number | null
           amount_usd?: number
+          billing_plan_id?: string | null
+          company_name?: string | null
           created_at?: string
           email?: string
           full_name?: string | null
@@ -5551,10 +5561,12 @@ export type Database = {
           id?: string
           modules?: Json
           mp_preapproval_id?: string | null
+          mp_preapproval_plan_id?: string | null
           plan_id?: string
           provider?: string
           status?: string
           stripe_checkout_session_id?: string | null
+          trial_days?: number | null
         }
         Relationships: [
           {
