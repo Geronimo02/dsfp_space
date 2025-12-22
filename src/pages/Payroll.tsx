@@ -2,6 +2,7 @@ import { useState } from "react";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
 import { useCompany } from "@/contexts/CompanyContext";
+import { usePermissions } from "@/hooks/usePermissions";
 import { Layout } from "@/components/layout/Layout";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
@@ -16,6 +17,7 @@ import { toast } from "sonner";
 import { DollarSign, Plus, FileText, Calculator, Users, CheckCircle, Clock, Settings } from "lucide-react";
 import { PayrollCalculator } from "@/components/payroll/PayrollCalculator";
 import { PayrollReceiptPDF } from "@/components/payroll/PayrollReceiptPDF";
+import { ContributionRatesManager } from "@/components/payroll/ContributionRatesManager";
 
 const Payroll = () => {
   const { currentCompany } = useCompany();
