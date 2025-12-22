@@ -442,10 +442,10 @@ export default function Dashboard() {
 
   return (
     <Layout>
-      <div className="space-y-8">
+      <div className="space-y-4 md:space-y-8">
         <div>
-          <h1 className="text-3xl font-bold text-foreground">Dashboard</h1>
-          <p className="text-muted-foreground">Panel de control y salud del negocio</p>
+          <h1 className="text-2xl md:text-3xl font-bold text-foreground">Dashboard</h1>
+          <p className="text-sm md:text-base text-muted-foreground">Panel de control y salud del negocio</p>
         </div>
 
         {/* Business Health Panel */}
@@ -454,19 +454,19 @@ export default function Dashboard() {
         )}
 
         {canViewSales && (
-          <div className="grid gap-6 md:grid-cols-2 lg:grid-cols-4">
+          <div className="grid gap-3 md:gap-6 grid-cols-2 lg:grid-cols-4">
             <Card className="shadow-soft hover:shadow-lg transition-all overflow-hidden border-l-4 border-blue-500/30">
-              <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-                <CardTitle className="text-sm font-medium text-muted-foreground">
+              <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-1 md:pb-2 p-3 md:p-6">
+                <CardTitle className="text-xs md:text-sm font-medium text-muted-foreground">
                   Ventas del Mes
                 </CardTitle>
-                <div className="p-2.5 rounded-lg bg-blue-500/10">
-                  <Calendar className="h-5 w-5 text-blue-600 dark:text-blue-500" />
+                <div className="p-1.5 md:p-2.5 rounded-lg bg-blue-500/10">
+                  <Calendar className="h-4 w-4 md:h-5 md:w-5 text-blue-600 dark:text-blue-500" />
                 </div>
               </CardHeader>
-              <CardContent className="space-y-2">
-                <div className="flex items-baseline gap-2">
-                  <div className="text-3xl font-bold text-foreground">
+              <CardContent className="space-y-1 md:space-y-2 p-3 md:p-6 pt-0 md:pt-0">
+                <div className="flex flex-col md:flex-row md:items-baseline gap-1 md:gap-2">
+                  <div className="text-xl md:text-3xl font-bold text-foreground">
                     ${monthlyComparison?.currentMonth.toFixed(0) || "0"}
                   </div>
                   {monthlyComparison && (
@@ -487,78 +487,78 @@ export default function Dashboard() {
                     </Badge>
                   )}
                 </div>
-                <p className="text-xs text-muted-foreground">
+                <p className="text-[10px] md:text-xs text-muted-foreground hidden md:block">
                   vs mes pasado: ${monthlyComparison?.lastMonth.toFixed(0) || "0"}
                 </p>
               </CardContent>
             </Card>
 
             <Card className="shadow-soft hover:shadow-lg transition-all overflow-hidden border-l-4 border-green-500/30">
-              <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-                <CardTitle className="text-sm font-medium text-muted-foreground">
+              <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-1 md:pb-2 p-3 md:p-6">
+                <CardTitle className="text-xs md:text-sm font-medium text-muted-foreground">
                   Margen Bruto
                 </CardTitle>
-                <div className="p-2.5 rounded-lg bg-green-500/10">
-                  <TrendingUp className="h-5 w-5 text-green-600 dark:text-green-500" />
+                <div className="p-1.5 md:p-2.5 rounded-lg bg-green-500/10">
+                  <TrendingUp className="h-4 w-4 md:h-5 md:w-5 text-green-600 dark:text-green-500" />
                 </div>
               </CardHeader>
-              <CardContent className="space-y-2">
-                <div className="flex items-baseline gap-2">
-                  <div className="text-3xl font-bold text-foreground">
+              <CardContent className="space-y-1 md:space-y-2 p-3 md:p-6 pt-0 md:pt-0">
+                <div className="flex flex-col md:flex-row md:items-baseline gap-1 md:gap-2">
+                  <div className="text-xl md:text-3xl font-bold text-foreground">
                     ${monthlyComparison?.grossMargin.toFixed(0) || "0"}
                   </div>
-                  <Badge variant="outline" className="bg-green-500/10 text-green-700 dark:text-green-400 border-green-500/30">
+                  <Badge variant="outline" className="bg-green-500/10 text-green-700 dark:text-green-400 border-green-500/30 text-[10px] md:text-xs w-fit">
                     {monthlyComparison?.marginPercentage.toFixed(1)}%
                   </Badge>
                 </div>
-                <p className="text-xs text-muted-foreground">
+                <p className="text-[10px] md:text-xs text-muted-foreground hidden md:block">
                   Rentabilidad del mes
                 </p>
               </CardContent>
             </Card>
 
             <Card className="shadow-soft hover:shadow-lg transition-all overflow-hidden border-l-4 border-orange-500/30">
-              <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-                <CardTitle className="text-sm font-medium text-muted-foreground">
+              <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-1 md:pb-2 p-3 md:p-6">
+                <CardTitle className="text-xs md:text-sm font-medium text-muted-foreground">
                   Por Cobrar
                 </CardTitle>
-                <div className="p-2.5 rounded-lg bg-orange-500/10">
-                  <DollarSign className="h-5 w-5 text-orange-600 dark:text-orange-500" />
+                <div className="p-1.5 md:p-2.5 rounded-lg bg-orange-500/10">
+                  <DollarSign className="h-4 w-4 md:h-5 md:w-5 text-orange-600 dark:text-orange-500" />
                 </div>
               </CardHeader>
-              <CardContent className="space-y-2">
-                <div className="flex items-baseline gap-2">
-                  <div className="text-3xl font-bold text-foreground">
+              <CardContent className="space-y-1 md:space-y-2 p-3 md:p-6 pt-0 md:pt-0">
+                <div className="flex flex-col md:flex-row md:items-baseline gap-1 md:gap-2">
+                  <div className="text-xl md:text-3xl font-bold text-foreground">
                     ${receivables?.total.toFixed(0) || "0"}
                   </div>
                   {receivables && receivables.overduePercentage > 0 && (
-                    <Badge variant="outline" className="bg-red-500/10 text-red-700 dark:text-red-400 border-red-500/30">
-                      {receivables.overduePercentage.toFixed(0)}% vencido
+                    <Badge variant="outline" className="bg-red-500/10 text-red-700 dark:text-red-400 border-red-500/30 text-[10px] md:text-xs w-fit">
+                      {receivables.overduePercentage.toFixed(0)}% venc.
                     </Badge>
                   )}
                 </div>
-                <p className="text-xs text-muted-foreground">
-                  Vencidas: ${receivables?.overdue.toFixed(0) || "0"} ({receivables?.overdueCount || 0} facturas)
+                <p className="text-[10px] md:text-xs text-muted-foreground hidden md:block">
+                  Vencidas: ${receivables?.overdue.toFixed(0) || "0"} ({receivables?.overdueCount || 0})
                 </p>
               </CardContent>
             </Card>
 
             <Card className="shadow-soft hover:shadow-lg transition-all overflow-hidden border-l-4 border-purple-500/30">
-              <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-                <CardTitle className="text-sm font-medium text-muted-foreground">
-                  Ventas de Hoy
+              <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-1 md:pb-2 p-3 md:p-6">
+                <CardTitle className="text-xs md:text-sm font-medium text-muted-foreground">
+                  Ventas Hoy
                 </CardTitle>
-                <div className="p-2.5 rounded-lg bg-purple-500/10">
-                  <Activity className="h-5 w-5 text-purple-600 dark:text-purple-500" />
+                <div className="p-1.5 md:p-2.5 rounded-lg bg-purple-500/10">
+                  <Activity className="h-4 w-4 md:h-5 md:w-5 text-purple-600 dark:text-purple-500" />
                 </div>
               </CardHeader>
-              <CardContent className="space-y-2">
+              <CardContent className="space-y-1 md:space-y-2 p-3 md:p-6 pt-0 md:pt-0">
                 <div className="flex items-baseline gap-2">
-                  <div className="text-3xl font-bold text-foreground">
+                  <div className="text-xl md:text-3xl font-bold text-foreground">
                     ${salesData?.today.toFixed(0) || "0"}
                   </div>
                 </div>
-                <p className="text-xs text-muted-foreground">
+                <p className="text-[10px] md:text-xs text-muted-foreground hidden md:block">
                   Ingresos del día actual
                 </p>
               </CardContent>
@@ -566,7 +566,7 @@ export default function Dashboard() {
           </div>
         )}
 
-        <div className="grid gap-6 lg:grid-cols-2">
+        <div className="grid gap-4 md:gap-6 lg:grid-cols-2">
           {/* Currency Dashboard Widget */}
           {exchangeRates && exchangeRates.length > 0 && (
             <div className="col-span-full">

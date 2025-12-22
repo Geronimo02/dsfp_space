@@ -1074,100 +1074,96 @@ Impuestos: $${saleData.tax.toFixed(2)}
 
   return (
     <Layout>
-      <div className="container mx-auto p-4 space-y-6">
+      <div className="space-y-4 md:space-y-6">
         {/* Encabezado */}
-        <div className="flex items-center justify-between">
+        <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
           <div>
-            <h1 className="text-3xl font-bold text-foreground">Punto de Venta</h1>
-            <p className="text-muted-foreground">Sistema de gestión de ventas</p>
+            <h1 className="text-2xl md:text-3xl font-bold text-foreground">Punto de Venta</h1>
+            <p className="text-sm text-muted-foreground hidden sm:block">Sistema de gestión de ventas</p>
           </div>
           
-          <div className="flex items-center gap-4">
-            <Badge variant="outline" className="px-3 py-1">
-              <DollarSign className="mr-1 h-4 w-4" />
-              Total: ${total.toFixed(2)}
+          <div className="flex items-center gap-2">
+            <Badge variant="outline" className="px-2 py-1 text-xs md:text-sm">
+              <DollarSign className="mr-1 h-3 w-3 md:h-4 md:w-4" />
+              ${total.toFixed(2)}
             </Badge>
-            <Badge variant={cart.length > 0 ? "default" : "secondary"} className="px-3 py-1">
-              <ShoppingCart className="mr-1 h-4 w-4" />
-              {cart.length} items
+            <Badge variant={cart.length > 0 ? "default" : "secondary"} className="px-2 py-1 text-xs md:text-sm">
+              <ShoppingCart className="mr-1 h-3 w-3 md:h-4 md:w-4" />
+              {cart.length}
             </Badge>
           </div>
         </div>
 
-        {/* Grid principal */}
-        <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
+        {/* Grid principal - En móvil muestra carrito primero */}
+        <div className="grid grid-cols-1 lg:grid-cols-3 gap-4 md:gap-6">
           {/* Panel de productos */}
-          <div className="lg:col-span-2 space-y-4">
+          <div className="lg:col-span-2 space-y-4 order-2 lg:order-1">
             {/* Barra de búsqueda */}
             <div className="relative">
               <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 text-muted-foreground h-4 w-4" />
               <Input
                 ref={searchInputRef}
-                placeholder="Buscar productos por nombre, código o escanear código de barras..."
+                placeholder="Buscar productos..."
                 value={searchQuery}
                 onChange={(e) => setSearchQuery(sanitizeSearchQuery(e.target.value))}
-                className="pl-10"
+                className="pl-10 h-10"
               />
             </div>
 
             {/* Grid de productos */}
             {isLoadingProducts ? (
-              <div className="grid grid-cols-2 md:grid-cols-3 xl:grid-cols-4 gap-4">
+              <div className="grid grid-cols-2 sm:grid-cols-3 xl:grid-cols-4 gap-2 md:gap-4">
                 {[...Array(8)].map((_, i) => (
                   <Card key={i} className="animate-pulse">
-                    <CardHeader className="pb-2">
-                      <div className="h-4 bg-gray-200 rounded w-3/4"></div>
-                      <div className="h-3 bg-gray-200 rounded w-1/2"></div>
+                    <CardHeader className="pb-2 p-2 md:p-4">
+                      <div className="h-4 bg-muted rounded w-3/4"></div>
+                      <div className="h-3 bg-muted rounded w-1/2"></div>
                     </CardHeader>
-                    <CardContent>
-                      <div className="h-6 bg-gray-200 rounded w-full mb-2"></div>
-                      <div className="h-8 bg-gray-200 rounded w-full"></div>
+                    <CardContent className="p-2 md:p-4 pt-0">
+                      <div className="h-6 bg-muted rounded w-full mb-2"></div>
                     </CardContent>
                   </Card>
                 ))}
               </div>
             ) : (
-              <div className="grid grid-cols-2 md:grid-cols-3 xl:grid-cols-4 gap-4">
+              <div className="grid grid-cols-2 sm:grid-cols-3 xl:grid-cols-4 gap-2 md:gap-4">
                 {filteredProducts.map((product) => (
                   <Card 
                     key={product.id} 
-                    className="hover:shadow-md transition-shadow cursor-pointer"
+                    className="hover:shadow-md transition-shadow cursor-pointer active:scale-95"
                     onClick={() => addToCart(product)}
                   >
-                    <CardHeader className="pb-2">
-                      <div className="flex items-center gap-3">
+                    <CardHeader className="pb-1 md:pb-2 p-2 md:p-4">
+                      <div className="flex items-center gap-2">
                         {product.image_url ? (
                           <img 
                             src={product.image_url} 
                             alt={product.name}
-                            className="w-12 h-12 object-cover rounded border"
+                            className="w-8 h-8 md:w-12 md:h-12 object-cover rounded border flex-shrink-0"
                           />
                         ) : (
-                          <div className="w-12 h-12 bg-muted rounded border flex items-center justify-center">
-                            <Package className="h-6 w-6 text-muted-foreground" />
+                          <div className="w-8 h-8 md:w-12 md:h-12 bg-muted rounded border flex items-center justify-center flex-shrink-0">
+                            <Package className="h-4 w-4 md:h-6 md:w-6 text-muted-foreground" />
                           </div>
                         )}
-                        <div>
-                          <CardTitle className="text-sm font-medium truncate">
+                        <div className="min-w-0 flex-1">
+                          <CardTitle className="text-xs md:text-sm font-medium line-clamp-2">
                             {product.name}
                           </CardTitle>
-                          <CardDescription className="text-xs">
-                            Código: {product.sku || product.barcode || "N/A"}
+                          <CardDescription className="text-[10px] md:text-xs hidden sm:block">
+                            {product.sku || product.barcode || "N/A"}
                           </CardDescription>
                         </div>
                       </div>
                     </CardHeader>
-                    <CardContent className="pt-2">
+                    <CardContent className="p-2 md:p-4 pt-0">
                       <div className="flex items-center justify-center gap-1">
-                        <span className="text-xs font-medium text-muted-foreground">
-                          {product.currency || 'ARS'}
-                        </span>
-                        <span className="text-lg font-bold text-primary">
-                          ${product.price.toFixed(2)}
+                        <span className="text-base md:text-lg font-bold text-primary">
+                          ${product.price.toFixed(0)}
                         </span>
                       </div>
                       {product.stock === 0 && (
-                        <div className="text-center text-xs text-muted-foreground mt-2">
+                        <div className="text-center text-[10px] md:text-xs text-destructive mt-1">
                           Sin stock
                         </div>
                       )}
@@ -1188,35 +1184,35 @@ Impuestos: $${saleData.tax.toFixed(2)}
           </div>
 
           {/* Panel de carrito y checkout */}
-          <div className="space-y-4">
+          <div className="space-y-4 order-1 lg:order-2">
             <Card>
-              <CardHeader>
-                <CardTitle className="flex items-center gap-2">
-                  <ShoppingCart className="h-5 w-5" />
-                  Carrito de Compras
+              <CardHeader className="p-3 md:p-6">
+                <CardTitle className="flex items-center gap-2 text-base md:text-lg">
+                  <ShoppingCart className="h-4 w-4 md:h-5 md:w-5" />
+                  Carrito
                 </CardTitle>
               </CardHeader>
-              <CardContent>
-                <div className="space-y-2 max-h-64 overflow-y-auto">
+              <CardContent className="p-3 md:p-6 pt-0">
+                <div className="space-y-2 max-h-48 md:max-h-64 overflow-y-auto">
                   {cart.map((item, index) => (
                     <div 
                       key={item.product_id} 
-                      className="flex items-center justify-between p-3 bg-muted rounded-lg animate-slide-in-right"
+                      className="flex items-center justify-between p-2 md:p-3 bg-muted rounded-lg animate-slide-in-right"
                       style={{ animationDelay: `${index * 50}ms` }}
                     >
-                      <div className="flex-1">
-                        <p className="font-medium text-sm">{item.product_name}</p>
-                        <p className="text-xs text-muted-foreground">${item.unit_price.toFixed(2)} c/u</p>
+                      <div className="flex-1 min-w-0 mr-2">
+                        <p className="font-medium text-xs md:text-sm truncate">{item.product_name}</p>
+                        <p className="text-[10px] md:text-xs text-muted-foreground">${item.unit_price.toFixed(0)} x {item.quantity}</p>
                       </div>
-                      <div className="flex items-center gap-2">
-                        <Button size="icon" variant="outline" className="h-7 w-7 hover:scale-110 transition-transform" onClick={() => updateQuantity(item.product_id, -1)}>
+                      <div className="flex items-center gap-1">
+                        <Button size="icon" variant="outline" className="h-6 w-6 md:h-7 md:w-7" onClick={() => updateQuantity(item.product_id, -1)}>
                           <Minus className="h-3 w-3" />
                         </Button>
-                        <span className="w-8 text-center font-medium">{item.quantity}</span>
-                        <Button size="icon" variant="outline" className="h-7 w-7 hover:scale-110 transition-transform" onClick={() => updateQuantity(item.product_id, 1)}>
+                        <span className="w-6 md:w-8 text-center text-sm font-medium">{item.quantity}</span>
+                        <Button size="icon" variant="outline" className="h-6 w-6 md:h-7 md:w-7" onClick={() => updateQuantity(item.product_id, 1)}>
                           <Plus className="h-3 w-3" />
                         </Button>
-                        <Button size="icon" variant="ghost" className="h-7 w-7 text-destructive hover:scale-110 transition-transform" onClick={() => removeFromCart(item.product_id)}>
+                        <Button size="icon" variant="ghost" className="h-6 w-6 md:h-7 md:w-7 text-destructive" onClick={() => removeFromCart(item.product_id)}>
                           <Trash2 className="h-3 w-3" />
                         </Button>
                       </div>

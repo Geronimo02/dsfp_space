@@ -433,20 +433,20 @@ const AccountantReports = () => {
 
   return (
     <Layout>
-      <div className="container mx-auto p-6 space-y-6">
-        <div className="flex items-center justify-between">
+      <div className="space-y-4 md:space-y-6">
+        <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
           <div>
-            <h1 className="text-3xl font-bold flex items-center gap-2">
-              <Calculator className="h-8 w-8" />
-              Reportes para Contador
+            <h1 className="text-xl md:text-3xl font-bold flex items-center gap-2">
+              <Calculator className="h-6 w-6 md:h-8 md:w-8" />
+              Reportes Contador
             </h1>
-            <p className="text-muted-foreground">
+            <p className="text-sm text-muted-foreground hidden sm:block">
               Genera y exporta reportes contables en formatos compatibles con AFIP
             </p>
           </div>
           <Popover>
             <PopoverTrigger asChild>
-              <Button variant="outline" className="min-w-[200px]">
+              <Button variant="outline" className="w-full sm:w-auto sm:min-w-[200px]">
                 <CalendarIcon className="mr-2 h-4 w-4" />
                 {format(selectedMonth, "MMMM yyyy", { locale: es })}
               </Button>
@@ -463,69 +463,69 @@ const AccountantReports = () => {
         </div>
 
         {/* Stats Cards */}
-        <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-4">
+        <div className="grid gap-3 md:gap-4 grid-cols-2 lg:grid-cols-4">
           <Card>
-            <CardHeader className="flex flex-row items-center justify-between pb-2">
-              <CardTitle className="text-sm font-medium">Ventas</CardTitle>
+            <CardHeader className="flex flex-row items-center justify-between pb-1 md:pb-2 p-3 md:p-6">
+              <CardTitle className="text-xs md:text-sm font-medium">Ventas</CardTitle>
               <TrendingUp className="h-4 w-4 text-green-500" />
             </CardHeader>
-            <CardContent>
-              <div className="text-2xl font-bold">
+            <CardContent className="p-3 md:p-6 pt-0">
+              <div className="text-lg md:text-2xl font-bold">
                 {isLoading ? "..." : formatCurrency(reportData?.totals.totalSales || 0)}
               </div>
-              <p className="text-xs text-muted-foreground">
-                {reportData?.totals.salesCount || 0} operaciones
+              <p className="text-[10px] md:text-xs text-muted-foreground">
+                {reportData?.totals.salesCount || 0} ops
               </p>
             </CardContent>
           </Card>
           
           <Card>
-            <CardHeader className="flex flex-row items-center justify-between pb-2">
-              <CardTitle className="text-sm font-medium">Compras</CardTitle>
+            <CardHeader className="flex flex-row items-center justify-between pb-1 md:pb-2 p-3 md:p-6">
+              <CardTitle className="text-xs md:text-sm font-medium">Compras</CardTitle>
               <TrendingDown className="h-4 w-4 text-red-500" />
             </CardHeader>
-            <CardContent>
-              <div className="text-2xl font-bold">
+            <CardContent className="p-3 md:p-6 pt-0">
+              <div className="text-lg md:text-2xl font-bold">
                 {isLoading ? "..." : formatCurrency(reportData?.totals.totalPurchases || 0)}
               </div>
-              <p className="text-xs text-muted-foreground">
-                {reportData?.totals.purchasesCount || 0} operaciones
+              <p className="text-[10px] md:text-xs text-muted-foreground">
+                {reportData?.totals.purchasesCount || 0} ops
               </p>
             </CardContent>
           </Card>
           
           <Card>
-            <CardHeader className="flex flex-row items-center justify-between pb-2">
-              <CardTitle className="text-sm font-medium">IVA Posición</CardTitle>
+            <CardHeader className="flex flex-row items-center justify-between pb-1 md:pb-2 p-3 md:p-6">
+              <CardTitle className="text-xs md:text-sm font-medium">IVA</CardTitle>
               <DollarSign className="h-4 w-4 text-blue-500" />
             </CardHeader>
-            <CardContent>
+            <CardContent className="p-3 md:p-6 pt-0">
               <div className={cn(
-                "text-2xl font-bold",
+                "text-lg md:text-2xl font-bold",
                 (reportData?.totals.ivaBalance || 0) >= 0 ? "text-red-600" : "text-green-600"
               )}>
                 {isLoading ? "..." : formatCurrency(Math.abs(reportData?.totals.ivaBalance || 0))}
               </div>
-              <p className="text-xs text-muted-foreground">
+              <p className="text-[10px] md:text-xs text-muted-foreground">
                 {(reportData?.totals.ivaBalance || 0) >= 0 ? "A Pagar" : "A Favor"}
               </p>
             </CardContent>
           </Card>
           
           <Card>
-            <CardHeader className="flex flex-row items-center justify-between pb-2">
-              <CardTitle className="text-sm font-medium">Resultado</CardTitle>
+            <CardHeader className="flex flex-row items-center justify-between pb-1 md:pb-2 p-3 md:p-6">
+              <CardTitle className="text-xs md:text-sm font-medium">Resultado</CardTitle>
               <Building2 className="h-4 w-4 text-purple-500" />
             </CardHeader>
-            <CardContent>
+            <CardContent className="p-3 md:p-6 pt-0">
               <div className={cn(
-                "text-2xl font-bold",
+                "text-lg md:text-2xl font-bold",
                 (reportData?.totals.netResult || 0) >= 0 ? "text-green-600" : "text-red-600"
               )}>
                 {isLoading ? "..." : formatCurrency(reportData?.totals.netResult || 0)}
               </div>
-              <p className="text-xs text-muted-foreground">
-                Neto del período
+              <p className="text-[10px] md:text-xs text-muted-foreground">
+                Neto período
               </p>
             </CardContent>
           </Card>
