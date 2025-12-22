@@ -736,83 +736,27 @@ const AccountantReports = () => {
                 <CardTitle className="flex items-center gap-2">
                   <Mail className="h-5 w-5" />
                   Enviar Reportes por Email
+                  <Badge variant="secondary" className="ml-2">Próximamente</Badge>
                 </CardTitle>
                 <CardDescription>
                   Envía todos los reportes del período directamente al contador
                 </CardDescription>
               </CardHeader>
               <CardContent className="space-y-4">
-                <div className="grid gap-4 md:grid-cols-2">
-                  <div className="space-y-2">
-                    <Label htmlFor="email">Email del Contador *</Label>
-                    <Input
-                      id="email"
-                      type="email"
-                      placeholder="contador@estudio.com"
-                      value={recipientEmail}
-                      onChange={(e) => setRecipientEmail(e.target.value)}
-                    />
+                <div className="flex flex-col items-center justify-center py-12 text-center">
+                  <div className="rounded-full bg-muted p-4 mb-4">
+                    <Mail className="h-8 w-8 text-muted-foreground" />
                   </div>
-
-                  <div className="space-y-2">
-                    <Label htmlFor="name">Nombre del Contador</Label>
-                    <Input
-                      id="name"
-                      type="text"
-                      placeholder="Ej: Juan Pérez"
-                      value={recipientName}
-                      onChange={(e) => setRecipientName(e.target.value)}
-                    />
-                  </div>
-                </div>
-
-                <Separator />
-
-                <div className="space-y-2">
-                  <p className="text-sm text-muted-foreground">
-                    Se enviarán los siguientes archivos:
+                  <h3 className="text-lg font-semibold mb-2">Función en desarrollo</h3>
+                  <p className="text-muted-foreground max-w-md mb-4">
+                    Pronto podrás enviar los reportes directamente al email de tu contador. 
+                    Por ahora, podés descargar todos los archivos desde la pestaña "Descargas".
                   </p>
-                  <ul className="text-sm space-y-1">
-                    <li className="flex items-center gap-2">
-                      <div className="h-2 w-2 rounded-full bg-green-500" />
-                      libro_iva_ventas.csv
-                    </li>
-                    <li className="flex items-center gap-2">
-                      <div className="h-2 w-2 rounded-full bg-red-500" />
-                      libro_iva_compras.csv
-                    </li>
-                    <li className="flex items-center gap-2">
-                      <div className="h-2 w-2 rounded-full bg-blue-500" />
-                      registro_ventas.csv
-                    </li>
-                    <li className="flex items-center gap-2">
-                      <div className="h-2 w-2 rounded-full bg-orange-500" />
-                      registro_compras.csv
-                    </li>
-                    <li className="flex items-center gap-2">
-                      <div className="h-2 w-2 rounded-full bg-purple-500" />
-                      resumen_mensual.csv
-                    </li>
-                  </ul>
+                  <Button variant="outline" onClick={() => document.querySelector('[data-value="downloads"]')?.dispatchEvent(new MouseEvent('click', { bubbles: true }))}>
+                    <Download className="mr-2 h-4 w-4" />
+                    Ir a Descargas
+                  </Button>
                 </div>
-
-                <Button
-                  onClick={handleSendReports}
-                  disabled={sendReportsMutation.isPending || !recipientEmail}
-                  className="w-full"
-                >
-                  {sendReportsMutation.isPending ? (
-                    <>
-                      <Loader2 className="mr-2 h-4 w-4 animate-spin" />
-                      Enviando...
-                    </>
-                  ) : (
-                    <>
-                      <Send className="mr-2 h-4 w-4" />
-                      Enviar Reportes
-                    </>
-                  )}
-                </Button>
               </CardContent>
             </Card>
           </TabsContent>
