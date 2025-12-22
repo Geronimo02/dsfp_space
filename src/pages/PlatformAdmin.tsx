@@ -1483,7 +1483,40 @@ export default function PlatformAdmin() {
                                     : 'bg-muted'
                                 }`}
                               >
-                                <p className="text-sm">{msg.message}</p>
+                                <p className="text-sm whitespace-pre-wrap">{msg.message}</p>
+                                
+                                {/* Attachments */}
+                                {msg.attachments && msg.attachments.length > 0 && (
+                                  <div className="mt-2 space-y-1">
+                                    {msg.attachments.map((att: any, idx: number) => (
+                                      <a
+                                        key={idx}
+                                        href={att.url}
+                                        target="_blank"
+                                        rel="noopener noreferrer"
+                                        className={`flex items-center gap-2 text-xs p-2 rounded ${
+                                          msg.sender_type === 'admin'
+                                            ? 'bg-primary-foreground/10 hover:bg-primary-foreground/20'
+                                            : 'bg-background hover:bg-accent'
+                                        }`}
+                                      >
+                                        {att.type?.startsWith('image/') ? (
+                                          <img 
+                                            src={att.url} 
+                                            alt={att.name} 
+                                            className="max-w-[150px] max-h-[100px] rounded object-cover"
+                                          />
+                                        ) : (
+                                          <>
+                                            <FileText className="h-3 w-3" />
+                                            <span className="truncate max-w-[150px]">{att.name}</span>
+                                          </>
+                                        )}
+                                      </a>
+                                    ))}
+                                  </div>
+                                )}
+                                
                                 <p className="text-xs opacity-70 mt-1">
                                   {new Date(msg.created_at).toLocaleString('es-AR')}
                                 </p>
