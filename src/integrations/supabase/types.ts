@@ -6560,6 +6560,23 @@ export type Database = {
       }
     }
     Views: {
+      company_member_profiles: {
+        Row: {
+          avatar_url: string | null
+          company_id: string | null
+          full_name: string | null
+          id: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "company_users_company_id_fkey"
+            columns: ["company_id"]
+            isOneToOne: false
+            referencedRelation: "companies"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       customer_pos_view: {
         Row: {
           condicion_iva: string | null
@@ -6715,6 +6732,14 @@ export type Database = {
       get_combo_available_stock: {
         Args: { p_combo_product_id: string }
         Returns: number
+      }
+      get_company_members: {
+        Args: { p_company_id: string }
+        Returns: {
+          avatar_url: string
+          full_name: string
+          id: string
+        }[]
       }
       get_customer_movements: {
         Args: { customer_id: string }
