@@ -3232,6 +3232,8 @@ export type Database = {
       payroll_concepts: {
         Row: {
           active: boolean | null
+          afip_code: string | null
+          applies_to: string | null
           calculation_type: string | null
           code: string
           company_id: string | null
@@ -3240,11 +3242,16 @@ export type Database = {
           default_value: number | null
           description: string | null
           id: string
+          is_mandatory: boolean | null
+          is_taxable: boolean | null
           name: string
+          percentage_base: string | null
           updated_at: string | null
         }
         Insert: {
           active?: boolean | null
+          afip_code?: string | null
+          applies_to?: string | null
           calculation_type?: string | null
           code: string
           company_id?: string | null
@@ -3253,11 +3260,16 @@ export type Database = {
           default_value?: number | null
           description?: string | null
           id?: string
+          is_mandatory?: boolean | null
+          is_taxable?: boolean | null
           name: string
+          percentage_base?: string | null
           updated_at?: string | null
         }
         Update: {
           active?: boolean | null
+          afip_code?: string | null
+          applies_to?: string | null
           calculation_type?: string | null
           code?: string
           company_id?: string | null
@@ -3266,12 +3278,74 @@ export type Database = {
           default_value?: number | null
           description?: string | null
           id?: string
+          is_mandatory?: boolean | null
+          is_taxable?: boolean | null
           name?: string
+          percentage_base?: string | null
           updated_at?: string | null
         }
         Relationships: [
           {
             foreignKeyName: "payroll_concepts_company_id_fkey"
+            columns: ["company_id"]
+            isOneToOne: false
+            referencedRelation: "companies"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      payroll_contribution_rates: {
+        Row: {
+          calculation_base: string | null
+          code: string
+          company_id: string
+          created_at: string | null
+          employee_rate: number | null
+          employer_rate: number | null
+          id: string
+          is_active: boolean | null
+          max_base: number | null
+          min_base: number | null
+          name: string
+          updated_at: string | null
+          valid_from: string | null
+          valid_until: string | null
+        }
+        Insert: {
+          calculation_base?: string | null
+          code: string
+          company_id: string
+          created_at?: string | null
+          employee_rate?: number | null
+          employer_rate?: number | null
+          id?: string
+          is_active?: boolean | null
+          max_base?: number | null
+          min_base?: number | null
+          name: string
+          updated_at?: string | null
+          valid_from?: string | null
+          valid_until?: string | null
+        }
+        Update: {
+          calculation_base?: string | null
+          code?: string
+          company_id?: string
+          created_at?: string | null
+          employee_rate?: number | null
+          employer_rate?: number | null
+          id?: string
+          is_active?: boolean | null
+          max_base?: number | null
+          min_base?: number | null
+          name?: string
+          updated_at?: string | null
+          valid_from?: string | null
+          valid_until?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "payroll_contribution_rates_company_id_fkey"
             columns: ["company_id"]
             isOneToOne: false
             referencedRelation: "companies"
@@ -3335,61 +3409,82 @@ export type Database = {
       }
       payroll_liquidations: {
         Row: {
+          absent_days: number | null
           approved_by: string | null
           base_salary: number
           company_id: string | null
           created_at: string | null
           created_by: string
           employee_id: string | null
+          employer_contributions: Json | null
           id: string
           net_salary: number | null
           notes: string | null
+          overtime_hours: number | null
           paid_at: string | null
+          payment_date: string | null
+          payment_method: string | null
           period_month: number
           period_year: number
           status: string | null
           total_deductions: number | null
+          total_employer_contributions: number | null
           total_non_remunerative: number | null
           total_remunerative: number | null
           updated_at: string | null
+          worked_days: number | null
         }
         Insert: {
+          absent_days?: number | null
           approved_by?: string | null
           base_salary?: number
           company_id?: string | null
           created_at?: string | null
           created_by: string
           employee_id?: string | null
+          employer_contributions?: Json | null
           id?: string
           net_salary?: number | null
           notes?: string | null
+          overtime_hours?: number | null
           paid_at?: string | null
+          payment_date?: string | null
+          payment_method?: string | null
           period_month: number
           period_year: number
           status?: string | null
           total_deductions?: number | null
+          total_employer_contributions?: number | null
           total_non_remunerative?: number | null
           total_remunerative?: number | null
           updated_at?: string | null
+          worked_days?: number | null
         }
         Update: {
+          absent_days?: number | null
           approved_by?: string | null
           base_salary?: number
           company_id?: string | null
           created_at?: string | null
           created_by?: string
           employee_id?: string | null
+          employer_contributions?: Json | null
           id?: string
           net_salary?: number | null
           notes?: string | null
+          overtime_hours?: number | null
           paid_at?: string | null
+          payment_date?: string | null
+          payment_method?: string | null
           period_month?: number
           period_year?: number
           status?: string | null
           total_deductions?: number | null
+          total_employer_contributions?: number | null
           total_non_remunerative?: number | null
           total_remunerative?: number | null
           updated_at?: string | null
+          worked_days?: number | null
         }
         Relationships: [
           {
