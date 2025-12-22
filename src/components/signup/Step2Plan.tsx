@@ -20,14 +20,17 @@ export function Step2Plan({ formData, updateFormData, nextStep, prevStep }: Step
   const { data: plans, isLoading } = useQuery({
     queryKey: ["subscription_plans"],
     queryFn: async () => {
-      const { data, error } = await supabase
-        .from("subscription_plans")
-        .select("id, name, description, price, billing_period")
-        .eq("active", true)
-        .order("price", { ascending: true });
-
+      const { data, error } = await supabase.functions.invoke("list-plans", {
+        body: {},
+      });
       if (error) throw error;
-      return data;
+      return (data?.plans ?? []) as Array<{
+        id: string;
+        name: string;
+        description: string | null;
+        price: number;
+        billing_period: string | null;
+      }>;
     },
   });
 
