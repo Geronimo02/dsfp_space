@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
 import { useCompany } from "@/contexts/CompanyContext";
@@ -84,12 +84,18 @@ export function EmployeeRoleAssignment() {
 
   const updateRoleMutation = useMutation({
     mutationFn: async ({ userId, newRole }: { userId: string; newRole: AppRole }) => {
+      // Prevent changing own role from the client side
+      const { data: { user } } = await supabase.auth.getUser();
+      if (user && user.id === userId) {
+        throw new Error("No puedes cambiar tu propio rol");
+      }
+
       const { error } = await supabase
         .from("company_users")
         .update({ role: newRole })
         .eq("user_id", userId)
         .eq("company_id", currentCompany?.id);
-      
+
       if (error) throw error;
     },
     onSuccess: () => {
@@ -100,6 +106,16 @@ export function EmployeeRoleAssignment() {
       toast.error("Error al actualizar rol: " + error.message);
     },
   });
+
+  const [authUserId, setAuthUserId] = useState<string | null>(null);
+  useEffect(() => {
+    let mounted = true;
+    (async () => {
+      const { data: { user } } = await supabase.auth.getUser();
+      if (mounted) setAuthUserId(user?.id ?? null);
+    })();
+    return () => { mounted = false; };
+  }, []);
 
   const inviteMutation = useMutation({
     mutationFn: async () => {
@@ -252,15 +268,19 @@ export function EmployeeRoleAssignment() {
                     <TableCell>
                       <Select
                         value={user.role}
-                        onValueChange={(newRole) => 
-                          updateRoleMutation.mutate({ 
-                            userId: user.user_id, 
-                            newRole: newRole as AppRole 
-                          })
-                        }
-                        disabled={updateRoleMutation.isPending}
+                        onValueChange={(newRole) => {
+                          if (authUserId && authUserId === user.user_id) {
+                            toast.error("No puedes cambiar tu propio rol");
+                            return;
+                          }
+                          updateRoleMutation.mutate({
+                            userId: user.user_id,
+                            newRole: newRole as AppRole,
+                          });
+                        }}
+                        disabled={updateRoleMutation.isPending || (authUserId === user.user_id)}
                       >
-                        <SelectTrigger className="w-40">
+                        <SelectTrigger className="w-40" title={authUserId === user.user_id ? "No puedes cambiar tu propio rol" : undefined}>
                           <SelectValue />
                         </SelectTrigger>
                         <SelectContent>
