@@ -52,7 +52,9 @@ import { CompanyModuleSelector } from "@/components/settings/CompanyModuleSelect
 import { CustomPricingManager } from "@/components/settings/CustomPricingManager";
 import { ModuleLimitsManager } from "@/components/settings/ModuleLimitsManager";
 import { ModuleAuditLog } from "@/components/settings/ModuleAuditLog";
-import { PlatformAdminHeader, PlatformAdminStats, PlatformAdminNav } from "@/components/platformAdmin";
+import { PlatformAdminHeader, PlatformAdminNav, PlatformAdminDashboard } from "@/components/platformAdmin";
+import { PaginationControls } from "@/components/ui/pagination-controls";
+import { usePagination } from "@/hooks/usePagination";
 
 export default function PlatformAdmin() {
   const { isPlatformAdmin, isLoading: adminLoading } = usePlatformAdmin();
@@ -825,6 +827,16 @@ export default function PlatformAdmin() {
     return matchesSearch && matchesAction;
   });
 
+  // Pagination hooks
+  const companiesPagination = usePagination(filteredCompanies, { initialPageSize: 10 });
+  const notificationsPagination = usePagination(filteredNotifications, { initialPageSize: 10 });
+  const feedbackPagination = usePagination(filteredFeedback, { initialPageSize: 10 });
+  const paymentsPagination = usePagination(filteredPayments, { initialPageSize: 10 });
+  const auditLogsPagination = usePagination(filteredAuditLogs, { initialPageSize: 20 });
+  const usersPagination = usePagination(allUsers?.filter(u => 
+    u.companies?.name?.toLowerCase().includes(userSearch.toLowerCase())
+  ), { initialPageSize: 10 });
+
   if (isLoading) {
     return (
       <div className="flex items-center justify-center h-screen">
@@ -865,7 +877,19 @@ export default function PlatformAdmin() {
           </p>
         </div>
 
-        <PlatformAdminStats stats={stats} />
+        <PlatformAdminDashboard 
+          stats={stats} 
+          revenueData={revenueAnalytics}
+          ticketStats={{
+            open: platformSupportTickets?.filter((t: any) => t.status === 'open').length || 0,
+            inProgress: platformSupportTickets?.filter((t: any) => t.status === 'in_progress').length || 0,
+            resolved: platformSupportTickets?.filter((t: any) => t.status === 'resolved').length || 0,
+            slaBreach: platformSupportTickets?.filter((t: any) => t.sla_response_breached || t.sla_resolution_breached).length || 0,
+          }}
+          companiesGrowth={0}
+          usersCount={totalUsers}
+          overduePayments={overduePayments}
+        />
 
         <Tabs defaultValue="companies" className="flex gap-6">
           <PlatformAdminNav 
@@ -1512,7 +1536,7 @@ export default function PlatformAdmin() {
                     </TableRow>
                   </TableHeader>
                   <TableBody>
-                    {filteredCompanies?.map((company) => {
+                    {companiesPagination.paginatedData?.map((company) => {
                       const subscription = company.company_subscriptions?.[0];
                       return (
                         <TableRow key={company.id}>
@@ -1580,6 +1604,22 @@ export default function PlatformAdmin() {
                     })}
                   </TableBody>
                 </Table>
+                <PaginationControls
+                  currentPage={companiesPagination.currentPage}
+                  totalPages={companiesPagination.totalPages}
+                  totalItems={companiesPagination.totalItems}
+                  startIndex={companiesPagination.startIndex}
+                  endIndex={companiesPagination.endIndex}
+                  pageSize={companiesPagination.pageSize}
+                  canGoNext={companiesPagination.canGoNext}
+                  canGoPrevious={companiesPagination.canGoPrevious}
+                  onPageChange={companiesPagination.setCurrentPage}
+                  onPageSizeChange={companiesPagination.setPageSize}
+                  onNextPage={companiesPagination.goToNextPage}
+                  onPreviousPage={companiesPagination.goToPreviousPage}
+                  onFirstPage={companiesPagination.goToFirstPage}
+                  onLastPage={companiesPagination.goToLastPage}
+                />
               </CardContent>
             </Card>
           </TabsContent>
@@ -1623,7 +1663,7 @@ export default function PlatformAdmin() {
                     </TableRow>
                   </TableHeader>
                   <TableBody>
-                    {filteredNotifications?.map((notification) => (
+                    {notificationsPagination.paginatedData?.map((notification) => (
                       <TableRow key={notification.id}>
                         <TableCell>
                           <div className="flex items-center gap-2">
@@ -1660,6 +1700,22 @@ export default function PlatformAdmin() {
                     ))}
                   </TableBody>
                 </Table>
+                <PaginationControls
+                  currentPage={notificationsPagination.currentPage}
+                  totalPages={notificationsPagination.totalPages}
+                  totalItems={notificationsPagination.totalItems}
+                  startIndex={notificationsPagination.startIndex}
+                  endIndex={notificationsPagination.endIndex}
+                  pageSize={notificationsPagination.pageSize}
+                  canGoNext={notificationsPagination.canGoNext}
+                  canGoPrevious={notificationsPagination.canGoPrevious}
+                  onPageChange={notificationsPagination.setCurrentPage}
+                  onPageSizeChange={notificationsPagination.setPageSize}
+                  onNextPage={notificationsPagination.goToNextPage}
+                  onPreviousPage={notificationsPagination.goToPreviousPage}
+                  onFirstPage={notificationsPagination.goToFirstPage}
+                  onLastPage={notificationsPagination.goToLastPage}
+                />
               </CardContent>
             </Card>
           </TabsContent>
@@ -1703,7 +1759,7 @@ export default function PlatformAdmin() {
                     </TableRow>
                   </TableHeader>
                   <TableBody>
-                    {filteredFeedback?.map((item) => (
+                    {feedbackPagination.paginatedData?.map((item) => (
                       <TableRow key={item.id}>
                         <TableCell>
                           <Badge
@@ -1768,6 +1824,22 @@ export default function PlatformAdmin() {
                     ))}
                   </TableBody>
                 </Table>
+                <PaginationControls
+                  currentPage={feedbackPagination.currentPage}
+                  totalPages={feedbackPagination.totalPages}
+                  totalItems={feedbackPagination.totalItems}
+                  startIndex={feedbackPagination.startIndex}
+                  endIndex={feedbackPagination.endIndex}
+                  pageSize={feedbackPagination.pageSize}
+                  canGoNext={feedbackPagination.canGoNext}
+                  canGoPrevious={feedbackPagination.canGoPrevious}
+                  onPageChange={feedbackPagination.setCurrentPage}
+                  onPageSizeChange={feedbackPagination.setPageSize}
+                  onNextPage={feedbackPagination.goToNextPage}
+                  onPreviousPage={feedbackPagination.goToPreviousPage}
+                  onFirstPage={feedbackPagination.goToFirstPage}
+                  onLastPage={feedbackPagination.goToLastPage}
+                />
               </CardContent>
             </Card>
           </TabsContent>
@@ -1908,7 +1980,7 @@ export default function PlatformAdmin() {
                     </TableRow>
                   </TableHeader>
                   <TableBody>
-                    {filteredPayments?.map((payment) => {
+                    {paymentsPagination.paginatedData?.map((payment) => {
                       const company = companies?.find(c => c.id === payment.company_id);
                       return (
                         <TableRow key={payment.id}>
@@ -1964,6 +2036,22 @@ export default function PlatformAdmin() {
                     })}
                   </TableBody>
                 </Table>
+                <PaginationControls
+                  currentPage={paymentsPagination.currentPage}
+                  totalPages={paymentsPagination.totalPages}
+                  totalItems={paymentsPagination.totalItems}
+                  startIndex={paymentsPagination.startIndex}
+                  endIndex={paymentsPagination.endIndex}
+                  pageSize={paymentsPagination.pageSize}
+                  canGoNext={paymentsPagination.canGoNext}
+                  canGoPrevious={paymentsPagination.canGoPrevious}
+                  onPageChange={paymentsPagination.setCurrentPage}
+                  onPageSizeChange={paymentsPagination.setPageSize}
+                  onNextPage={paymentsPagination.goToNextPage}
+                  onPreviousPage={paymentsPagination.goToPreviousPage}
+                  onFirstPage={paymentsPagination.goToFirstPage}
+                  onLastPage={paymentsPagination.goToLastPage}
+                />
               </CardContent>
             </Card>
           </TabsContent>
@@ -2118,37 +2206,47 @@ export default function PlatformAdmin() {
                     </TableRow>
                   </TableHeader>
                   <TableBody>
-                    {allUsers
-                      ?.filter(user =>
-                        userSearch === '' ||
-                        user.id.toLowerCase().includes(userSearch.toLowerCase()) ||
-                        ((user.companies as any)?.name || '').toLowerCase().includes(userSearch.toLowerCase())
-                      )
-                      .map((user) => (
-                        <TableRow key={user.id}>
-                          <TableCell className="font-mono text-xs">
-                            {user.user_id?.substring(0, 8)}...
-                          </TableCell>
-                          <TableCell>
-                            {(user.companies as any)?.name || 'N/A'}
-                          </TableCell>
-                          <TableCell>
-                            <Badge variant="outline">{user.role}</Badge>
-                          </TableCell>
-                          <TableCell>
-                            {user.active ? (
-                              <Badge variant="default">Activo</Badge>
-                            ) : (
-                              <Badge variant="secondary">Inactivo</Badge>
-                            )}
-                          </TableCell>
-                          <TableCell>
-                            {formatDate(user.created_at || '')}
-                          </TableCell>
-                        </TableRow>
-                      ))}
+                    {usersPagination.paginatedData?.map((user) => (
+                      <TableRow key={user.id}>
+                        <TableCell className="font-mono text-xs">
+                          {user.user_id?.substring(0, 8)}...
+                        </TableCell>
+                        <TableCell>
+                          {(user.companies as any)?.name || 'N/A'}
+                        </TableCell>
+                        <TableCell>
+                          <Badge variant="outline">{user.role}</Badge>
+                        </TableCell>
+                        <TableCell>
+                          {user.active ? (
+                            <Badge variant="default">Activo</Badge>
+                          ) : (
+                            <Badge variant="secondary">Inactivo</Badge>
+                          )}
+                        </TableCell>
+                        <TableCell>
+                          {formatDate(user.created_at || '')}
+                        </TableCell>
+                      </TableRow>
+                    ))}
                   </TableBody>
                 </Table>
+                <PaginationControls
+                  currentPage={usersPagination.currentPage}
+                  totalPages={usersPagination.totalPages}
+                  totalItems={usersPagination.totalItems}
+                  startIndex={usersPagination.startIndex}
+                  endIndex={usersPagination.endIndex}
+                  pageSize={usersPagination.pageSize}
+                  canGoNext={usersPagination.canGoNext}
+                  canGoPrevious={usersPagination.canGoPrevious}
+                  onPageChange={usersPagination.setCurrentPage}
+                  onPageSizeChange={usersPagination.setPageSize}
+                  onNextPage={usersPagination.goToNextPage}
+                  onPreviousPage={usersPagination.goToPreviousPage}
+                  onFirstPage={usersPagination.goToFirstPage}
+                  onLastPage={usersPagination.goToLastPage}
+                />
               </CardContent>
             </Card>
           </TabsContent>
@@ -2459,8 +2557,8 @@ export default function PlatformAdmin() {
                     </TableRow>
                   </TableHeader>
                   <TableBody>
-                    {filteredAuditLogs && filteredAuditLogs.length > 0 ? (
-                      filteredAuditLogs.map((log) => (
+                    {auditLogsPagination.paginatedData && auditLogsPagination.paginatedData.length > 0 ? (
+                      auditLogsPagination.paginatedData.map((log) => (
                         <TableRow key={log.id}>
                           <TableCell className="text-sm">
                             {new Date(log.created_at).toLocaleString('es-AR', {
@@ -2517,6 +2615,22 @@ export default function PlatformAdmin() {
                     )}
                   </TableBody>
                 </Table>
+                <PaginationControls
+                  currentPage={auditLogsPagination.currentPage}
+                  totalPages={auditLogsPagination.totalPages}
+                  totalItems={auditLogsPagination.totalItems}
+                  startIndex={auditLogsPagination.startIndex}
+                  endIndex={auditLogsPagination.endIndex}
+                  pageSize={auditLogsPagination.pageSize}
+                  canGoNext={auditLogsPagination.canGoNext}
+                  canGoPrevious={auditLogsPagination.canGoPrevious}
+                  onPageChange={auditLogsPagination.setCurrentPage}
+                  onPageSizeChange={auditLogsPagination.setPageSize}
+                  onNextPage={auditLogsPagination.goToNextPage}
+                  onPreviousPage={auditLogsPagination.goToPreviousPage}
+                  onFirstPage={auditLogsPagination.goToFirstPage}
+                  onLastPage={auditLogsPagination.goToLastPage}
+                />
               </CardContent>
             </Card>
           </TabsContent>
