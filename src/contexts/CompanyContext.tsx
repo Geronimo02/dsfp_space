@@ -119,26 +119,39 @@ export function CompanyProvider({ children }: { children: React.ReactNode }) {
   };
 
   useEffect(() => {
-    fetchUserCompanies();
+    let subscription: ReturnType<typeof supabase.channel> | null = null;
 
-    // Subscribe to changes in company_users
-    const subscription = supabase
-      .channel('company_users_changes')
-      .on(
-        'postgres_changes',
-        {
-          event: '*',
-          schema: 'public',
-          table: 'company_users',
-        },
-        () => {
-          fetchUserCompanies();
-        }
-      )
-      .subscribe();
+    const setupSubscription = async () => {
+      await fetchUserCompanies();
+
+      // Get current user to filter subscription
+      const { data: { user } } = await supabase.auth.getUser();
+      if (!user) return;
+
+      // Subscribe to changes only for current user's company_users
+      subscription = supabase
+        .channel(`company_users_changes_${user.id}`)
+        .on(
+          'postgres_changes',
+          {
+            event: '*',
+            schema: 'public',
+            table: 'company_users',
+            filter: `user_id=eq.${user.id}`,
+          },
+          () => {
+            fetchUserCompanies();
+          }
+        )
+        .subscribe();
+    };
+
+    setupSubscription();
 
     return () => {
-      subscription.unsubscribe();
+      if (subscription) {
+        subscription.unsubscribe();
+      }
     };
   }, []);
 
