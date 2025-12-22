@@ -3296,6 +3296,7 @@ export type Database = {
       }
       payroll_contribution_rates: {
         Row: {
+          art_empleador: number | null
           calculation_base: string | null
           code: string
           company_id: string
@@ -3304,14 +3305,23 @@ export type Database = {
           employer_rate: number | null
           id: string
           is_active: boolean | null
+          jubilacion_empleado: number | null
+          jubilacion_empleador: number | null
           max_base: number | null
           min_base: number | null
           name: string
+          obra_social_empleado: number | null
+          obra_social_empleador: number | null
+          pami_empleado: number | null
+          pami_empleador: number | null
+          seguro_vida_empleador: number | null
+          sindicato_empleado: number | null
           updated_at: string | null
           valid_from: string | null
           valid_until: string | null
         }
         Insert: {
+          art_empleador?: number | null
           calculation_base?: string | null
           code: string
           company_id: string
@@ -3320,14 +3330,23 @@ export type Database = {
           employer_rate?: number | null
           id?: string
           is_active?: boolean | null
+          jubilacion_empleado?: number | null
+          jubilacion_empleador?: number | null
           max_base?: number | null
           min_base?: number | null
           name: string
+          obra_social_empleado?: number | null
+          obra_social_empleador?: number | null
+          pami_empleado?: number | null
+          pami_empleador?: number | null
+          seguro_vida_empleador?: number | null
+          sindicato_empleado?: number | null
           updated_at?: string | null
           valid_from?: string | null
           valid_until?: string | null
         }
         Update: {
+          art_empleador?: number | null
           calculation_base?: string | null
           code?: string
           company_id?: string
@@ -3336,9 +3355,17 @@ export type Database = {
           employer_rate?: number | null
           id?: string
           is_active?: boolean | null
+          jubilacion_empleado?: number | null
+          jubilacion_empleador?: number | null
           max_base?: number | null
           min_base?: number | null
           name?: string
+          obra_social_empleado?: number | null
+          obra_social_empleador?: number | null
+          pami_empleado?: number | null
+          pami_empleador?: number | null
+          seguro_vida_empleador?: number | null
+          sindicato_empleado?: number | null
           updated_at?: string | null
           valid_from?: string | null
           valid_until?: string | null

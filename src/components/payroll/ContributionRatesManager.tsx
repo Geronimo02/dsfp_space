@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
@@ -51,14 +51,15 @@ export function ContributionRatesManager({ companyId }: ContributionRatesManager
         .maybeSingle();
 
       if (error) throw error;
-      return data;
+      // Type assertion since the new columns are not yet in the auto-generated types
+      return data as (typeof data & Partial<ContributionRates>) | null;
     },
     enabled: !!companyId,
   });
 
-  // Sync rates with saved data
-  useState(() => {
-    if (savedRates) {
+  // Sync rates when savedRates changes
+  useEffect(() => {
+    if (savedRates && !isEditing) {
       setRates({
         jubilacion_empleado: savedRates.jubilacion_empleado ?? defaultRates.jubilacion_empleado,
         obra_social_empleado: savedRates.obra_social_empleado ?? defaultRates.obra_social_empleado,
@@ -71,14 +72,14 @@ export function ContributionRatesManager({ companyId }: ContributionRatesManager
         seguro_vida_empleador: savedRates.seguro_vida_empleador ?? defaultRates.seguro_vida_empleador,
       });
     }
-  });
+  }, [savedRates, isEditing]);
 
   const saveMutation = useMutation({
     mutationFn: async (newRates: ContributionRates) => {
       if (savedRates) {
         const { error } = await supabase
           .from("payroll_contribution_rates")
-          .update(newRates)
+          .update(newRates as any)
           .eq("id", savedRates.id);
         if (error) throw error;
       } else {
@@ -86,8 +87,10 @@ export function ContributionRatesManager({ companyId }: ContributionRatesManager
           .from("payroll_contribution_rates")
           .insert({
             company_id: companyId,
+            code: "default",
+            name: "Tasas por Defecto",
             ...newRates,
-          });
+          } as any);
         if (error) throw error;
       }
     },
@@ -111,24 +114,6 @@ export function ContributionRatesManager({ companyId }: ContributionRatesManager
       [key]: parseFloat(value) || 0,
     }));
   };
-
-  // Recalculate when savedRates loads
-  if (savedRates && !isEditing) {
-    const currentRates = {
-      jubilacion_empleado: savedRates.jubilacion_empleado ?? defaultRates.jubilacion_empleado,
-      obra_social_empleado: savedRates.obra_social_empleado ?? defaultRates.obra_social_empleado,
-      pami_empleado: savedRates.pami_empleado ?? defaultRates.pami_empleado,
-      sindicato_empleado: savedRates.sindicato_empleado ?? defaultRates.sindicato_empleado,
-      jubilacion_empleador: savedRates.jubilacion_empleador ?? defaultRates.jubilacion_empleador,
-      obra_social_empleador: savedRates.obra_social_empleador ?? defaultRates.obra_social_empleador,
-      pami_empleador: savedRates.pami_empleador ?? defaultRates.pami_empleador,
-      art_empleador: savedRates.art_empleador ?? defaultRates.art_empleador,
-      seguro_vida_empleador: savedRates.seguro_vida_empleador ?? defaultRates.seguro_vida_empleador,
-    };
-    if (JSON.stringify(rates) !== JSON.stringify(currentRates)) {
-      setRates(currentRates);
-    }
-  }
 
   const totalEmpleado = rates.jubilacion_empleado + rates.obra_social_empleado + rates.pami_empleado + rates.sindicato_empleado;
   const totalEmpleador = rates.jubilacion_empleador + rates.obra_social_empleador + rates.pami_empleador + rates.art_empleador + rates.seguro_vida_empleador;
