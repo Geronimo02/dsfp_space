@@ -4,7 +4,7 @@ import { supabase } from "@/integrations/supabase/client";
 import { Layout } from "@/components/layout/Layout";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
-import { Plus, CreditCard, Clock, CheckCircle2 } from "lucide-react";
+import { Plus, CreditCard, Clock, CheckCircle2, AlertTriangle } from "lucide-react";
 import {
   Dialog,
   DialogContent,
@@ -28,6 +28,7 @@ import {
   TableRow,
 } from "@/components/ui/table";
 import { Badge } from "@/components/ui/badge";
+import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
 import { toast } from "sonner";
 import { useCompany } from "@/contexts/CompanyContext";
 import { format } from "date-fns";
@@ -139,6 +140,12 @@ export default function CardMovements() {
           </div>
 
           <Dialog open={isDialogOpen} onOpenChange={setIsDialogOpen}>
+            <DialogTrigger asChild>
+              <Button>
+                <Plus className="h-4 w-4 mr-2" />
+                Nuevo Movimiento
+              </Button>
+            </DialogTrigger>
             <DialogTrigger asChild>
               <Button>
                 <Plus className="h-4 w-4 mr-2" />
@@ -273,9 +280,18 @@ export default function CardMovements() {
                   {createMovement.isPending ? "Registrando..." : "Registrar Movimiento"}
                 </Button>
               </div>
-            </DialogContent>
+          </DialogContent>
           </Dialog>
         </div>
+
+        <Alert className="border-blue-500/50 bg-blue-500/10">
+          <AlertTriangle className="h-4 w-4 text-blue-500" />
+          <AlertTitle className="text-blue-600">Próximamente: Sincronización Automática</AlertTitle>
+          <AlertDescription className="text-blue-600/80">
+            Pronto podrás sincronizar automáticamente los movimientos con Prisma Medios de Pago, 
+            Mercado Pago, Naranja X y otras procesadoras para conciliación automática.
+          </AlertDescription>
+        </Alert>
 
         <div className="grid gap-4 md:grid-cols-3">
           <div className="p-6 bg-card rounded-lg border">

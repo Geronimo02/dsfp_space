@@ -137,9 +137,10 @@ export default function Retentions() {
           </div>
 
           <div className="flex gap-2">
-            <Button variant="outline">
+            <Button variant="outline" disabled className="opacity-60">
               <Download className="h-4 w-4 mr-2" />
               Exportar AFIP
+              <Badge variant="secondary" className="ml-2 text-xs">Próximamente</Badge>
             </Button>
 
             <Dialog open={isDialogOpen} onOpenChange={setIsDialogOpen}>

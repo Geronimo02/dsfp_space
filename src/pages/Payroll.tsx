@@ -10,8 +10,9 @@ import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog";
 import { Label } from "@/components/ui/label";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
+import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
 import { toast } from "sonner";
-import { DollarSign, Plus, FileText } from "lucide-react";
+import { DollarSign, Plus, FileText, Clock, AlertTriangle } from "lucide-react";
 import { format } from "date-fns";
 import { es } from "date-fns/locale";
 
@@ -163,10 +164,25 @@ const Payroll = () => {
   return (
     <Layout>
       <div className="container mx-auto p-6">
+        <Alert className="mb-6 border-amber-500/50 bg-amber-500/10">
+          <AlertTriangle className="h-4 w-4 text-amber-500" />
+          <AlertTitle className="text-amber-600">Módulo en Desarrollo</AlertTitle>
+          <AlertDescription className="text-amber-600/80">
+            Las funcionalidades avanzadas como cálculo automático de deducciones, aportes patronales, 
+            generación de recibos de sueldo y exportación a formatos legales estarán disponibles próximamente.
+          </AlertDescription>
+        </Alert>
+
         <div className="flex items-center justify-between mb-6">
           <div className="flex items-center gap-2">
             <DollarSign className="h-8 w-8" />
-            <h1 className="text-3xl font-bold">Liquidaciones</h1>
+            <div>
+              <h1 className="text-3xl font-bold">Liquidaciones</h1>
+              <Badge variant="secondary" className="mt-1 flex items-center gap-1 w-fit">
+                <Clock className="h-3 w-3" />
+                Versión Beta
+              </Badge>
+            </div>
           </div>
           <Dialog open={dialogOpen} onOpenChange={setDialogOpen}>
             <DialogTrigger asChild>
