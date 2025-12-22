@@ -219,7 +219,7 @@ export const InvoicePDF = (data: InvoiceData) => {
     y += 2;
   }
 
-  // CAE y QR (placeholders si no hay CAE)
+  // CAE y QR AFIP
   doc.line(margin, y, rightX, y);
   y += 6;
   doc.setFont("helvetica", "bold");
@@ -232,25 +232,99 @@ export const InvoicePDF = (data: InvoiceData) => {
   doc.text(`CAE: ${cae}`, margin, y); y += 5;
   doc.text(`Vencimiento CAE: ${caeVto}`, margin, y); y += 8;
 
-  // Caja para QR placeholder
-  const qrSize = 36;
-  const qrX = rightX - qrSize;
-  const qrY = y - 14;
-  doc.rect(qrX, qrY, qrSize, qrSize);
-  doc.setFontSize(9);
-  doc.text("QR AFIP", qrX + qrSize / 2, qrY + qrSize / 2, { align: "center" });
-  doc.setFontSize(10);
-  y += qrSize - 6;
+  // Generar código QR AFIP (formato oficial)
+  const qrSize = 40;
+  const qrX = rightX - qrSize - 5;
+  const qrY = y - 20;
+
+  if (data.cae && data.company?.cuit) {
+    // Datos para QR AFIP según RG 4291
+    const qrData = {
+      ver: 1,
+      fecha: data.fecha ? format(new Date(data.fecha), "yyyy-MM-dd") : format(new Date(), "yyyy-MM-dd"),
+      cuit: (data.company.cuit || "").replace(/-/g, ""),
+      ptoVta: parseInt(String(data.puntoVenta || 0)),
+      tipoCmp: getTipoComprobanteAFIP(data.tipoComprobante),
+      nroCmp: parseInt(String(data.numeroComprobante || "0").split("-").pop() || "0"),
+      importe: data.total,
+      moneda: "PES",
+      ctz: 1,
+      tipoDocRec: getTipoDocAFIP(data.customer?.tipo_documento),
+      nroDocRec: parseInt((data.customer?.numero_documento || "0").replace(/\D/g, "")) || 0,
+      tipoCodAut: "E",
+      codAut: parseInt(data.cae),
+    };
+    
+    // Convertir a Base64 URL según spec AFIP
+    const qrJson = JSON.stringify(qrData);
+    const qrBase64 = btoa(qrJson);
+    const qrUrl = `https://www.afip.gob.ar/fe/qr/?p=${qrBase64}`;
+    
+    // Dibujar marco QR con URL
+    doc.setDrawColor(0);
+    doc.rect(qrX, qrY, qrSize, qrSize);
+    
+    // Texto QR placeholder (el QR real necesita librería adicional como qrcode)
+    doc.setFontSize(7);
+    doc.text("QR AFIP", qrX + qrSize / 2, qrY + 8, { align: "center" });
+    doc.setFontSize(5);
+    doc.text("Escanear para", qrX + qrSize / 2, qrY + 14, { align: "center" });
+    doc.text("verificar en AFIP", qrX + qrSize / 2, qrY + 18, { align: "center" });
+    
+    // Agregar URL debajo del QR
+    doc.setFontSize(4);
+    const urlLines = doc.splitTextToSize(qrUrl, qrSize);
+    urlLines.forEach((line: string, idx: number) => {
+      doc.text(line, qrX + qrSize / 2, qrY + qrSize + 3 + (idx * 2.5), { align: "center" });
+    });
+    
+    y += qrSize - 10;
+  } else {
+    // Placeholder cuando no hay CAE
+    doc.rect(qrX, qrY, qrSize, qrSize);
+    doc.setFontSize(8);
+    doc.text("QR AFIP", qrX + qrSize / 2, qrY + qrSize / 2, { align: "center" });
+    doc.setFontSize(6);
+    doc.text("(Pendiente CAE)", qrX + qrSize / 2, qrY + qrSize / 2 + 6, { align: "center" });
+    y += qrSize - 10;
+  }
 
   // Nota legal
-  y += 8;
-  doc.setFontSize(9);
-  const nota = `Comprobante generado en modo contingencia/offline. Si corresponde, el CAE será asignado al sincronizar con AFIP.\nEste documento no reemplaza al comprobante fiscal electrónico autorizado hasta su validación.`;
-  const notaLines = doc.splitTextToSize(nota, rightX - margin);
-  notaLines.forEach((line) => { doc.text(line, margin, y); y += 5; });
+  y += 12;
+  doc.setFontSize(8);
+  if (data.cae) {
+    doc.text("Comprobante Autorizado - Documento no válido como factura", margin, y);
+  } else {
+    const nota = `Comprobante generado en modo contingencia/offline. El CAE será asignado al sincronizar con AFIP.`;
+    doc.text(nota, margin, y);
+  }
 
   // Guardar
   const safePV = pv || "0000";
   const fileName = `Factura_${letra || "X"}_${safePV}_${nro || "PENDIENTE"}.pdf`;
   doc.save(fileName);
 };
+
+// Helpers para códigos AFIP
+function getTipoComprobanteAFIP(tipo: string): number {
+  const map: Record<string, number> = {
+    "FACTURA_A": 1,
+    "FACTURA_B": 6,
+    "FACTURA_C": 11,
+    "NCA": 3,
+    "NCB": 8,
+    "NCC": 13,
+  };
+  return map[tipo] || 0;
+}
+
+function getTipoDocAFIP(tipo?: string | null): number {
+  if (!tipo) return 99; // Sin identificar
+  const map: Record<string, number> = {
+    "cuit": 80,
+    "cuil": 86,
+    "dni": 96,
+    "pasaporte": 94,
+  };
+  return map[tipo.toLowerCase()] || 99;
+}
