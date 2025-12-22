@@ -49,16 +49,14 @@ async function fetchMpResource(topic: MpTopic, id: string, token: string) {
   return await res.json();
 }
 
-export default async (req: Request) => {
-  // ✅ Preflight CORS
+Deno.serve(async (req: Request) => {
   if (req.method === "OPTIONS") {
-    return new Response("ok", {
-      headers: {
-        "Access-Control-Allow-Origin": "*",
-        "Access-Control-Allow-Headers": "authorization, x-client-info, apikey, content-type",
-        "Access-Control-Allow-Methods": "POST, OPTIONS",
-      },
-    });
+    return new Response("ok", { headers: corsHeaders });
+  }
+
+  // Acknowledge GET quickly (useful for testing)
+  if (req.method === "GET") {
+    return json({ ok: true }, 200);
   }
 
   try {
@@ -95,11 +93,9 @@ export default async (req: Request) => {
       url.searchParams.get("id");
 
     if (!dataId) {
-      // notificación vacía o test
       return json({ ok: true, note: "No data.id" }, 200);
     }
 
-    // Idempotencia
     const eventKey = `${topic}:${dataId}`;
 
     const { error: evtErr } = await supabaseAdmin
@@ -111,22 +107,21 @@ export default async (req: Request) => {
       });
 
     if (evtErr) {
-      // Duplicado → no reprocesar
       return json({ ok: true, note: "Duplicate" }, 200);
     }
 
-    // 1) Consultar a MP el estado real del recurso
     const mpObj = await fetchMpResource(topic, dataId, mpToken);
 
-    // 2) Encontrar intent_id (external_reference = intent.id)
     const externalRef: string | null =
       mpObj?.external_reference || mpObj?.metadata?.intent_id || null;
 
-    // 3) Map status
     const mpStatus: string | null = mpObj?.status ?? null;
     const internalStatus = mapMpStatusToInternal(mpStatus);
 
-    // 4) Caso A: flujo signup
+    console.log("MP topic:", topic);
+    console.log("MP status:", mpStatus);
+    console.log("External reference:", externalRef);
+
     if (externalRef) {
       const { data: intent, error: intentErr } = await supabaseAdmin
         .from("signup_intents")
@@ -145,18 +140,16 @@ export default async (req: Request) => {
             .eq("id", intent.id);
 
           if (updIntentErr) throw updIntentErr;
+        } else if (internalStatus === "canceled") {
+          await supabaseAdmin.from("signup_intents").update({ status: "canceled" }).eq("id", intent.id);
         } else {
-          await supabaseAdmin
-            .from("signup_intents")
-            .update({ status: "checkout_created" })
-            .eq("id", intent.id);
+          await supabaseAdmin.from("signup_intents").update({ status: "checkout_created" }).eq("id", intent.id);
         }
 
         return json({ ok: true }, 200);
       }
     }
 
-    // 5) Caso B: suscripción ya existe
     const providerSubId = mpObj?.id ?? dataId;
 
     const { data: sub, error: subErr } = await supabaseAdmin
@@ -180,8 +173,6 @@ export default async (req: Request) => {
 
     return json({ ok: true }, 200);
   } catch (e) {
-    // para debugging mejor 500. Cuando pases a prod, podés devolver 200 para evitar reintentos si ya guardás event_key.
     return json({ error: String(e) }, 500);
   }
-};
-
+});

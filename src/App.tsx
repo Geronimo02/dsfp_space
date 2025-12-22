@@ -39,6 +39,9 @@ import CompanySetup from "./pages/CompanySetup";
 import ResetPassword from "./pages/ResetPassword";
 import POSPoints from "./pages/POSPoints";
 import SignupFlowTester from "./pages/SignUpFlowTester";
+import SignupWizard from "./pages/SignupWizard";
+import SignupSuccess from "./pages/SignupSuccess";
+import SignupCancel from "./pages/SignupCancel";
 import NotificationSettings from "./pages/NotificationSettings";
 import Checks from "./pages/Checks";
 import MonthlyClosing from "./pages/MonthlyClosing";
@@ -207,6 +210,9 @@ const App = () => (
         <CompanyProvider>
           <Routes>
           <Route path="/dev/signup-tester" element={<SignupFlowTester />} />
+          <Route path="/signup" element={<SignupWizard />} />
+          <Route path="/signup/success" element={<SignupSuccess />} />
+          <Route path="/signup/cancel" element={<SignupCancel />} />
           <Route path="/auth" element={<Auth />} />
           <Route path="/reset-password" element={<ResetPassword />} />
           <Route path="/company-setup" element={<AuthOnlyRoute><CompanySetup /></AuthOnlyRoute>} />

@@ -12,16 +12,14 @@ function json(payload: unknown, status = 200) {
   });
 }
 
-export default async (req: Request) => {
-  // ✅ Preflight CORS
+// Business constants
+const FREE_PLAN_ID = "460d1274-59bc-4c99-a815-c3c1d52d0803";
+const BASIC_PLAN_ID = "ea1d515e-5557-4b5c-a0b1-cd5ea9d13fc0";
+const FREE_TRIAL_DAYS = 7;
+
+Deno.serve(async (req: Request) => {
   if (req.method === "OPTIONS") {
-    return new Response("ok", {
-      headers: {
-        "Access-Control-Allow-Origin": "*",
-        "Access-Control-Allow-Headers": "authorization, x-client-info, apikey, content-type",
-        "Access-Control-Allow-Methods": "POST, OPTIONS",
-      },
-    });
+    return new Response("ok", { headers: corsHeaders });
   }
 
   try {
@@ -36,7 +34,6 @@ export default async (req: Request) => {
       Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!
     );
 
-    // 1) Cargar intent
     const { data: intent, error: intentErr } = await supabaseAdmin
       .from("signup_intents")
       .select("*")
@@ -53,23 +50,34 @@ export default async (req: Request) => {
       return json({ error: "El intent no está en un estado válido" }, 409);
     }
 
-    // 2) Branch por provider
+    // Determine trial & billing plan
+    const trialDays = intent.plan_id === FREE_PLAN_ID ? FREE_TRIAL_DAYS : 0;
+    const billingPlanId = intent.plan_id === FREE_PLAN_ID ? BASIC_PLAN_ID : (intent.billing_plan_id ?? intent.plan_id);
+
+    // Load billing plan for better descriptions
+    const { data: plan, error: planErr } = await supabaseAdmin
+      .from("subscription_plans")
+      .select("id, name, price, active")
+      .eq("id", billingPlanId)
+      .single();
+
+    if (planErr || !plan || !plan.active) {
+      return json({ error: "Plan de cobro inválido" }, 400);
+    }
+
     if (provider === "stripe") {
       const stripeKey = Deno.env.get("STRIPE_SECRET_KEY");
       if (!stripeKey) return json({ error: "STRIPE_SECRET_KEY no configurado" }, 500);
 
-      const stripe = new Stripe(stripeKey, {
-        apiVersion: "2023-10-16",
-      });
+      const stripe = new Stripe(stripeKey, { apiVersion: "2023-10-16" });
 
-      // Customer
       const customer = await stripe.customers.create({
         email: intent.email,
         name: intent.full_name ?? undefined,
         metadata: { intent_id: intent.id },
       });
 
-      // Checkout Session (subscription + trial)
+      // IMPORTANT: Stripe trial is set at subscription level
       const session = await stripe.checkout.sessions.create({
         mode: "subscription",
         customer: customer.id,
@@ -81,15 +89,16 @@ export default async (req: Request) => {
               unit_amount: Math.round(Number(intent.amount_usd) * 100),
               recurring: { interval: "month" },
               product_data: {
-                name: "Suscripción mensual",
-                description: `Plan ${intent.plan_id}`,
+                name: `Suscripción ${plan.name}`,
+                description:
+                  trialDays > 0 ? `Prueba gratis ${trialDays} días → se cobra luego` : `Plan ${billingPlanId}`,
               },
             },
             quantity: 1,
           },
         ],
         subscription_data: {
-          trial_period_days: 7,
+          trial_period_days: trialDays > 0 ? trialDays : undefined,
           metadata: { intent_id: intent.id },
         },
         success_url,
@@ -97,13 +106,14 @@ export default async (req: Request) => {
         metadata: { intent_id: intent.id },
       });
 
-      // Persistir
       const { error: updErr } = await supabaseAdmin
         .from("signup_intents")
         .update({
           status: "checkout_created",
           stripe_customer_id: customer.id,
           stripe_checkout_session_id: session.id,
+          billing_plan_id: billingPlanId,
+          trial_days: trialDays,
         })
         .eq("id", intent_id);
 
@@ -116,22 +126,30 @@ export default async (req: Request) => {
       const mpToken = Deno.env.get("MP_ACCESS_TOKEN");
       if (!mpToken) return json({ error: "MP_ACCESS_TOKEN no configurado" }, 500);
 
-      // Validar monto ARS
       if (!intent.amount_ars) {
         return json({ error: "intent.amount_ars es requerido para Mercado Pago" }, 400);
       }
 
-      // 2.1) Crear preapproval_plan
+      const amountArs = Math.round(Number(intent.amount_ars));
+      if (!isFinite(amountArs) || amountArs <= 0) {
+        return json({ error: "intent.amount_ars inválido" }, 400);
+      }
+
+      const autoRecurring: any = {
+        frequency: 1,
+        frequency_type: "months",
+        transaction_amount: amountArs,
+        currency_id: "ARS",
+      };
+
+      if (trialDays > 0) {
+        autoRecurring.free_trial = { frequency: trialDays, frequency_type: "days" };
+      }
+
       const planPayload = {
-        reason: `Suscripción ${intent.plan_id}`,
+        reason: trialDays > 0 ? `Prueba gratis ${trialDays} días → ${plan.name}` : `Suscripción ${plan.name}`,
         external_reference: intent.id,
-        auto_recurring: {
-          frequency: 1,
-          frequency_type: "months",
-          transaction_amount: Number(intent.amount_ars),
-          currency_id: "ARS",
-          free_trial: { frequency: 7, frequency_type: "days" },
-        },
+        auto_recurring: autoRecurring,
         back_url: success_url,
       };
 
@@ -146,48 +164,26 @@ export default async (req: Request) => {
 
       if (!planRes.ok) {
         const errTxt = await planRes.text();
+        console.log("MP plan error payload:", planPayload);
+        console.log("MP plan error response:", errTxt);
         return json({ error: `MP plan error: ${errTxt}` }, 502);
       }
 
       const mpPlan = await planRes.json();
 
-      // 2.2) Crear preapproval
-      const preapprovalPayload = {
-        preapproval_plan_id: mpPlan.id,
-        reason: planPayload.reason,
-        external_reference: intent.id,
-        payer_email: intent.email,
-        back_url: success_url,
-      };
-
-      const preRes = await fetch("https://api.mercadopago.com/preapproval", {
-        method: "POST",
-        headers: {
-          Authorization: `Bearer ${mpToken}`,
-          "Content-Type": "application/json",
-        },
-        body: JSON.stringify(preapprovalPayload),
-      });
-
-      if (!preRes.ok) {
-        const errTxt = await preRes.text();
-        return json({ error: `MP preapproval error: ${errTxt}` }, 502);
-      }
-
-      const mpPre = await preRes.json();
-
-      const checkoutUrl = mpPre.init_point || mpPre.sandbox_init_point;
+      const checkoutUrl = mpPlan.init_point || mpPlan.sandbox_init_point;
       if (!checkoutUrl) {
-        return json({ error: "MP no devolvió init_point/sandbox_init_point" }, 502);
+        console.log("MP plan response (no init_point):", mpPlan);
+        return json({ error: "MP no devolvió init_point/sandbox_init_point en preapproval_plan" }, 502);
       }
 
-      // Persistir IDs MP en intent
       const { error: updErr } = await supabaseAdmin
         .from("signup_intents")
         .update({
           status: "checkout_created",
           mp_preapproval_plan_id: mpPlan.id,
-          mp_preapproval_id: mpPre.id,
+          billing_plan_id: billingPlanId,
+          trial_days: trialDays,
         })
         .eq("id", intent_id);
 
@@ -200,4 +196,4 @@ export default async (req: Request) => {
   } catch (e) {
     return json({ error: String(e) }, 500);
   }
-};
+});

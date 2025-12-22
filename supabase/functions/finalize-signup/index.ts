@@ -9,16 +9,14 @@ function json(payload: unknown, status = 200) {
   });
 }
 
-export default async (req: Request) => {
-  // ✅ Preflight CORS
+// Business constants
+const FREE_PLAN_ID = "460d1274-59bc-4c99-a815-c3c1d52d0803";
+const BASIC_PLAN_ID = "ea1d515e-5557-4b5c-a0b1-cd5ea9d13fc0";
+const FREE_TRIAL_DAYS = 7;
+
+Deno.serve(async (req: Request) => {
   if (req.method === "OPTIONS") {
-    return new Response("ok", {
-      headers: {
-        "Access-Control-Allow-Origin": "*",
-        "Access-Control-Allow-Headers": "authorization, x-client-info, apikey, content-type",
-        "Access-Control-Allow-Methods": "POST, OPTIONS",
-      },
-    });
+    return new Response("ok", { headers: corsHeaders });
   }
 
   try {
@@ -33,7 +31,6 @@ export default async (req: Request) => {
       Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!
     );
 
-    // 1️⃣ Obtener signup_intent
     const { data: intent, error: intentErr } = await supabaseAdmin
       .from("signup_intents")
       .select("*")
@@ -45,19 +42,25 @@ export default async (req: Request) => {
     }
 
     if (intent.status !== "paid_ready") {
-      return json({ error: "El pago aún no fue confirmado" }, 409);
+      return json({ error: "El pago/autorización aún no fue confirmado" }, 409);
     }
 
+    // Determine final billed plan (basic if free was chosen)
+    const finalPlanId = intent.plan_id === FREE_PLAN_ID ? BASIC_PLAN_ID : (intent.billing_plan_id ?? intent.plan_id);
+
+    // Trial settings
+    const trialEndsAt =
+      intent.plan_id === FREE_PLAN_ID
+        ? new Date(Date.now() + FREE_TRIAL_DAYS * 24 * 60 * 60 * 1000).toISOString()
+        : (intent.trial_ends_at ?? null);
+
     // 2️⃣ Crear usuario Auth (admin)
-    const { data: createdUser, error: userErr } =
-      await supabaseAdmin.auth.admin.createUser({
-        email: intent.email,
-        password,
-        email_confirm: true,
-        user_metadata: {
-          full_name: intent.full_name ?? null,
-        },
-      });
+    const { data: createdUser, error: userErr } = await supabaseAdmin.auth.admin.createUser({
+      email: intent.email,
+      password,
+      email_confirm: true,
+      user_metadata: { full_name: intent.full_name ?? null },
+    });
 
     if (userErr || !createdUser?.user) {
       return json({ error: String(userErr?.message ?? "No se pudo crear el usuario") }, 500);
@@ -82,55 +85,43 @@ export default async (req: Request) => {
 
     const companyId = company.id;
 
-    // 4️⃣ Asociar usuario a empresa como ADMIN (dueño)
-    const { error: cuErr } = await supabaseAdmin
-      .from("company_users")
-      .insert({
-        company_id: companyId,
-        user_id: userId,
-        role: "admin",
-        active: true,
-        platform_admin: false,
-      });
+    // 4️⃣ Asociar usuario a empresa como ADMIN
+    const { error: cuErr } = await supabaseAdmin.from("company_users").insert({
+      company_id: companyId,
+      user_id: userId,
+      role: "admin",
+      active: true,
+      platform_admin: false,
+    });
 
     if (cuErr) return json({ error: String(cuErr.message ?? cuErr) }, 500);
 
-    // 5️⃣ Crear suscripción (1 por empresa)
+    // 5️⃣ Crear suscripción (se guarda como plan final; si venía de Free, queda Basic trialing)
     const providerSubscriptionId =
-      intent.provider === "stripe"
-        ? intent.stripe_subscription_id
-        : intent.mp_preapproval_id;
+      intent.provider === "stripe" ? intent.stripe_subscription_id : intent.mp_preapproval_id;
 
-    const providerCustomerId =
-      intent.provider === "stripe"
-        ? intent.stripe_customer_id
-        : null;
+    const providerCustomerId = intent.provider === "stripe" ? intent.stripe_customer_id : null;
 
-    const { error: subErr } = await supabaseAdmin
-      .from("subscriptions")
-      .insert({
-        company_id: companyId,
-        plan_id: intent.plan_id,
-        provider: intent.provider,
-        provider_customer_id: providerCustomerId,
-        provider_subscription_id: providerSubscriptionId,
-        status: "trialing",
-        trial_ends_at: intent.trial_ends_at ?? null,
-        current_period_end: intent.current_period_end ?? null,
-        amount_usd: intent.amount_usd,
-        amount_ars: intent.amount_ars ?? null,
-        fx_rate_usd_ars: intent.fx_rate_usd_ars ?? null,
-        fx_rate_at: intent.fx_rate_at ?? null,
-        modules: intent.modules ?? [],
-      });
+    const { error: subErr } = await supabaseAdmin.from("subscriptions").insert({
+      company_id: companyId,
+      plan_id: finalPlanId,
+      provider: intent.provider,
+      provider_customer_id: providerCustomerId,
+      provider_subscription_id: providerSubscriptionId,
+      status: "trialing",
+      trial_ends_at: trialEndsAt,
+      current_period_end: trialEndsAt,
+      amount_usd: intent.amount_usd,
+      amount_ars: intent.amount_ars ?? null,
+      fx_rate_usd_ars: intent.fx_rate_usd_ars ?? null,
+      fx_rate_at: intent.fx_rate_at ?? null,
+      modules: intent.modules ?? [],
+    });
 
     if (subErr) return json({ error: String(subErr.message ?? subErr) }, 500);
 
     // 6️⃣ Marcar intent como completado
-    const { error: updErr } = await supabaseAdmin
-      .from("signup_intents")
-      .update({ status: "completed" })
-      .eq("id", intent_id);
+    const { error: updErr } = await supabaseAdmin.from("signup_intents").update({ status: "completed" }).eq("id", intent_id);
 
     if (updErr) return json({ error: String(updErr.message ?? updErr) }, 500);
 
@@ -138,4 +129,4 @@ export default async (req: Request) => {
   } catch (e) {
     return json({ error: String(e) }, 500);
   }
-};
+});

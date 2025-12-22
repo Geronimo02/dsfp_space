@@ -1,12 +1,11 @@
+// supabase/functions/create-intent/index.ts
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2.49.1";
+import { corsHeaders } from "../_shared/cors.ts";
 
 function json(payload: unknown, status = 200) {
   return new Response(JSON.stringify(payload), {
     status,
-    headers: {
-      "Content-Type": "application/json",
-      "Access-Control-Allow-Origin": "*",
-    },
+    headers: { ...corsHeaders, "Content-Type": "application/json" },
   });
 }
 
@@ -14,19 +13,14 @@ function round2(n: number): number {
   return Math.round(n * 100) / 100;
 }
 
-export default async (req: Request) => {
-  if (req.method === "OPTIONS") {
-    return new Response(null, {
-      status: 204,
-      headers: {
-        "Access-Control-Allow-Origin": "*",
-        "Access-Control-Allow-Methods": "POST",
-        "Access-Control-Allow-Headers": "authorization, x-client-info, apikey, content-type",
-      },
-    });
-  }
+// Business constants
+const FREE_PLAN_ID = "460d1274-59bc-4c99-a815-c3c1d52d0803";
+const BASIC_PLAN_ID = "ea1d515e-5557-4b5c-a0b1-cd5ea9d13fc0";
 
-  console.log(`[create-intent] ${req.method} started`);
+Deno.serve(async (req: Request) => {
+  if (req.method === "OPTIONS") {
+    return new Response("ok", { status: 200, headers: corsHeaders });
+  }
 
   try {
     if (req.method !== "POST") {
@@ -34,7 +28,6 @@ export default async (req: Request) => {
     }
 
     const body = await req.json();
-    console.log("[create-intent] Body:", body);
 
     const { email, full_name, company_name, plan_id, modules, provider } = body;
 
@@ -56,27 +49,33 @@ export default async (req: Request) => {
 
     const supabaseAdmin = createClient(supabaseUrl, supabaseKey);
 
-    console.log("[create-intent] Validating plan");
+    // If user selected "Free trial", bill Basic after trial
+    const billingPlanId = plan_id === FREE_PLAN_ID ? BASIC_PLAN_ID : plan_id;
+
+    // Validate billing plan exists and active
     const { data: plan, error: planErr } = await supabaseAdmin
       .from("subscription_plans")
       .select("id, price, active")
-      .eq("id", plan_id)
+      .eq("id", billingPlanId)
       .single();
 
     if (planErr || !plan || !plan.active) {
-      console.log("[create-intent] Plan error:", planErr);
       return json({ error: "Plan inválido" }, 400);
     }
 
     const modulesArr: string[] = Array.isArray(modules) ? modules : [];
     const modulesPrice = modulesArr.length * 10;
+
+    // Compute amount based on billing plan (basic if free selected)
     const amount_usd = round2(Number(plan.price) + modulesPrice);
 
     if (!isFinite(amount_usd) || amount_usd <= 0) {
+      // If FREE selected and BASIC price is 0 somehow, still allow intent (but usually BASIC > 0)
+      // To keep strictness, return error.
       return json({ error: "amount_usd inválido" }, 400);
     }
 
-    // Use fixed rate for MercadoPago (no external API call)
+    // Fixed rate for MercadoPago (replace later with FX)
     const FIXED_USD_ARS = 1000;
     let amount_ars: number | null = null;
     let fx_rate_usd_ars: number | null = null;
@@ -86,17 +85,21 @@ export default async (req: Request) => {
       fx_rate_usd_ars = FIXED_USD_ARS;
       fx_rate_at = new Date().toISOString();
       amount_ars = round2(amount_usd * FIXED_USD_ARS);
-      console.log(`[create-intent] MercadoPago: ${amount_usd} USD = ${amount_ars} ARS`);
     }
 
-    console.log("[create-intent] Inserting intent");
     const { data: intent, error: insErr } = await supabaseAdmin
       .from("signup_intents")
       .insert({
         email: String(email).trim().toLowerCase(),
         full_name: full_name ?? null,
         company_name: company_name ?? null,
+
+        // store what user picked
         plan_id,
+
+        // store what we'll actually bill (basic if free selected)
+        billing_plan_id: billingPlanId,
+
         modules: modulesArr,
         provider: providerNorm,
         status: "draft",
@@ -109,14 +112,11 @@ export default async (req: Request) => {
       .single();
 
     if (insErr || !intent) {
-      console.error("[create-intent] Insert error:", insErr);
       return json({ error: `Insert failed: ${insErr?.message}` }, 500);
     }
 
-    console.log("[create-intent] Success:", intent.id);
     return json({ intent_id: intent.id }, 200);
   } catch (e) {
-    console.error("[create-intent] Error:", e);
     return json({ error: String(e) }, 500);
   }
-};
+});

@@ -1,0 +1,188 @@
+import { useEffect, useState } from "react";
+import { useNavigate, useSearchParams } from "react-router-dom";
+import { supabase } from "@/integrations/supabase/client";
+import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
+import { Button } from "@/components/ui/button";
+import { Loader2, CheckCircle2, XCircle, Clock } from "lucide-react";
+import { toast } from "sonner";
+
+export default function SignupSuccess() {
+  const [searchParams] = useSearchParams();
+  const navigate = useNavigate();
+  const intentId = searchParams.get("intent_id");
+
+  const [status, setStatus] = useState<"checking" | "paid_ready" | "timeout" | "error">("checking");
+  const [attempts, setAttempts] = useState(0);
+  const [password, setPassword] = useState("");
+
+  useEffect(() => {
+    // Try to get password from localStorage
+    const savedData = localStorage.getItem("signup_wizard_data");
+    if (savedData) {
+      try {
+        const data = JSON.parse(savedData);
+        setPassword(data.password);
+      } catch (e) {
+        console.error("Error loading password:", e);
+      }
+    }
+  }, []);
+
+  useEffect(() => {
+    if (!intentId) {
+      setStatus("error");
+      return;
+    }
+
+    const checkStatus = async () => {
+      try {
+        const { data, error } = await supabase
+          .from("signup_intents")
+          .select("status")
+          .eq("id", intentId)
+          .single();
+
+        if (error) throw error;
+
+        console.log("[SignupSuccess] Intent status:", data.status);
+
+        if (data.status === "paid_ready") {
+          setStatus("paid_ready");
+          // Automatically finalize signup
+          await finalizeSignup();
+        } else if (attempts >= 30) {
+          // 30 attempts * 2s = 60s
+          setStatus("timeout");
+        }
+      } catch (error) {
+        console.error("[SignupSuccess] Error checking status:", error);
+        setStatus("error");
+      }
+    };
+
+    if (status === "checking") {
+      const interval = setInterval(() => {
+        setAttempts((prev) => prev + 1);
+        checkStatus();
+      }, 2000);
+
+      // Initial check
+      checkStatus();
+
+      return () => clearInterval(interval);
+    }
+  }, [intentId, status, attempts]);
+
+  const finalizeSignup = async () => {
+    if (!intentId || !password) {
+      toast.error("Faltan datos para finalizar el registro");
+      return;
+    }
+
+    try {
+      console.log("[SignupSuccess] Finalizing signup...");
+
+      const { data, error } = await supabase.functions.invoke("finalize-signup", {
+        body: {
+          intent_id: intentId,
+          password: password,
+        },
+      });
+
+      if (error) throw error;
+
+      console.log("[SignupSuccess] Signup finalized:", data);
+
+      // Clear localStorage
+      localStorage.removeItem("signup_wizard_data");
+      localStorage.removeItem("signup_intent_id");
+
+      toast.success("¡Cuenta creada exitosamente!");
+
+      // Redirect to login
+      setTimeout(() => {
+        navigate("/auth");
+      }, 1500);
+    } catch (error) {
+      console.error("[SignupSuccess] Error finalizing:", error);
+      toast.error(`Error al finalizar registro: ${error}`);
+      setStatus("error");
+    }
+  };
+
+  const handleRetry = () => {
+    setStatus("checking");
+    setAttempts(0);
+  };
+
+  return (
+    <div className="min-h-screen bg-gradient-to-br from-background via-background to-muted/20 flex items-center justify-center p-4">
+      <Card className="max-w-md w-full">
+        <CardHeader>
+          <CardTitle className="text-center">
+            {status === "checking" && "Verificando pago..."}
+            {status === "paid_ready" && "¡Pago confirmado!"}
+            {status === "timeout" && "Verificación en curso"}
+            {status === "error" && "Error"}
+          </CardTitle>
+          <CardDescription className="text-center">
+            {status === "checking" && "Estamos confirmando tu pago. Por favor espera..."}
+            {status === "paid_ready" && "Configurando tu cuenta empresarial"}
+            {status === "timeout" && "El proceso está tomando más tiempo del esperado"}
+            {status === "error" && "Ocurrió un error al verificar el pago"}
+          </CardDescription>
+        </CardHeader>
+        <CardContent className="space-y-6">
+          <div className="flex justify-center">
+            {status === "checking" && <Loader2 className="w-16 h-16 animate-spin text-primary" />}
+            {status === "paid_ready" && <CheckCircle2 className="w-16 h-16 text-green-500" />}
+            {status === "timeout" && <Clock className="w-16 h-16 text-amber-500" />}
+            {status === "error" && <XCircle className="w-16 h-16 text-destructive" />}
+          </div>
+
+          {status === "checking" && (
+            <div className="text-center space-y-2">
+              <p className="text-sm text-muted-foreground">
+                Tiempo transcurrido: {attempts * 2} segundos
+              </p>
+              <div className="w-full bg-muted rounded-full h-2">
+                <div
+                  className="bg-primary h-2 rounded-full transition-all"
+                  style={{ width: `${(attempts / 30) * 100}%` }}
+                />
+              </div>
+            </div>
+          )}
+
+          {status === "timeout" && (
+            <div className="space-y-4">
+              <p className="text-sm text-center">
+                El pago puede estar siendo procesado. Puedes intentar refrescar la página o contactar
+                soporte.
+              </p>
+              <div className="flex gap-2">
+                <Button onClick={handleRetry} className="flex-1">
+                  Reintentar
+                </Button>
+                <Button variant="outline" onClick={() => navigate("/auth")} className="flex-1">
+                  Ir a login
+                </Button>
+              </div>
+            </div>
+          )}
+
+          {status === "error" && (
+            <div className="space-y-4">
+              <p className="text-sm text-center text-destructive">
+                No pudimos verificar tu pago. Por favor contacta a soporte con el ID: {intentId}
+              </p>
+              <Button onClick={() => navigate("/signup")} className="w-full">
+                Volver al registro
+              </Button>
+            </div>
+          )}
+        </CardContent>
+      </Card>
+    </div>
+  );
+}
