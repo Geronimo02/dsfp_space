@@ -2,7 +2,7 @@ import "https://deno.land/x/xhr@0.1.0/mod.ts";
 import { serve } from "https://deno.land/std@0.168.0/http/server.ts";
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
 
-const LOVABLE_API_KEY = Deno.env.get('LOVABLE_API_KEY');
+const OPENAI_API_KEY = Deno.env.get('OPENAI_API_KEY');
 const supabaseUrl = Deno.env.get('SUPABASE_URL')!;
 const supabaseServiceKey = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')!;
 
@@ -63,8 +63,8 @@ serve(async (req) => {
       }
     }
     
-    if (!LOVABLE_API_KEY) {
-      throw new Error('LOVABLE_API_KEY no configurada');
+    if (!OPENAI_API_KEY) {
+      throw new Error('OPENAI_API_KEY no configurada');
     }
 
     let systemPrompt = '';
@@ -306,7 +306,7 @@ Sé claro y directo en tus análisis.`;
 
       const { data: expenses } = await supabaseClient
         .from('expenses')
-        .select('amount, category, expense_date')
+        .select('amount, category_id, expense_date')
         .eq('company_id', companyId)
         .gte('expense_date', new Date(Date.now() - 30 * 24 * 60 * 60 * 1000).toISOString().split('T')[0]);
 
@@ -323,7 +323,7 @@ Sé claro y directo en tus análisis.`;
       // Expenses by category
       const expensesByCategory: Record<string, number> = {};
       expenses?.forEach(e => {
-        expensesByCategory[e.category || 'otros'] = (expensesByCategory[e.category || 'otros'] || 0) + (e.amount || 0);
+        expensesByCategory[e.category_id || 'otros'] = (expensesByCategory[e.category_id || 'otros'] || 0) + (e.amount || 0);
       });
 
       dataContext = `
@@ -357,20 +357,22 @@ Responde en español de forma profesional pero accesible.`;
       dataContext = context || 'El usuario solicita un análisis general del negocio.';
     }
 
-    console.log('Sending request to Lovable AI:', { type, queryLength: query?.length });
+    console.log('Sending request to OpenAI:', { type, queryLength: query?.length });
 
-    const response = await fetch('https://ai.gateway.lovable.dev/v1/chat/completions', {
+    const response = await fetch('https://api.openai.com/v1/chat/completions', {
       method: 'POST',
       headers: {
-        'Authorization': `Bearer ${LOVABLE_API_KEY}`,
+        'Authorization': `Bearer ${OPENAI_API_KEY}`,
         'Content-Type': 'application/json',
       },
       body: JSON.stringify({
-        model: 'google/gemini-2.5-flash',
+        model: 'gpt-4o-mini',
         messages: [
           { role: 'system', content: systemPrompt },
           { role: 'user', content: `${dataContext}\n\n---\n\nConsulta del usuario: ${query}` }
         ],
+        max_tokens: 2000,
+        temperature: 0.7,
       }),
     });
 
@@ -381,21 +383,15 @@ Responde en español de forma profesional pero accesible.`;
           headers: { ...corsHeaders, 'Content-Type': 'application/json' },
         });
       }
-      if (response.status === 402) {
-        return new Response(JSON.stringify({ error: 'Créditos agotados. Recarga tus créditos para continuar.' }), {
-          status: 402,
-          headers: { ...corsHeaders, 'Content-Type': 'application/json' },
-        });
-      }
       const errorData = await response.text();
-      console.error('Lovable AI error:', response.status, errorData);
-      throw new Error(`Error de IA: ${response.status}`);
+      console.error('OpenAI error:', response.status, errorData);
+      throw new Error(`Error de OpenAI: ${response.status}`);
     }
 
     const data = await response.json();
     const aiResponse = data.choices[0].message.content;
 
-    console.log('Response generated successfully');
+    console.log('Response generated successfully with OpenAI');
 
     return new Response(JSON.stringify({ response: aiResponse }), {
       headers: { ...corsHeaders, 'Content-Type': 'application/json' },
