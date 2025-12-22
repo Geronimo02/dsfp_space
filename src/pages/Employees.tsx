@@ -227,20 +227,20 @@ const Employees = () => {
 
           <TabsContent value="list">
             <Card>
-              <CardHeader>
-                <div className="flex items-center justify-between">
+              <CardHeader className="p-3 sm:p-6">
+                <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
                   <div>
-                    <CardTitle>Gestión de Empleados</CardTitle>
-                    <CardDescription>
-                      Administra la información de tus empleados y su información laboral
+                    <CardTitle className="text-base sm:text-lg">Gestión de Empleados</CardTitle>
+                    <CardDescription className="text-xs sm:text-sm">
+                      Administra la información de tus empleados
                     </CardDescription>
                   </div>
                   {canCreate && (
                     <Dialog open={dialogOpen} onOpenChange={setDialogOpen}>
                       <DialogTrigger asChild>
-                        <Button onClick={handleOpenDialog}>
+                        <Button onClick={handleOpenDialog} size="sm" className="w-full sm:w-auto">
                           <Plus className="mr-2 h-4 w-4" />
-                          Nuevo Empleado
+                          <span className="sm:inline">Nuevo Empleado</span>
                         </Button>
                       </DialogTrigger>
                       <DialogContent className="max-w-2xl max-h-[90vh] overflow-y-auto">
@@ -255,7 +255,7 @@ const Employees = () => {
                             }
                           </DialogDescription>
                         </DialogHeader>
-                        <div className="grid grid-cols-2 gap-4 py-4">
+                        <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 py-4">
                           <div className="space-y-2">
                             <Label htmlFor="first_name">Nombre *</Label>
                             <Input
@@ -413,17 +413,17 @@ const Employees = () => {
                           <TableCell className="font-medium">
                             {employee.first_name} {employee.last_name}
                           </TableCell>
-                          <TableCell>
+                          <TableCell className="hidden sm:table-cell text-xs sm:text-sm">
                             {employee.document_type} {employee.document_number}
                           </TableCell>
-                          <TableCell>{employee.position || "-"}</TableCell>
-                          <TableCell>{employee.department || "-"}</TableCell>
-                          <TableCell>
+                          <TableCell className="hidden md:table-cell text-xs sm:text-sm">{employee.position || "-"}</TableCell>
+                          <TableCell className="hidden lg:table-cell text-xs sm:text-sm">{employee.department || "-"}</TableCell>
+                          <TableCell className="hidden lg:table-cell text-xs sm:text-sm">
                             {employee.hire_date
                               ? format(new Date(employee.hire_date), "dd/MM/yyyy", { locale: es })
                               : "-"}
                           </TableCell>
-                          <TableCell>${employee.base_salary?.toLocaleString() || 0}</TableCell>
+                          <TableCell className="hidden md:table-cell text-xs sm:text-sm">${employee.base_salary?.toLocaleString() || 0}</TableCell>
                           <TableCell>
                             <Badge variant={employee.active ? "default" : "secondary"}>
                               {employee.active ? "Activo" : "Inactivo"}

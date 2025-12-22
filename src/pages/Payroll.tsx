@@ -223,27 +223,30 @@ const Payroll = () => {
     <Layout>
       <div className="container mx-auto p-6 space-y-6">
         {/* Header */}
-        <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
-          <div>
-            <h1 className="text-3xl font-bold flex items-center gap-2">
-              <DollarSign className="h-8 w-8" />
-              Liquidaciones de Sueldo
-            </h1>
-            <p className="text-muted-foreground">
-              Gestión de recibos de sueldo y cargas sociales
-            </p>
+        <div className="flex flex-col gap-4">
+          <div className="flex items-center gap-2">
+            <DollarSign className="h-6 w-6 sm:h-8 sm:w-8" />
+            <div>
+              <h1 className="text-xl sm:text-3xl font-bold">
+                Liquidaciones
+              </h1>
+              <p className="text-xs sm:text-sm text-muted-foreground">
+                Gestión de recibos de sueldo
+              </p>
+            </div>
           </div>
-          <div className="flex gap-2">
-            <Button variant="outline" onClick={() => setShowCalculator(!showCalculator)}>
-              <Calculator className="mr-2 h-4 w-4" />
-              Simulador
+          <div className="flex flex-wrap gap-2">
+            <Button variant="outline" size="sm" onClick={() => setShowCalculator(!showCalculator)}>
+              <Calculator className="mr-1 sm:mr-2 h-4 w-4" />
+              <span className="hidden sm:inline">Simulador</span>
             </Button>
             {canCreate && (
               <Dialog open={dialogOpen} onOpenChange={setDialogOpen}>
                 <DialogTrigger asChild>
-                  <Button>
-                    <Plus className="mr-2 h-4 w-4" />
-                    Nueva Liquidación
+                  <Button size="sm">
+                    <Plus className="mr-1 sm:mr-2 h-4 w-4" />
+                    <span className="hidden sm:inline">Nueva Liquidación</span>
+                    <span className="sm:hidden">Nueva</span>
                   </Button>
                 </DialogTrigger>
                 <DialogContent>
@@ -435,13 +438,13 @@ const Payroll = () => {
                       <TableCell className="text-xs sm:text-sm">
                         {months.find(m => m.value === String(liquidation.period_month))?.label?.substring(0, 3)} {liquidation.period_year}
                       </TableCell>
-                      <TableCell className="text-right hidden sm:table-cell">
+                      <TableCell className="text-right hidden sm:table-cell text-xs sm:text-sm">
                         ${liquidation.total_remunerative.toLocaleString()}
                       </TableCell>
-                      <TableCell className="text-right text-destructive">
+                      <TableCell className="text-right text-destructive hidden md:table-cell text-xs sm:text-sm">
                         -${liquidation.total_deductions.toLocaleString()}
                       </TableCell>
-                      <TableCell className="text-right font-semibold text-primary">
+                      <TableCell className="text-right font-semibold text-primary text-xs sm:text-sm">
                         ${liquidation.net_salary.toLocaleString()}
                       </TableCell>
                       <TableCell>{getStatusBadge(liquidation.status)}</TableCell>
