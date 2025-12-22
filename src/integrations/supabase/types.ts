@@ -2622,18 +2622,37 @@ export type Database = {
       }
       integration_secrets: {
         Row: {
+          company_id: string | null
+          created_at: string | null
           id: string
+          key_name: string | null
           secret: Json | null
+          updated_at: string | null
         }
         Insert: {
+          company_id?: string | null
+          created_at?: string | null
           id: string
+          key_name?: string | null
           secret?: Json | null
+          updated_at?: string | null
         }
         Update: {
+          company_id?: string | null
+          created_at?: string | null
           id?: string
+          key_name?: string | null
           secret?: Json | null
+          updated_at?: string | null
         }
         Relationships: [
+          {
+            foreignKeyName: "integration_secrets_company_id_fkey"
+            columns: ["company_id"]
+            isOneToOne: false
+            referencedRelation: "companies"
+            referencedColumns: ["id"]
+          },
           {
             foreignKeyName: "integration_secrets_id_fkey"
             columns: ["id"]
