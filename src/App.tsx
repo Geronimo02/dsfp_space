@@ -35,7 +35,6 @@ import BulkOperations from "./pages/BulkOperations";
 import Warehouses from "./pages/Warehouses";
 import WarehouseStock from "./pages/WarehouseStock";
 import WarehouseTransfers from "./pages/WarehouseTransfers";
-import CompanySetup from "./pages/CompanySetup";
 import ResetPassword from "./pages/ResetPassword";
 import POSPoints from "./pages/POSPoints";
 import SignupFlowTester from "./pages/SignUpFlowTester";
@@ -82,7 +81,7 @@ function CompanyCheck({ children }: { children: React.ReactNode }) {
   }
 
   if (shouldRedirect) {
-    return <Navigate to="/company-setup" replace />;
+    return <Navigate to="/signup" replace />;
   }
 
   if (!currentCompany) {
@@ -215,7 +214,7 @@ const App = () => (
           <Route path="/signup/cancel" element={<SignupCancel />} />
           <Route path="/auth" element={<Auth />} />
           <Route path="/reset-password" element={<ResetPassword />} />
-          <Route path="/company-setup" element={<AuthOnlyRoute><CompanySetup /></AuthOnlyRoute>} />
+          <Route path="/company-setup" element={<Navigate to="/signup" replace />} />
           <Route path="/" element={<ProtectedRoute><Dashboard /></ProtectedRoute>} />
           <Route path="/pos" element={<ProtectedRoute><POS /></ProtectedRoute>} />
           <Route path="/products" element={<ProtectedRoute><Products /></ProtectedRoute>} />
