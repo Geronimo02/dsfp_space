@@ -362,41 +362,41 @@ const Reports = () => {
 
   return (
     <Layout>
-      <div className="space-y-6">
-        <div className="flex items-center justify-between">
+      <div className="space-y-4 md:space-y-6">
+        <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
           <div>
-            <h1 className="text-3xl font-bold">Reportes y Análisis</h1>
-            <p className="text-muted-foreground">Visualiza el rendimiento de tu negocio</p>
+            <h1 className="text-2xl md:text-3xl font-bold">Reportes</h1>
+            <p className="text-sm text-muted-foreground hidden sm:block">Visualiza el rendimiento de tu negocio</p>
           </div>
           <div className="flex gap-2">
             <Select value={dateRange} onValueChange={setDateRange}>
-              <SelectTrigger className="w-[180px]">
+              <SelectTrigger className="w-[130px] md:w-[180px]">
                 <SelectValue />
               </SelectTrigger>
               <SelectContent>
-                <SelectItem value="7">Últimos 7 días</SelectItem>
-                <SelectItem value="15">Últimos 15 días</SelectItem>
-                <SelectItem value="30">Últimos 30 días</SelectItem>
-                <SelectItem value="90">Últimos 90 días</SelectItem>
+                <SelectItem value="7">7 días</SelectItem>
+                <SelectItem value="15">15 días</SelectItem>
+                <SelectItem value="30">30 días</SelectItem>
+                <SelectItem value="90">90 días</SelectItem>
               </SelectContent>
             </Select>
             <Select value={reportCurrency} onValueChange={setReportCurrency}>
-              <SelectTrigger className="w-[140px]">
+              <SelectTrigger className="w-[100px] md:w-[140px]">
                 <SelectValue />
               </SelectTrigger>
               <SelectContent>
-                <SelectItem value="ARS">💵 ARS</SelectItem>
-                <SelectItem value="USD">💵 USD</SelectItem>
-                <SelectItem value="EUR">💶 EUR</SelectItem>
-                <SelectItem value="BRL">💵 BRL</SelectItem>
-                <SelectItem value="UYU">💵 UYU</SelectItem>
+                <SelectItem value="ARS">ARS</SelectItem>
+                <SelectItem value="USD">USD</SelectItem>
+                <SelectItem value="EUR">EUR</SelectItem>
+                <SelectItem value="BRL">BRL</SelectItem>
+                <SelectItem value="UYU">UYU</SelectItem>
               </SelectContent>
             </Select>
           </div>
         </div>
 
         {/* Resumen de métricas */}
-        <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-4">
+        <div className="grid gap-3 md:gap-4 grid-cols-2 lg:grid-cols-4">
           <StatCard
             title="Ventas Totales"
             value={formatCurrency(summary?.totalSales || 0)}
@@ -425,15 +425,17 @@ const Reports = () => {
 
         {/* Gráficos */}
         <Tabs defaultValue="sales" className="space-y-4">
-          <TabsList className="grid w-full grid-cols-7">
-            <TabsTrigger value="sales">Ventas</TabsTrigger>
-            <TabsTrigger value="customers">Por Cliente</TabsTrigger>
-            <TabsTrigger value="products">Productos</TabsTrigger>
-            <TabsTrigger value="balances">Saldos</TabsTrigger>
-            <TabsTrigger value="purchases">Compras</TabsTrigger>
-            <TabsTrigger value="payments">Pagos</TabsTrigger>
-            <TabsTrigger value="rotation">Rotación</TabsTrigger>
-          </TabsList>
+          <div className="overflow-x-auto -mx-4 px-4">
+            <TabsList className="inline-flex w-auto min-w-full md:grid md:w-full md:grid-cols-7">
+              <TabsTrigger value="sales" className="text-xs md:text-sm">Ventas</TabsTrigger>
+              <TabsTrigger value="customers" className="text-xs md:text-sm">Clientes</TabsTrigger>
+              <TabsTrigger value="products" className="text-xs md:text-sm">Productos</TabsTrigger>
+              <TabsTrigger value="balances" className="text-xs md:text-sm">Saldos</TabsTrigger>
+              <TabsTrigger value="purchases" className="text-xs md:text-sm">Compras</TabsTrigger>
+              <TabsTrigger value="payments" className="text-xs md:text-sm">Pagos</TabsTrigger>
+              <TabsTrigger value="rotation" className="text-xs md:text-sm">Rotación</TabsTrigger>
+            </TabsList>
+          </div>
 
           <TabsContent value="sales" className="space-y-4">
             <Card>
