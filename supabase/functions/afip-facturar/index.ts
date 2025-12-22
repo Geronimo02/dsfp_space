@@ -2,9 +2,21 @@
 import { serve } from "https://deno.land/std@0.168.0/http/server.ts";
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
 
-const corsHeaders = {
-  'Access-Control-Allow-Origin': '*',
-  'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type',
+// Allowed origins for CORS
+const ALLOWED_ORIGINS = [
+  "https://pjcfncnydhxrlnaowbae.supabase.co",
+  "http://localhost:5173",
+  "http://localhost:8080"
+];
+
+const getCorsHeaders = (origin: string | null) => {
+  const allowedOrigin = origin && ALLOWED_ORIGINS.some(allowed => 
+    origin === allowed || origin.endsWith('.lovableproject.com') || origin.endsWith('.lovable.app')
+  ) ? origin : ALLOWED_ORIGINS[0];
+  return {
+    'Access-Control-Allow-Origin': allowedOrigin,
+    'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type',
+  };
 };
 
 // WSFEv1 endpoints
@@ -37,6 +49,9 @@ interface FacturaRequest {
 }
 
 serve(async (req: Request) => {
+  const origin = req.headers.get('origin');
+  const corsHeaders = getCorsHeaders(origin);
+  
   if (req.method === 'OPTIONS') {
     return new Response('ok', { headers: corsHeaders });
   }
@@ -88,7 +103,8 @@ serve(async (req: Request) => {
     const numeroComprobante = ultimoNro;
 
     // Build SOAP request for CAESolicitar
-    const soapRequest = buildCAESolicitarRequest(
+    const soapRequest = await buildCAESolicitarRequest(
+      supabaseClient,
       credentials,
       facturaData,
       numeroComprobante
@@ -191,15 +207,26 @@ async function getAFIPCredentials(supabaseClient: any, companyId: string, ambien
   throw new Error('AFIP token expired. Please refresh authentication.');
 }
 
-function buildCAESolicitarRequest(
+async function buildCAESolicitarRequest(
+  supabaseClient: any,
   credentials: any,
   factura: FacturaRequest,
   numeroComprobante: number
-): string {
+): Promise<string> {
   const { token, sign } = credentials;
   
-  // Get company CUIT (should be passed in factura or fetched)
-  const cuit = "20123456789"; // This should come from company data
+  // Fetch company CUIT from database
+  const { data: company, error: companyError } = await supabaseClient
+    .from('companies')
+    .select('cuit')
+    .eq('id', factura.companyId)
+    .single();
+
+  if (companyError || !company?.cuit) {
+    throw new Error('Company CUIT not found or invalid. Please configure CUIT in company settings.');
+  }
+
+  const cuit = company.cuit;
 
   return `<?xml version="1.0" encoding="UTF-8"?>
 <soapenv:Envelope xmlns:soapenv="http://schemas.xmlsoap.org/soap/envelope/" xmlns:ar="http://ar.gov.afip.dif.FEV1/">
