@@ -1,7 +1,5 @@
 import { serve } from "https://deno.land/std@0.168.0/http/server.ts";
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
-// Editor helpers: declare global Deno when TS server can't resolve Deno types locally
-declare const Deno: any;
 
 // Restrict CORS to specific domains for security
 const ALLOWED_ORIGINS = [

@@ -1,6 +1,9 @@
 import { serve } from "https://deno.land/std@0.168.0/http/server.ts";
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
 
+interface UserRole {
+  role: string;
+}
 // Restrict CORS to specific domains for security
 const ALLOWED_ORIGINS = [
   "https://5670e5fc-c3f6-4b61-9f11-214ae88eb9ef.lovableproject.com",
@@ -55,7 +58,7 @@ serve(async (req) => {
       .select("role")
       .eq("user_id", user.id);
 
-    const isAdmin = roles?.some((r) => r.role === "admin");
+    const isAdmin = (roles as UserRole[] | null)?.some((r: UserRole) => r.role === "admin");
     if (!isAdmin) {
       throw new Error("Only admins can reset the database");
     }
