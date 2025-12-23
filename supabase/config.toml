@@ -45,6 +45,12 @@ verify_jwt = false
 [functions.invite-employee]
 verify_jwt = true
 
+[functions.notify-admins-platform-ticket]
+verify_jwt = true
+
+[functions.notify-platform-support-ticket]
+verify_jwt = true
+
 [functions.reset-database]
 verify_jwt = false
 
@@ -54,7 +60,13 @@ verify_jwt = true
 [functions.send-bulk-email]
 verify_jwt = true
 
+[functions.send-customer-support-notification]
+verify_jwt = true
+
 [functions.send-monthly-reports]
+verify_jwt = true
+
+[functions.send-whatsapp-ticket-notification]
 verify_jwt = true
 
 [functions.update-exchange-rates]

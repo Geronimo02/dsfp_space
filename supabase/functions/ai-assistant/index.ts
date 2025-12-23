@@ -2,6 +2,56 @@ import "https://deno.land/x/xhr@0.1.0/mod.ts";
 import { serve } from "https://deno.land/std@0.168.0/http/server.ts";
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
 
+// Type definitions
+interface Sale {
+  id?: string;
+  total?: number;
+  payment_method?: string;
+  created_at?: string;
+  customer_id?: string;
+}
+
+interface Product {
+  id: string;
+  name: string;
+  stock?: number;
+  min_stock?: number;
+  price?: number;
+}
+
+interface SaleItem {
+  product_id: string;
+  quantity: number;
+  created_at?: string;
+}
+
+interface Customer {
+  id: string;
+  name: string;
+  total_purchases?: number;
+  current_balance?: number;
+}
+
+interface Expense {
+  id?: string;
+  amount?: number;
+  category_id?: string;
+  expense_date?: string;
+}
+
+interface EnrichedProduct extends Product {
+  velocity_30d: number;
+  days_of_stock: number;
+  needs_reorder: boolean;
+}
+
+interface EnrichedCustomer extends Customer {
+  purchases?: number;
+  total?: number;
+  lastPurchase?: string;
+  daysSinceLastPurchase: number;
+}
+
 const OPENAI_API_KEY = Deno.env.get('OPENAI_API_KEY');
 const supabaseUrl = Deno.env.get('SUPABASE_URL')!;
 const supabaseServiceKey = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')!;
