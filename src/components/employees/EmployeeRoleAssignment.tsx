@@ -145,16 +145,28 @@ export function EmployeeRoleAssignment() {
               })()
             : rawBody;
 
-        throw new Error(
-          bodyObj?.error || ctx?.error || (error as any)?.message || "Error al enviar invitación"
-        );
+        const message =
+          bodyObj?.error || ctx?.error || (error as any)?.message || "Error al enviar invitación";
+
+        // If the user is already in the company, treat it as a non-fatal outcome.
+        if (typeof message === "string" && message.includes("ya pertenece a esta empresa")) {
+          return { already_member: true, message };
+        }
+
+        throw new Error(message);
       }
 
       return data;
     },
-    onSuccess: () => {
+    onSuccess: (result: any) => {
       queryClient.invalidateQueries({ queryKey: ["company-users"] });
-      toast.success("Invitación enviada correctamente");
+
+      if (result?.already_member) {
+        toast.info(result?.message || "El usuario ya pertenece a esta empresa");
+      } else {
+        toast.success("Invitación enviada correctamente");
+      }
+
       setInviteDialogOpen(false);
       setInviteEmail("");
       setInviteRole("employee");
