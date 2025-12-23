@@ -148,15 +148,15 @@ serve(async (req: Request) => {
       userId = data.user.id;
       
       // Send password reset email so user can set their password
-      const { error: resetError } = await supabaseAdmin.auth.admin.generateLink({
-        type: 'recovery',
-        email: email,
-        options: {
-          redirectTo: `${req.headers.get("origin") || "https://5670e5fc-c3f6-4b61-9f11-214ae88eb9ef.lovableproject.com"}/reset-password`,
-        }
+      // NOTE: admin.generateLink only GENERATES the link; it does not send an email.
+      const redirectTo = `${req.headers.get("origin") || "https://5670e5fc-c3f6-4b61-9f11-214ae88eb9ef.lovableproject.com"}/reset-password`;
+
+      const { data: resetData, error: resetError } = await supabaseAdmin.auth.resetPasswordForEmail(email, {
+        redirectTo,
       });
-      
-      if (resetError) console.error("Error sending password reset:", resetError);
+
+      console.log("Password reset email requested", { email, redirectTo, resetData });
+      if (resetError) console.error("Error requesting password reset email:", resetError);
 
       // Create company_users entry for new user
       const { error: companyUserError } = await supabaseAdmin
