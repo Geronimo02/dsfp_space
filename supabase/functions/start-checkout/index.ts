@@ -126,10 +126,34 @@ Deno.serve(async (req: Request) => {
       const mpToken = Deno.env.get("MP_ACCESS_TOKEN");
       if (!mpToken) return json({ error: "MP_ACCESS_TOKEN no configurado" }, 500);
 
-      if (!intent.amount_ars) {
-        return json({ error: "intent.amount_ars es requerido para Mercado Pago" }, 400);
+      // For free trial, we don't charge now; MercadoPago can't handle 0-amount preapprovals
+      // We'll charge after trial ends via charge-trial-subscriptions
+      const isFreeTrial = intent.plan_id === FREE_PLAN_ID || intent.amount_ars === 0;
+
+      if (isFreeTrial) {
+        // Free trial: just mark as ready for finalization, don't create preapproval yet
+        const { error: updErr } = await supabaseAdmin
+          .from("signup_intents")
+          .update({
+            status: "paid_ready", // Skip checkout_created, go straight to paid_ready for free trial
+            billing_plan_id: billingPlanId,
+            trial_days: trialDays,
+          })
+          .eq("id", intent_id);
+
+        if (updErr) return json({ error: String(updErr.message ?? updErr) }, 500);
+
+        // For free trial, return intent_id and skip checkout (frontend will handle via localStorage)
+        return json({ 
+          checkout_url: null, // No external checkout needed
+          provider: "mercadopago",
+          intent_id: intent_id, // Return intent_id so frontend can save it
+          is_free_trial: true,
+          message: "Free trial - no payment required"
+        }, 200);
       }
 
+      // Paid plan: create preapproval as usual
       const amountArs = Math.round(Number(intent.amount_ars));
       if (!isFinite(amountArs) || amountArs <= 0) {
         return json({ error: "intent.amount_ars inválido" }, 400);
@@ -142,12 +166,8 @@ Deno.serve(async (req: Request) => {
         currency_id: "ARS",
       };
 
-      if (trialDays > 0) {
-        autoRecurring.free_trial = { frequency: trialDays, frequency_type: "days" };
-      }
-
       const planPayload = {
-        reason: trialDays > 0 ? `Prueba gratis ${trialDays} días → ${plan.name}` : `Suscripción ${plan.name}`,
+        reason: `Suscripción ${plan.name}`,
         external_reference: intent.id,
         auto_recurring: autoRecurring,
         back_url: success_url,

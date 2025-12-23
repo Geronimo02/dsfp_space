@@ -69,7 +69,14 @@ export default function SignupWizard() {
 
       console.log("[SignupWizard] Checkout created:", checkoutData);
 
-      if (checkoutData?.checkout_url) {
+      if (checkoutData?.is_free_trial) {
+        // Free trial: save intent_id to localStorage and redirect to success page
+        localStorage.setItem("signup_intent_id", checkoutData.intent_id);
+        toast.success("¡Prueba gratuita activada!");
+        setTimeout(() => {
+          window.location.href = "/signup/success";
+        }, 500);
+      } else if (checkoutData?.checkout_url) {
         toast.success("Redirigiendo al procesador de pagos...");
         // Redirect to checkout
         window.location.href = checkoutData.checkout_url;

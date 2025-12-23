@@ -147,10 +147,23 @@ async function attemptCharge(
         throw new Error("MercadoPago preapproval ID not found");
       }
 
-      // Create new authorized payment for the subscription
-      const amount_ars = Math.round(intent.amount_ars || 0);
+      // Get the plan price to charge (from subscription which has the actual plan being billed)
+      const { data: planData } = await admin
+        .from("subscription_plans")
+        .select("price")
+        .eq("id", subscription.plan_id)
+        .single();
+
+      const basePriceUsd = Number(planData?.price || 0);
+      const modulesPrice = (subscription.modules?.length || 0) * 10;
+      const totalUsd = basePriceUsd + modulesPrice;
+
+      // Use the FX rate from subscription or a fixed rate
+      const fxRate = subscription.fx_rate_usd_ars || 1000;
+      const amount_ars = Math.round(totalUsd * fxRate * 100); // Convert to cents
+
       if (amount_ars <= 0) {
-        throw new Error("Invalid amount for charging");
+        throw new Error(`Invalid amount for charging: ${amount_ars} (USD: ${totalUsd}, FX: ${fxRate})`);
       }
 
       const paymentRes = await fetch(
@@ -165,7 +178,7 @@ async function attemptCharge(
             preapproval_id: subscription.provider_subscription_id,
             amount: amount_ars / 100, // Convert cents to currency
             reference_id: `trial-${intent.id}-${Date.now()}`,
-            description: `Cobro después del período de prueba`,
+            description: `Cobro después del período de prueba - Plan ${planData?.name || "básico"}`,
           }),
         }
       );

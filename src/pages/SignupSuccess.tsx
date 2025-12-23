@@ -9,7 +9,11 @@ import { toast } from "sonner";
 export default function SignupSuccess() {
   const [searchParams] = useSearchParams();
   const navigate = useNavigate();
-  const intentId = searchParams.get("intent_id");
+  
+  // Get intent_id from URL or localStorage
+  const intentFromUrl = searchParams.get("intent_id");
+  const intentFromStorage = typeof window !== "undefined" ? localStorage.getItem("signup_intent_id") : null;
+  const intentId = intentFromUrl || intentFromStorage;
 
   const [status, setStatus] = useState<"checking" | "paid_ready" | "timeout" | "error">("checking");
   const [attempts, setAttempts] = useState(0);
