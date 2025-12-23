@@ -130,8 +130,26 @@ export function EmployeeRoleAssignment() {
           companyName: currentCompany.name,
         },
       });
-      
-      if (error) throw error;
+
+      if (error) {
+        const ctx = (error as any)?.context;
+        const rawBody = ctx?.body;
+        const bodyObj =
+          typeof rawBody === "string"
+            ? (() => {
+                try {
+                  return JSON.parse(rawBody);
+                } catch {
+                  return null;
+                }
+              })()
+            : rawBody;
+
+        throw new Error(
+          bodyObj?.error || ctx?.error || (error as any)?.message || "Error al enviar invitación"
+        );
+      }
+
       return data;
     },
     onSuccess: () => {

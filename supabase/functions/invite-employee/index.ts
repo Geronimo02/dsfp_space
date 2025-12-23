@@ -53,15 +53,35 @@ serve(async (req: Request) => {
       throw new Error("Unauthorized");
     }
 
-    // Get company_id from company_users table
-    const { data: companyUser } = await supabaseAdmin
-      .from("company_users")
-      .select("company_id, role")
-      .eq("user_id", user.id)
-      .eq("active", true)
-      .single();
+    // Get email and role from request (prefer the company selected in the UI)
+    const { email, full_name, role, companyId: requestedCompanyId } = await req.json();
 
-    if (!companyUser || !companyUser.company_id) {
+    if (!email) {
+      throw new Error("Email is required");
+    }
+
+    if (!role) {
+      throw new Error("Role is required");
+    }
+
+    // Verify membership + permissions in the target company
+    const baseMembershipQuery = supabaseAdmin
+      .from("company_users")
+      .select("company_id, role, active")
+      .eq("user_id", user.id)
+      // Treat NULL as active (legacy rows)
+      .or("active.eq.true,active.is.null");
+
+    const { data: companyUser, error: companyUserError } = requestedCompanyId
+      ? await baseMembershipQuery.eq("company_id", requestedCompanyId).maybeSingle()
+      : await baseMembershipQuery.limit(1).maybeSingle();
+
+    if (companyUserError || !companyUser?.company_id) {
+      console.error("Invite employee: membership not found", {
+        user_id: user.id,
+        requestedCompanyId,
+        companyUserError,
+      });
       throw new Error("User is not associated with any company");
     }
 
@@ -71,17 +91,6 @@ serve(async (req: Request) => {
     const isAdmin = companyUser.role === "admin" || companyUser.role === "manager";
     if (!isAdmin) {
       throw new Error("Only admins and managers can invite employees");
-    }
-
-    // Get email and role from request
-    const { email, full_name, role } = await req.json();
-
-    if (!email) {
-      throw new Error("Email is required");
-    }
-
-    if (!role) {
-      throw new Error("Role is required");
     }
 
     // Check if user already exists
