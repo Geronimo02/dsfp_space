@@ -43,6 +43,7 @@ const WarehouseStock = lazy(() => import("./pages/WarehouseStock"));
 const WarehouseTransfers = lazy(() => import("./pages/WarehouseTransfers"));
 const CompanySetup = lazy(() => import("./pages/CompanySetup"));
 const ResetPassword = lazy(() => import("./pages/ResetPassword"));
+const SetPasswordToken = lazy(() => import("./pages/SetPasswordToken"));
 const POSPoints = lazy(() => import("./pages/POSPoints"));
 const NotificationSettings = lazy(() => import("./pages/NotificationSettings"));
 const Checks = lazy(() => import("./pages/Checks"));
@@ -229,6 +230,7 @@ const App = () => (
             <Routes>
             <Route path="/auth" element={<Auth />} />
             <Route path="/reset-password" element={<ResetPassword />} />
+              <Route path="/set-password/:token" element={<SetPasswordToken />} />
             <Route path="/company-setup" element={<AuthOnlyRoute><CompanySetup /></AuthOnlyRoute>} />
             <Route path="/module-not-available" element={<ProtectedRoute><ModuleNotAvailable /></ProtectedRoute>} />
             {/* Módulos Base - siempre disponibles */}

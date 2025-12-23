@@ -206,6 +206,23 @@ serve(async (req: Request) => {
       }
     }
 
+    // Create a single-use invite token and include a link to set password without fragment
+    let inviteToken: string | null = null;
+    try {
+      inviteToken = crypto.randomUUID();
+      const expiresAt = new Date(Date.now() + 1000 * 60 * 60 * 24 * 3).toISOString(); // 3 days
+      const { error: tokenErr } = await supabaseAdmin
+        .from("invite_tokens")
+        .insert({ token: inviteToken, user_id: userId, company_id: companyId, expires_at: expiresAt });
+      if (tokenErr) {
+        console.error("Error creating invite token", tokenErr);
+        inviteToken = null;
+      }
+    } catch (err) {
+      console.error("Error creating invite token", err);
+      inviteToken = null;
+    }
+
     // Try to fetch company-specific SMTP/SendGrid config to also send a custom invitation email
     try {
       const { data: smtpRow, error: smtpError } = await supabaseAdmin
@@ -222,11 +239,12 @@ serve(async (req: Request) => {
 
         // Compose a simple HTML invitation including the temporary password and a link to login/reset
         const loginLink = `${frontendUrl}/auth`;
+        const setPasswordLink = inviteToken ? `${frontendUrl}/set-password/${inviteToken}` : (actionLink || loginLink);
         const html = `
           <p>Hola ${full_name || ""},</p>
           <p>Has sido invitado a la empresa. Tu usuario es <strong>${email}</strong>.</p>
           <p>Para configurar tu contraseña y acceder, haz clic en el siguiente enlace:</p>
-          <p><a href="${actionLink || loginLink}">${actionLink || loginLink}</a></p>
+          <p><a href="${setPasswordLink}">${setPasswordLink}</a></p>
           <p>Si el enlace expira, contacta al administrador de la empresa.</p>
         `;
 
