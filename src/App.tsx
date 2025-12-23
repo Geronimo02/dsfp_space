@@ -37,7 +37,6 @@ import WarehouseStock from "./pages/WarehouseStock";
 import WarehouseTransfers from "./pages/WarehouseTransfers";
 import ResetPassword from "./pages/ResetPassword";
 import POSPoints from "./pages/POSPoints";
-import SignupFlowTester from "./pages/SignUpFlowTester";
 import SignupWizard from "./pages/SignupWizard";
 import SignupSuccess from "./pages/SignupSuccess";
 import SignupCancel from "./pages/SignupCancel";
@@ -214,7 +213,6 @@ const App = () => (
       <BrowserRouter>
         <CompanyProvider>
           <Routes>
-          <Route path="/dev/signup-tester" element={<SignupFlowTester />} />
           <Route path="/signup" element={<SignupWizard />} />
           <Route path="/signup/success" element={<SignupSuccess />} />
           <Route path="/signup/cancel" element={<SignupCancel />} />
