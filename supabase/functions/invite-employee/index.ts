@@ -213,7 +213,7 @@ serve(async (req: Request) => {
 
     if (insertCompanyUserError) {
       console.error("Error creating company_users entry:", insertCompanyUserError);
-      throw companyUserError;
+      throw insertCompanyUserError;
     }
 
     return new Response(
