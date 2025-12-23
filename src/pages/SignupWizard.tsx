@@ -68,20 +68,27 @@ export default function SignupWizard() {
       }
 
       console.log("[SignupWizard] Checkout created:", checkoutData);
+      console.log("[SignupWizard] is_free_trial:", checkoutData?.is_free_trial);
+      console.log("[SignupWizard] checkout_url:", checkoutData?.checkout_url);
+      console.log("[SignupWizard] intent_id:", checkoutData?.intent_id);
 
-      if (checkoutData?.is_free_trial) {
-        // Free trial: save intent_id to localStorage and redirect to success page
-        localStorage.setItem("signup_intent_id", checkoutData.intent_id);
+      // Handle free trial (no external checkout needed)
+      if (checkoutData?.is_free_trial || !checkoutData?.checkout_url) {
+        // Save intent_id to localStorage if provided
+        if (checkoutData?.intent_id) {
+          localStorage.setItem("signup_intent_id", checkoutData.intent_id);
+          console.log("[SignupWizard] Saved intent_id to localStorage:", checkoutData.intent_id);
+        }
         toast.success("¡Prueba gratuita activada!");
         setTimeout(() => {
           window.location.href = "/signup/success";
         }, 500);
       } else if (checkoutData?.checkout_url) {
         toast.success("Redirigiendo al procesador de pagos...");
-        // Redirect to checkout
+        // Redirect to external checkout
         window.location.href = checkoutData.checkout_url;
       } else {
-        throw new Error("No checkout_url returned");
+        throw new Error("No checkout_url o is_free_trial en response");
       }
     } catch (error) {
       console.error("[SignupWizard] Error:", error);
