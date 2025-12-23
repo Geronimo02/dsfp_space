@@ -33,14 +33,20 @@ export function Step4Confirmation({
   const { data: plan } = useQuery({
     queryKey: ["plan", formData.plan_id],
     queryFn: async () => {
-      const { data, error } = await supabase
-        .from("subscription_plans")
-        .select("*")
-        .eq("id", formData.plan_id)
-        .single();
-
+      const { data, error } = await supabase.functions.invoke("list-plans", {
+        body: {},
+      });
       if (error) throw error;
-      return data;
+      
+      const plans = (data?.plans ?? []) as Array<{
+        id: string;
+        name: string;
+        description: string | null;
+        price: number;
+        billing_period: string;
+      }>;
+      
+      return plans.find(p => p.id === formData.plan_id) || null;
     },
     enabled: !!formData.plan_id,
   });
