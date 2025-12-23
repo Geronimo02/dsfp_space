@@ -176,17 +176,108 @@ serve(async (req: Request) => {
 
     userId = data.user.id;
 
-    // Send password reset email so user can set their password
-    // NOTE: admin.generateLink only generates the link; it does not send an email.
-    const redirectTo = `${req.headers.get("origin") || "https://5670e5fc-c3f6-4b61-9f11-214ae88eb9ef.lovableproject.com"}/reset-password`;
+    // Generate a recovery link (preferred) so we can send a custom invite email.
+    const redirectTo = `${Deno.env.get("FRONTEND_URL") || req.headers.get("origin") || ""}/reset-password`;
 
-    const { data: resetData, error: resetError } =
-      await supabaseAdmin.auth.resetPasswordForEmail(email, {
-        redirectTo,
-      });
+    let actionLink: string | null = null;
 
-    console.log("Password reset email requested", { email, redirectTo, resetData });
-    if (resetError) console.error("Error requesting password reset email:", resetError);
+    try {
+      // Try to generate a recovery link with admin privileges (does not send email)
+      // Note: Supabase admin API may return the action link in different shapes; try common fields.
+      const { data: linkData, error: linkError } = await (supabaseAdmin.auth as any).admin.generateLink?.({ type: "recovery", email, redirectTo }) || { data: null, error: new Error("generateLink not available") };
+      if (!linkError && linkData) {
+        actionLink = linkData.action_link || linkData.actionLink || linkData.link || null;
+      }
+    } catch (err) {
+      console.warn("generateLink not available or failed, will fallback to resetPasswordForEmail", err);
+    }
+
+    // Fallback: request Supabase to send reset email (if generateLink not available)
+    let resetData: any = null;
+    if (!actionLink) {
+      try {
+        const res = await supabaseAdmin.auth.resetPasswordForEmail(email, { redirectTo });
+        resetData = res.data;
+        // Some Supabase setups return the action link in the response
+        actionLink = res.data?.action_link || res.data?.link || null;
+        console.log("Password reset email requested (fallback)", { email, redirectTo, resetData });
+      } catch (err) {
+        console.error("Error requesting password reset email (fallback):", err);
+      }
+    }
+
+    // Try to fetch company-specific SMTP/SendGrid config to also send a custom invitation email
+    try {
+      const { data: smtpRow, error: smtpError } = await supabaseAdmin
+        .from("company_settings")
+        .select("value")
+        .eq("company_id", companyId)
+        .eq("key", "smtp")
+        .limit(1)
+        .maybeSingle();
+
+      if (!smtpError && smtpRow?.value) {
+        const cfg = smtpRow.value as any;
+        const frontendUrl = Deno.env.get("FRONTEND_URL") || req.headers.get("origin") || "";
+
+        // Compose a simple HTML invitation including the temporary password and a link to login/reset
+        const loginLink = `${frontendUrl}/auth`;
+        const html = `
+          <p>Hola ${full_name || ""},</p>
+          <p>Has sido invitado a la empresa. Tu usuario es <strong>${email}</strong>.</p>
+          <p>Para configurar tu contraseña y acceder, haz clic en el siguiente enlace:</p>
+          <p><a href="${actionLink || loginLink}">${actionLink || loginLink}</a></p>
+          <p>Si el enlace expira, contacta al administrador de la empresa.</p>
+        `;
+
+        if (cfg.provider === "sendgrid" && cfg.apiKey) {
+          try {
+            await fetch("https://api.sendgrid.com/v3/mail/send", {
+              method: "POST",
+              headers: {
+                "Authorization": `Bearer ${cfg.apiKey}`,
+                "Content-Type": "application/json",
+              },
+              body: JSON.stringify({
+                personalizations: [{ to: [{ email }], subject: "Invitación a la empresa" }],
+                from: { email: cfg.from || "no-reply@yourapp.com" },
+                content: [{ type: "text/html", value: html }],
+              }),
+            });
+            console.log("Invitation email sent via SendGrid to", email);
+          } catch (err) {
+            console.error("Error sending invite via SendGrid", err);
+          }
+        } else if (cfg.provider === "smtp") {
+          // Send via company SMTP using deno smtp client
+          try {
+            const { SmtpClient } = await import("https://deno.land/x/smtp/mod.ts");
+            const client = new SmtpClient();
+            await client.connect({
+              hostname: cfg.host,
+              port: Number(cfg.port) || 587,
+              username: cfg.user,
+              password: cfg.password,
+              tls: cfg.secure === true || cfg.secure === "true",
+            });
+            await client.send({
+              from: cfg.from || "no-reply@yourapp.com",
+              to: email,
+              subject: "Invitación a la empresa",
+              content: html,
+            });
+            await client.close();
+            console.log("Invitation email sent via SMTP to", email);
+          } catch (err) {
+            console.error("Error sending invite via SMTP", err);
+          }
+        } else {
+          console.log("No supported company email provider found; rely on project's reset email or SendGrid");
+        }
+      }
+    } catch (err) {
+      console.error("Error fetching company SMTP config:", err);
+    }
 
     // Create company_users entry for new user
     const { error: insertCompanyUserError } = await supabaseAdmin

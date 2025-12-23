@@ -66,6 +66,7 @@ const PlatformSupport = lazy(() => import("./pages/PlatformSupport"));
 const ModuleNotAvailable = lazy(() => import("./pages/ModuleNotAvailable"));
 const NotFound = lazy(() => import("./pages/NotFound"));
 const AccountsReceivable = lazy(() => import("./pages/AccountsReceivable"));
+const EmailConfig = lazy(() => import("./pages/EmailConfig"));
 
 const queryClient = new QueryClient();
 
@@ -237,6 +238,7 @@ const App = () => (
             <Route path="/customers" element={<ProtectedRoute><ModuleProtectedRoute moduleCode="customers"><Customers /></ModuleProtectedRoute></ProtectedRoute>} />
             <Route path="/sales" element={<ProtectedRoute><ModuleProtectedRoute moduleCode="sales"><Sales /></ModuleProtectedRoute></ProtectedRoute>} />
             <Route path="/settings" element={<ProtectedRoute><Settings /></ProtectedRoute>} />
+            <Route path="/settings/email" element={<ProtectedRoute><EmailConfig /></ProtectedRoute>} />
             
             {/* Módulos Adicionales - requieren contrato */}
             <Route path="/quotations" element={<ProtectedRoute><ModuleProtectedRoute moduleCode="quotations"><Quotations /></ModuleProtectedRoute></ProtectedRoute>} />

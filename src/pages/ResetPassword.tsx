@@ -28,13 +28,35 @@ export default function ResetPassword() {
   const [confirmPassword, setConfirmPassword] = useState("");
 
   useEffect(() => {
-    // Verificar si hay una sesión de recuperación
-    supabase.auth.getSession().then(({ data: { session } }) => {
-      if (!session) {
-        toast.error("Enlace de recuperación inválido o expirado");
-        navigate("/auth");
+    // Verificar si hay una sesión de recuperación.
+    // Si el link de recuperación vino con tokens en el fragmento (hash),
+    // parsearlos y establecer la sesión para que `supabase.auth.getSession()` funcione.
+    (async () => {
+      const { data: { session } } = await supabase.auth.getSession();
+      if (session) return;
+
+      // Parsear fragmento de URL (access_token, refresh_token)
+      const hash = window.location.hash || "";
+      if (hash.includes("access_token") && hash.includes("refresh_token")) {
+        const params = new URLSearchParams(hash.replace(/^#/, ""));
+        const access_token = params.get("access_token") || undefined;
+        const refresh_token = params.get("refresh_token") || undefined;
+
+        if (access_token && refresh_token) {
+          try {
+            await supabase.auth.setSession({ access_token, refresh_token });
+            // Remove hash so tokens are not visible in URL
+            history.replaceState(null, document.title, window.location.pathname + window.location.search);
+            return;
+          } catch (err) {
+            console.error("Error setting session from URL fragment:", err);
+          }
+        }
       }
-    });
+
+      toast.error("Enlace de recuperación inválido o expirado");
+      navigate("/auth");
+    })();
   }, [navigate]);
 
   const handleResetPassword = async (e: React.FormEvent) => {
