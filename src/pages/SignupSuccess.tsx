@@ -40,11 +40,10 @@ export default function SignupSuccess() {
 
     const checkStatus = async () => {
       try {
-        const { data, error } = await supabase
-          .from("signup_intents")
-          .select("status")
-          .eq("id", intentId)
-          .single();
+        // Use edge function to check status (avoids RLS issues with unauthenticated users)
+        const { data, error } = await supabase.functions.invoke("get-intent-status", {
+          body: { intent_id: intentId },
+        });
 
         if (error) throw error;
 
