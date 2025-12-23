@@ -1,34 +1,21 @@
 import { serve } from "https://deno.land/std@0.168.0/http/server.ts";
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
 
-// Restrict CORS to specific domains for security
-const ALLOWED_ORIGINS = [
-  "https://5670e5fc-c3f6-4b61-9f11-214ae88eb9ef.lovableproject.com",
-  "https://preview--dsfp-space.lovable.app",
-  "http://localhost:5173",
-  "http://localhost:3000",
-  "http://127.0.0.1:5173",
-  "https://dsfp-space.vercel.app",
-];
-
-const getCorsHeaders = (origin: string | null) => {
-  const allowedOrigin = origin && ALLOWED_ORIGINS.includes(origin)
-    ? origin
-    : ALLOWED_ORIGINS[0];
-  return {
-    "Access-Control-Allow-Origin": allowedOrigin,
-    "Access-Control-Allow-Headers": "authorization, x-client-info, apikey, content-type",
-    "Access-Control-Allow-Credentials": "true",
-  };
+// CORS headers (Edge Functions are called from browsers; use wildcard to avoid preview-domain mismatches)
+const corsHeaders = {
+  "Access-Control-Allow-Origin": "*",
+  "Access-Control-Allow-Headers":
+    "authorization, x-client-info, apikey, content-type",
 };
 
 serve(async (req: Request) => {
-  const origin = req.headers.get("origin");
-  const corsHeaders = getCorsHeaders(origin);
-
+  // Handle CORS preflight requests
   if (req.method === "OPTIONS") {
-    return new Response("ok", { headers: corsHeaders });
+    return new Response(null, { headers: corsHeaders });
   }
+
+  const origin = req.headers.get("origin");
+  console.log("invite-employee request", { method: req.method, origin });
 
   try {
     const supabaseAdmin = createClient(
