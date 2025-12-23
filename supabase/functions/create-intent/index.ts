@@ -49,14 +49,20 @@ Deno.serve(async (req: Request) => {
 
     const supabaseAdmin = createClient(supabaseUrl, supabaseKey);
 
-    // If user selected "Free trial", bill Basic after trial
-    const billingPlanId = plan_id === FREE_PLAN_ID ? BASIC_PLAN_ID : plan_id;
+    // Determine if user selected free trial
+    const isFreeTrial = plan_id === FREE_PLAN_ID;
+    
+    // Determine which plan to charge NOW (amount_usd)
+    const chargePlanId = isFreeTrial ? FREE_PLAN_ID : plan_id;
+    
+    // Determine which plan to charge AFTER trial
+    const billingPlanId = isFreeTrial ? BASIC_PLAN_ID : plan_id;
 
-    // Validate billing plan exists and active
+    // Get the plan to charge NOW (free or paid)
     const { data: plan, error: planErr } = await supabaseAdmin
       .from("subscription_plans")
       .select("id, price, active")
-      .eq("id", billingPlanId)
+      .eq("id", chargePlanId)
       .single();
 
     if (planErr || !plan || !plan.active) {
@@ -66,12 +72,11 @@ Deno.serve(async (req: Request) => {
     const modulesArr: string[] = Array.isArray(modules) ? modules : [];
     const modulesPrice = modulesArr.length * 10;
 
-    // Compute amount based on billing plan (basic if free selected)
+    // Compute amount to charge NOW (0 for free trial + any modules)
     const amount_usd = round2(Number(plan.price) + modulesPrice);
 
-    if (!isFinite(amount_usd) || amount_usd <= 0) {
-      // If FREE selected and BASIC price is 0 somehow, still allow intent (but usually BASIC > 0)
-      // To keep strictness, return error.
+    // Allow free plans (0 USD) and valid paid plans
+    if (!isFinite(amount_usd) || amount_usd < 0) {
       return json({ error: "amount_usd inválido" }, 400);
     }
 

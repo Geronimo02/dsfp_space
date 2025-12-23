@@ -120,8 +120,15 @@ Deno.serve(async (req: Request) => {
 
     if (subErr) return json({ error: String(subErr.message ?? subErr) }, 500);
 
-    // 6️⃣ Marcar intent como completado
-    const { error: updErr } = await supabaseAdmin.from("signup_intents").update({ status: "completed" }).eq("id", intent_id);
+    // 6️⃣ Marcar intent como completado con trial info
+    const { error: updErr } = await supabaseAdmin
+      .from("signup_intents")
+      .update({ 
+        status: "completed",
+        company_id: companyId,
+        trial_ends_at: trialEndsAt
+      })
+      .eq("id", intent_id);
 
     if (updErr) return json({ error: String(updErr.message ?? updErr) }, 500);
 
