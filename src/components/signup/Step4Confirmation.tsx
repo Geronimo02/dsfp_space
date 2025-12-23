@@ -10,8 +10,12 @@ import { toast } from "sonner";
 import { Separator } from "@/components/ui/separator";
 import { Label } from "@/components/ui/label";
 import { RadioGroup, RadioGroupItem } from "@/components/ui/radio-group";
+import { Skeleton } from "@/components/ui/skeleton";
 
 const MODULE_PRICE = 10;
+
+// Format currency to 2 decimal places
+const formatCurrency = (value: number) => value.toFixed(2);
 
 interface Step4ConfirmationProps {
   formData: SignupFormData;
@@ -30,7 +34,7 @@ export function Step4Confirmation({
 }: Step4ConfirmationProps) {
   const [isCreating, setIsCreating] = useState(false);
 
-  const { data: plan } = useQuery({
+  const { data: plan, isLoading: isPlanLoading } = useQuery({
     queryKey: ["plan", formData.plan_id],
     queryFn: async () => {
       const { data, error } = await supabase.functions.invoke("list-plans", {
@@ -109,17 +113,27 @@ export function Step4Confirmation({
               </CardTitle>
             </CardHeader>
             <CardContent className="space-y-2 text-sm">
-              <div className="flex justify-between items-start">
-                <span className="text-muted-foreground">Plan:</span>
-                <div className="text-right">
-                  <p className="font-medium">{plan?.name}</p>
-                  <p className="text-xs text-muted-foreground">{plan?.description}</p>
+              {isPlanLoading ? (
+                <div className="space-y-2">
+                  <Skeleton className="h-4 w-24" />
+                  <Skeleton className="h-3 w-40" />
+                  <Skeleton className="h-4 w-32" />
                 </div>
-              </div>
-              <div className="flex justify-between">
-                <span className="text-muted-foreground">Precio base:</span>
-                <span className="font-medium">${baseCost} USD/mes</span>
-              </div>
+              ) : (
+                <>
+                  <div className="flex justify-between items-start">
+                    <span className="text-muted-foreground">Plan:</span>
+                    <div className="text-right">
+                      <p className="font-medium">{plan?.name}</p>
+                      <p className="text-xs text-muted-foreground">{plan?.description}</p>
+                    </div>
+                  </div>
+                  <div className="flex justify-between">
+                    <span className="text-muted-foreground">Precio base:</span>
+                    <span className="font-medium">${formatCurrency(baseCost)} USD/mes</span>
+                  </div>
+                </>
+              )}
             </CardContent>
           </Card>
 
@@ -155,20 +169,20 @@ export function Step4Confirmation({
               <div className="space-y-2">
                 <div className="flex justify-between text-sm">
                   <span className="text-muted-foreground">Plan {plan?.name}:</span>
-                  <span>${baseCost} USD</span>
+                  <span>${formatCurrency(baseCost)} USD</span>
                 </div>
                 {formData.modules.length > 0 && (
                   <div className="flex justify-between text-sm">
                     <span className="text-muted-foreground">
                       Módulos ({formData.modules.length}):
                     </span>
-                    <span>${totalModulesCost} USD</span>
+                    <span>${formatCurrency(totalModulesCost)} USD</span>
                   </div>
                 )}
                 <Separator />
                 <div className="flex justify-between font-bold text-lg">
                   <span>Total mensual:</span>
-                  <span className="text-primary">${totalCost} USD</span>
+                  <span className="text-primary">${formatCurrency(totalCost)} USD</span>
                 </div>
               </div>
 
