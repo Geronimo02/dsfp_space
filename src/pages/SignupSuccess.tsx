@@ -18,23 +18,37 @@ export default function SignupSuccess() {
   const [status, setStatus] = useState<"checking" | "paid_ready" | "timeout" | "error">("checking");
   const [attempts, setAttempts] = useState(0);
   const [password, setPassword] = useState("");
+  const [passwordLoaded, setPasswordLoaded] = useState(false);
 
   useEffect(() => {
     // Try to get password from localStorage
     const savedData = localStorage.getItem("signup_wizard_data");
+    console.log("[SignupSuccess] Loading saved data:", savedData);
     if (savedData) {
       try {
         const data = JSON.parse(savedData);
+        console.log("[SignupSuccess] Parsed data:", { email: data.email, hasPassword: !!data.password });
         setPassword(data.password);
+        setPasswordLoaded(true);
       } catch (e) {
-        console.error("Error loading password:", e);
+        console.error("[SignupSuccess] Error loading password:", e);
+        setPasswordLoaded(true); // Mark as loaded even if error
       }
+    } else {
+      console.warn("[SignupSuccess] No saved wizard data found");
+      setPasswordLoaded(true);
     }
   }, []);
 
   useEffect(() => {
     if (!intentId) {
       setStatus("error");
+      return;
+    }
+
+    // Don't start checking until password is loaded
+    if (!passwordLoaded) {
+      console.log("[SignupSuccess] Waiting for password to load...");
       return;
     }
 
@@ -74,16 +88,18 @@ export default function SignupSuccess() {
 
       return () => clearInterval(interval);
     }
-  }, [intentId, status, attempts]);
+  }, [intentId, status, attempts, passwordLoaded]);
 
   const finalizeSignup = async () => {
     if (!intentId || !password) {
+      console.error("[SignupSuccess] Missing data:", { intentId, hasPassword: !!password });
       toast.error("Faltan datos para finalizar el registro");
+      setStatus("error");
       return;
     }
 
     try {
-      console.log("[SignupSuccess] Finalizing signup...");
+      console.log("[SignupSuccess] Finalizing signup with intent_id:", intentId);
 
       const { data, error } = await supabase.functions.invoke("finalize-signup", {
         body: {
