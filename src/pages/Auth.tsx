@@ -39,8 +39,9 @@ export default function Auth() {
 
     const { data: { subscription } } = supabase.auth.onAuthStateChange(async (event, session) => {
       // Only redirect to home if user is already logged in and comes back to auth page
-      // Don't redirect on fresh login to avoid race condition with CompanyContext
-      if (session && (event === 'TOKEN_REFRESHED' || event === 'INITIAL_SESSION')) {
+      // Don't redirect on fresh signup/login to avoid race condition with CompanyContext
+      if (session && event === 'INITIAL_SESSION') {
+        // User already has a session, redirect to home
         navigate("/");
       }
     });

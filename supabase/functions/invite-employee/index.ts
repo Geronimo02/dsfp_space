@@ -1,29 +1,19 @@
 import { serve } from "https://deno.land/std@0.168.0/http/server.ts";
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
 
-// Restrict CORS to specific domains for security
-const ALLOWED_ORIGINS = [
-  "https://5670e5fc-c3f6-4b61-9f11-214ae88eb9ef.lovableproject.com",
-  "https://preview--dsfp-space.lovable.app",
-  "http://localhost:5173"
-];
-
-const getCorsHeaders = (origin: string | null) => {
-  const allowedOrigin = origin && ALLOWED_ORIGINS.includes(origin) ? origin : ALLOWED_ORIGINS[0];
-  return {
-    "Access-Control-Allow-Origin": allowedOrigin,
-    "Access-Control-Allow-Headers": "authorization, x-client-info, apikey, content-type",
-    "Access-Control-Allow-Credentials": "true",
-  };
+const corsHeaders = {
+  "Access-Control-Allow-Origin": "*",
+  "Access-Control-Allow-Headers":
+    "authorization, x-client-info, apikey, content-type",
 };
 
-serve(async (req) => {
-  const origin = req.headers.get("origin");
-  const corsHeaders = getCorsHeaders(origin);
-  
+serve(async (req: Request) => {
   if (req.method === "OPTIONS") {
-    return new Response("ok", { headers: corsHeaders });
+    return new Response(null, { headers: corsHeaders });
   }
+
+  const origin = req.headers.get("origin");
+  console.log("invite-employee request", { method: req.method, origin });
 
   try {
     const supabaseAdmin = createClient(
@@ -37,41 +27,23 @@ serve(async (req) => {
       }
     );
 
-    // Verify the user is an admin
     const authHeader = req.headers.get("Authorization");
     if (!authHeader) {
       throw new Error("No authorization header");
     }
 
     const token = authHeader.replace("Bearer ", "");
-    const { data: { user }, error: userError } = await supabaseAdmin.auth.getUser(token);
+    const {
+      data: { user },
+      error: userError,
+    } = await supabaseAdmin.auth.getUser(token);
 
     if (userError || !user) {
       throw new Error("Unauthorized");
     }
 
-    // Get company_id from company_users table
-    const { data: companyUser } = await supabaseAdmin
-      .from("company_users")
-      .select("company_id, role")
-      .eq("user_id", user.id)
-      .eq("active", true)
-      .single();
-
-    if (!companyUser || !companyUser.company_id) {
-      throw new Error("User is not associated with any company");
-    }
-
-    const companyId = companyUser.company_id;
-
-    // Check if user has admin or manager role in this company
-    const isAdmin = companyUser.role === "admin" || companyUser.role === "manager";
-    if (!isAdmin) {
-      throw new Error("Only admins and managers can invite employees");
-    }
-
-    // Get email and role from request
-    const { email, full_name, role } = await req.json();
+    const { email, full_name, role, companyId: requestedCompanyId } =
+      await req.json();
 
     if (!email) {
       throw new Error("Email is required");
@@ -81,29 +53,77 @@ serve(async (req) => {
       throw new Error("Role is required");
     }
 
+    const baseMembershipQuery = supabaseAdmin
+      .from("company_users")
+      .select("company_id, role, active")
+      .eq("user_id", user.id)
+      .or("active.eq.true,active.is.null");
+
+    const { data: companyUser, error: membershipError } = requestedCompanyId
+      ? await baseMembershipQuery.eq("company_id", requestedCompanyId).maybeSingle()
+      : await baseMembershipQuery.limit(1).maybeSingle();
+
+    if (membershipError || !companyUser?.company_id) {
+      console.error("Invite employee: membership not found", {
+        user_id: user.id,
+        requestedCompanyId,
+        membershipError,
+      });
+      throw new Error("User is not associated with any company");
+    }
+
+    const companyId = companyUser.company_id;
+
+    const isAdmin = companyUser.role === "admin" || companyUser.role === "manager";
+    if (!isAdmin) {
+      throw new Error("Only admins and managers can invite employees");
+    }
+
     // Check if user already exists
-    const { data: { users }, error: listError } = await supabaseAdmin.auth.admin.listUsers();
-    const existingUser = users?.find(u => u.email === email);
+    const {
+      data: { users },
+      error: listError,
+    } = await supabaseAdmin.auth.admin.listUsers();
+    if (listError) throw listError;
+
+    const existingUser = users?.find((u: any) => u.email === email);
 
     let userId: string;
 
     if (existingUser) {
-      // User already exists - just add to company
       userId = existingUser.id;
-      
-      // Check if already in company
-      const { data: existingCompanyUser } = await supabaseAdmin
-        .from("company_users")
-        .select("id")
-        .eq("user_id", userId)
-        .eq("company_id", companyId)
-        .single();
 
-      if (existingCompanyUser) {
-        throw new Error("El usuario ya pertenece a esta empresa");
+      // Check if already in company
+      const { data: existingCompanyUser, error: existingCompanyUserError } =
+        await supabaseAdmin
+          .from("company_users")
+          .select("id")
+          .eq("user_id", userId)
+          .eq("company_id", companyId)
+          .limit(1)
+          .maybeSingle();
+
+      if (existingCompanyUserError) {
+        console.error("Error checking existing company user", existingCompanyUserError);
+        throw existingCompanyUserError;
       }
 
-      // Add user to company
+      if (existingCompanyUser) {
+        return new Response(
+          JSON.stringify({
+            success: true,
+            already_member: true,
+            user_id: userId,
+            message: "El usuario ya pertenece a esta empresa",
+          }),
+          {
+            headers: { ...corsHeaders, "Content-Type": "application/json" },
+            status: 200,
+          }
+        );
+      }
+
+      // Add existing user to company
       const { error: companyUserError } = await supabaseAdmin
         .from("company_users")
         .insert({
@@ -115,63 +135,77 @@ serve(async (req) => {
 
       if (companyUserError) throw companyUserError;
 
-    } else {
-      // User doesn't exist - create them directly with auto-confirm
-      const tempPassword = crypto.randomUUID();
-      
-      const { data, error } = await supabaseAdmin.auth.admin.createUser({
-        email: email,
-        password: tempPassword,
-        email_confirm: true, // Auto-confirm email
-        user_metadata: {
-          full_name: full_name || "",
-          invited_to_company: companyId,
-          assigned_role: role,
-        },
-      });
-
-      if (error) throw error;
-      if (!data.user) throw new Error("No se pudo crear el usuario");
-
-      userId = data.user.id;
-      
-      // Send password reset email so user can set their password
-      const { error: resetError } = await supabaseAdmin.auth.admin.generateLink({
-        type: 'recovery',
-        email: email,
-        options: {
-          redirectTo: `${req.headers.get("origin") || "https://5670e5fc-c3f6-4b61-9f11-214ae88eb9ef.lovableproject.com"}/reset-password`,
-        }
-      });
-      
-      if (resetError) console.error("Error sending password reset:", resetError);
-
-      // Create company_users entry for new user
-      const { error: companyUserError } = await supabaseAdmin
-        .from("company_users")
-        .insert({
+      return new Response(
+        JSON.stringify({
+          success: true,
           user_id: userId,
-          company_id: companyId,
-          role: role,
-          active: true,
-        });
-
-      if (companyUserError) {
-        console.error("Error creating company_users entry:", companyUserError);
-        throw companyUserError;
-      }
+          email_sent: false,
+          message: "Usuario agregado a la empresa (ya tenía cuenta)",
+        }),
+        {
+          headers: { ...corsHeaders, "Content-Type": "application/json" },
+          status: 200,
+        }
+      );
     }
 
-    return new Response(JSON.stringify({ 
-      success: true, 
-      user_id: userId,
-      message: existingUser ? "Usuario agregado a la empresa" : "Usuario invitado. Se le ha enviado un email para configurar su contraseña"
-    }), {
-      headers: { ...corsHeaders, "Content-Type": "application/json" },
-      status: 200,
+    // User doesn't exist - use inviteUserByEmail which sends email via Supabase SMTP
+    const frontendUrl = Deno.env.get("FRONTEND_URL") || origin || "";
+    const redirectTo = `${frontendUrl}/auth`;
+
+    console.log("Inviting new user via Supabase Auth", { email, redirectTo });
+
+    const { data: inviteData, error: inviteError } = await supabaseAdmin.auth.admin.inviteUserByEmail(email, {
+      redirectTo,
+      data: {
+        full_name: full_name || "",
+        invited_to_company: companyId,
+        assigned_role: role,
+      },
     });
+
+    if (inviteError) {
+      console.error("Error inviting user:", inviteError);
+      throw inviteError;
+    }
+
+    if (!inviteData.user) {
+      throw new Error("No se pudo crear el usuario");
+    }
+
+    userId = inviteData.user.id;
+    console.log("User invited successfully", { userId, email });
+
+    // Create company_users entry for new user
+    const { error: insertCompanyUserError } = await supabaseAdmin
+      .from("company_users")
+      .insert({
+        user_id: userId,
+        company_id: companyId,
+        role: role,
+        active: true,
+      });
+
+    if (insertCompanyUserError) {
+      console.error("Error creating company_users entry:", insertCompanyUserError);
+      throw insertCompanyUserError;
+    }
+
+    return new Response(
+      JSON.stringify({
+        success: true,
+        user_id: userId,
+        email_sent: true,
+        message: "Invitación enviada. El usuario recibirá un email para configurar su contraseña.",
+      }),
+      {
+        headers: { ...corsHeaders, "Content-Type": "application/json" },
+        status: 200,
+      }
+    );
   } catch (error) {
     const errorMessage = error instanceof Error ? error.message : "Unknown error";
+    console.error("invite-employee error", error);
     return new Response(JSON.stringify({ error: errorMessage }), {
       headers: { ...corsHeaders, "Content-Type": "application/json" },
       status: 400,

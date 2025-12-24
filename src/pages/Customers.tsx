@@ -34,7 +34,7 @@ const customerSchema = z.object({
   address: z.string().max(500, "La dirección debe tener máximo 500 caracteres").optional(),
   credit_limit: z.number({ invalid_type_error: "El límite de crédito debe ser un número" })
     .nonnegative("El límite de crédito no puede ser negativo")
-    .max(999999999.99, "El límite de crédito es demasiado alto")
+    .max(9999999999.99, "El límite de crédito es demasiado alto")
     .optional(),
   payment_terms: z.string().max(100, "Los términos de pago deben tener máximo 100 caracteres").optional(),
   price_list_id: z.string().uuid().optional().nullable(),

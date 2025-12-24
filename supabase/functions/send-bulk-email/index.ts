@@ -1,6 +1,9 @@
 import { Resend } from "https://esm.sh/resend@2.0.0";
+import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
 
 const resend = new Resend(Deno.env.get("RESEND_API_KEY"));
+const supabaseUrl = Deno.env.get('SUPABASE_URL')!;
+const supabaseServiceKey = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')!;
 
 const corsHeaders = {
   "Access-Control-Allow-Origin": "*",
@@ -17,18 +20,89 @@ interface BulkEmailRequest {
   recipients: Recipient[];
   subject: string;
   body: string;
+  companyId?: string;
+}
+
+// Función para escapar HTML y prevenir XSS
+function escapeHtml(text: string): string {
+  const htmlEscapeMap: Record<string, string> = {
+    '&': '&amp;',
+    '<': '&lt;',
+    '>': '&gt;',
+    '"': '&quot;',
+    "'": '&#039;',
+  };
+  return text.replace(/[&<>"']/g, (char) => htmlEscapeMap[char]);
 }
 
 const handler = async (req: Request): Promise<Response> => {
-  // Handle CORS preflight requests
   if (req.method === "OPTIONS") {
     return new Response(null, { headers: corsHeaders });
   }
 
   try {
-    const { recipients, subject, body }: BulkEmailRequest = await req.json();
+    // Verificar autenticación
+    const authHeader = req.headers.get('authorization');
+    if (!authHeader) {
+      console.error('No authorization header provided');
+      return new Response(JSON.stringify({ error: 'No autorizado' }), {
+        status: 401,
+        headers: { ...corsHeaders, "Content-Type": "application/json" },
+      });
+    }
 
-    console.log(`Sending bulk emails to ${recipients.length} recipients`);
+    // Crear cliente Supabase y verificar usuario
+    const supabaseClient = createClient(supabaseUrl, supabaseServiceKey, {
+      global: { headers: { Authorization: authHeader } },
+    });
+
+    const { data: { user }, error: authError } = await supabaseClient.auth.getUser(
+      authHeader.replace('Bearer ', '')
+    );
+
+    if (authError || !user) {
+      console.error('Auth error:', authError);
+      return new Response(JSON.stringify({ error: 'No autorizado' }), {
+        status: 401,
+        headers: { ...corsHeaders, "Content-Type": "application/json" },
+      });
+    }
+
+    const { recipients, subject, body, companyId }: BulkEmailRequest = await req.json();
+
+    // Si se proporciona companyId, verificar que el usuario pertenece a la empresa
+    if (companyId) {
+      const { data: membership, error: membershipError } = await supabaseClient
+        .from('company_users')
+        .select('id, role')
+        .eq('user_id', user.id)
+        .eq('company_id', companyId)
+        .eq('active', true)
+        .maybeSingle();
+
+      if (membershipError || !membership) {
+        console.error('User does not belong to company:', companyId);
+        return new Response(JSON.stringify({ error: 'Acceso denegado a esta empresa' }), {
+          status: 403,
+          headers: { ...corsHeaders, "Content-Type": "application/json" },
+        });
+      }
+
+      // Solo admins y managers pueden enviar emails masivos
+      if (!['admin', 'manager'].includes(membership.role)) {
+        console.error('User role not authorized for bulk email:', membership.role);
+        return new Response(JSON.stringify({ error: 'No tienes permisos para enviar emails masivos' }), {
+          status: 403,
+          headers: { ...corsHeaders, "Content-Type": "application/json" },
+        });
+      }
+    }
+
+    console.log(`Sending bulk emails to ${recipients.length} recipients (user: ${user.email})`);
+
+    // Sanitizar el contenido del email para prevenir XSS/HTML injection
+    const safeBody = escapeHtml(body).replace(/\n/g, '<br>');
+    const safeSubject = escapeHtml(subject);
 
     // Send emails to all recipients
     const emailPromises = recipients.map(async (recipient) => {
@@ -38,15 +112,16 @@ const handler = async (req: Request): Promise<Response> => {
       }
 
       try {
+        const safeName = escapeHtml(recipient.name);
         const emailResponse = await resend.emails.send({
           from: "Sistema POS <onboarding@resend.dev>",
           to: [recipient.email],
-          subject: subject,
+          subject: safeSubject,
           html: `
             <div style="font-family: Arial, sans-serif; max-width: 600px; margin: 0 auto;">
-              <h2 style="color: #333;">Hola ${recipient.name},</h2>
+              <h2 style="color: #333;">Hola ${safeName},</h2>
               <div style="margin: 20px 0; line-height: 1.6;">
-                ${body.replace(/\n/g, '<br>')}
+                ${safeBody}
               </div>
               <hr style="border: none; border-top: 1px solid #eee; margin: 30px 0;">
               <p style="color: #666; font-size: 12px;">

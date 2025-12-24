@@ -11,7 +11,7 @@ import { Separator } from "@/components/ui/separator";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import { toast } from "sonner";
 import { useMemo, useState, useEffect } from "react";
-import { Settings, ShoppingCart, Store, FileText, BarChart3 } from "lucide-react";
+import { Settings, ShoppingCart, Store, FileText, BarChart3, Clock } from "lucide-react";
 
 type IntegrationType = "mercadolibre" | "tiendanube" | "woocommerce" | "google_forms";
 
@@ -453,9 +453,45 @@ const Integrations = () => {
     onError: () => toast.error("Error al actualizar la integración"),
   });
 
+<<<<<<< HEAD
   // -------------------- Helpers --------------------
   const getIntegrationStatus = (type: IntegrationType) => {
     return (integrations ?? []).find((i) => i.integration_type === type) ?? null;
+=======
+  const integrationTypes = [
+    {
+      type: "mercadolibre",
+      name: "Mercado Libre",
+      icon: ShoppingCart,
+      description: "Sincroniza pedidos y genera facturas automáticamente",
+      comingSoon: true,
+    },
+    {
+      type: "tiendanube",
+      name: "Tienda Nube",
+      icon: Store,
+      description: "Conecta tu tienda online con tu sistema",
+      comingSoon: true,
+    },
+    {
+      type: "woocommerce",
+      name: "WooCommerce",
+      icon: Store,
+      description: "Integración con tu tienda WordPress",
+      comingSoon: true,
+    },
+    {
+      type: "google_forms",
+      name: "Google Forms",
+      icon: FileText,
+      description: "Crea clientes y presupuestos desde formularios",
+      comingSoon: true,
+    },
+  ];
+
+  const getIntegrationStatus = (type: string) => {
+    return integrations?.find((i) => i.integration_type === type);
+>>>>>>> origin/main
   };
 
   /**
@@ -630,12 +666,13 @@ const Integrations = () => {
 
   return (
     <Layout>
-      <div className="container mx-auto p-6">
-        <div className="flex items-center gap-2 mb-6">
-          <Settings className="h-8 w-8" />
-          <h1 className="text-3xl font-bold">Integraciones</h1>
+      <div className="space-y-4 md:space-y-6">
+        <div className="flex items-center gap-2">
+          <Settings className="h-6 w-6 md:h-8 md:w-8" />
+          <h1 className="text-2xl md:text-3xl font-bold">Integraciones</h1>
         </div>
 
+<<<<<<< HEAD
         <div className="grid gap-6 md:grid-cols-2 lg:grid-cols-3">
           {integrationTypes.map((integration) => {
             const status = getIntegrationStatus(integration.type);
@@ -891,6 +928,78 @@ const Integrations = () => {
                 <div className="text-base font-semibold mb-2">Ítems</div>
 
                 {Array.isArray(selectedOrder?.order_data?.items) && selectedOrder!.order_data.items.length > 0 ? (
+=======
+        {/* Coming Soon Banner */}
+        <Card className="border-primary/20 bg-primary/5">
+          <CardContent className="flex items-center gap-4 py-4">
+            <div className="p-3 bg-primary/10 rounded-full">
+              <Clock className="h-6 w-6 text-primary" />
+            </div>
+            <div>
+              <h3 className="font-semibold text-lg">Integraciones Próximamente</h3>
+              <p className="text-muted-foreground text-sm">
+                Estamos trabajando para conectar tu sistema con las plataformas más populares. 
+                Pronto podrás sincronizar pedidos, productos e inventario automáticamente.
+              </p>
+            </div>
+          </CardContent>
+        </Card>
+
+        <div className="grid gap-4 md:gap-6 sm:grid-cols-2 lg:grid-cols-3">
+        {integrationTypes.map((integration) => {
+          const status = getIntegrationStatus(integration.type);
+          const Icon = integration.icon;
+
+          return (
+            <Card key={integration.type} className={integration.comingSoon ? "opacity-75" : ""}>
+              <CardHeader>
+                <div className="flex items-start justify-between">
+                  <div className="flex items-center gap-3">
+                    <div className="p-2 bg-primary/10 rounded-lg">
+                      <Icon className="h-6 w-6 text-primary" />
+                    </div>
+                    <div>
+                      <CardTitle className="text-lg flex items-center gap-2">
+                        {integration.name}
+                        {integration.comingSoon && (
+                          <Badge variant="secondary" className="text-xs flex items-center gap-1">
+                            <Clock className="h-3 w-3" />
+                            Próximamente
+                          </Badge>
+                        )}
+                      </CardTitle>
+                      {status && !integration.comingSoon && (
+                        <Badge variant={status.active ? "default" : "secondary"} className="mt-1">
+                          {status.active ? "Activo" : "Inactivo"}
+                        </Badge>
+                      )}
+                    </div>
+                  </div>
+                  {status && !integration.comingSoon && (
+                    <Switch
+                      checked={status.active}
+                      onCheckedChange={(checked) =>
+                        toggleMutation.mutate({ id: status.id, active: checked })
+                      }
+                    />
+                  )}
+                </div>
+              </CardHeader>
+              <CardContent>
+                <CardDescription className="mb-4">
+                  {integration.description}
+                </CardDescription>
+                {integration.comingSoon ? (
+                  <Button variant="outline" className="w-full" disabled>
+                    <Clock className="mr-2 h-4 w-4" />
+                    Disponible Pronto
+                  </Button>
+                ) : !status ? (
+                  <Button variant="outline" className="w-full">
+                    Configurar
+                  </Button>
+                ) : (
+>>>>>>> origin/main
                   <div className="space-y-2">
                     {selectedOrder!.order_data.items.map((it: any, idx: number) => (
                       <div key={idx} className="rounded-lg border p-3 text-sm">

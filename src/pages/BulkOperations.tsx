@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useState, useMemo } from "react";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
 import { Layout } from "@/components/layout/Layout";
@@ -19,6 +19,12 @@ import { format } from "date-fns";
 import { es } from "date-fns/locale";
 import { usePermissions } from "@/hooks/usePermissions";
 import { useCompany } from "@/contexts/CompanyContext";
+import { RadioGroup, RadioGroupItem } from "@/components/ui/radio-group";
+import { Switch } from "@/components/ui/switch";
+import { Dialog as ShadDialog, DialogContent as ShadDialogContent, DialogHeader as ShadDialogHeader, DialogTitle as ShadDialogTitle, DialogTrigger as ShadDialogTrigger } from "@/components/ui/dialog";
+import { isValidEmail } from "@/lib/utils";
+
+const EMAIL_MASSIVE_CONFIRM_THRESHOLD = 200;
 
 export default function BulkOperations() {
   const { currentCompany } = useCompany();
@@ -33,7 +39,6 @@ export default function BulkOperations() {
   const [emailSubject, setEmailSubject] = useState("");
   const [emailBody, setEmailBody] = useState("");
   const [messageBody, setMessageBody] = useState("");
-  const [selectedCustomers, setSelectedCustomers] = useState<string[]>([]);
   const [filterType, setFilterType] = useState<string>("all");
 
   const queryClient = useQueryClient();
@@ -163,33 +168,35 @@ export default function BulkOperations() {
     mutationFn: async () => {
       const { data: { user } } = await supabase.auth.getUser();
       if (!user) throw new Error("No user found");
-
-      const recipients = selectedCustomers.length > 0 
-        ? customers?.filter(c => selectedCustomers.includes(c.id))
-        : customers;
-
-      const { data, error } = await supabase.functions.invoke("send-bulk-email", {
-        body: {
-          recipients: recipients?.map(c => ({ email: c.email, name: c.name })),
-          subject: emailSubject,
-          body: emailBody,
-        },
-      });
-
-      if (error) throw error;
-
-      // Log operation
-      await supabase.from("bulk_operations").insert({
+      // Insert log with status 'processing'
+      const { data: logData, error: logError } = await supabase.from("bulk_operations").insert({
         operation_type: "send_email",
         entity_type: "customers",
-        records_affected: recipients?.length || 0,
-        operation_data: { subject: emailSubject },
-        status: "completed",
+        records_affected: recipientsCount,
+        status: "processing",
+        operation_data: { subject: emailSubject, selectionMode, filterType, scheduleAt: scheduleEnabled ? scheduleAt : null },
         user_id: user.id,
-        completed_at: new Date().toISOString(),
+        created_at: new Date().toISOString(),
+      }).select();
+      if (logError) throw logError;
+      const logId = logData?.[0]?.id;
+      // Call edge function
+      const { error, data } = await supabase.functions.invoke("send-bulk-email", {
+        body: {
+          recipients: recipients.map(c => ({ email: c.email, name: c.name, id: c.id })),
+          subject: emailSubject,
+          body: emailBody,
+          scheduleAt: scheduleEnabled ? scheduleAt : null,
+        },
       });
-
-      return recipients?.length || 0;
+      // Update log
+      if (!error) {
+        await supabase.from("bulk_operations").update({ status: "completed", completed_at: new Date().toISOString() }).eq("id", logId);
+      } else {
+        await supabase.from("bulk_operations").update({ status: "failed", operation_data: { error: error.message } }).eq("id", logId);
+        throw error;
+      }
+      return recipientsCount;
     },
     onSuccess: (count) => {
       queryClient.invalidateQueries({ queryKey: ["bulk-operations"] });
@@ -197,7 +204,8 @@ export default function BulkOperations() {
       setDialogOpen(false);
       setEmailSubject("");
       setEmailBody("");
-      setSelectedCustomers([]);
+      setSelectedCustomerIds([]);
+      setSelectionMode("allFiltered");
     },
     onError: (error) => {
       toast.error("Error al enviar emails: " + error.message);
@@ -209,8 +217,8 @@ export default function BulkOperations() {
       const { data: { user } } = await supabase.auth.getUser();
       if (!user) throw new Error("No user found");
 
-      const recipients = selectedCustomers.length > 0 
-        ? customers?.filter(c => selectedCustomers.includes(c.id))
+      const recipients = selectedMessageCustomerIds.length > 0 
+        ? customers?.filter(c => selectedMessageCustomerIds.includes(c.id))
         : customers;
 
       // Log operation
@@ -231,16 +239,43 @@ export default function BulkOperations() {
       toast.success(`${count} mensajes enviados correctamente`);
       setDialogOpen(false);
       setMessageBody("");
-      setSelectedCustomers([]);
+      setSelectedMessageCustomerIds([]);
     },
     onError: (error) => {
       toast.error("Error al enviar mensajes: " + error.message);
     },
   });
 
+  const sendTestEmailMutation = useMutation({
+    mutationFn: async () => {
+      if (!isValidEmail(testEmail)) throw new Error("Email destino inválido");
+      const previewCustomer = filteredCustomers.find(c => c.id === previewCustomerId) || filteredCustomers[0];
+      const previewName = previewCustomer?.name || "Cliente";
+      const previewBody = emailBody.replace(/{{name}}/g, previewName);
+      const { error } = await supabase.functions.invoke("send-test-email", {
+        body: {
+          toEmail: testEmail,
+          subject: emailSubject,
+          body: previewBody,
+          previewData: { name: previewName },
+        },
+      });
+      if (error) throw error;
+      return true;
+    },
+    onSuccess: () => {
+      toast.success("Email de prueba enviado");
+      setTestEmail("");
+      setPreviewDialogOpen(false);
+    },
+    onError: (error) => {
+      toast.error("Error al enviar test: " + error.message);
+    },
+  });
+
   const handleExecute = () => {
     if (activeTab === "emails") {
-      if (!emailSubject || !emailBody) {
+      if (!emailSubject || !emailBody || recipientsCount === 0) {
         toast.error("Por favor completa el asunto y cuerpo del email");
         return;
       }
@@ -260,20 +295,55 @@ export default function BulkOperations() {
     }
   };
 
-  const toggleCustomerSelection = (customerId: string) => {
-    setSelectedCustomers(prev =>
-      prev.includes(customerId)
-        ? prev.filter(id => id !== customerId)
-        : [...prev, customerId]
-    );
+  const [selectionMode, setSelectionMode] = useState<'allFiltered' | 'manual'>('allFiltered');
+  const [selectedCustomerIds, setSelectedCustomerIds] = useState<string[]>([]);
+  const [searchTerm, setSearchTerm] = useState("");
+  const [previewDialogOpen, setPreviewDialogOpen] = useState(false);
+  const [previewTab, setPreviewTab] = useState<'preview' | 'test'>('preview');
+  const [previewCustomerId, setPreviewCustomerId] = useState<string | null>(null);
+  const [testEmail, setTestEmail] = useState("");
+  const [scheduleEnabled, setScheduleEnabled] = useState(false);
+  const [scheduleAt, setScheduleAt] = useState<string>("");
+  const [confirmDialogOpen, setConfirmDialogOpen] = useState(false);
+  const [confirmInput, setConfirmInput] = useState("");
+
+  const [selectedMessageCustomerIds, setSelectedMessageCustomerIds] = useState<string[]>([]);
+  const handleSelectMessageCustomer = (id: string) => {
+    setSelectedMessageCustomerIds(prev => prev.includes(id) ? prev.filter(cid => cid !== id) : [...prev, id]);
+  };
+  const handleSelectAllMessageCustomers = () => {
+    setSelectedMessageCustomerIds(filteredCustomers.map(c => c.id));
+  };
+  const handleDeselectAllMessageCustomers = () => {
+    setSelectedMessageCustomerIds([]);
   };
 
-  const toggleAllCustomers = () => {
-    if (selectedCustomers.length === customers?.length) {
-      setSelectedCustomers([]);
-    } else {
-      setSelectedCustomers(customers?.map(c => c.id) || []);
+  const filteredCustomers = useMemo(() => {
+    let list = customers || [];
+    if (filterType === "with_email") list = list.filter(c => !!c.email);
+    if (searchTerm) {
+      const term = searchTerm.toLowerCase();
+      list = list.filter(c => c.name.toLowerCase().includes(term) || (c.email || "").toLowerCase().includes(term));
     }
+    return list;
+  }, [customers, filterType, searchTerm]);
+
+  const filteredCount = filteredCustomers.length;
+  const selectedCount = selectionMode === "allFiltered" ? filteredCount : selectedCustomerIds.length;
+  const recipients = selectionMode === "allFiltered"
+    ? filteredCustomers.filter(c => !!c.email)
+    : filteredCustomers.filter(c => selectedCustomerIds.includes(c.id) && !!c.email);
+  const recipientsCount = recipients.length;
+  const hasMissingEmails = selectionMode === "allFiltered" ? filteredCustomers.some(c => !c.email) : filteredCustomers.filter(c => selectedCustomerIds.includes(c.id)).some(c => !c.email);
+
+  const handleSelectCustomer = (id: string) => {
+    setSelectedCustomerIds(prev => prev.includes(id) ? prev.filter(cid => cid !== id) : [...prev, id]);
+  };
+  const handleSelectAll = () => {
+    setSelectedCustomerIds(filteredCustomers.map(c => c.id));
+  };
+  const handleDeselectAll = () => {
+    setSelectedCustomerIds([]);
   };
 
   if (permissionsLoading) {
@@ -303,15 +373,13 @@ export default function BulkOperations() {
 
   return (
     <Layout>
-      <div className="space-y-6">
-        <div className="flex justify-between items-center">
-          <div>
-            <h1 className="text-3xl font-bold">Operaciones Masivas</h1>
-            <p className="text-muted-foreground">Ejecuta cambios en múltiples registros y envía comunicaciones masivas</p>
-          </div>
+      <div className="space-y-4 md:space-y-6">
+        <div>
+          <h1 className="text-2xl md:text-3xl font-bold">Operaciones Masivas</h1>
+          <p className="text-sm md:text-base text-muted-foreground">Ejecuta cambios en múltiples registros</p>
         </div>
 
-        <div className="grid gap-6 md:grid-cols-3">
+        <div className="grid grid-cols-2 md:grid-cols-3 gap-3 md:gap-6">
           <Card>
             <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
               <CardTitle className="text-sm font-medium">Operaciones Completadas</CardTitle>
@@ -350,23 +418,23 @@ export default function BulkOperations() {
           </Card>
         </div>
 
-        <Tabs value={activeTab} onValueChange={setActiveTab} className="space-y-6">
-          <TabsList className="grid w-full grid-cols-4">
-            <TabsTrigger value="products" className="flex items-center gap-2">
+        <Tabs value={activeTab} onValueChange={setActiveTab} className="space-y-4 md:space-y-6">
+          <TabsList className="w-full flex flex-wrap h-auto gap-1 p-1">
+            <TabsTrigger value="products" className="flex-1 min-w-[80px] text-xs sm:text-sm flex items-center gap-1 sm:gap-2">
               <Package className="h-4 w-4" />
-              Productos
+              <span className="hidden sm:inline">Productos</span>
             </TabsTrigger>
-            <TabsTrigger value="emails" className="flex items-center gap-2">
+            <TabsTrigger value="emails" className="flex-1 min-w-[80px] text-xs sm:text-sm flex items-center gap-1 sm:gap-2">
               <Mail className="h-4 w-4" />
-              Emails Masivos
+              <span className="hidden sm:inline">Emails</span>
             </TabsTrigger>
-            <TabsTrigger value="messages" className="flex items-center gap-2">
+            <TabsTrigger value="messages" className="flex-1 min-w-[80px] text-xs sm:text-sm flex items-center gap-1 sm:gap-2">
               <MessageSquare className="h-4 w-4" />
-              Mensajes
+              <span className="hidden sm:inline">Mensajes</span>
             </TabsTrigger>
-            <TabsTrigger value="history" className="flex items-center gap-2">
+            <TabsTrigger value="history" className="flex-1 min-w-[80px] text-xs sm:text-sm flex items-center gap-1 sm:gap-2">
               <TrendingUp className="h-4 w-4" />
-              Historial
+              <span className="hidden sm:inline">Historial</span>
             </TabsTrigger>
           </TabsList>
 
@@ -457,65 +525,186 @@ export default function BulkOperations() {
                 <CardDescription>Envía emails personalizados a múltiples clientes</CardDescription>
               </CardHeader>
               <CardContent className="space-y-4">
-                <div>
-                  <Label>Filtrar Destinatarios</Label>
-                  <Select value={filterType} onValueChange={setFilterType}>
-                    <SelectTrigger>
-                      <SelectValue />
-                    </SelectTrigger>
-                    <SelectContent>
-                      <SelectItem value="all">Todos los clientes</SelectItem>
-                      <SelectItem value="with_email">Solo con email</SelectItem>
-                    </SelectContent>
-                  </Select>
-                </div>
-
-                <div>
-                  <Label>Asunto del Email</Label>
-                  <Input
-                    value={emailSubject}
-                    onChange={(e) => setEmailSubject(e.target.value)}
-                    placeholder="Ej: Ofertas especiales para ti"
-                  />
-                </div>
-
-                <div>
-                  <Label>Cuerpo del Email</Label>
-                  <Textarea
-                    value={emailBody}
-                    onChange={(e) => setEmailBody(e.target.value)}
-                    placeholder="Escribe el contenido de tu email aquí..."
-                    rows={8}
-                  />
-                </div>
-
-                <div className="border rounded-lg p-4 space-y-2 max-h-60 overflow-y-auto">
-                  <div className="flex items-center justify-between mb-2">
-                    <Label>Destinatarios ({selectedCustomers.length > 0 ? selectedCustomers.length : customers?.length || 0})</Label>
-                    <Button variant="outline" size="sm" onClick={toggleAllCustomers}>
-                      {selectedCustomers.length === customers?.length ? "Deseleccionar todos" : "Seleccionar todos"}
-                    </Button>
+                <div className="grid gap-4 md:grid-cols-2">
+                  <div>
+                    <Label>Filtrar Destinatarios</Label>
+                    <Select value={filterType} onValueChange={setFilterType}>
+                      <SelectTrigger>
+                        <SelectValue />
+                      </SelectTrigger>
+                      <SelectContent>
+                        <SelectItem value="all">Todos los clientes</SelectItem>
+                        <SelectItem value="with_email">Solo con email</SelectItem>
+                      </SelectContent>
+                    </Select>
                   </div>
-                  {customers?.map((customer) => (
-                    <div key={customer.id} className="flex items-center space-x-2">
-                      <Checkbox
-                        id={customer.id}
-                        checked={selectedCustomers.length === 0 || selectedCustomers.includes(customer.id)}
-                        onCheckedChange={() => toggleCustomerSelection(customer.id)}
-                      />
-                      <label htmlFor={customer.id} className="text-sm flex-1 cursor-pointer">
-                        {customer.name} {customer.email && `(${customer.email})`}
-                      </label>
-                    </div>
-                  ))}
+                  <div>
+                    <Label>Búsqueda</Label>
+                    <Input value={searchTerm} onChange={e => setSearchTerm(e.target.value)} placeholder="Buscar por nombre o email" />
+                  </div>
                 </div>
-
-                {canCreate && (
-                  <Button onClick={handleExecute} disabled={sendBulkEmailMutation.isPending} className="w-full">
-                    <Mail className="mr-2 h-4 w-4" />
-                    {sendBulkEmailMutation.isPending ? "Enviando..." : `Enviar Emails (${selectedCustomers.length > 0 ? selectedCustomers.length : customers?.length || 0})`}
+                <div className="flex gap-4 items-center">
+                  <RadioGroup value={selectionMode} onValueChange={v => setSelectionMode(v as 'allFiltered' | 'manual')} className="flex gap-4">
+                    <div className="flex items-center gap-2">
+                      <RadioGroupItem value="allFiltered" id="allFiltered" />
+                      <label htmlFor="allFiltered" className="text-sm cursor-pointer">Enviar a todos los filtrados</label>
+                    </div>
+                    <div className="flex items-center gap-2">
+                      <RadioGroupItem value="manual" id="manual" />
+                      <label htmlFor="manual" className="text-sm cursor-pointer">Seleccionar manualmente</label>
+                    </div>
+                  </RadioGroup>
+                  <div className="text-xs text-muted-foreground">Filtrados: {filteredCount} | Seleccionados: {selectedCount}</div>
+                </div>
+                <div className="border rounded-lg p-4 space-y-2 max-h-60 overflow-y-auto">
+                  {filteredCount === 0 ? (
+                    <div className="text-center text-muted-foreground">0 resultados</div>
+                  ) : selectionMode === "manual" ? (
+                    <div>
+                      <div className="flex items-center gap-2 mb-2">
+                        <Button variant="outline" size="sm" onClick={handleSelectAll}>Seleccionar todos</Button>
+                        <Button variant="outline" size="sm" onClick={handleDeselectAll}>Deseleccionar todos</Button>
+                      </div>
+                      {filteredCustomers.map((customer) => (
+                        <div key={customer.id} className="flex items-center space-x-2">
+                          <Checkbox
+                            id={customer.id}
+                            checked={selectedCustomerIds.includes(customer.id)}
+                            onCheckedChange={() => handleSelectCustomer(customer.id)}
+                          />
+                          <label htmlFor={customer.id} className="text-sm flex-1 cursor-pointer">
+                            {customer.name} {customer.email && `(${customer.email})`}
+                          </label>
+                          {!customer.email && <span className="text-xs text-warning">Sin email</span>}
+                        </div>
+                      ))}
+                    </div>
+                  ) : (
+                    <div>
+                      {filteredCustomers.map((customer) => (
+                        <div key={customer.id} className="flex items-center space-x-2">
+                          <Checkbox id={customer.id} checked disabled />
+                          <label htmlFor={customer.id} className="text-sm flex-1 cursor-pointer">
+                            {customer.name} {customer.email && `(${customer.email})`}
+                          </label>
+                          {!customer.email && <span className="text-xs text-warning">Sin email</span>}
+                        </div>
+                      ))}
+                    </div>
+                  )}
+                </div>
+                {hasMissingEmails && <div className="text-xs text-warning">Algunos clientes no tienen email y serán ignorados.</div>}
+                <div className="grid gap-4 md:grid-cols-2">
+                  <div>
+                    <Label>Asunto del Email</Label>
+                    <Input value={emailSubject} onChange={e => setEmailSubject(e.target.value)} placeholder="Ej: Ofertas especiales para ti" />
+                  </div>
+                  <div>
+                    <Label>Cuerpo del Email</Label>
+                    <Textarea value={emailBody} onChange={e => setEmailBody(e.target.value)} placeholder="Escribe el contenido de tu email aquí..." rows={8} />
+                  </div>
+                </div>
+                <div className="flex gap-4 items-center">
+                  <Switch checked={scheduleEnabled} onCheckedChange={setScheduleEnabled} />
+                  <span className="text-sm">{scheduleEnabled ? "Programar envío" : "Enviar ahora"}</span>
+                  {scheduleEnabled && (
+                    <Input type="datetime-local" value={scheduleAt} onChange={e => setScheduleAt(e.target.value)} className="max-w-xs" />
+                  )}
+                  {scheduleEnabled && <span className="text-xs text-muted-foreground">Zona horaria: America/Argentina/Buenos_Aires</span>}
+                </div>
+                <div className="flex gap-4">
+                  <Button variant="outline" onClick={() => setPreviewDialogOpen(true)}>
+                    Previsualizar y testear
                   </Button>
-                )}
+                  {canCreate && (
+                    <Button
+                      onClick={() => {
+                        if (!emailSubject || !emailBody || recipientsCount === 0) {
+                          toast.error("Completa asunto, cuerpo y destinatarios");
+                          return;
+                        }
+                        if (recipientsCount >= EMAIL_MASSIVE_CONFIRM_THRESHOLD) {
+                          setConfirmDialogOpen(true);
+                        } else {
+                          sendBulkEmailMutation.mutate();
+                        }
+                      }}
+                      disabled={sendBulkEmailMutation.isPending || recipientsCount === 0 || !emailSubject || !emailBody}
+                      className="w-full"
+                    >
+                      <Mail className="mr-2 h-4 w-4" />
+                      {sendBulkEmailMutation.isPending ? "Enviando..." : `Enviar Emails (${recipientsCount})`}
+                    </Button>
+                  )}
+                </div>
+                {/* Preview & Test Dialog */}
+                <ShadDialog open={previewDialogOpen} onOpenChange={setPreviewDialogOpen}>
+                  <ShadDialogContent>
+                    <ShadDialogHeader>
+                      <ShadDialogTitle>Previsualizar y Testear Email</ShadDialogTitle>
+                    </ShadDialogHeader>
+                    <Tabs value={previewTab} onValueChange={v => setPreviewTab(v as 'preview' | 'test')} className="mt-2">
+                      <TabsList className="grid grid-cols-2 mb-4">
+                        <TabsTrigger value="preview">Previsualizar</TabsTrigger>
+                        <TabsTrigger value="test">Test</TabsTrigger>
+                      </TabsList>
+                      <TabsContent value="preview">
+                        <div className="mb-2">
+                          <Label>Previsualizar como</Label>
+                          <Select value={previewCustomerId || filteredCustomers[0]?.id || ""} onValueChange={setPreviewCustomerId}>
+                            <SelectTrigger><SelectValue /></SelectTrigger>
+                            <SelectContent>
+                              {filteredCustomers.map(c => (
+                                <SelectItem key={c.id} value={c.id}>{c.name} {c.email && `(${c.email})`}</SelectItem>
+                              ))}
+                            </SelectContent>
+                          </Select>
+                        </div>
+                        <div className="border rounded-lg p-4 bg-muted">
+                          <div className="font-bold mb-2">{emailSubject}</div>
+                          <div>{emailBody.replace(/{{name}}/g, (filteredCustomers.find(c => c.id === previewCustomerId)?.name || filteredCustomers[0]?.name || "Cliente"))}</div>
+                        </div>
+                      </TabsContent>
+                      <TabsContent value="test">
+                        <div className="mb-2">
+                          <Label>Email destino</Label>
+                          <Input value={testEmail} onChange={e => setTestEmail(e.target.value)} placeholder="tu@email.com" />
+                        </div>
+                        <Button
+                          onClick={() => {
+                            if (!emailSubject || !emailBody || !isValidEmail(testEmail)) {
+                              toast.error("Completa asunto, cuerpo y email válido");
+                              return;
+                            }
+                            sendTestEmailMutation.mutate();
+                          }}
+                          disabled={!emailSubject || !emailBody || !isValidEmail(testEmail) || sendTestEmailMutation.isPending}
+                        >
+                          {sendTestEmailMutation.isPending ? "Enviando..." : "Enviar test"}
+                        </Button>
+                      </TabsContent>
+                    </Tabs>
+                  </ShadDialogContent>
+                </ShadDialog>
+                {/* Confirmación masiva */}
+                <ShadDialog open={confirmDialogOpen} onOpenChange={setConfirmDialogOpen}>
+                  <ShadDialogContent>
+                    <ShadDialogHeader>
+                      <ShadDialogTitle>Confirmar envío masivo</ShadDialogTitle>
+                      <DialogDescription>
+                        Vas a enviar a {recipientsCount} destinatarios. Escribe <b>ENVIAR</b> para confirmar.
+                      </DialogDescription>
+                    </ShadDialogHeader>
+                    <Input value={confirmInput} onChange={e => setConfirmInput(e.target.value)} placeholder="ENVIAR" />
+                    <Button
+                      disabled={confirmInput !== "ENVIAR"}
+                      onClick={() => {
+                        setConfirmDialogOpen(false);
+                        sendBulkEmailMutation.mutate();
+                      }}
+                    >Confirmar y enviar</Button>
+                  </ShadDialogContent>
+                </ShadDialog>
               </CardContent>
             </Card>
           </TabsContent>
@@ -552,17 +741,17 @@ export default function BulkOperations() {
 
                 <div className="border rounded-lg p-4 space-y-2 max-h-60 overflow-y-auto">
                   <div className="flex items-center justify-between mb-2">
-                    <Label>Destinatarios ({selectedCustomers.length > 0 ? selectedCustomers.length : customers?.length || 0})</Label>
-                    <Button variant="outline" size="sm" onClick={toggleAllCustomers}>
-                      {selectedCustomers.length === customers?.length ? "Deseleccionar todos" : "Seleccionar todos"}
+                    <Label>Destinatarios ({selectedMessageCustomerIds.length > 0 ? selectedMessageCustomerIds.length : customers?.length || 0})</Label>
+                    <Button variant="outline" size="sm" onClick={handleSelectAllMessageCustomers}>
+                      {selectedMessageCustomerIds.length === customers?.length ? "Deseleccionar todos" : "Seleccionar todos"}
                     </Button>
                   </div>
                   {customers?.map((customer) => (
                     <div key={customer.id} className="flex items-center space-x-2">
                       <Checkbox
                         id={`msg-${customer.id}`}
-                        checked={selectedCustomers.length === 0 || selectedCustomers.includes(customer.id)}
-                        onCheckedChange={() => toggleCustomerSelection(customer.id)}
+                        checked={selectedMessageCustomerIds.includes(customer.id)}
+                        onCheckedChange={() => handleSelectMessageCustomer(customer.id)}
                       />
                       <label htmlFor={`msg-${customer.id}`} className="text-sm flex-1 cursor-pointer">
                         {customer.name} {customer.phone && `(${customer.phone})`}
@@ -574,7 +763,7 @@ export default function BulkOperations() {
                 {canCreate && (
                   <Button onClick={handleExecute} disabled={sendBulkMessageMutation.isPending} className="w-full">
                     <MessageSquare className="mr-2 h-4 w-4" />
-                    {sendBulkMessageMutation.isPending ? "Enviando..." : `Enviar Mensajes (${selectedCustomers.length > 0 ? selectedCustomers.length : customers?.length || 0})`}
+                    {sendBulkMessageMutation.isPending ? "Enviando..." : `Enviar Mensajes (${selectedMessageCustomerIds.length > 0 ? selectedMessageCustomerIds.length : customers?.length || 0})`}
                   </Button>
                 )}
               </CardContent>

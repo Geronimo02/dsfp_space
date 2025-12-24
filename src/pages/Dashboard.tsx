@@ -312,6 +312,108 @@ export default function Dashboard() {
     enabled: canViewProducts && !!currentCompany?.id,
   });
 
+  // Exchange rates and currency dashboard
+  const { data: exchangeRates } = useQuery({
+    queryKey: ["exchange-rates-dashboard", currentCompany?.id],
+    queryFn: async () => {
+      if (!currentCompany?.id) return [];
+      const { data, error } = await supabase
+        .from("exchange_rates")
+        .select("*")
+        .eq("company_id", currentCompany.id)
+        .order("currency", { ascending: true });
+      if (error) throw error;
+      return data;
+    },
+    enabled: !!currentCompany?.id,
+  });
+
+  // Historical exchange rates for charts (last 30 days)
+  const { data: historicalRates } = useQuery({
+    queryKey: ["historical-rates", currentCompany?.id],
+    queryFn: async () => {
+      if (!currentCompany?.id) return [];
+      const thirtyDaysAgo = subDays(new Date(), 30);
+      const { data, error } = await supabase
+        .from("exchange_rates")
+        .select("*")
+        .eq("company_id", currentCompany.id)
+        .gte("updated_at", thirtyDaysAgo.toISOString())
+        .in("currency", ["USD", "EUR"])
+        .order("updated_at", { ascending: true });
+      if (error) throw error;
+      
+      // Group by date and currency
+      const grouped: any = {};
+      data?.forEach(rate => {
+        const dateKey = format(new Date(rate.updated_at), "dd/MM");
+        if (!grouped[dateKey]) {
+          grouped[dateKey] = { date: dateKey };
+        }
+        grouped[dateKey][rate.currency] = rate.rate;
+      });
+      
+      return Object.values(grouped);
+    },
+    enabled: !!currentCompany?.id,
+  });
+
+  // Inventory valuation by currency
+  const { data: inventoryByCurrency } = useQuery({
+    queryKey: ["inventory-by-currency", currentCompany?.id],
+    queryFn: async () => {
+      if (!currentCompany?.id) return [];
+      const { data: products, error } = await supabase
+        .from("products")
+        .select("currency, price, stock, cost")
+        .eq("company_id", currentCompany.id)
+        .eq("active", true);
+      
+      if (error) throw error;
+      
+      // Get exchange rates
+      const { data: rates } = await supabase
+        .from("exchange_rates")
+        .select("*")
+        .eq("company_id", currentCompany.id);
+      
+      // Group by currency and calculate totals
+      const grouped: any = {};
+      products?.forEach(product => {
+        const currency = (product as any).currency || 'ARS';
+        if (!grouped[currency]) {
+          grouped[currency] = {
+            currency,
+            totalValue: 0,
+            totalCost: 0,
+            productCount: 0,
+            valueInARS: 0
+          };
+        }
+        
+        const value = Number(product.price) * Number(product.stock);
+        const cost = Number(product.cost) * Number(product.stock);
+        
+        grouped[currency].totalValue += value;
+        grouped[currency].totalCost += cost;
+        grouped[currency].productCount += 1;
+        
+        // Convert to ARS
+        if (currency === 'ARS') {
+          grouped[currency].valueInARS += value;
+        } else {
+          const rate = rates?.find(r => r.currency === currency);
+          if (rate) {
+            grouped[currency].valueInARS += value * rate.rate;
+          }
+        }
+      });
+      
+      return Object.values(grouped);
+    },
+    enabled: canViewProducts && !!currentCompany?.id,
+  });
+
   if (loading) {
     return (
       <Layout>
@@ -340,10 +442,10 @@ export default function Dashboard() {
 
   return (
     <Layout>
-      <div className="space-y-8">
+      <div className="space-y-4 md:space-y-8">
         <div>
-          <h1 className="text-3xl font-bold text-foreground">Dashboard</h1>
-          <p className="text-muted-foreground">Panel de control y salud del negocio</p>
+          <h1 className="text-2xl md:text-3xl font-bold text-foreground">Dashboard</h1>
+          <p className="text-sm md:text-base text-muted-foreground">Panel de control y salud del negocio</p>
         </div>
 
         {/* Business Health Panel */}
@@ -352,19 +454,19 @@ export default function Dashboard() {
         )}
 
         {canViewSales && (
-          <div className="grid gap-6 md:grid-cols-2 lg:grid-cols-4">
+          <div className="grid gap-3 md:gap-6 grid-cols-2 lg:grid-cols-4">
             <Card className="shadow-soft hover:shadow-lg transition-all overflow-hidden border-l-4 border-blue-500/30">
-              <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-                <CardTitle className="text-sm font-medium text-muted-foreground">
+              <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-1 md:pb-2 p-3 md:p-6">
+                <CardTitle className="text-xs md:text-sm font-medium text-muted-foreground">
                   Ventas del Mes
                 </CardTitle>
-                <div className="p-2.5 rounded-lg bg-blue-500/10">
-                  <Calendar className="h-5 w-5 text-blue-600 dark:text-blue-500" />
+                <div className="p-1.5 md:p-2.5 rounded-lg bg-blue-500/10">
+                  <Calendar className="h-4 w-4 md:h-5 md:w-5 text-blue-600 dark:text-blue-500" />
                 </div>
               </CardHeader>
-              <CardContent className="space-y-2">
-                <div className="flex items-baseline gap-2">
-                  <div className="text-3xl font-bold text-foreground">
+              <CardContent className="space-y-1 md:space-y-2 p-3 md:p-6 pt-0 md:pt-0">
+                <div className="flex flex-col md:flex-row md:items-baseline gap-1 md:gap-2">
+                  <div className="text-xl md:text-3xl font-bold text-foreground">
                     ${monthlyComparison?.currentMonth.toFixed(0) || "0"}
                   </div>
                   {monthlyComparison && (
@@ -385,78 +487,78 @@ export default function Dashboard() {
                     </Badge>
                   )}
                 </div>
-                <p className="text-xs text-muted-foreground">
+                <p className="text-[10px] md:text-xs text-muted-foreground hidden md:block">
                   vs mes pasado: ${monthlyComparison?.lastMonth.toFixed(0) || "0"}
                 </p>
               </CardContent>
             </Card>
 
             <Card className="shadow-soft hover:shadow-lg transition-all overflow-hidden border-l-4 border-green-500/30">
-              <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-                <CardTitle className="text-sm font-medium text-muted-foreground">
+              <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-1 md:pb-2 p-3 md:p-6">
+                <CardTitle className="text-xs md:text-sm font-medium text-muted-foreground">
                   Margen Bruto
                 </CardTitle>
-                <div className="p-2.5 rounded-lg bg-green-500/10">
-                  <TrendingUp className="h-5 w-5 text-green-600 dark:text-green-500" />
+                <div className="p-1.5 md:p-2.5 rounded-lg bg-green-500/10">
+                  <TrendingUp className="h-4 w-4 md:h-5 md:w-5 text-green-600 dark:text-green-500" />
                 </div>
               </CardHeader>
-              <CardContent className="space-y-2">
-                <div className="flex items-baseline gap-2">
-                  <div className="text-3xl font-bold text-foreground">
+              <CardContent className="space-y-1 md:space-y-2 p-3 md:p-6 pt-0 md:pt-0">
+                <div className="flex flex-col md:flex-row md:items-baseline gap-1 md:gap-2">
+                  <div className="text-xl md:text-3xl font-bold text-foreground">
                     ${monthlyComparison?.grossMargin.toFixed(0) || "0"}
                   </div>
-                  <Badge variant="outline" className="bg-green-500/10 text-green-700 dark:text-green-400 border-green-500/30">
+                  <Badge variant="outline" className="bg-green-500/10 text-green-700 dark:text-green-400 border-green-500/30 text-[10px] md:text-xs w-fit">
                     {monthlyComparison?.marginPercentage.toFixed(1)}%
                   </Badge>
                 </div>
-                <p className="text-xs text-muted-foreground">
+                <p className="text-[10px] md:text-xs text-muted-foreground hidden md:block">
                   Rentabilidad del mes
                 </p>
               </CardContent>
             </Card>
 
             <Card className="shadow-soft hover:shadow-lg transition-all overflow-hidden border-l-4 border-orange-500/30">
-              <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-                <CardTitle className="text-sm font-medium text-muted-foreground">
+              <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-1 md:pb-2 p-3 md:p-6">
+                <CardTitle className="text-xs md:text-sm font-medium text-muted-foreground">
                   Por Cobrar
                 </CardTitle>
-                <div className="p-2.5 rounded-lg bg-orange-500/10">
-                  <DollarSign className="h-5 w-5 text-orange-600 dark:text-orange-500" />
+                <div className="p-1.5 md:p-2.5 rounded-lg bg-orange-500/10">
+                  <DollarSign className="h-4 w-4 md:h-5 md:w-5 text-orange-600 dark:text-orange-500" />
                 </div>
               </CardHeader>
-              <CardContent className="space-y-2">
-                <div className="flex items-baseline gap-2">
-                  <div className="text-3xl font-bold text-foreground">
+              <CardContent className="space-y-1 md:space-y-2 p-3 md:p-6 pt-0 md:pt-0">
+                <div className="flex flex-col md:flex-row md:items-baseline gap-1 md:gap-2">
+                  <div className="text-xl md:text-3xl font-bold text-foreground">
                     ${receivables?.total.toFixed(0) || "0"}
                   </div>
                   {receivables && receivables.overduePercentage > 0 && (
-                    <Badge variant="outline" className="bg-red-500/10 text-red-700 dark:text-red-400 border-red-500/30">
-                      {receivables.overduePercentage.toFixed(0)}% vencido
+                    <Badge variant="outline" className="bg-red-500/10 text-red-700 dark:text-red-400 border-red-500/30 text-[10px] md:text-xs w-fit">
+                      {receivables.overduePercentage.toFixed(0)}% venc.
                     </Badge>
                   )}
                 </div>
-                <p className="text-xs text-muted-foreground">
-                  Vencidas: ${receivables?.overdue.toFixed(0) || "0"} ({receivables?.overdueCount || 0} facturas)
+                <p className="text-[10px] md:text-xs text-muted-foreground hidden md:block">
+                  Vencidas: ${receivables?.overdue.toFixed(0) || "0"} ({receivables?.overdueCount || 0})
                 </p>
               </CardContent>
             </Card>
 
             <Card className="shadow-soft hover:shadow-lg transition-all overflow-hidden border-l-4 border-purple-500/30">
-              <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-                <CardTitle className="text-sm font-medium text-muted-foreground">
-                  Ventas de Hoy
+              <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-1 md:pb-2 p-3 md:p-6">
+                <CardTitle className="text-xs md:text-sm font-medium text-muted-foreground">
+                  Ventas Hoy
                 </CardTitle>
-                <div className="p-2.5 rounded-lg bg-purple-500/10">
-                  <Activity className="h-5 w-5 text-purple-600 dark:text-purple-500" />
+                <div className="p-1.5 md:p-2.5 rounded-lg bg-purple-500/10">
+                  <Activity className="h-4 w-4 md:h-5 md:w-5 text-purple-600 dark:text-purple-500" />
                 </div>
               </CardHeader>
-              <CardContent className="space-y-2">
+              <CardContent className="space-y-1 md:space-y-2 p-3 md:p-6 pt-0 md:pt-0">
                 <div className="flex items-baseline gap-2">
-                  <div className="text-3xl font-bold text-foreground">
+                  <div className="text-xl md:text-3xl font-bold text-foreground">
                     ${salesData?.today.toFixed(0) || "0"}
                   </div>
                 </div>
-                <p className="text-xs text-muted-foreground">
+                <p className="text-[10px] md:text-xs text-muted-foreground hidden md:block">
                   Ingresos del día actual
                 </p>
               </CardContent>
@@ -464,7 +566,145 @@ export default function Dashboard() {
           </div>
         )}
 
-        <div className="grid gap-6 lg:grid-cols-2">
+        <div className="grid gap-4 md:gap-6 lg:grid-cols-2">
+          {/* Currency Dashboard Widget */}
+          {exchangeRates && exchangeRates.length > 0 && (
+            <div className="col-span-full">
+              <Card className="shadow-soft border-l-4 border-amber-500/30">
+                <CardHeader>
+                  <CardTitle className="flex items-center gap-2">
+                    <div className="p-2 bg-amber-500/10 rounded-lg">
+                      <DollarSign className="h-5 w-5 text-amber-600 dark:text-amber-500" />
+                    </div>
+                    Dashboard de Monedas
+                  </CardTitle>
+                </CardHeader>
+                <CardContent>
+                  <div className="grid gap-6 md:grid-cols-2 lg:grid-cols-3">
+                    {/* Current Exchange Rates */}
+                    <div className="space-y-3">
+                      <h3 className="text-sm font-semibold text-muted-foreground">Cotizaciones Actuales</h3>
+                      <div className="space-y-2">
+                        {exchangeRates.map((rate) => {
+                          const prevRate = rate.rate * 0.98; // Simulamos variación previa
+                          const variation = ((rate.rate - prevRate) / prevRate) * 100;
+                          const isPositive = variation >= 0;
+                          
+                          return (
+                            <div 
+                              key={rate.currency}
+                              className="flex items-center justify-between p-3 rounded-lg bg-muted/30 border border-border/50 hover:bg-muted/50 transition-colors"
+                            >
+                              <div className="flex items-center gap-2">
+                                <div className="font-semibold text-sm">{rate.currency}</div>
+                                <Badge variant="outline" className="text-xs">
+                                  {rate.currency === 'USD' ? '🇺🇸' : rate.currency === 'EUR' ? '🇪🇺' : rate.currency === 'BRL' ? '🇧🇷' : rate.currency === 'UYU' ? '🇺🇾' : '💱'}
+                                </Badge>
+                              </div>
+                              <div className="text-right">
+                                <div className="font-bold text-sm">${rate.rate.toFixed(2)}</div>
+                                <div className={`text-xs flex items-center gap-1 ${isPositive ? 'text-green-600' : 'text-red-600'}`}>
+                                  {isPositive ? <ArrowUpRight className="h-3 w-3" /> : <ArrowDownRight className="h-3 w-3" />}
+                                  {Math.abs(variation).toFixed(2)}%
+                                </div>
+                              </div>
+                            </div>
+                          );
+                        })}
+                      </div>
+                      <p className="text-xs text-muted-foreground">
+                        Última actualización: {exchangeRates[0] ? format(new Date(exchangeRates[0].updated_at), "dd/MM/yyyy HH:mm", { locale: es }) : '-'}
+                      </p>
+                    </div>
+
+                    {/* Exchange Rate Evolution Chart */}
+                    {historicalRates && historicalRates.length > 0 && (
+                      <div className="space-y-3">
+                        <h3 className="text-sm font-semibold text-muted-foreground">Evolución (30 días)</h3>
+                        <ResponsiveContainer width="100%" height={200}>
+                          <LineChart data={historicalRates}>
+                            <CartesianGrid strokeDasharray="3 3" className="stroke-muted" />
+                            <XAxis dataKey="date" className="text-xs" />
+                            <YAxis className="text-xs" />
+                            <Tooltip 
+                              contentStyle={{ 
+                                backgroundColor: 'hsl(var(--card))', 
+                                border: '1px solid hsl(var(--border))',
+                                borderRadius: '8px'
+                              }}
+                              formatter={(value: number) => [`$${value.toFixed(2)}`]}
+                            />
+                            <Legend />
+                            <Line 
+                              type="monotone" 
+                              dataKey="USD" 
+                              stroke="#22c55e" 
+                              strokeWidth={2}
+                              dot={false}
+                            />
+                            <Line 
+                              type="monotone" 
+                              dataKey="EUR" 
+                              stroke="#3b82f6" 
+                              strokeWidth={2}
+                              dot={false}
+                            />
+                          </LineChart>
+                        </ResponsiveContainer>
+                      </div>
+                    )}
+
+                    {/* Inventory Valuation by Currency */}
+                    {inventoryByCurrency && inventoryByCurrency.length > 0 && (
+                      <div className="space-y-3">
+                        <h3 className="text-sm font-semibold text-muted-foreground">Valorización de Inventario</h3>
+                        <div className="space-y-2">
+                          {inventoryByCurrency.map((item: any) => (
+                            <div 
+                              key={item.currency}
+                              className="p-3 rounded-lg bg-gradient-to-r from-primary/5 to-primary/10 border border-primary/20"
+                            >
+                              <div className="flex items-center justify-between mb-1">
+                                <span className="font-semibold text-sm">{item.currency}</span>
+                                <Badge variant="secondary" className="text-xs">
+                                  {item.productCount} productos
+                                </Badge>
+                              </div>
+                              <div className="space-y-1">
+                                <div className="flex justify-between text-xs">
+                                  <span className="text-muted-foreground">Valor:</span>
+                                  <span className="font-medium">{item.currency} {item.totalValue.toFixed(2)}</span>
+                                </div>
+                                <div className="flex justify-between text-xs">
+                                  <span className="text-muted-foreground">En ARS:</span>
+                                  <span className="font-medium">$ {item.valueInARS.toFixed(2)}</span>
+                                </div>
+                                <div className="flex justify-between text-xs">
+                                  <span className="text-muted-foreground">Margen:</span>
+                                  <span className="font-medium text-green-600">
+                                    {item.totalValue > 0 ? (((item.totalValue - item.totalCost) / item.totalValue) * 100).toFixed(1) : 0}%
+                                  </span>
+                                </div>
+                              </div>
+                            </div>
+                          ))}
+                          <div className="p-3 rounded-lg bg-gradient-to-r from-amber-500/10 to-amber-500/5 border border-amber-500/30">
+                            <div className="flex justify-between items-center">
+                              <span className="text-sm font-semibold">Total General (ARS)</span>
+                              <span className="text-lg font-bold">
+                                ${Number(inventoryByCurrency.reduce((acc: number, item: any) => acc + (item.valueInARS || 0), 0)).toFixed(2)}
+                              </span>
+                            </div>
+                          </div>
+                        </div>
+                      </div>
+                    )}
+                  </div>
+                </CardContent>
+              </Card>
+            </div>
+          )}
+
           {canViewSales && canViewProducts && (
             <>
               <Card className="shadow-soft border-l-4 border-purple-500/30">

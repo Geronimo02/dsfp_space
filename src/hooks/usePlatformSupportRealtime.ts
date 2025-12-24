@@ -1,0 +1,106 @@
+import { useEffect } from "react";
+import { useQueryClient } from "@tanstack/react-query";
+import { supabase } from "@/integrations/supabase/client";
+import { toast } from "sonner";
+
+interface RealtimeOptions {
+  companyId?: string;
+  ticketId?: string;
+  onNewMessage?: (message: any) => void;
+  onTicketUpdate?: (ticket: any) => void;
+}
+
+export function usePlatformSupportRealtime({
+  companyId,
+  ticketId,
+  onNewMessage,
+  onTicketUpdate,
+}: RealtimeOptions) {
+  const queryClient = useQueryClient();
+
+  useEffect(() => {
+    if (!companyId) return;
+
+    // Subscribe to ticket changes
+    const ticketChannel = supabase
+      .channel(`platform-tickets-${companyId}`)
+      .on(
+        "postgres_changes",
+        {
+          event: "*",
+          schema: "public",
+          table: "platform_support_tickets",
+          filter: `company_id=eq.${companyId}`,
+        },
+        (payload) => {
+          console.log("Ticket change:", payload);
+          
+          // Invalidate queries to refresh data
+          queryClient.invalidateQueries({ 
+            queryKey: ["platform-support-tickets", companyId] 
+          });
+          queryClient.invalidateQueries({ 
+            queryKey: ["platform-support-tickets-metrics", companyId] 
+          });
+
+          if (payload.eventType === "UPDATE") {
+            const newData = payload.new as any;
+            const oldData = payload.old as any;
+
+            // Notify on status change
+            if (oldData.status !== newData.status) {
+              toast.info(`Ticket ${newData.ticket_number}: Estado cambiado a ${newData.status}`);
+            }
+
+            onTicketUpdate?.(newData);
+          }
+        }
+      )
+      .subscribe();
+
+    // Subscribe to messages for the selected ticket
+    let messageChannel: ReturnType<typeof supabase.channel> | null = null;
+
+    if (ticketId) {
+      messageChannel = supabase
+        .channel(`platform-messages-${ticketId}`)
+        .on(
+          "postgres_changes",
+          {
+            event: "INSERT",
+            schema: "public",
+            table: "platform_support_messages",
+            filter: `ticket_id=eq.${ticketId}`,
+          },
+          async (payload) => {
+            console.log("New message:", payload);
+            
+            // Invalidate messages query
+            queryClient.invalidateQueries({ 
+              queryKey: ["platform-support-messages", ticketId] 
+            });
+
+            const newMessage = payload.new as any;
+            
+            // Only notify for admin messages (responses)
+            if (newMessage.sender_type === "admin") {
+              toast.success("Nueva respuesta del equipo de soporte", {
+                description: newMessage.message.substring(0, 100) + "...",
+                duration: 5000,
+              });
+            }
+
+            onNewMessage?.(newMessage);
+          }
+        )
+        .subscribe();
+    }
+
+    return () => {
+      supabase.removeChannel(ticketChannel);
+      if (messageChannel) {
+        supabase.removeChannel(messageChannel);
+      }
+    };
+  }, [companyId, ticketId, queryClient, onNewMessage, onTicketUpdate]);
+}

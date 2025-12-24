@@ -1,10 +1,73 @@
 project_id = "pjcfncnydhxrlnaowbae"
 
+[api]
+enabled = true
+port = 54321
+schemas = ["public", "graphql_public"]
+extra_search_path = ["public", "extensions"]
+max_rows = 1000
+
+[db]
+port = 54322
+shadow_port = 54320
+major_version = 15
+
+[studio]
+enabled = true
+port = 54323
+api_url = "http://localhost"
+
+[auth]
+enabled = true
+site_url = "http://localhost:3000"
+additional_redirect_urls = ["https://localhost:3000"]
+jwt_expiry = 3600
+enable_signup = true
+enable_anonymous_sign_ins = false
+
+[auth.email]
+enable_signup = true
+double_confirm_changes = true
+enable_confirmations = false
+
+[functions.afip-auth]
+verify_jwt = true
+
+[functions.afip-facturar]
+verify_jwt = true
+
 [functions.ai-assistant]
+verify_jwt = true
+
+[functions.check-inventory-alerts]
 verify_jwt = false
 
-[functions.send-monthly-reports]
+[functions.invite-employee]
+verify_jwt = true
+
+[functions.notify-admins-platform-ticket]
+verify_jwt = true
+
+[functions.notify-platform-support-ticket]
+verify_jwt = true
+
+[functions.reset-database]
 verify_jwt = false
+
+[functions.send-alert-email]
+verify_jwt = true
+
+[functions.send-bulk-email]
+verify_jwt = true
+
+[functions.send-customer-support-notification]
+verify_jwt = true
+
+[functions.send-monthly-reports]
+verify_jwt = true
+
+[functions.send-whatsapp-ticket-notification]
+verify_jwt = true
 
 [functions.update-exchange-rates]
 verify_jwt = false

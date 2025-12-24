@@ -518,12 +518,12 @@ const MonthlyClosing = () => {
 
   return (
     <Layout>
-      <div className="space-y-6">
-        <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
+      <div className="space-y-4 md:space-y-6">
+        <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3">
           <div>
-            <h1 className="text-3xl font-bold">Cierre Mensual</h1>
-            <p className="text-muted-foreground">
-              Proceso guiado para el cierre contable del mes
+            <h1 className="text-2xl md:text-3xl font-bold">Cierre Mensual</h1>
+            <p className="text-sm md:text-base text-muted-foreground">
+              Proceso de cierre contable
             </p>
           </div>
 
@@ -567,7 +567,7 @@ const MonthlyClosing = () => {
           </CardContent>
         </Card>
 
-        <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
+        <div className="grid grid-cols-2 md:grid-cols-4 gap-3 md:gap-4">
           {steps.map((step) => {
             const Icon = step.icon;
             const isCompleted = completedSteps.has(step.id);
@@ -583,17 +583,17 @@ const MonthlyClosing = () => {
                 )}
                 onClick={() => setCurrentStep(step.id)}
               >
-                <CardHeader>
+                <CardHeader className="p-3 md:p-6">
                   <div className="flex items-start justify-between">
-                    <Icon className={cn("h-8 w-8", isCompleted ? "text-green-600" : "text-muted-foreground")} />
+                    <Icon className={cn("h-6 w-6 md:h-8 md:w-8", isCompleted ? "text-green-600" : "text-muted-foreground")} />
                     {isCompleted && (
                       <Badge variant="secondary" className="bg-green-100 text-green-800">
                         <Check className="h-3 w-3" />
                       </Badge>
                     )}
                   </div>
-                  <CardTitle className="text-base">{step.title}</CardTitle>
-                  <CardDescription className="text-xs">{step.description}</CardDescription>
+                  <CardTitle className="text-sm md:text-base">{step.title}</CardTitle>
+                  <CardDescription className="text-xs hidden sm:block">{step.description}</CardDescription>
                 </CardHeader>
               </Card>
             );

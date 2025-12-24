@@ -18,7 +18,7 @@ interface CompanyUser {
   id: string;
   company_id: string;
   user_id: string;
-  role: 'admin' | 'manager' | 'accountant' | 'employee' | 'cashier' | 'viewer' | 'warehouse' | 'technician' | 'auditor';
+  role: 'admin' | 'manager' | 'accountant' | 'employee' | 'cashier' | 'viewer' | 'warehouse' | 'technician' | 'auditor' | 'platform_admin';
   active: boolean;
   companies: Company;
 }
@@ -45,9 +45,12 @@ export function CompanyProvider({ children }: { children: React.ReactNode }) {
     try {
       const { data: { user } } = await supabase.auth.getUser();
       if (!user) {
+        console.log("No authenticated user found");
         setLoading(false);
         return;
       }
+
+      console.log("Fetching companies for user:", user.id);
 
       const { data, error } = await supabase
         .from('company_users')
@@ -73,10 +76,14 @@ export function CompanyProvider({ children }: { children: React.ReactNode }) {
         .eq('active', true)
         .order('created_at', { ascending: true });
 
-      if (error) throw error;
+      if (error) {
+        console.error("Error fetching company_users:", error);
+        throw error;
+      }
 
-  const companyUsers = data as CompanyUser[];
-  setUserCompanies(companyUsers);
+      console.log("Companies fetched:", data?.length || 0, "companies");
+      const companyUsers = data as CompanyUser[];
+      setUserCompanies(companyUsers);
 
       // Set current company from localStorage or first company
       const savedCompanyId = localStorage.getItem('currentCompanyId');
@@ -112,26 +119,39 @@ export function CompanyProvider({ children }: { children: React.ReactNode }) {
   };
 
   useEffect(() => {
-    fetchUserCompanies();
+    let subscription: ReturnType<typeof supabase.channel> | null = null;
 
-    // Subscribe to changes in company_users
-    const subscription = supabase
-      .channel('company_users_changes')
-      .on(
-        'postgres_changes',
-        {
-          event: '*',
-          schema: 'public',
-          table: 'company_users',
-        },
-        () => {
-          fetchUserCompanies();
-        }
-      )
-      .subscribe();
+    const setupSubscription = async () => {
+      await fetchUserCompanies();
+
+      // Get current user to filter subscription
+      const { data: { user } } = await supabase.auth.getUser();
+      if (!user) return;
+
+      // Subscribe to changes only for current user's company_users
+      subscription = supabase
+        .channel(`company_users_changes_${user.id}`)
+        .on(
+          'postgres_changes',
+          {
+            event: '*',
+            schema: 'public',
+            table: 'company_users',
+            filter: `user_id=eq.${user.id}`,
+          },
+          () => {
+            fetchUserCompanies();
+          }
+        )
+        .subscribe();
+    };
+
+    setupSubscription();
 
     return () => {
-      subscription.unsubscribe();
+      if (subscription) {
+        subscription.unsubscribe();
+      }
     };
   }, []);
 

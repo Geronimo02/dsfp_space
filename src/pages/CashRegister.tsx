@@ -230,28 +230,28 @@ export default function CashRegister() {
 
   return (
     <Layout>
-      <div className="space-y-6">
-        <div className="flex justify-between items-center">
+      <div className="space-y-4 md:space-y-6">
+        <div className="flex flex-col sm:flex-row sm:justify-between sm:items-center gap-3">
           <div>
-            <h1 className="text-3xl font-bold text-foreground">Gestión de Caja</h1>
-            <p className="text-muted-foreground mt-1">
-              Control de apertura, cierre y movimientos de caja
+            <h1 className="text-2xl md:text-3xl font-bold text-foreground">Gestión de Caja</h1>
+            <p className="text-sm md:text-base text-muted-foreground mt-1">
+              Control de apertura, cierre y movimientos
             </p>
           </div>
-          <div className="flex gap-2">
+          <div className="flex flex-wrap gap-2">
             {!currentRegister ? (
-              <Button onClick={() => setOpenDialog(true)}>
+              <Button onClick={() => setOpenDialog(true)} className="w-full sm:w-auto">
                 <Clock className="mr-2 h-4 w-4" />
                 Abrir Caja
               </Button>
             ) : (
               <>
-                <Button variant="outline" onClick={() => setMovementDialog(true)}>
-                  <Plus className="mr-2 h-4 w-4" />
-                  Registrar Movimiento
+                <Button variant="outline" onClick={() => setMovementDialog(true)} size="sm" className="flex-1 sm:flex-none">
+                  <Plus className="mr-1 sm:mr-2 h-4 w-4" />
+                  <span className="hidden sm:inline">Registrar </span>Movimiento
                 </Button>
-                <Button variant="destructive" onClick={() => setCloseDialog(true)}>
-                  <Clock className="mr-2 h-4 w-4" />
+                <Button variant="destructive" onClick={() => setCloseDialog(true)} size="sm" className="flex-1 sm:flex-none">
+                  <Clock className="mr-1 sm:mr-2 h-4 w-4" />
                   Cerrar Caja
                 </Button>
               </>
@@ -261,7 +261,7 @@ export default function CashRegister() {
 
         {currentRegister ? (
           <>
-            <div className="grid gap-4 md:grid-cols-4">
+            <div className="grid grid-cols-2 md:grid-cols-4 gap-3 md:gap-4">
               <Card>
                 <CardHeader className="flex flex-row items-center justify-between pb-2">
                   <CardTitle className="text-sm font-medium">Monto Inicial</CardTitle>
@@ -315,15 +315,15 @@ export default function CashRegister() {
               <CardHeader>
                 <CardTitle>Movimientos del Día</CardTitle>
               </CardHeader>
-              <CardContent>
+              <CardContent className="overflow-x-auto p-2 sm:p-6">
                 <Table>
                   <TableHeader>
                     <TableRow>
-                      <TableHead>Tipo</TableHead>
-                      <TableHead>Categoría</TableHead>
-                      <TableHead>Descripción</TableHead>
-                      <TableHead>Monto</TableHead>
-                      <TableHead>Hora</TableHead>
+                      <TableHead className="min-w-[80px]">Tipo</TableHead>
+                      <TableHead className="min-w-[100px]">Categoría</TableHead>
+                      <TableHead className="hidden sm:table-cell">Descripción</TableHead>
+                      <TableHead className="min-w-[90px]">Monto</TableHead>
+                      <TableHead className="hidden md:table-cell">Hora</TableHead>
                     </TableRow>
                   </TableHeader>
                   <TableBody>

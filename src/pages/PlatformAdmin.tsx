@@ -35,17 +35,34 @@ import {
   Ticket,
   Plug,
   Activity,
-  XCircle
+  XCircle,
+  Rocket,
+  Circle,
+  Calculator,
+  Package
 } from "lucide-react";
 import { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip as RechartsTooltip, ResponsiveContainer, LineChart, Line } from "recharts";
 import { exportToExcel, exportToPDF, formatCurrency, formatDate } from "@/lib/exportUtils";
 import { usePlatformAdmin } from "@/hooks/usePlatformAdmin";
+import { usePlatformAdminRealtime } from "@/hooks/usePlatformAdminRealtime";
 import { useNavigate, Navigate } from "react-router-dom";
+import { PricingConfiguration } from "@/components/settings/PricingConfiguration";
+import { PricingCalculator } from "@/components/settings/PricingCalculator";
+import { CompanyModuleSelector } from "@/components/settings/CompanyModuleSelector";
+import { CustomPricingManager } from "@/components/settings/CustomPricingManager";
+import { ModuleLimitsManager } from "@/components/settings/ModuleLimitsManager";
+import { ModuleAuditLog } from "@/components/settings/ModuleAuditLog";
+import { PlatformAdminHeader, PlatformAdminNav, PlatformAdminDashboard } from "@/components/platformAdmin";
+import { PaginationControls } from "@/components/ui/pagination-controls";
+import { usePagination } from "@/hooks/usePagination";
 
 export default function PlatformAdmin() {
   const { isPlatformAdmin, isLoading: adminLoading } = usePlatformAdmin();
   const navigate = useNavigate();
   const queryClient = useQueryClient();
+  
+  // Enable realtime for platform admin to receive new tickets and messages
+  usePlatformAdminRealtime({ enabled: isPlatformAdmin });
   
   // State for filters and dialogs
   const [companySearch, setCompanySearch] = useState("");
@@ -59,17 +76,7 @@ export default function PlatformAdmin() {
   const [planDialogOpen, setPlanDialogOpen] = useState(false);
   const [editingPlan, setEditingPlan] = useState<any>(null);
   const [isPaymentDialogOpen, setIsPaymentDialogOpen] = useState(false);
-  const [ticketStatusFilter, setTicketStatusFilter] = useState<string>("all");
-  const [ticketDialogOpen, setTicketDialogOpen] = useState(false);
-  const [selectedTicket, setSelectedTicket] = useState<any>(null);
-  const [ticketResponse, setTicketResponse] = useState("");
-  const [newTicket, setNewTicket] = useState({
-    company_id: "",
-    title: "",
-    description: "",
-    priority: "medium",
-    category: "general"
-  });
+  const [platformSupportStatusFilter, setPlatformSupportStatusFilter] = useState<string>("active");
   const [integrationStatusFilter, setIntegrationStatusFilter] = useState<string>("all");
   const [newPayment, setNewPayment] = useState({
     company_id: "",
@@ -86,6 +93,10 @@ export default function PlatformAdmin() {
     max_users: "",
     features: ""
   });
+  const [modulesDialogOpen, setModulesDialogOpen] = useState(false);
+  const [selectedCompanyForModules, setSelectedCompanyForModules] = useState<any>(null);
+  const [customPricingDialogOpen, setCustomPricingDialogOpen] = useState(false);
+  const [selectedCompanyForPricing, setSelectedCompanyForPricing] = useState<any>(null);
 
   // Fetch all companies with their subscriptions (must be before any conditional returns)
   const { data: companies, isLoading, error: companiesError } = useQuery({
@@ -165,30 +176,18 @@ export default function PlatformAdmin() {
     },
   });
 
-  // Fetch audit logs
+  // Fetch audit logs from existing audit_logs table
   const { data: auditLogs } = useQuery({
     queryKey: ["platform-audit-logs"],
     queryFn: async () => {
-      const { data, error } = await (supabase as any)
-        .from("platform_audit_logs")
+      const { data, error } = await supabase
+        .from("audit_logs")
         .select("*")
         .order("created_at", { ascending: false })
         .limit(100);
-
+      
       if (error) throw error;
-      return data as Array<{
-        id: string;
-        user_id: string | null;
-        user_email: string | null;
-        action: string;
-        entity_type: string | null;
-        entity_id: string | null;
-        description: string;
-        metadata: any;
-        ip_address: string | null;
-        user_agent: string | null;
-        created_at: string;
-      }>;
+      return data;
     },
   });
 
@@ -317,20 +316,141 @@ export default function PlatformAdmin() {
     }
   });
 
-  // Fetch support tickets
-  const { data: tickets } = useQuery({
+  // Fetch support tickets (sistema antiguo)
+  // Fetch customer support tickets (nuevo sistema integrado)
+  // Estados para gestión de tickets de plataforma
+  const [selectedPlatformTicket, setSelectedPlatformTicket] = useState<any>(null);
+  const [platformTicketMessage, setPlatformTicketMessage] = useState("");
+
+  // Tickets de soporte de PLATAFORMA (empresas reportando problemas a admins)
+  const { data: platformSupportTickets, isLoading: platformTicketsLoading, error: platformTicketsError, refetch: refetchTickets } = useQuery({
     queryKey: ["platform-support-tickets"],
     queryFn: async () => {
-      const { data, error } = await supabase
-        .from("support_tickets")
-        .select(`
-          *,
-          companies (name)
-        `)
-        .order("created_at", { ascending: false });
+      try {
+        const { data, error } = await (supabase as any)
+          .from("platform_support_tickets")
+          .select(`
+            *,
+            companies!platform_support_tickets_company_id_fkey (
+              name,
+              email,
+              phone,
+              whatsapp_number
+            )
+          `)
+          .order("created_at", { ascending: false });
 
+        if (error) {
+          console.error("Error fetching platform support tickets:", error);
+          return [];
+        }
+        return data || [];
+      } catch (err) {
+        console.error("Exception fetching tickets:", err);
+        return [];
+      }
+    },
+    retry: 1,
+    staleTime: 30000,
+    gcTime: 5 * 60 * 1000,
+  });
+
+  // Mensajes del ticket seleccionado
+  const { data: platformTicketMessages } = useQuery({
+    queryKey: ["platform-ticket-messages", selectedPlatformTicket?.id],
+    queryFn: async () => {
+      if (!selectedPlatformTicket?.id) return [];
+      const { data, error } = await (supabase as any)
+        .from("platform_support_messages")
+        .select("*")
+        .eq("ticket_id", selectedPlatformTicket.id)
+        .order("created_at", { ascending: true });
       if (error) throw error;
       return data;
+    },
+    enabled: !!selectedPlatformTicket?.id,
+  });
+
+  // Mutation para responder ticket
+  const respondPlatformTicketMutation = useMutation({
+    mutationFn: async () => {
+      if (!selectedPlatformTicket?.id || !platformTicketMessage.trim()) return;
+      const { data: { user } } = await supabase.auth.getUser();
+      if (!user) throw new Error("Usuario no autenticado");
+
+      const { error } = await (supabase as any)
+        .from("platform_support_messages")
+        .insert([{
+          ticket_id: selectedPlatformTicket.id,
+          sender_type: "admin",
+          sender_id: user.id,
+          message: platformTicketMessage,
+        }]);
+
+      if (error) throw error;
+
+      // Retornar info para enviar notificación a la empresa
+      return {
+        ticketId: selectedPlatformTicket.id,
+        ticketNumber: selectedPlatformTicket.ticket_number,
+        companyId: selectedPlatformTicket.company_id,
+        companyEmail: selectedPlatformTicket.companies?.email,
+      };
+    },
+    onSuccess: (data) => {
+      queryClient.invalidateQueries({ queryKey: ["platform-ticket-messages"] });
+      setPlatformTicketMessage("");
+      
+      // Enviar notificación a la empresa (opcional - solo si hay email)
+      if (data?.companyEmail) {
+        supabase.functions.invoke("notify-platform-support-ticket", {
+          body: {
+            ticket_id: data.ticketId,
+            type: "message_received",
+            send_email: true,
+            send_sms: false,
+          }
+        }).catch(() => {});
+      }
+      
+      toast.success("Respuesta enviada");
+    },
+    onError: (error: any) => {
+      toast.error(error.message || "Error al enviar respuesta");
+    },
+  });
+
+  // Mutation para cambiar estado del ticket
+  const updatePlatformTicketStatusMutation = useMutation({
+    mutationFn: async ({ ticketId, status }: { ticketId: string, status: string }) => {
+      const updates: any = { status };
+      if (status === "resolved") updates.resolved_at = new Date().toISOString();
+      if (status === "closed") updates.closed_at = new Date().toISOString();
+
+      const { error } = await (supabase as any)
+        .from("platform_support_tickets")
+        .update(updates)
+        .eq("id", ticketId);
+
+      if (error) throw error;
+      return { ticketId, status, ...updates };
+    },
+    onSuccess: (data) => {
+      toast.success("Estado actualizado");
+      queryClient.invalidateQueries({ queryKey: ["platform-support-tickets"] });
+      // Actualizar el ticket seleccionado localmente
+      if (selectedPlatformTicket && selectedPlatformTicket.id === data.ticketId) {
+        setSelectedPlatformTicket({
+          ...selectedPlatformTicket,
+          status: data.status,
+          resolved_at: data.resolved_at,
+          closed_at: data.closed_at
+        });
+        // Si se cierra, deselecciona después de 1 segundo
+        if (data.status === "closed") {
+          setTimeout(() => setSelectedPlatformTicket(null), 1000);
+        }
+      }
     },
   });
 
@@ -386,6 +506,23 @@ export default function PlatformAdmin() {
     },
   });
 
+  // Fetch company onboarding data
+  const { data: onboardingData } = useQuery({
+    queryKey: ["platform-onboarding"],
+    queryFn: async () => {
+      const { data, error } = await supabase
+        .from("company_onboarding")
+        .select(`
+          *,
+          companies (name, active, created_at)
+        `)
+        .order("created_at", { ascending: false });
+
+      if (error) throw error;
+      return data;
+    },
+  });
+
   // Stats query
   const { data: stats } = useQuery({
     queryKey: ["platform-stats"],
@@ -415,23 +552,6 @@ export default function PlatformAdmin() {
     },
     enabled: !!companies && !!notifications && !!feedbacks && !!payments,
   });
-
-  // Show loading while checking admin status
-  if (adminLoading) {
-    return (
-      <div className="flex items-center justify-center h-screen">
-        <div className="text-center">
-          <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-primary mx-auto"></div>
-          <p className="mt-4 text-muted-foreground">Verificando permisos...</p>
-        </div>
-      </div>
-    );
-  }
-
-  // Redirect if not platform admin
-  if (!isPlatformAdmin) {
-    return <Navigate to="/" replace />;
-  }
 
   // Toggle company active status
   const toggleCompanyMutation = useMutation({
@@ -586,119 +706,23 @@ export default function PlatformAdmin() {
   });
 
   // Create ticket
-  const createTicketMutation = useMutation({
-    mutationFn: async (ticket: typeof newTicket) => {
-      // First generate ticket number
-      const { data: ticketNumber, error: fnError } = await supabase
-        .rpc('generate_ticket_number');
-      
-      if (fnError) throw fnError;
 
-      const { error } = await supabase
-        .from("support_tickets")
-        .insert({
-          company_id: ticket.company_id,
-          title: ticket.title,
-          description: ticket.description,
-          priority: ticket.priority,
-          category: ticket.category,
-          ticket_number: ticketNumber,
-          status: "open"
-        });
-      
-      if (error) throw error;
-    },
-    onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ["platform-support-tickets"] });
-      setTicketDialogOpen(false);
-      setNewTicket({
-        company_id: "",
-        title: "",
-        description: "",
-        priority: "medium",
-        category: "general"
-      });
-      toast.success("Ticket creado exitosamente");
-    },
-    onError: (error) => {
-      toast.error("Error al crear el ticket: " + error.message);
-    },
-  });
+  // Show loading while checking admin status
+  if (adminLoading) {
+    return (
+      <div className="flex items-center justify-center h-screen">
+        <div className="text-center">
+          <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-primary mx-auto"></div>
+          <p className="mt-4 text-muted-foreground">Verificando permisos...</p>
+        </div>
+      </div>
+    );
+  }
 
-  // Update ticket
-  const updateTicketMutation = useMutation({
-    mutationFn: async ({ 
-      ticketId, 
-      status, 
-      priority,
-      assigned_to 
-    }: { 
-      ticketId: string; 
-      status?: string;
-      priority?: string;
-      assigned_to?: string;
-    }) => {
-      const updates: any = { 
-        updated_at: new Date().toISOString()
-      };
-      
-      if (status) {
-        updates.status = status;
-        if (status === "resolved") {
-          updates.resolved_at = new Date().toISOString();
-        }
-      }
-      if (priority) updates.priority = priority;
-      if (assigned_to) updates.assigned_to = assigned_to;
-
-      const { error } = await supabase
-        .from("support_tickets")
-        .update(updates)
-        .eq("id", ticketId);
-
-      if (error) throw error;
-    },
-    onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ["platform-support-tickets"] });
-      toast.success("Ticket actualizado");
-    },
-    onError: (error) => {
-      toast.error("Error al actualizar ticket");
-      console.error("Error:", error);
-    },
-  });
-
-  // Create ticket response
-  const createTicketResponseMutation = useMutation({
-    mutationFn: async ({ 
-      ticketId, 
-      message,
-      isInternal 
-    }: { 
-      ticketId: string; 
-      message: string;
-      isInternal?: boolean;
-    }) => {
-      const { error } = await supabase
-        .from("support_ticket_responses")
-        .insert({
-          ticket_id: ticketId,
-          message,
-          is_internal: isInternal || false
-        });
-
-      if (error) throw error;
-    },
-    onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ["platform-support-tickets"] });
-      setTicketResponse("");
-      toast.success("Respuesta agregada");
-    },
-    onError: (error) => {
-      toast.error("Error al agregar respuesta");
-      console.error("Error:", error);
-    },
-  });
+  // Redirect if not platform admin
+  if (!isPlatformAdmin) {
+    return <Navigate to="/" replace />;
+  }
 
   const handleLogout = async () => {
     const { error } = await supabase.auth.signOut();
@@ -795,13 +819,23 @@ export default function PlatformAdmin() {
   const filteredAuditLogs = auditLogs?.filter(log => {
     const matchesSearch = !auditLogSearch || 
       log.user_email?.toLowerCase().includes(auditLogSearch.toLowerCase()) ||
-      log.entity_type?.toLowerCase().includes(auditLogSearch.toLowerCase()) ||
-      log.description?.toLowerCase().includes(auditLogSearch.toLowerCase());
+      log.table_name?.toLowerCase().includes(auditLogSearch.toLowerCase()) ||
+      log.user_name?.toLowerCase().includes(auditLogSearch.toLowerCase());
     
     const matchesAction = auditLogActionFilter === "all" || log.action === auditLogActionFilter;
     
     return matchesSearch && matchesAction;
   });
+
+  // Pagination hooks
+  const companiesPagination = usePagination(filteredCompanies, { initialPageSize: 10 });
+  const notificationsPagination = usePagination(filteredNotifications, { initialPageSize: 10 });
+  const feedbackPagination = usePagination(filteredFeedback, { initialPageSize: 10 });
+  const paymentsPagination = usePagination(filteredPayments, { initialPageSize: 10 });
+  const auditLogsPagination = usePagination(filteredAuditLogs, { initialPageSize: 20 });
+  const usersPagination = usePagination(allUsers?.filter(u => 
+    u.companies?.name?.toLowerCase().includes(userSearch.toLowerCase())
+  ), { initialPageSize: 10 });
 
   if (isLoading) {
     return (
@@ -833,24 +867,7 @@ export default function PlatformAdmin() {
 
   return (
     <div className="min-h-screen bg-background">
-      {/* Header with logout */}
-      <div className="border-b bg-card">
-        <div className="container mx-auto px-6 py-4 flex items-center justify-between">
-          <div className="flex items-center gap-3">
-            <div className="w-10 h-10 rounded-lg bg-primary flex items-center justify-center">
-              <ShoppingCart className="w-6 h-6 text-primary-foreground" />
-            </div>
-            <div>
-              <h1 className="text-xl font-bold">RetailSnap</h1>
-              <p className="text-xs text-muted-foreground">Panel de Administración</p>
-            </div>
-          </div>
-          <Button variant="outline" onClick={handleLogout}>
-            <LogOut className="h-4 w-4 mr-2" />
-            Cerrar Sesión
-          </Button>
-        </div>
-      </div>
+      <PlatformAdminHeader onLogout={handleLogout} />
 
       <div className="container mx-auto p-6 space-y-6">
         <div>
@@ -860,141 +877,47 @@ export default function PlatformAdmin() {
           </p>
         </div>
 
-        {/* Stats Overview */}
-        {stats && (
-          <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-6">
-            <Card>
-              <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-                <CardTitle className="text-sm font-medium">Total Empresas</CardTitle>
-                <Building2 className="h-4 w-4 text-muted-foreground" />
-              </CardHeader>
-              <CardContent>
-                <div className="text-2xl font-bold">{stats.totalCompanies}</div>
-                <p className="text-xs text-muted-foreground">
-                  {stats.activeCompanies} activas
-                </p>
-              </CardContent>
-            </Card>
-            
-            <Card>
-              <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-                <CardTitle className="text-sm font-medium">Empresas Activas</CardTitle>
-                <CheckCircle2 className="h-4 w-4 text-green-500" />
-              </CardHeader>
-              <CardContent>
-                <div className="text-2xl font-bold">{stats.activeCompanies}</div>
-                <p className="text-xs text-muted-foreground">
-                  {Math.round((stats.activeCompanies / stats.totalCompanies) * 100)}% del total
-                </p>
-              </CardContent>
-            </Card>
-            
-            <Card>
-              <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-                <CardTitle className="text-sm font-medium">Notificaciones</CardTitle>
-                <Bell className="h-4 w-4 text-muted-foreground" />
-              </CardHeader>
-              <CardContent>
-                <div className="text-2xl font-bold">{stats.unreadNotifications}</div>
-                <p className="text-xs text-muted-foreground">
-                  Sin leer
-                </p>
-              </CardContent>
-            </Card>
-            
-            <Card>
-              <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-                <CardTitle className="text-sm font-medium">Feedback Pendiente</CardTitle>
-                <MessageSquare className="h-4 w-4 text-muted-foreground" />
-              </CardHeader>
-              <CardContent>
-                <div className="text-2xl font-bold">{stats.pendingFeedback}</div>
-                <p className="text-xs text-muted-foreground">
-                  Requiere atención
-                </p>
-              </CardContent>
-            </Card>
-            
-            <Card>
-              <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-                <CardTitle className="text-sm font-medium">Ingresos Totales</CardTitle>
-                <DollarSign className="h-4 w-4 text-green-500" />
-              </CardHeader>
-              <CardContent>
-                <div className="text-2xl font-bold">${stats.totalRevenue.toLocaleString()}</div>
-                <p className="text-xs text-muted-foreground">
-                  Cobrado
-                </p>
-              </CardContent>
-            </Card>
-            
-            <Card>
-              <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-                <CardTitle className="text-sm font-medium">Pendiente</CardTitle>
-                <Clock className="h-4 w-4 text-yellow-500" />
-              </CardHeader>
-              <CardContent>
-                <div className="text-2xl font-bold">${stats.pendingRevenue.toLocaleString()}</div>
-                <p className="text-xs text-muted-foreground">
-                  Por cobrar
-                </p>
-              </CardContent>
-            </Card>
-          </div>
-        )}
+        <PlatformAdminDashboard 
+          stats={stats} 
+          revenueData={revenueAnalytics}
+          ticketStats={{
+            open: platformSupportTickets?.filter((t: any) => t.status === 'open').length || 0,
+            inProgress: platformSupportTickets?.filter((t: any) => t.status === 'in_progress').length || 0,
+            resolved: platformSupportTickets?.filter((t: any) => t.status === 'resolved').length || 0,
+            slaBreach: platformSupportTickets?.filter((t: any) => t.sla_response_breached || t.sla_resolution_breached).length || 0,
+          }}
+          companiesGrowth={0}
+          usersCount={totalUsers}
+          overduePayments={overduePayments}
+        />
 
-        <Tabs defaultValue="companies" className="space-y-6">
-          <TabsList className="grid w-full grid-cols-11">
-            <TabsTrigger value="companies" className="gap-2">
-              <Building2 className="h-4 w-4" />
-              Empresas
-            </TabsTrigger>
-            <TabsTrigger value="usage" className="gap-2">
-              <TrendingUp className="h-4 w-4" />
-              Métricas
-            </TabsTrigger>
-            <TabsTrigger value="tickets" className="gap-2">
-              <Ticket className="h-4 w-4" />
-              Tickets
-            </TabsTrigger>
-            <TabsTrigger value="notifications" className="gap-2">
-              <Bell className="h-4 w-4" />
-              Notificaciones
-              {stats && stats.unreadNotifications > 0 && (
-                <Badge variant="destructive" className="ml-2">
-                  {stats.unreadNotifications}
-                </Badge>
-              )}
-            </TabsTrigger>
-            <TabsTrigger value="feedback" className="gap-2">
-              <MessageSquare className="h-4 w-4" />
-              Feedback
-            </TabsTrigger>
-            <TabsTrigger value="payments" className="gap-2">
-              <DollarSign className="h-4 w-4" />
-              Pagos
-            </TabsTrigger>
-            <TabsTrigger value="analytics" className="gap-2">
-              <BarChart3 className="h-4 w-4" />
-              Analytics
-            </TabsTrigger>
-            <TabsTrigger value="users" className="gap-2">
-              <Users className="h-4 w-4" />
-              Usuarios
-            </TabsTrigger>
-            <TabsTrigger value="plans" className="gap-2">
-              <Settings className="h-4 w-4" />
-              Planes
-            </TabsTrigger>
-            <TabsTrigger value="audit" className="gap-2">
-              <FileText className="h-4 w-4" />
-              Auditoría
-            </TabsTrigger>
-            <TabsTrigger value="integrations" className="gap-2">
-              <Plug className="h-4 w-4" />
-              Integraciones
-            </TabsTrigger>
-          </TabsList>
+        <Tabs defaultValue="companies" className="flex gap-6">
+          <PlatformAdminNav 
+            openTicketsCount={platformSupportTickets?.filter((t: any) => t.status === 'open').length || 0}
+            unreadNotificationsCount={stats?.unreadNotifications || 0}
+          />
+
+          <div className="flex-1 min-w-0">
+
+          {/* Pricing Configuration Tab */}
+          <TabsContent value="pricing" className="space-y-4">
+            <PricingConfiguration />
+          </TabsContent>
+
+          {/* Pricing Calculator Tab */}
+          <TabsContent value="calculator" className="space-y-4">
+            <PricingCalculator />
+          </TabsContent>
+
+          {/* Module Limits Manager Tab */}
+          <TabsContent value="module-limits" className="space-y-4">
+            <ModuleLimitsManager />
+          </TabsContent>
+
+          {/* Module Audit Log Tab */}
+          <TabsContent value="module-audit" className="space-y-4">
+            <ModuleAuditLog />
+          </TabsContent>
 
           {/* Usage Metrics Tab */}
           <TabsContent value="usage" className="space-y-4">
@@ -1104,294 +1027,554 @@ export default function PlatformAdmin() {
             </Card>
           </TabsContent>
 
-          {/* Support Tickets Tab */}
-          <TabsContent value="tickets" className="space-y-4">
-            <Card>
-              <CardHeader>
-                <div className="flex items-center justify-between">
-                  <div>
-                    <CardTitle>Sistema de Tickets de Soporte</CardTitle>
-                    <CardDescription>
-                      Gestiona consultas y tickets de las empresas
-                    </CardDescription>
+          {/* Platform Support Tab - Tickets de empresas a admins */}
+          <TabsContent value="platform-support" className="space-y-4">
+            <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
+              {/* Lista de Tickets */}
+              <Card className="lg:col-span-1">
+                <CardHeader className="pb-3">
+                  <CardTitle>Tickets de Soporte</CardTitle>
+                  <CardDescription>
+                    Problemas reportados por empresas
+                  </CardDescription>
+                  
+                  {/* Tabs para separar activos de históricos */}
+                  <div className="flex gap-1 mt-4 p-1 bg-muted rounded-lg">
+                    <Button 
+                      variant={platformSupportStatusFilter === 'active' ? 'default' : 'ghost'}
+                      size="sm"
+                      className="flex-1"
+                      onClick={() => setPlatformSupportStatusFilter('active')}
+                    >
+                      🔥 Activos ({platformSupportTickets?.filter((t: any) => 
+                        ['open', 'in_progress', 'pending'].includes(t.status)
+                      ).length || 0})
+                    </Button>
+                    <Button 
+                      variant={platformSupportStatusFilter === 'history' ? 'default' : 'ghost'}
+                      size="sm"
+                      className="flex-1"
+                      onClick={() => setPlatformSupportStatusFilter('history')}
+                    >
+                      📋 Historial ({platformSupportTickets?.filter((t: any) => 
+                        ['resolved', 'closed'].includes(t.status)
+                      ).length || 0})
+                    </Button>
                   </div>
-                  <Button onClick={() => {
-                    setNewTicket({
-                      company_id: "",
-                      title: "",
-                      description: "",
-                      priority: "medium",
-                      category: "general"
-                    });
-                    setTicketDialogOpen(true);
-                  }}>
-                    <Plus className="h-4 w-4 mr-2" />
-                    Nuevo Ticket
-                  </Button>
-                </div>
-                <div className="flex gap-4 mt-4">
-                  <Select value={ticketStatusFilter} onValueChange={setTicketStatusFilter}>
-                    <SelectTrigger className="w-[200px]">
-                      <SelectValue placeholder="Filtrar por estado" />
-                    </SelectTrigger>
-                    <SelectContent>
-                      <SelectItem value="all">Todos</SelectItem>
-                      <SelectItem value="open">Abiertos</SelectItem>
-                      <SelectItem value="in_progress">En proceso</SelectItem>
-                      <SelectItem value="resolved">Resueltos</SelectItem>
-                      <SelectItem value="closed">Cerrados</SelectItem>
-                    </SelectContent>
-                  </Select>
-                </div>
-              </CardHeader>
-              <CardContent>
-                <Table>
-                  <TableHeader>
-                    <TableRow>
-                      <TableHead>Número</TableHead>
-                      <TableHead>Empresa</TableHead>
-                      <TableHead>Título</TableHead>
-                      <TableHead>Estado</TableHead>
-                      <TableHead>Prioridad</TableHead>
-                      <TableHead>Categoría</TableHead>
-                      <TableHead>Creado</TableHead>
-                      <TableHead>Acciones</TableHead>
-                    </TableRow>
-                  </TableHeader>
-                  <TableBody>
-                    {tickets?.filter(ticket => ticketStatusFilter === "all" || ticket.status === ticketStatusFilter).map((ticket: any) => (
-                      <TableRow key={ticket.id}>
-                        <TableCell className="font-mono">{ticket.ticket_number}</TableCell>
-                        <TableCell>{ticket.companies?.name || "N/A"}</TableCell>
-                        <TableCell className="max-w-xs truncate">{ticket.title}</TableCell>
-                        <TableCell>
-                          <Badge 
-                            variant={
-                              ticket.status === "open" ? "default" : 
-                              ticket.status === "in_progress" ? "secondary" :
-                              ticket.status === "resolved" ? "default" :
-                              "outline"
-                            }
-                          >
-                            {ticket.status === "open" ? "Abierto" : 
-                             ticket.status === "in_progress" ? "En proceso" :
-                             ticket.status === "resolved" ? "Resuelto" :
-                             "Cerrado"}
-                          </Badge>
-                        </TableCell>
-                        <TableCell>
-                          <Badge 
-                            variant={
-                              ticket.priority === "urgent" ? "destructive" :
-                              ticket.priority === "high" ? "destructive" :
-                              ticket.priority === "medium" ? "secondary" :
-                              "outline"
-                            }
-                          >
-                            {ticket.priority === "urgent" ? "Urgente" :
-                             ticket.priority === "high" ? "Alta" :
-                             ticket.priority === "medium" ? "Media" :
-                             "Baja"}
-                          </Badge>
-                        </TableCell>
-                        <TableCell>
-                          <Badge variant="outline">
-                            {ticket.category === "technical" ? "Técnico" :
-                             ticket.category === "billing" ? "Facturación" :
-                             ticket.category === "feature_request" ? "Funcionalidad" :
-                             ticket.category === "bug" ? "Bug" :
-                             "General"}
-                          </Badge>
-                        </TableCell>
-                        <TableCell>{new Date(ticket.created_at).toLocaleDateString()}</TableCell>
-                        <TableCell>
-                          <Button
-                            variant="outline"
-                            size="sm"
-                            onClick={() => {
-                              setSelectedTicket(ticket);
-                              setTicketDialogOpen(true);
-                            }}
-                          >
-                            Ver detalle
-                          </Button>
-                        </TableCell>
-                      </TableRow>
-                    ))}
-                    {(!tickets || tickets.length === 0) && (
-                      <TableRow>
-                        <TableCell colSpan={8} className="text-center text-muted-foreground">
-                          No hay tickets disponibles
-                        </TableCell>
-                      </TableRow>
-                    )}
-                  </TableBody>
-                </Table>
-              </CardContent>
-            </Card>
 
-            {/* Ticket Dialog */}
-            <Dialog open={ticketDialogOpen} onOpenChange={(open) => {
-              setTicketDialogOpen(open);
-              if (!open) {
-                setSelectedTicket(null);
-                setTicketResponse("");
-              }
-            }}>
-              <DialogContent className="max-w-2xl">
-                <DialogHeader>
-                  <DialogTitle>
-                    {selectedTicket ? `Ticket ${selectedTicket.ticket_number}` : "Nuevo Ticket"}
-                  </DialogTitle>
-                  <DialogDescription>
-                    {selectedTicket ? "Detalles y respuestas del ticket" : "Crear un nuevo ticket de soporte"}
-                  </DialogDescription>
-                </DialogHeader>
-                <div className="space-y-4">
-                  {selectedTicket ? (
-                    <>
-                      <div className="grid grid-cols-2 gap-4">
-                        <div>
-                          <Label>Estado</Label>
-                          <Select defaultValue={selectedTicket.status}>
-                            <SelectTrigger>
-                              <SelectValue />
-                            </SelectTrigger>
-                            <SelectContent>
-                              <SelectItem value="open">Abierto</SelectItem>
-                              <SelectItem value="in_progress">En proceso</SelectItem>
-                              <SelectItem value="resolved">Resuelto</SelectItem>
-                              <SelectItem value="closed">Cerrado</SelectItem>
-                            </SelectContent>
-                          </Select>
-                        </div>
-                        <div>
-                          <Label>Prioridad</Label>
-                          <Select defaultValue={selectedTicket.priority}>
-                            <SelectTrigger>
-                              <SelectValue />
-                            </SelectTrigger>
-                            <SelectContent>
-                              <SelectItem value="low">Baja</SelectItem>
-                              <SelectItem value="medium">Media</SelectItem>
-                              <SelectItem value="high">Alta</SelectItem>
-                              <SelectItem value="urgent">Urgente</SelectItem>
-                            </SelectContent>
-                          </Select>
-                        </div>
-                      </div>
-                      <div>
-                        <Label>Título</Label>
-                        <Input value={selectedTicket.title} disabled />
-                      </div>
-                      <div>
-                        <Label>Descripción</Label>
-                        <Textarea value={selectedTicket.description} disabled rows={4} />
-                      </div>
-                      <div>
-                        <Label>Agregar respuesta</Label>
-                        <Textarea 
-                          value={ticketResponse}
-                          onChange={(e) => setTicketResponse(e.target.value)}
-                          placeholder="Escribe una respuesta..."
-                          rows={3}
-                        />
-                      </div>
-                    </>
-                  ) : (
-                    <>
-                      <div>
-                        <Label>Empresa</Label>
-                        <Select value={newTicket.company_id} onValueChange={(value) => setNewTicket({...newTicket, company_id: value})}>
-                          <SelectTrigger>
-                            <SelectValue placeholder="Seleccionar empresa" />
-                          </SelectTrigger>
-                          <SelectContent>
-                            {companies?.map((company) => (
-                              <SelectItem key={company.id} value={company.id}>
-                                {company.name}
-                              </SelectItem>
-                            ))}
-                          </SelectContent>
-                        </Select>
-                      </div>
-                      <div className="grid grid-cols-2 gap-4">
-                        <div>
-                          <Label>Prioridad</Label>
-                          <Select value={newTicket.priority} onValueChange={(value) => setNewTicket({...newTicket, priority: value})}>
-                            <SelectTrigger>
-                              <SelectValue />
-                            </SelectTrigger>
-                            <SelectContent>
-                              <SelectItem value="low">Baja</SelectItem>
-                              <SelectItem value="medium">Media</SelectItem>
-                              <SelectItem value="high">Alta</SelectItem>
-                              <SelectItem value="urgent">Urgente</SelectItem>
-                            </SelectContent>
-                          </Select>
-                        </div>
-                        <div>
-                          <Label>Categoría</Label>
-                          <Select value={newTicket.category} onValueChange={(value) => setNewTicket({...newTicket, category: value})}>
-                            <SelectTrigger>
-                              <SelectValue />
-                            </SelectTrigger>
-                            <SelectContent>
-                              <SelectItem value="technical">Técnico</SelectItem>
-                              <SelectItem value="billing">Facturación</SelectItem>
-                              <SelectItem value="feature_request">Funcionalidad</SelectItem>
-                              <SelectItem value="bug">Bug</SelectItem>
-                              <SelectItem value="general">General</SelectItem>
-                            </SelectContent>
-                          </Select>
-                        </div>
-                      </div>
-                      <div>
-                        <Label>Título</Label>
-                        <Input 
-                          value={newTicket.title}
-                          onChange={(e) => setNewTicket({...newTicket, title: e.target.value})}
-                          placeholder="Título del ticket"
-                        />
-                      </div>
-                      <div>
-                        <Label>Descripción</Label>
-                        <Textarea 
-                          value={newTicket.description}
-                          onChange={(e) => setNewTicket({...newTicket, description: e.target.value})}
-                          placeholder="Describe el problema o consulta..."
-                          rows={4}
-                        />
-                      </div>
-                    </>
+                  {/* Filtro adicional dentro de la pestaña activa */}
+                  {platformSupportStatusFilter === 'active' && (
+                    <div className="flex gap-1 mt-2">
+                      <Badge 
+                        variant="destructive" 
+                        className="cursor-pointer hover:bg-destructive/80"
+                        onClick={() => setPlatformSupportStatusFilter('open')}
+                      >
+                        Abiertos ({platformSupportTickets?.filter((t: any) => t.status === 'open').length || 0})
+                      </Badge>
+                      <Badge 
+                        variant="secondary" 
+                        className="cursor-pointer hover:bg-secondary/80"
+                        onClick={() => setPlatformSupportStatusFilter('in_progress')}
+                      >
+                        En Progreso ({platformSupportTickets?.filter((t: any) => t.status === 'in_progress').length || 0})
+                      </Badge>
+                    </div>
                   )}
-                </div>
-                <DialogFooter>
-                  <Button variant="outline" onClick={() => setTicketDialogOpen(false)}>
-                    Cancelar
-                  </Button>
-                  <Button onClick={() => {
-                    if (selectedTicket) {
-                      updateTicketMutation.mutate({
-                        ticketId: selectedTicket.id,
-                        status: selectedTicket.status,
-                        priority: selectedTicket.priority
-                      });
-                      if (ticketResponse.trim()) {
-                        createTicketResponseMutation.mutate({
-                          ticketId: selectedTicket.id,
-                          message: ticketResponse
-                        });
-                      }
-                    } else {
-                      createTicketMutation.mutate(newTicket);
-                    }
-                  }}>
-                    {selectedTicket ? "Guardar cambios" : "Crear ticket"}
-                  </Button>
-                </DialogFooter>
-              </DialogContent>
-            </Dialog>
+                </CardHeader>
+                <CardContent>
+                  {/* Stats rápidos */}
+                  <div className="grid grid-cols-4 gap-1 mb-4">
+                    <div className="text-center p-2 bg-red-500/10 rounded">
+                      <div className="text-lg font-bold text-red-600">
+                        {platformSupportTickets?.filter((t: any) => t.status === 'open').length || 0}
+                      </div>
+                      <div className="text-[10px] text-muted-foreground">Abiertos</div>
+                    </div>
+                    <div className="text-center p-2 bg-blue-500/10 rounded">
+                      <div className="text-lg font-bold text-blue-600">
+                        {platformSupportTickets?.filter((t: any) => t.status === 'in_progress').length || 0}
+                      </div>
+                      <div className="text-[10px] text-muted-foreground">Progreso</div>
+                    </div>
+                    <div className="text-center p-2 bg-yellow-500/10 rounded">
+                      <div className="text-lg font-bold text-yellow-600">
+                        {platformSupportTickets?.filter((t: any) => t.waiting_for_customer).length || 0}
+                      </div>
+                      <div className="text-[10px] text-muted-foreground">Esperando</div>
+                    </div>
+                    <div className="text-center p-2 bg-green-500/10 rounded">
+                      <div className="text-lg font-bold text-green-600">
+                        {platformSupportTickets?.filter((t: any) => t.status === 'resolved').length || 0}
+                      </div>
+                      <div className="text-[10px] text-muted-foreground">Resueltos</div>
+                    </div>
+                  </div>
+                  
+                  {/* SLA Breaches */}
+                  {(platformSupportTickets?.filter((t: any) => t.sla_response_breached || t.sla_resolution_breached).length || 0) > 0 && (
+                    <div className="p-2 mb-4 bg-destructive/10 border border-destructive/20 rounded-lg">
+                      <div className="flex items-center gap-2 text-destructive">
+                        <AlertCircle className="h-4 w-4" />
+                        <span className="text-sm font-medium">
+                          {platformSupportTickets?.filter((t: any) => t.sla_response_breached || t.sla_resolution_breached).length} SLA incumplidos
+                        </span>
+                      </div>
+                    </div>
+                  )}
+
+                  <div className="space-y-2 max-h-[500px] overflow-y-auto border rounded p-2">
+                    {platformSupportTickets && platformSupportTickets.length > 0 ? (
+                      (() => {
+                        let filtered = platformSupportTickets;
+                        
+                        // Filtrar según la pestaña seleccionada
+                        if (platformSupportStatusFilter === 'active') {
+                          filtered = filtered.filter((t: any) => ['open', 'in_progress', 'pending'].includes(t.status));
+                        } else if (platformSupportStatusFilter === 'history') {
+                          filtered = filtered.filter((t: any) => ['resolved', 'closed'].includes(t.status));
+                        } else if (platformSupportStatusFilter === 'open') {
+                          filtered = filtered.filter((t: any) => t.status === 'open');
+                        } else if (platformSupportStatusFilter === 'in_progress') {
+                          filtered = filtered.filter((t: any) => t.status === 'in_progress');
+                        } else if (platformSupportStatusFilter !== 'all') {
+                          filtered = filtered.filter((t: any) => t.status === platformSupportStatusFilter);
+                        }
+                        
+                        if (filtered.length === 0) {
+                          return (
+                            <div className="text-center py-8 text-muted-foreground">
+                              <p className="text-sm">No hay tickets en esta categoría</p>
+                            </div>
+                          );
+                        }
+                        
+                        return filtered.map((ticket: any) => (
+                        <div
+                          key={ticket.id}
+                          className={`p-3 border rounded-lg cursor-pointer transition-colors hover:bg-muted/50 ${
+                            selectedPlatformTicket?.id === ticket.id ? "bg-muted border-2 border-primary" : ""
+                          }`}
+                          onClick={() => setSelectedPlatformTicket(ticket)}
+                        >
+                          <div className="flex items-start justify-between mb-2">
+                            <div className="flex items-center gap-2 flex-wrap">
+                              <span className="font-mono text-xs font-medium">{ticket.ticket_number}</span>
+                              <Badge variant={
+                                ticket.status === 'open' ? 'destructive' :
+                                ticket.status === 'in_progress' ? 'secondary' :
+                                ticket.status === 'resolved' ? 'default' :
+                                'outline'
+                              } className="text-xs">
+                                {ticket.status === 'open' ? 'Abierto' :
+                                 ticket.status === 'in_progress' ? 'En Progreso' :
+                                 ticket.status === 'resolved' ? '✓ Resuelto' : '✓ Cerrado'}
+                              </Badge>
+                              {ticket.waiting_for_customer && (
+                                <Badge variant="outline" className="text-xs bg-yellow-500/10 text-yellow-600 border-yellow-500/30">
+                                  ⏳ Esperando
+                                </Badge>
+                              )}
+                              {(ticket.sla_response_breached || ticket.sla_resolution_breached) && (
+                                <Badge variant="destructive" className="text-xs">
+                                  ⚠️ SLA
+                                </Badge>
+                              )}
+                            </div>
+                            <Badge variant="outline" className="text-xs">
+                              {ticket.priority === 'urgent' ? '🔴' :
+                               ticket.priority === 'high' ? '🟠' :
+                               ticket.priority === 'medium' ? '🟡' : '🟢'}
+                            </Badge>
+                          </div>
+                          <div className="text-xs text-muted-foreground mb-1 flex items-center gap-1">
+                            <Building2 className="h-3 w-3" />
+                            {ticket.companies?.name}
+                            {ticket.auto_priority_reason && (
+                              <span className="ml-2 text-yellow-600">{ticket.subscription_plan === 'annual' ? '⭐' : ''}</span>
+                            )}
+                          </div>
+                          <h4 className="font-medium text-sm line-clamp-1">{ticket.subject}</h4>
+                          <p className="text-xs text-muted-foreground line-clamp-2 mt-1">{ticket.description}</p>
+                          
+                          {/* Botones de acción rápida */}
+                          {ticket.status !== 'closed' && (
+                            <div className="flex gap-1 mt-2 pt-2 border-t" onClick={(e) => e.stopPropagation()}>
+                              {ticket.status === 'open' && (
+                                <Button 
+                                  variant="outline" 
+                                  size="sm" 
+                                  className="h-6 text-xs flex-1"
+                                  onClick={() => updatePlatformTicketStatusMutation.mutate({
+                                    ticketId: ticket.id,
+                                    status: 'in_progress'
+                                  })}
+                                >
+                                  ▶ Tomar
+                                </Button>
+                              )}
+                              {ticket.status !== 'resolved' && ticket.status !== 'closed' && (
+                                <Button 
+                                  variant="outline" 
+                                  size="sm" 
+                                  className="h-6 text-xs flex-1 text-green-600 hover:text-green-700"
+                                  onClick={() => updatePlatformTicketStatusMutation.mutate({
+                                    ticketId: ticket.id,
+                                    status: 'resolved'
+                                  })}
+                                >
+                                  ✓ Resolver
+                                </Button>
+                              )}
+                              {ticket.status === 'resolved' && (
+                                <Button 
+                                  variant="outline" 
+                                  size="sm" 
+                                  className="h-6 text-xs flex-1"
+                                  onClick={() => updatePlatformTicketStatusMutation.mutate({
+                                    ticketId: ticket.id,
+                                    status: 'closed'
+                                  })}
+                                >
+                                  📁 Archivar
+                                </Button>
+                              )}
+                            </div>
+                          )}
+                        </div>
+                      ));
+                      })()
+                    ) : (
+                      <div className="text-center py-12 text-muted-foreground">
+                        <Ticket className="h-12 w-12 mx-auto mb-2 opacity-50" />
+                        <p className="text-sm">No hay tickets reportados</p>
+                      </div>
+                    )}
+                  </div>
+                </CardContent>
+              </Card>
+
+              {/* Detalle del Ticket */}
+              <Card className="lg:col-span-2">
+                {selectedPlatformTicket ? (
+                  <>
+                    <CardHeader>
+                      <div className="flex items-start justify-between gap-4">
+                        <div className="flex-1">
+                          <div className="flex items-center gap-2 mb-2">
+                            <CardTitle className="text-lg">{selectedPlatformTicket.ticket_number}</CardTitle>
+                            <Select
+                              value={selectedPlatformTicket.status}
+                              onValueChange={(val) => {
+                                updatePlatformTicketStatusMutation.mutate({
+                                  ticketId: selectedPlatformTicket.id,
+                                  status: val
+                                });
+                              }}
+                            >
+                              <SelectTrigger className="w-[140px] h-8">
+                                <SelectValue />
+                              </SelectTrigger>
+                              <SelectContent>
+                                <SelectItem value="open">Abierto</SelectItem>
+                                <SelectItem value="in_progress">En Progreso</SelectItem>
+                                <SelectItem value="pending">Pendiente</SelectItem>
+                                <SelectItem value="resolved">Resuelto</SelectItem>
+                                <SelectItem value="closed">Cerrado</SelectItem>
+                              </SelectContent>
+                            </Select>
+                          </div>
+                          <CardDescription>{selectedPlatformTicket.subject}</CardDescription>
+                        </div>
+                        <Button 
+                          variant="outline" 
+                          size="sm"
+                          onClick={() => setSelectedPlatformTicket(null)}
+                          className="mt-1"
+                        >
+                          ✕ Cerrar
+                        </Button>
+                      </div>
+                      
+                      {/* Info de la Empresa */}
+                      <div className="mt-4 p-3 bg-muted rounded-lg">
+                        <div className="grid grid-cols-2 gap-3 text-sm">
+                          <div>
+                            <span className="text-muted-foreground">Empresa:</span>
+                            <div className="font-medium flex items-center gap-1">
+                              <Building2 className="h-3 w-3" />
+                              {selectedPlatformTicket.companies?.name}
+                            </div>
+                          </div>
+                          <div>
+                            <span className="text-muted-foreground">Email:</span>
+                            <div className="font-medium">{selectedPlatformTicket.companies?.email || 'No disponible'}</div>
+                          </div>
+                          <div>
+                            <span className="text-muted-foreground">Categoría:</span>
+                            <div className="font-medium">
+                              {selectedPlatformTicket.category === 'technical' ? '🔧 Técnico' :
+                               selectedPlatformTicket.category === 'billing' ? '💰 Facturación' :
+                               selectedPlatformTicket.category === 'feature_request' ? '✨ Nueva Función' :
+                               selectedPlatformTicket.category === 'bug' ? '🐛 Bug' :
+                               selectedPlatformTicket.category === 'account' ? '👤 Cuenta' : '📋 Otro'}
+                            </div>
+                          </div>
+                          <div>
+                            <span className="text-muted-foreground">Prioridad:</span>
+                            <div className="font-medium">
+                              {selectedPlatformTicket.priority === 'urgent' ? '🔴 Urgente' :
+                               selectedPlatformTicket.priority === 'high' ? '🟠 Alta' :
+                               selectedPlatformTicket.priority === 'medium' ? '🟡 Media' : '🟢 Baja'}
+                              {selectedPlatformTicket.auto_priority_reason && (
+                                <span className="ml-2 text-xs text-yellow-600">
+                                  ({selectedPlatformTicket.auto_priority_reason})
+                                </span>
+                              )}
+                            </div>
+                          </div>
+                        </div>
+                        {/* SLA Info */}
+                        <div className="grid grid-cols-2 gap-3 text-sm mt-3 pt-3 border-t">
+                          <div>
+                            <span className="text-muted-foreground">SLA Respuesta:</span>
+                            <div className={`font-medium flex items-center gap-1 ${selectedPlatformTicket.sla_response_breached ? 'text-destructive' : ''}`}>
+                              <Clock className="h-3 w-3" />
+                              {selectedPlatformTicket.sla_response_hours || 24}h
+                              {selectedPlatformTicket.first_response_at && (
+                                <span className="text-green-600 ml-1">✓</span>
+                              )}
+                              {selectedPlatformTicket.sla_response_breached && (
+                                <span className="text-destructive ml-1">⚠️</span>
+                              )}
+                            </div>
+                          </div>
+                          <div>
+                            <span className="text-muted-foreground">SLA Resolución:</span>
+                            <div className={`font-medium flex items-center gap-1 ${selectedPlatformTicket.sla_resolution_breached ? 'text-destructive' : ''}`}>
+                              <Clock className="h-3 w-3" />
+                              {selectedPlatformTicket.sla_resolution_hours || 72}h
+                              {selectedPlatformTicket.resolved_at && (
+                                <span className="text-green-600 ml-1">✓</span>
+                              )}
+                              {selectedPlatformTicket.sla_resolution_breached && (
+                                <span className="text-destructive ml-1">⚠️</span>
+                              )}
+                            </div>
+                          </div>
+                          {selectedPlatformTicket.waiting_for_customer && (
+                            <div className="col-span-2">
+                              <Badge variant="outline" className="bg-yellow-500/10 text-yellow-600 border-yellow-500/30">
+                                ⏳ Esperando respuesta del cliente desde {new Date(selectedPlatformTicket.waiting_since).toLocaleDateString('es-AR')}
+                              </Badge>
+                            </div>
+                          )}
+                          {selectedPlatformTicket.escalated_at && (
+                            <div className="col-span-2">
+                              <Badge variant="destructive">
+                                🔺 Escalado: {selectedPlatformTicket.escalated_to || 'Supervisor'}
+                              </Badge>
+                            </div>
+                          )}
+                        </div>
+                      </div>
+                    </CardHeader>
+                    <CardContent className="space-y-4">
+                      {/* Descripción Original */}
+                      <div className="p-4 bg-muted rounded-lg">
+                        <h4 className="text-sm font-medium mb-2">Descripción del Problema:</h4>
+                        <p className="text-sm">{selectedPlatformTicket.description}</p>
+                      </div>
+
+                      {/* Mensajes */}
+                      <div className="space-y-3 max-h-[300px] overflow-y-auto border rounded-lg p-3">
+                        {platformTicketMessages && platformTicketMessages.length > 0 ? (
+                          platformTicketMessages.map((msg: any) => (
+                            <div
+                              key={msg.id}
+                              className={`flex ${msg.sender_type === 'admin' ? 'justify-end' : 'justify-start'}`}
+                            >
+                              <div
+                                className={`max-w-[80%] p-3 rounded-lg ${
+                                  msg.sender_type === 'admin'
+                                    ? 'bg-primary text-primary-foreground'
+                                    : 'bg-muted'
+                                }`}
+                              >
+                                <p className="text-sm whitespace-pre-wrap">{msg.message}</p>
+                                
+                                {/* Attachments */}
+                                {msg.attachments && msg.attachments.length > 0 && (
+                                  <div className="mt-2 space-y-1">
+                                    {msg.attachments.map((att: any, idx: number) => (
+                                      <a
+                                        key={idx}
+                                        href={att.url}
+                                        target="_blank"
+                                        rel="noopener noreferrer"
+                                        className={`flex items-center gap-2 text-xs p-2 rounded ${
+                                          msg.sender_type === 'admin'
+                                            ? 'bg-primary-foreground/10 hover:bg-primary-foreground/20'
+                                            : 'bg-background hover:bg-accent'
+                                        }`}
+                                      >
+                                        {att.type?.startsWith('image/') ? (
+                                          <img 
+                                            src={att.url} 
+                                            alt={att.name} 
+                                            className="max-w-[150px] max-h-[100px] rounded object-cover"
+                                          />
+                                        ) : (
+                                          <>
+                                            <FileText className="h-3 w-3" />
+                                            <span className="truncate max-w-[150px]">{att.name}</span>
+                                          </>
+                                        )}
+                                      </a>
+                                    ))}
+                                  </div>
+                                )}
+                                
+                                <p className="text-xs opacity-70 mt-1">
+                                  {new Date(msg.created_at).toLocaleString('es-AR')}
+                                </p>
+                              </div>
+                            </div>
+                          ))
+                        ) : (
+                          <p className="text-sm text-muted-foreground text-center py-4">
+                            No hay mensajes todavía
+                          </p>
+                        )}
+                      </div>
+
+                      {/* Responder */}
+                      {selectedPlatformTicket.status !== 'closed' && (
+                        <div className="space-y-3 p-4 bg-muted/30 rounded-lg">
+                          <Label>Responder a la Empresa</Label>
+                          <Textarea
+                            placeholder="Escribe tu respuesta..."
+                            value={platformTicketMessage}
+                            onChange={(e) => setPlatformTicketMessage(e.target.value)}
+                            className="min-h-[100px]"
+                          />
+                          
+                          {/* Botones de envío */}
+                          <div className="space-y-2">
+                            <div className="grid grid-cols-3 gap-2">
+                              <Button
+                                onClick={() => respondPlatformTicketMutation.mutate()}
+                                disabled={!platformTicketMessage.trim()}
+                                className="col-span-1"
+                              >
+                                <MessageSquare className="h-4 w-4 mr-2" />
+                                Enviar
+                              </Button>
+                              <Button
+                                variant="outline"
+                                size="sm"
+                                onClick={() => {
+                                  const email = selectedPlatformTicket.companies?.email;
+                                  if (!email) {
+                                    toast.error("Esta empresa no tiene email registrado");
+                                    return;
+                                  }
+                                  const subject = `RE: Ticket ${selectedPlatformTicket.ticket_number} - ${selectedPlatformTicket.subject}`;
+                                  const body = `${platformTicketMessage}\n\n---\nTicket: ${selectedPlatformTicket.ticket_number}`;
+                                  const gmailUrl = `https://mail.google.com/mail/?view=cm&fs=1&to=${email}&su=${encodeURIComponent(subject)}&body=${encodeURIComponent(body)}`;
+                                  window.open(gmailUrl, '_blank');
+                                  toast.success("Gmail abierto");
+                                }}
+                                disabled={!platformTicketMessage.trim()}
+                              >
+                                📧
+                              </Button>
+                              <Button
+                                variant="outline"
+                                size="sm"
+                                onClick={() => {
+                                  const phone = selectedPlatformTicket.companies?.whatsapp_number || selectedPlatformTicket.companies?.phone;
+                                  if (!phone) {
+                                    toast.error("Esta empresa no tiene número de teléfono registrado");
+                                    return;
+                                  }
+                                  // Limpiar el número para WhatsApp (solo dígitos en formato internacional)
+                                  const cleanPhone = phone.replace(/\D/g, "");
+                                  const message = `${platformTicketMessage}\n\nTicket: ${selectedPlatformTicket.ticket_number}`;
+                                  const waUrl = `https://wa.me/${cleanPhone}?text=${encodeURIComponent(message)}`;
+                                  window.open(waUrl, "_blank", "noopener,noreferrer");
+                                  toast.success("WhatsApp abierto");
+                                }}
+                                disabled={!platformTicketMessage.trim()}
+                              >
+                                💬
+                              </Button>
+                            </div>
+                            <p className="text-xs text-muted-foreground">
+                              Presiona "Enviar" para publicar en el sistema. 📧 y 💬 abren Gmail/WhatsApp Web con tu mensaje.
+                            </p>
+                          </div>
+                        </div>
+                      )}
+
+                      {/* Notificaciones Adicionales (cuando no hay respuesta activa) */}
+                      {selectedPlatformTicket.status !== 'closed' && (
+                        <div className="space-y-2 pt-4 border-t">
+                          <Label className="font-semibold text-sm">Contactar Directamente</Label>
+                          <p className="text-xs text-muted-foreground">
+                            Abre Gmail o WhatsApp Web para enviar un mensaje directo
+                          </p>
+                          <div className="grid grid-cols-2 gap-2">
+                            <Button
+                              variant="outline"
+                              size="sm"
+                              onClick={() => {
+                                const email = selectedPlatformTicket.companies?.email;
+                                if (!email) {
+                                  toast.error("Esta empresa no tiene email registrado");
+                                  return;
+                                }
+                                const subject = `Ticket ${selectedPlatformTicket.ticket_number} - ${selectedPlatformTicket.subject}`;
+                                const body = `Hola,\n\nActualización sobre tu ticket ${selectedPlatformTicket.ticket_number}.\n\nSaludos,\nEquipo de Soporte`;
+                                const gmailUrl = `https://mail.google.com/mail/?view=cm&fs=1&to=${email}&su=${encodeURIComponent(subject)}&body=${encodeURIComponent(body)}`;
+                                window.open(gmailUrl, '_blank');
+                              }}
+                            >
+                              📧 Gmail
+                            </Button>
+                            <Button
+                              variant="outline"
+                              size="sm"
+                              onClick={() => {
+                                const phone = selectedPlatformTicket.companies?.whatsapp_number || selectedPlatformTicket.companies?.phone;
+                                if (!phone) {
+                                  toast.error("Esta empresa no tiene número de teléfono registrado");
+                                  return;
+                                }
+                                const cleanPhone = phone.replace(/\D/g, "");
+                                const message = `Hola,\n\nActualización sobre tu ticket ${selectedPlatformTicket.ticket_number}.\n\nSaludos,\nEquipo de Soporte`;
+                                const waUrl = `https://wa.me/${cleanPhone}?text=${encodeURIComponent(message)}`;
+                                window.open(waUrl, "_blank", "noopener,noreferrer");
+                              }}
+                            >
+                              💬 WhatsApp
+                            </Button>
+                          </div>
+                        </div>
+                      )}
+                    </CardContent>
+                  </>
+                ) : (
+                  <CardContent className="flex items-center justify-center h-[600px]">
+                    <div className="text-center text-muted-foreground">
+                      <Ticket className="h-12 w-12 mx-auto mb-4 opacity-50" />
+                      <p>Selecciona un ticket para ver los detalles</p>
+                      <p className="text-sm mt-2">Podrás ver info de la empresa y responder</p>
+                    </div>
+                  </CardContent>
+                )}
+              </Card>
+            </div>
           </TabsContent>
 
           {/* Companies Tab */}
@@ -1443,7 +1626,7 @@ export default function PlatformAdmin() {
                     </TableRow>
                   </TableHeader>
                   <TableBody>
-                    {filteredCompanies?.map((company) => {
+                    {companiesPagination.paginatedData?.map((company) => {
                       const subscription = company.company_subscriptions?.[0];
                       return (
                         <TableRow key={company.id}>
@@ -1475,6 +1658,28 @@ export default function PlatformAdmin() {
                               <Button 
                                 variant="outline" 
                                 size="sm"
+                                onClick={() => {
+                                  setSelectedCompanyForModules(company);
+                                  setModulesDialogOpen(true);
+                                }}
+                              >
+                                <Package className="h-4 w-4 mr-1" />
+                                Módulos
+                              </Button>
+                              <Button 
+                                variant="outline" 
+                                size="sm"
+                                onClick={() => {
+                                  setSelectedCompanyForPricing(company);
+                                  setCustomPricingDialogOpen(true);
+                                }}
+                              >
+                                <DollarSign className="h-4 w-4 mr-1" />
+                                Precios
+                              </Button>
+                              <Button 
+                                variant="outline" 
+                                size="sm"
                                 onClick={() => toggleCompanyMutation.mutate({ 
                                   companyId: company.id, 
                                   active: !company.active 
@@ -1489,6 +1694,22 @@ export default function PlatformAdmin() {
                     })}
                   </TableBody>
                 </Table>
+                <PaginationControls
+                  currentPage={companiesPagination.currentPage}
+                  totalPages={companiesPagination.totalPages}
+                  totalItems={companiesPagination.totalItems}
+                  startIndex={companiesPagination.startIndex}
+                  endIndex={companiesPagination.endIndex}
+                  pageSize={companiesPagination.pageSize}
+                  canGoNext={companiesPagination.canGoNext}
+                  canGoPrevious={companiesPagination.canGoPrevious}
+                  onPageChange={companiesPagination.setCurrentPage}
+                  onPageSizeChange={companiesPagination.setPageSize}
+                  onNextPage={companiesPagination.goToNextPage}
+                  onPreviousPage={companiesPagination.goToPreviousPage}
+                  onFirstPage={companiesPagination.goToFirstPage}
+                  onLastPage={companiesPagination.goToLastPage}
+                />
               </CardContent>
             </Card>
           </TabsContent>
@@ -1532,7 +1753,7 @@ export default function PlatformAdmin() {
                     </TableRow>
                   </TableHeader>
                   <TableBody>
-                    {filteredNotifications?.map((notification) => (
+                    {notificationsPagination.paginatedData?.map((notification) => (
                       <TableRow key={notification.id}>
                         <TableCell>
                           <div className="flex items-center gap-2">
@@ -1569,6 +1790,22 @@ export default function PlatformAdmin() {
                     ))}
                   </TableBody>
                 </Table>
+                <PaginationControls
+                  currentPage={notificationsPagination.currentPage}
+                  totalPages={notificationsPagination.totalPages}
+                  totalItems={notificationsPagination.totalItems}
+                  startIndex={notificationsPagination.startIndex}
+                  endIndex={notificationsPagination.endIndex}
+                  pageSize={notificationsPagination.pageSize}
+                  canGoNext={notificationsPagination.canGoNext}
+                  canGoPrevious={notificationsPagination.canGoPrevious}
+                  onPageChange={notificationsPagination.setCurrentPage}
+                  onPageSizeChange={notificationsPagination.setPageSize}
+                  onNextPage={notificationsPagination.goToNextPage}
+                  onPreviousPage={notificationsPagination.goToPreviousPage}
+                  onFirstPage={notificationsPagination.goToFirstPage}
+                  onLastPage={notificationsPagination.goToLastPage}
+                />
               </CardContent>
             </Card>
           </TabsContent>
@@ -1612,7 +1849,7 @@ export default function PlatformAdmin() {
                     </TableRow>
                   </TableHeader>
                   <TableBody>
-                    {filteredFeedback?.map((item) => (
+                    {feedbackPagination.paginatedData?.map((item) => (
                       <TableRow key={item.id}>
                         <TableCell>
                           <Badge
@@ -1677,6 +1914,22 @@ export default function PlatformAdmin() {
                     ))}
                   </TableBody>
                 </Table>
+                <PaginationControls
+                  currentPage={feedbackPagination.currentPage}
+                  totalPages={feedbackPagination.totalPages}
+                  totalItems={feedbackPagination.totalItems}
+                  startIndex={feedbackPagination.startIndex}
+                  endIndex={feedbackPagination.endIndex}
+                  pageSize={feedbackPagination.pageSize}
+                  canGoNext={feedbackPagination.canGoNext}
+                  canGoPrevious={feedbackPagination.canGoPrevious}
+                  onPageChange={feedbackPagination.setCurrentPage}
+                  onPageSizeChange={feedbackPagination.setPageSize}
+                  onNextPage={feedbackPagination.goToNextPage}
+                  onPreviousPage={feedbackPagination.goToPreviousPage}
+                  onFirstPage={feedbackPagination.goToFirstPage}
+                  onLastPage={feedbackPagination.goToLastPage}
+                />
               </CardContent>
             </Card>
           </TabsContent>
@@ -1817,7 +2070,7 @@ export default function PlatformAdmin() {
                     </TableRow>
                   </TableHeader>
                   <TableBody>
-                    {filteredPayments?.map((payment) => {
+                    {paymentsPagination.paginatedData?.map((payment) => {
                       const company = companies?.find(c => c.id === payment.company_id);
                       return (
                         <TableRow key={payment.id}>
@@ -1873,6 +2126,22 @@ export default function PlatformAdmin() {
                     })}
                   </TableBody>
                 </Table>
+                <PaginationControls
+                  currentPage={paymentsPagination.currentPage}
+                  totalPages={paymentsPagination.totalPages}
+                  totalItems={paymentsPagination.totalItems}
+                  startIndex={paymentsPagination.startIndex}
+                  endIndex={paymentsPagination.endIndex}
+                  pageSize={paymentsPagination.pageSize}
+                  canGoNext={paymentsPagination.canGoNext}
+                  canGoPrevious={paymentsPagination.canGoPrevious}
+                  onPageChange={paymentsPagination.setCurrentPage}
+                  onPageSizeChange={paymentsPagination.setPageSize}
+                  onNextPage={paymentsPagination.goToNextPage}
+                  onPreviousPage={paymentsPagination.goToPreviousPage}
+                  onFirstPage={paymentsPagination.goToFirstPage}
+                  onLastPage={paymentsPagination.goToLastPage}
+                />
               </CardContent>
             </Card>
           </TabsContent>
@@ -2027,37 +2296,47 @@ export default function PlatformAdmin() {
                     </TableRow>
                   </TableHeader>
                   <TableBody>
-                    {allUsers
-                      ?.filter(user =>
-                        userSearch === '' ||
-                        user.id.toLowerCase().includes(userSearch.toLowerCase()) ||
-                        ((user.companies as any)?.name || '').toLowerCase().includes(userSearch.toLowerCase())
-                      )
-                      .map((user) => (
-                        <TableRow key={user.id}>
-                          <TableCell className="font-mono text-xs">
-                            {user.user_id?.substring(0, 8)}...
-                          </TableCell>
-                          <TableCell>
-                            {(user.companies as any)?.name || 'N/A'}
-                          </TableCell>
-                          <TableCell>
-                            <Badge variant="outline">{user.role}</Badge>
-                          </TableCell>
-                          <TableCell>
-                            {user.active ? (
-                              <Badge variant="default">Activo</Badge>
-                            ) : (
-                              <Badge variant="secondary">Inactivo</Badge>
-                            )}
-                          </TableCell>
-                          <TableCell>
-                            {formatDate(user.created_at || '')}
-                          </TableCell>
-                        </TableRow>
-                      ))}
+                    {usersPagination.paginatedData?.map((user) => (
+                      <TableRow key={user.id}>
+                        <TableCell className="font-mono text-xs">
+                          {user.user_id?.substring(0, 8)}...
+                        </TableCell>
+                        <TableCell>
+                          {(user.companies as any)?.name || 'N/A'}
+                        </TableCell>
+                        <TableCell>
+                          <Badge variant="outline">{user.role}</Badge>
+                        </TableCell>
+                        <TableCell>
+                          {user.active ? (
+                            <Badge variant="default">Activo</Badge>
+                          ) : (
+                            <Badge variant="secondary">Inactivo</Badge>
+                          )}
+                        </TableCell>
+                        <TableCell>
+                          {formatDate(user.created_at || '')}
+                        </TableCell>
+                      </TableRow>
+                    ))}
                   </TableBody>
                 </Table>
+                <PaginationControls
+                  currentPage={usersPagination.currentPage}
+                  totalPages={usersPagination.totalPages}
+                  totalItems={usersPagination.totalItems}
+                  startIndex={usersPagination.startIndex}
+                  endIndex={usersPagination.endIndex}
+                  pageSize={usersPagination.pageSize}
+                  canGoNext={usersPagination.canGoNext}
+                  canGoPrevious={usersPagination.canGoPrevious}
+                  onPageChange={usersPagination.setCurrentPage}
+                  onPageSizeChange={usersPagination.setPageSize}
+                  onNextPage={usersPagination.goToNextPage}
+                  onPreviousPage={usersPagination.goToPreviousPage}
+                  onFirstPage={usersPagination.goToFirstPage}
+                  onLastPage={usersPagination.goToLastPage}
+                />
               </CardContent>
             </Card>
           </TabsContent>
@@ -2368,8 +2647,8 @@ export default function PlatformAdmin() {
                     </TableRow>
                   </TableHeader>
                   <TableBody>
-                    {filteredAuditLogs && filteredAuditLogs.length > 0 ? (
-                      filteredAuditLogs.map((log) => (
+                    {auditLogsPagination.paginatedData && auditLogsPagination.paginatedData.length > 0 ? (
+                      auditLogsPagination.paginatedData.map((log) => (
                         <TableRow key={log.id}>
                           <TableCell className="text-sm">
                             {new Date(log.created_at).toLocaleString('es-AR', {
@@ -2404,12 +2683,12 @@ export default function PlatformAdmin() {
                           </TableCell>
                           <TableCell>
                             <Badge variant="outline">
-                              {log.entity_type || "N/A"}
+                              {log.table_name || "N/A"}
                             </Badge>
                           </TableCell>
                           <TableCell className="max-w-md">
                             <p className="text-sm text-muted-foreground line-clamp-2">
-                              {log.description}
+                              {log.changed_fields?.join(", ") || "Sin cambios registrados"}
                             </p>
                           </TableCell>
                           <TableCell className="text-xs text-muted-foreground">
@@ -2426,6 +2705,22 @@ export default function PlatformAdmin() {
                     )}
                   </TableBody>
                 </Table>
+                <PaginationControls
+                  currentPage={auditLogsPagination.currentPage}
+                  totalPages={auditLogsPagination.totalPages}
+                  totalItems={auditLogsPagination.totalItems}
+                  startIndex={auditLogsPagination.startIndex}
+                  endIndex={auditLogsPagination.endIndex}
+                  pageSize={auditLogsPagination.pageSize}
+                  canGoNext={auditLogsPagination.canGoNext}
+                  canGoPrevious={auditLogsPagination.canGoPrevious}
+                  onPageChange={auditLogsPagination.setCurrentPage}
+                  onPageSizeChange={auditLogsPagination.setPageSize}
+                  onNextPage={auditLogsPagination.goToNextPage}
+                  onPreviousPage={auditLogsPagination.goToPreviousPage}
+                  onFirstPage={auditLogsPagination.goToFirstPage}
+                  onLastPage={auditLogsPagination.goToLastPage}
+                />
               </CardContent>
             </Card>
           </TabsContent>
@@ -2634,8 +2929,266 @@ export default function PlatformAdmin() {
               </CardContent>
             </Card>
           </TabsContent>
+
+          {/* Onboarding Tab */}
+          <TabsContent value="onboarding" className="space-y-4">
+            <Card>
+              <CardHeader>
+                <div className="flex items-center justify-between">
+                  <div>
+                    <CardTitle>Panel de Onboarding</CardTitle>
+                    <CardDescription>
+                      Progreso de configuración inicial de cada empresa
+                    </CardDescription>
+                  </div>
+                  <Button
+                    onClick={() => {
+                      if (!onboardingData) return;
+                      exportToExcel(
+                        onboardingData.map((o: any) => ({
+                          'Empresa': o.companies?.name || 'N/A',
+                          'Progreso (%)': o.completion_percentage || 0,
+                          'Info Empresa': o.company_info_completed ? 'Sí' : 'No',
+                          'Primer Producto': o.first_product_added ? 'Sí' : 'No',
+                          'Primer Cliente': o.first_customer_added ? 'Sí' : 'No',
+                          'Primera Venta': o.first_sale_completed ? 'Sí' : 'No',
+                          'Método Pago': o.payment_method_configured ? 'Sí' : 'No',
+                          'Equipo Invitado': o.team_members_invited ? 'Sí' : 'No',
+                          'AFIP Config.': o.afip_configured ? 'Sí' : 'No',
+                          'Iniciado': o.started_at ? new Date(o.started_at).toLocaleDateString() : 'N/A',
+                          'Completado': o.completed_at ? new Date(o.completed_at).toLocaleDateString() : 'En progreso'
+                        })),
+                        'onboarding-empresas'
+                      );
+                    }}
+                  >
+                    <Download className="mr-2 h-4 w-4" />
+                    Exportar
+                  </Button>
+                </div>
+              </CardHeader>
+              <CardContent className="space-y-6">
+                {/* Summary Stats */}
+                <div className="grid gap-4 md:grid-cols-4">
+                  <Card>
+                    <CardHeader className="pb-2">
+                      <CardTitle className="text-sm font-medium">Completados</CardTitle>
+                    </CardHeader>
+                    <CardContent>
+                      <div className="text-2xl font-bold text-green-600">
+                        {onboardingData?.filter((o: any) => o.completion_percentage === 100).length || 0}
+                      </div>
+                      <p className="text-xs text-muted-foreground">100% configurado</p>
+                    </CardContent>
+                  </Card>
+                  <Card>
+                    <CardHeader className="pb-2">
+                      <CardTitle className="text-sm font-medium">En Progreso</CardTitle>
+                    </CardHeader>
+                    <CardContent>
+                      <div className="text-2xl font-bold text-yellow-600">
+                        {onboardingData?.filter((o: any) => o.completion_percentage > 0 && o.completion_percentage < 100).length || 0}
+                      </div>
+                      <p className="text-xs text-muted-foreground">Configurando</p>
+                    </CardContent>
+                  </Card>
+                  <Card>
+                    <CardHeader className="pb-2">
+                      <CardTitle className="text-sm font-medium">Sin Iniciar</CardTitle>
+                    </CardHeader>
+                    <CardContent>
+                      <div className="text-2xl font-bold text-red-600">
+                        {onboardingData?.filter((o: any) => o.completion_percentage === 0).length || 0}
+                      </div>
+                      <p className="text-xs text-muted-foreground">0% progreso</p>
+                    </CardContent>
+                  </Card>
+                  <Card>
+                    <CardHeader className="pb-2">
+                      <CardTitle className="text-sm font-medium">Promedio General</CardTitle>
+                    </CardHeader>
+                    <CardContent>
+                      <div className="text-2xl font-bold">
+                        {onboardingData && onboardingData.length > 0
+                          ? Math.round(onboardingData.reduce((sum: number, o: any) => sum + (o.completion_percentage || 0), 0) / onboardingData.length)
+                          : 0}%
+                      </div>
+                      <p className="text-xs text-muted-foreground">Todas las empresas</p>
+                    </CardContent>
+                  </Card>
+                </div>
+
+                {/* Onboarding Table */}
+                <Table>
+                  <TableHeader>
+                    <TableRow>
+                      <TableHead>Empresa</TableHead>
+                      <TableHead>Progreso</TableHead>
+                      <TableHead className="text-center">Info</TableHead>
+                      <TableHead className="text-center">Producto</TableHead>
+                      <TableHead className="text-center">Cliente</TableHead>
+                      <TableHead className="text-center">Venta</TableHead>
+                      <TableHead className="text-center">Pago</TableHead>
+                      <TableHead className="text-center">Equipo</TableHead>
+                      <TableHead className="text-center">AFIP</TableHead>
+                      <TableHead>Última Actividad</TableHead>
+                    </TableRow>
+                  </TableHeader>
+                  <TableBody>
+                    {onboardingData && onboardingData.length > 0 ? (
+                      onboardingData.map((onb: any) => (
+                        <TableRow key={onb.id}>
+                          <TableCell className="font-medium">
+                            {onb.companies?.name || "N/A"}
+                            {!onb.companies?.active && (
+                              <Badge variant="secondary" className="ml-2">Inactiva</Badge>
+                            )}
+                          </TableCell>
+                          <TableCell>
+                            <div className="flex items-center gap-2">
+                              <div className="w-24 h-2 bg-muted rounded-full overflow-hidden">
+                                <div 
+                                  className={`h-full transition-all ${
+                                    onb.completion_percentage === 100 
+                                      ? 'bg-green-500' 
+                                      : onb.completion_percentage >= 50 
+                                        ? 'bg-yellow-500' 
+                                        : 'bg-red-500'
+                                  }`}
+                                  style={{ width: `${onb.completion_percentage || 0}%` }}
+                                />
+                              </div>
+                              <span className="text-sm font-medium">{onb.completion_percentage || 0}%</span>
+                            </div>
+                          </TableCell>
+                          <TableCell className="text-center">
+                            {onb.company_info_completed ? (
+                              <CheckCircle2 className="h-4 w-4 text-green-600 mx-auto" />
+                            ) : (
+                              <Circle className="h-4 w-4 text-muted-foreground mx-auto" />
+                            )}
+                          </TableCell>
+                          <TableCell className="text-center">
+                            {onb.first_product_added ? (
+                              <CheckCircle2 className="h-4 w-4 text-green-600 mx-auto" />
+                            ) : (
+                              <Circle className="h-4 w-4 text-muted-foreground mx-auto" />
+                            )}
+                          </TableCell>
+                          <TableCell className="text-center">
+                            {onb.first_customer_added ? (
+                              <CheckCircle2 className="h-4 w-4 text-green-600 mx-auto" />
+                            ) : (
+                              <Circle className="h-4 w-4 text-muted-foreground mx-auto" />
+                            )}
+                          </TableCell>
+                          <TableCell className="text-center">
+                            {onb.first_sale_completed ? (
+                              <CheckCircle2 className="h-4 w-4 text-green-600 mx-auto" />
+                            ) : (
+                              <Circle className="h-4 w-4 text-muted-foreground mx-auto" />
+                            )}
+                          </TableCell>
+                          <TableCell className="text-center">
+                            {onb.payment_method_configured ? (
+                              <CheckCircle2 className="h-4 w-4 text-green-600 mx-auto" />
+                            ) : (
+                              <Circle className="h-4 w-4 text-muted-foreground mx-auto" />
+                            )}
+                          </TableCell>
+                          <TableCell className="text-center">
+                            {onb.team_members_invited ? (
+                              <CheckCircle2 className="h-4 w-4 text-green-600 mx-auto" />
+                            ) : (
+                              <Circle className="h-4 w-4 text-muted-foreground mx-auto" />
+                            )}
+                          </TableCell>
+                          <TableCell className="text-center">
+                            {onb.afip_configured ? (
+                              <CheckCircle2 className="h-4 w-4 text-green-600 mx-auto" />
+                            ) : (
+                              <Circle className="h-4 w-4 text-muted-foreground mx-auto" />
+                            )}
+                          </TableCell>
+                          <TableCell className="text-sm text-muted-foreground">
+                            {onb.last_activity_at 
+                              ? new Date(onb.last_activity_at).toLocaleDateString()
+                              : 'Sin actividad'}
+                          </TableCell>
+                        </TableRow>
+                      ))
+                    ) : (
+                      <TableRow>
+                        <TableCell colSpan={10} className="text-center text-muted-foreground">
+                          No hay datos de onboarding disponibles
+                        </TableCell>
+                      </TableRow>
+                    )}
+                  </TableBody>
+                </Table>
+              </CardContent>
+            </Card>
+          </TabsContent>
+          </div>
         </Tabs>
       </div>
+
+      {/* Dialog para gestionar módulos de empresa */}
+      <Dialog open={modulesDialogOpen} onOpenChange={setModulesDialogOpen}>
+        <DialogContent className="max-w-4xl max-h-[80vh] overflow-y-auto">
+          <DialogHeader>
+            <DialogTitle>
+              Gestionar Módulos - {selectedCompanyForModules?.name}
+            </DialogTitle>
+            <DialogDescription>
+              Activa o desactiva los módulos disponibles para esta empresa
+            </DialogDescription>
+          </DialogHeader>
+          
+          {selectedCompanyForModules && (
+            <CompanyModuleSelector 
+              companyId={selectedCompanyForModules.id} 
+              onModulesChange={() => {
+                // Refrescar datos de empresas si es necesario
+                queryClient.invalidateQueries({ queryKey: ['platform-companies'] });
+              }}
+            />
+          )}
+          
+          <DialogFooter>
+            <Button onClick={() => setModulesDialogOpen(false)}>
+              Cerrar
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      {/* Dialog para gestionar precios personalizados */}
+      <Dialog open={customPricingDialogOpen} onOpenChange={setCustomPricingDialogOpen}>
+        <DialogContent className="max-w-6xl max-h-[90vh] overflow-y-auto">
+          <DialogHeader>
+            <DialogTitle>
+              Precios Personalizados - {selectedCompanyForPricing?.name}
+            </DialogTitle>
+            <DialogDescription>
+              Configura precios especiales para módulos específicos de esta empresa
+            </DialogDescription>
+          </DialogHeader>
+          
+          {selectedCompanyForPricing && (
+            <CustomPricingManager 
+              companyId={selectedCompanyForPricing.id}
+              companyName={selectedCompanyForPricing.name}
+            />
+          )}
+          
+          <DialogFooter>
+            <Button onClick={() => setCustomPricingDialogOpen(false)}>
+              Cerrar
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
     </div>
   );
 }

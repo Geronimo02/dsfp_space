@@ -17,10 +17,10 @@ import { supabase } from "@/integrations/supabase/client";
 import { toast } from "sonner";
 import { z } from "zod";
 import { format } from "date-fns";
+import { useCompany } from "@/contexts/CompanyContext";
 
 import { CompanySettings } from "@/components/settings/CompanySettings";
 import { PriceListsSettings } from "@/components/settings/PriceListsSettings";
-import { useCompany } from "@/contexts/CompanyContext";
 
 const settingsSchema = z.object({
   company_name: z.string().trim().min(1, "El nombre de la empresa es requerido").max(200, "El nombre debe tener máximo 200 caracteres"),
@@ -45,46 +45,7 @@ const settingsSchema = z.object({
   low_stock_alert: z.boolean(),
 });
 
-function StripePaymentSetup({ clientSecret, onSaved }: { clientSecret: string; onSaved: () => void }) {
-  const stripe = useStripe();
-  const elements = useElements();
-  const [saving, setSaving] = useState(false);
-
-  const handleSubmit = async () => {
-    if (!stripe || !elements) return;
-    setSaving(true);
-    try {
-      const { setupIntent, error } = await stripe.confirmSetup({
-        elements,
-        confirmParams: {
-          return_url: window.location.href,
-        },
-        redirect: "if_required",
-      });
-      if (error) throw error;
-      const pmId = (setupIntent?.payment_method as string) || "";
-      const { error: saveErr } = await supabase.functions.invoke("save-stripe-payment-method", { body: { payment_method_id: pmId } });
-      if (saveErr) throw saveErr;
-      toast.success("Método guardado");
-      onSaved();
-    } catch (e: any) {
-      console.error(e);
-      toast.error("Error al guardar tarjeta: " + (e?.message ?? e));
-    } finally {
-      setSaving(false);
-    }
-  };
-
-  return (
-    <div className="space-y-4">
-      <PaymentElement />
-      <Button onClick={handleSubmit} disabled={saving || !stripe || !elements}>
-        {saving ? "Guardando..." : "Guardar tarjeta"}
-      </Button>
-    </div>
-  );
-}
-
+// Settings page with mobile responsive design
 export default function Settings() {
   const queryClient = useQueryClient();
   const { currentCompany } = useCompany();
@@ -195,52 +156,60 @@ export default function Settings() {
   };
 
   const { data: settings, isLoading } = useQuery({
-    queryKey: ["company-settings"],
+    queryKey: ["company-settings", currentCompany?.id],
     queryFn: async () => {
+      if (!currentCompany?.id) return null;
+      
       const { data, error } = await supabase
         .from("companies")
         .select("*")
+        .eq("id", currentCompany.id)
         .single();
       
       if (error) throw error;
       
-      // Update form with loaded data
+      return data;
+    },
+    enabled: !!currentCompany?.id,
+  });
+
+  // Update form when settings load
+  useEffect(() => {
+    if (settings) {
       setFormData({
-        company_name: data.name || "",
-        tax_id: data.tax_id || "",
-        address: data.address || "",
-        phone: data.phone || "",
-        email: data.email || "",
-        default_tax_rate: data.default_tax_rate?.toString() || "",
-        card_surcharge_rate: data.card_surcharge_rate?.toString() || "",
-        currency: data.currency || "USD",
-        receipt_footer: data.receipt_footer || "",
-        receipt_format: data.receipt_format || "thermal",
-        receipt_printer_name: data.receipt_printer_name || "",
-        whatsapp_number: data.whatsapp_number || "",
-        whatsapp_enabled: data.whatsapp_enabled || false,
-        low_stock_alert: data.low_stock_alert !== false,
-        loyalty_enabled: data.loyalty_enabled || false,
-        loyalty_points_per_currency: data.loyalty_points_per_currency?.toString() || "1",
-        loyalty_currency_per_point: data.loyalty_currency_per_point?.toString() || "0.01",
-        loyalty_bronze_threshold: data.loyalty_bronze_threshold?.toString() || "0",
-        loyalty_silver_threshold: data.loyalty_silver_threshold?.toString() || "10000",
-        loyalty_gold_threshold: data.loyalty_gold_threshold?.toString() || "50000",
-        loyalty_bronze_discount: data.loyalty_bronze_discount?.toString() || "0",
-        loyalty_silver_discount: data.loyalty_silver_discount?.toString() || "5",
-        loyalty_gold_discount: data.loyalty_gold_discount?.toString() || "10",
+        company_name: settings.name || "",
+        tax_id: settings.tax_id || "",
+        address: settings.address || "",
+        phone: settings.phone || "",
+        email: settings.email || "",
+        default_tax_rate: settings.default_tax_rate?.toString() || "",
+        card_surcharge_rate: settings.card_surcharge_rate?.toString() || "",
+        currency: settings.currency || "USD",
+        receipt_footer: settings.receipt_footer || "",
+        receipt_format: settings.receipt_format || "thermal",
+        receipt_printer_name: settings.receipt_printer_name || "",
+        whatsapp_number: settings.whatsapp_number || "",
+        whatsapp_enabled: settings.whatsapp_enabled || false,
+        low_stock_alert: settings.low_stock_alert !== false,
+        loyalty_enabled: settings.loyalty_enabled || false,
+        loyalty_points_per_currency: settings.loyalty_points_per_currency?.toString() || "1",
+        loyalty_currency_per_point: settings.loyalty_currency_per_point?.toString() || "0.01",
+        loyalty_bronze_threshold: settings.loyalty_bronze_threshold?.toString() || "0",
+        loyalty_silver_threshold: settings.loyalty_silver_threshold?.toString() || "10000",
+        loyalty_gold_threshold: settings.loyalty_gold_threshold?.toString() || "50000",
+        loyalty_bronze_discount: settings.loyalty_bronze_discount?.toString() || "0",
+        loyalty_silver_discount: settings.loyalty_silver_discount?.toString() || "5",
+        loyalty_gold_discount: settings.loyalty_gold_discount?.toString() || "10",
         current_password: "",
         new_password: "",
         confirm_password: "",
       });
-      
-      return data;
-    },
-  });
+    }
+  }, [settings]);
 
   const updateSettingsMutation = useMutation({
     mutationFn: async (data: any) => {
-      if (!settings?.id) throw new Error("No settings found");
+      if (!currentCompany?.id) throw new Error("No company selected");
       
       const { error } = await supabase
         .from("companies")
@@ -269,16 +238,39 @@ export default function Settings() {
           loyalty_silver_discount: parseFloat(data.loyalty_silver_discount) || 5,
           loyalty_gold_discount: parseFloat(data.loyalty_gold_discount) || 10,
         })
-        .eq("id", settings.id);
+        .eq("id", currentCompany.id);
       
       if (error) throw error;
     },
     onSuccess: () => {
       toast.success("Configuración actualizada exitosamente");
-      queryClient.invalidateQueries({ queryKey: ["company-settings"] });
+      queryClient.invalidateQueries({ queryKey: ["company-settings", currentCompany?.id] });
     },
     onError: (error: any) => {
       toast.error(error.message || "Error al actualizar configuración");
+    },
+  });
+
+  const changePasswordMutation = useMutation({
+    mutationFn: async ({ currentPassword, newPassword }: { currentPassword: string; newPassword: string }) => {
+      const { data: { user } } = await supabase.auth.getUser();
+      if (!user?.email) throw new Error("No se pudo obtener el email del usuario");
+
+      const { error: signInError } = await supabase.auth.signInWithPassword({
+        email: user.email,
+        password: currentPassword,
+      });
+      if (signInError) throw signInError;
+
+      const { error: updateError } = await supabase.auth.updateUser({ password: newPassword });
+      if (updateError) throw updateError;
+    },
+    onSuccess: () => {
+      toast.success("Contraseña actualizada");
+      setFormData((prev) => ({ ...prev, current_password: "", new_password: "", confirm_password: "" }));
+    },
+    onError: (error: any) => {
+      toast.error(error?.message || "Error al actualizar la contraseña");
     },
   });
 
@@ -696,13 +688,14 @@ export default function Settings() {
 
   return (
     <Layout>
-      <div className="space-y-6">
+      <div className="space-y-4 md:space-y-6">
         <div>
-          <h1 className="text-3xl font-bold text-foreground">Configuración del Sistema</h1>
-          <p className="text-muted-foreground">Administra todos los ajustes globales del sistema</p>
+          <h1 className="text-2xl md:text-3xl font-bold text-foreground">Configuración del Sistema</h1>
+          <p className="text-sm text-muted-foreground">Administra todos los ajustes globales del sistema</p>
         </div>
 
         <Tabs defaultValue="company" className="w-full">
+<<<<<<< HEAD
           <TabsList className="grid w-full grid-cols-7">
             <TabsTrigger value="company">Empresa</TabsTrigger>
             <TabsTrigger value="price-lists">Listas de Precios</TabsTrigger>
@@ -712,6 +705,16 @@ export default function Settings() {
             <TabsTrigger value="integrations">Integraciones</TabsTrigger>
             <TabsTrigger value="subscription">Suscripción</TabsTrigger>
           </TabsList>
+=======
+          <div className="overflow-x-auto -mx-4 px-4">
+            <TabsList className="inline-flex w-auto min-w-full md:grid md:w-full md:grid-cols-4">
+              <TabsTrigger value="company" className="text-xs sm:text-sm">Empresa</TabsTrigger>
+              <TabsTrigger value="price-lists" className="text-xs sm:text-sm">Precios</TabsTrigger>
+              <TabsTrigger value="ticket-design" className="text-xs sm:text-sm">Tickets</TabsTrigger>
+              <TabsTrigger value="security" className="text-xs sm:text-sm">Seguridad</TabsTrigger>
+            </TabsList>
+          </div>
+>>>>>>> origin/main
 
           {/* Company */}
           <TabsContent value="company">
@@ -736,353 +739,8 @@ export default function Settings() {
             </Card>
           </TabsContent>
 
-          {/* General */}
-          <TabsContent value="general" className="space-y-6">
-            <Card className="shadow-soft">
-              <CardHeader>
-                <CardTitle className="flex items-center gap-2">
-                  <Building2 className="h-5 w-5 text-primary" />
-                  Datos de la Empresa
-                </CardTitle>
-                <CardDescription>
-                  Información que aparecerá en tickets y facturas
-                </CardDescription>
-              </CardHeader>
-              <CardContent>
-                <form onSubmit={handleSubmit} className="space-y-4">
-                  <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                    <div className="space-y-2">
-                      <Label htmlFor="company_name">Nombre de la Empresa *</Label>
-                      <Input
-                        id="company_name"
-                        value={formData.company_name}
-                        onChange={(e) => setFormData({ ...formData, company_name: e.target.value })}
-                        required
-                      />
-                    </div>
-                    
-                    <div className="space-y-2">
-                      <Label htmlFor="tax_id">RUC / Tax ID</Label>
-                      <Input
-                        id="tax_id"
-                        value={formData.tax_id}
-                        onChange={(e) => setFormData({ ...formData, tax_id: e.target.value })}
-                      />
-                    </div>
+          {/* General - eliminado (duplicaba configuración de Empresa) */}
 
-                    <div className="space-y-2">
-                      <Label htmlFor="phone">Teléfono</Label>
-                      <Input
-                        id="phone"
-                        value={formData.phone}
-                        onChange={(e) => setFormData({ ...formData, phone: e.target.value })}
-                      />
-                    </div>
-
-                    <div className="space-y-2">
-                      <Label htmlFor="email">Email</Label>
-                      <Input
-                        id="email"
-                        type="email"
-                        value={formData.email}
-                        onChange={(e) => setFormData({ ...formData, email: e.target.value })}
-                      />
-                    </div>
-
-                    <div className="space-y-2 md:col-span-2">
-                      <Label htmlFor="address">Dirección</Label>
-                      <Input
-                        id="address"
-                        value={formData.address}
-                        onChange={(e) => setFormData({ ...formData, address: e.target.value })}
-                      />
-                    </div>
-                  </div>
-
-                  <div className="flex justify-end pt-4">
-                    <Button type="submit" disabled={updateSettingsMutation.isPending}>
-                      {updateSettingsMutation.isPending ? "Guardando..." : "Guardar Cambios"}
-                    </Button>
-                  </div>
-                </form>
-              </CardContent>
-            </Card>
-
-            {/* Finanzas */}
-            <Card className="shadow-soft">
-              <CardHeader>
-                <CardTitle className="flex items-center gap-2">
-                  <DollarSign className="h-5 w-5 text-primary" />
-                  Configuración Financiera
-                </CardTitle>
-                <CardDescription>
-                  Ajustes de impuestos y moneda
-                </CardDescription>
-              </CardHeader>
-              <CardContent>
-                <form onSubmit={handleSubmit} className="space-y-4">
-                  <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                    <div className="space-y-2">
-                      <Label htmlFor="default_tax_rate">Impuesto por Defecto (%)</Label>
-                      <Input
-                        id="default_tax_rate"
-                        type="number"
-                        step="0.01"
-                        value={formData.default_tax_rate}
-                        onChange={(e) => setFormData({ ...formData, default_tax_rate: e.target.value })}
-                      />
-                      <p className="text-xs text-muted-foreground">
-                        IVA o impuesto aplicado automáticamente a productos
-                      </p>
-                    </div>
-
-                    <div className="space-y-2">
-                      <Label htmlFor="card_surcharge_rate">Recargo Tarjeta de Crédito (%)</Label>
-                      <Input
-                        id="card_surcharge_rate"
-                        type="number"
-                        step="0.01"
-                        value={formData.card_surcharge_rate}
-                        onChange={(e) => setFormData({ ...formData, card_surcharge_rate: e.target.value })}
-                      />
-                      <p className="text-xs text-muted-foreground">
-                        Se aplicará automáticamente al pagar con tarjeta
-                      </p>
-                    </div>
-
-                    <div className="space-y-2 md:col-span-2">
-                      <Label htmlFor="currency">Moneda (Código ISO)</Label>
-                      <Input
-                        id="currency"
-                        value={formData.currency}
-                        onChange={(e) => setFormData({ ...formData, currency: e.target.value.toUpperCase() })}
-                        placeholder="USD, EUR, PEN, ARS, etc."
-                        maxLength={3}
-                      />
-                      <p className="text-xs text-muted-foreground">
-                        Código de 3 letras según ISO 4217 (ej: USD, EUR, ARS, PEN)
-                      </p>
-                    </div>
-                  </div>
-
-                  <div className="flex justify-end pt-4">
-                    <Button type="submit" disabled={updateSettingsMutation.isPending}>
-                      {updateSettingsMutation.isPending ? "Guardando..." : "Guardar Cambios"}
-                    </Button>
-                  </div>
-                </form>
-              </CardContent>
-            </Card>
-
-            {/* Programa de Fidelización */}
-            <Card className="shadow-soft">
-              <CardHeader>
-                <CardTitle className="flex items-center gap-2">
-                  <Users className="h-5 w-5 text-primary" />
-                  Programa de Fidelización
-                </CardTitle>
-                <CardDescription>
-                  Configura el sistema de puntos y recompensas para tus clientes
-                </CardDescription>
-              </CardHeader>
-              <CardContent>
-                <form onSubmit={handleSubmit} className="space-y-4">
-                  <div className="flex items-center justify-between rounded-lg border p-4">
-                    <div className="space-y-0.5">
-                      <Label htmlFor="loyalty_enabled">Activar Programa de Fidelización</Label>
-                      <p className="text-sm text-muted-foreground">
-                        Los clientes acumularán puntos por cada compra
-                      </p>
-                    </div>
-                    <Switch
-                      id="loyalty_enabled"
-                      checked={formData.loyalty_enabled}
-                      onCheckedChange={(checked) => setFormData({ ...formData, loyalty_enabled: checked })}
-                    />
-                  </div>
-
-                  {formData.loyalty_enabled && (
-                    <>
-                      <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                        <div className="space-y-2">
-                          <Label htmlFor="loyalty_points_per_currency">Puntos por Unidad de Moneda</Label>
-                          <Input
-                            id="loyalty_points_per_currency"
-                            type="number"
-                            step="0.01"
-                            value={formData.loyalty_points_per_currency}
-                            onChange={(e) => setFormData({ ...formData, loyalty_points_per_currency: e.target.value })}
-                          />
-                          <p className="text-xs text-muted-foreground">
-                            Ej: Si es 1, por cada $1 gastado se otorga 1 punto
-                          </p>
-                        </div>
-
-                        <div className="space-y-2">
-                          <Label htmlFor="loyalty_currency_per_point">Valor de Cada Punto</Label>
-                          <Input
-                            id="loyalty_currency_per_point"
-                            type="number"
-                            step="0.01"
-                            value={formData.loyalty_currency_per_point}
-                            onChange={(e) => setFormData({ ...formData, loyalty_currency_per_point: e.target.value })}
-                          />
-                          <p className="text-xs text-muted-foreground">
-                            Ej: Si es 0.01, cada punto vale $0.01 en descuentos
-                          </p>
-                        </div>
-                      </div>
-
-                      <div className="space-y-4 pt-4">
-                        <h3 className="font-semibold">Niveles de Fidelización</h3>
-                        
-                        <div className="grid grid-cols-3 gap-4">
-                          <div className="space-y-2">
-                            <Label className="flex items-center gap-2">
-                              🥉 Nivel Bronze
-                            </Label>
-                            <div className="space-y-2">
-                              <Input
-                                type="number"
-                                step="0.01"
-                                placeholder="Monto mínimo"
-                                value={formData.loyalty_bronze_threshold}
-                                onChange={(e) => setFormData({ ...formData, loyalty_bronze_threshold: e.target.value })}
-                              />
-                              <Input
-                                type="number"
-                                step="0.01"
-                                placeholder="% Descuento"
-                                value={formData.loyalty_bronze_discount}
-                                onChange={(e) => setFormData({ ...formData, loyalty_bronze_discount: e.target.value })}
-                              />
-                            </div>
-                          </div>
-
-                          <div className="space-y-2">
-                            <Label className="flex items-center gap-2">
-                              🥈 Nivel Silver
-                            </Label>
-                            <div className="space-y-2">
-                              <Input
-                                type="number"
-                                step="0.01"
-                                placeholder="Monto mínimo"
-                                value={formData.loyalty_silver_threshold}
-                                onChange={(e) => setFormData({ ...formData, loyalty_silver_threshold: e.target.value })}
-                              />
-                              <Input
-                                type="number"
-                                step="0.01"
-                                placeholder="% Descuento"
-                                value={formData.loyalty_silver_discount}
-                                onChange={(e) => setFormData({ ...formData, loyalty_silver_discount: e.target.value })}
-                              />
-                            </div>
-                          </div>
-
-                          <div className="space-y-2">
-                            <Label className="flex items-center gap-2">
-                              🏆 Nivel Gold
-                            </Label>
-                            <div className="space-y-2">
-                              <Input
-                                type="number"
-                                step="0.01"
-                                placeholder="Monto mínimo"
-                                value={formData.loyalty_gold_threshold}
-                                onChange={(e) => setFormData({ ...formData, loyalty_gold_threshold: e.target.value })}
-                              />
-                              <Input
-                                type="number"
-                                step="0.01"
-                                placeholder="% Descuento"
-                                value={formData.loyalty_gold_discount}
-                                onChange={(e) => setFormData({ ...formData, loyalty_gold_discount: e.target.value })}
-                              />
-                            </div>
-                          </div>
-                        </div>
-                      </div>
-                    </>
-                  )}
-
-                  <div className="flex justify-end pt-4">
-                    <Button type="submit" disabled={updateSettingsMutation.isPending}>
-                      {updateSettingsMutation.isPending ? "Guardando..." : "Guardar Cambios"}
-                    </Button>
-                  </div>
-                </form>
-              </CardContent>
-            </Card>
-
-            {/* Tickets */}
-            <Card className="shadow-soft">
-              <CardHeader>
-                <CardTitle className="flex items-center gap-2">
-                  <Receipt className="h-5 w-5 text-primary" />
-                  Configuración de Tickets
-                </CardTitle>
-                <CardDescription>
-                  Personaliza la apariencia de tus tickets de venta
-                </CardDescription>
-              </CardHeader>
-              <CardContent>
-                <form onSubmit={handleSubmit} className="space-y-4">
-                  <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                    <div className="space-y-2">
-                      <Label htmlFor="receipt_format">Formato de Ticket</Label>
-                      <Select 
-                        value={formData.receipt_format} 
-                        onValueChange={(value) => setFormData({ ...formData, receipt_format: value })}
-                      >
-                        <SelectTrigger id="receipt_format">
-                          <SelectValue />
-                        </SelectTrigger>
-                        <SelectContent>
-                          <SelectItem value="thermal">Térmico (58mm/80mm)</SelectItem>
-                          <SelectItem value="a4">A4 (Hoja completa)</SelectItem>
-                        </SelectContent>
-                      </Select>
-                    </div>
-
-                    <div className="space-y-2">
-                      <Label htmlFor="receipt_printer_name">Nombre de Impresora</Label>
-                      <Input
-                        id="receipt_printer_name"
-                        value={formData.receipt_printer_name}
-                        onChange={(e) => setFormData({ ...formData, receipt_printer_name: e.target.value })}
-                        placeholder="Ej: EPSON TM-T20"
-                      />
-                      <p className="text-xs text-muted-foreground">
-                        Nombre exacto de la impresora configurada en el sistema
-                      </p>
-                    </div>
-                  </div>
-
-                  <div className="space-y-2">
-                    <Label htmlFor="receipt_footer">Mensaje en el Ticket</Label>
-                    <Textarea
-                      id="receipt_footer"
-                      value={formData.receipt_footer}
-                      onChange={(e) => setFormData({ ...formData, receipt_footer: e.target.value })}
-                      placeholder="Ej: ¡Gracias por su compra! Vuelva pronto."
-                      rows={4}
-                    />
-                    <p className="text-xs text-muted-foreground">
-                      Este mensaje aparecerá al final de cada ticket impreso
-                    </p>
-                  </div>
-
-                  <div className="flex justify-end pt-4">
-                    <Button type="submit" disabled={updateSettingsMutation.isPending}>
-                      {updateSettingsMutation.isPending ? "Guardando..." : "Guardar Cambios"}
-                    </Button>
-                  </div>
-                </form>
-              </CardContent>
-            </Card>
-          </TabsContent>
 
           {/* Diseño de Tickets */}
           <TabsContent value="ticket-design" className="space-y-6">
@@ -1495,7 +1153,27 @@ export default function Settings() {
                 </CardDescription>
               </CardHeader>
               <CardContent>
-                <form onSubmit={handleSubmit} className="space-y-4">
+                <form
+                  onSubmit={(e) => {
+                    e.preventDefault();
+
+                    if (!formData.current_password || !formData.new_password) {
+                      toast.error("Completá tu contraseña actual y la nueva contraseña");
+                      return;
+                    }
+
+                    if (formData.new_password !== formData.confirm_password) {
+                      toast.error("La confirmación no coincide");
+                      return;
+                    }
+
+                    changePasswordMutation.mutate({
+                      currentPassword: formData.current_password,
+                      newPassword: formData.new_password,
+                    });
+                  }}
+                  className="space-y-4"
+                >
                   <div className="space-y-2">
                     <Label htmlFor="current_password">Contraseña Actual</Label>
                     <Input
@@ -1532,8 +1210,8 @@ export default function Settings() {
                   </div>
 
                   <div className="flex justify-end pt-4">
-                    <Button type="submit" disabled={updateSettingsMutation.isPending}>
-                      {updateSettingsMutation.isPending ? "Guardando..." : "Guardar Cambios"}
+                    <Button type="submit" disabled={changePasswordMutation.isPending}>
+                      {changePasswordMutation.isPending ? "Guardando..." : "Cambiar Contraseña"}
                     </Button>
                   </div>
                 </form>
@@ -1541,59 +1219,12 @@ export default function Settings() {
             </Card>
           </TabsContent>
 
-          {/* Integraciones */}
-          <TabsContent value="integrations" className="space-y-6">
-            <Card className="shadow-soft">
-              <CardHeader>
-                <CardTitle className="flex items-center gap-2">
-                  <MessageSquare className="h-5 w-5 text-primary" />
-                  Integración WhatsApp Business
-                </CardTitle>
-                <CardDescription>
-                  Envía tickets y notificaciones por WhatsApp
-                </CardDescription>
-              </CardHeader>
-              <CardContent>
-                <form onSubmit={handleSubmit} className="space-y-4">
-                  <div className="flex items-center justify-between rounded-lg border p-4">
-                    <div className="space-y-0.5">
-                      <Label htmlFor="whatsapp_enabled" className="text-base font-medium">
-                        Activar WhatsApp
-                      </Label>
-                      <p className="text-sm text-muted-foreground">
-                        Habilita el envío de mensajes por WhatsApp
-                      </p>
-                    </div>
-                    <Switch
-                      id="whatsapp_enabled"
-                      checked={formData.whatsapp_enabled}
-                      onCheckedChange={(checked) => setFormData({ ...formData, whatsapp_enabled: checked })}
-                    />
-                  </div>
+          {/* Integraciones - eliminado (duplicaba configuración de Empresa) */}
 
-                  <div className="space-y-2">
-                    <Label htmlFor="whatsapp_number">Número de WhatsApp Business</Label>
-                    <Input
-                      id="whatsapp_number"
-                      value={formData.whatsapp_number}
-                      onChange={(e) => setFormData({ ...formData, whatsapp_number: e.target.value })}
-                      placeholder="+1234567890"
-                    />
-                    <p className="text-xs text-muted-foreground">
-                      Incluye el código de país (ej: +54 para Argentina, +51 para Perú)
-                    </p>
-                  </div>
 
-                  <div className="rounded-lg border p-4 space-y-2 bg-muted/50">
-                    <h4 className="font-semibold text-sm">Próximamente</h4>
-                    <ul className="text-sm text-muted-foreground space-y-1 list-disc list-inside">
-                      <li>Envío automático de tickets de venta</li>
-                      <li>Notificaciones de servicios técnicos</li>
-                      <li>Recordatorios de pagos pendientes</li>
-                      <li>Confirmaciones de compra</li>
-                    </ul>
-                  </div>
+          {/* Sistema - eliminado (sección no utilizada) */}
 
+<<<<<<< HEAD
                   <div className="flex justify-end pt-4">
                     <Button type="submit" disabled={updateSettingsMutation.isPending}>
                       {updateSettingsMutation.isPending ? "Guardando..." : "Guardar Cambios"}
@@ -1731,6 +1362,8 @@ export default function Settings() {
               </div>
             </div>
           </TabsContent>
+=======
+>>>>>>> origin/main
         </Tabs>
       </div>
     </Layout>

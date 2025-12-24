@@ -127,19 +127,21 @@ export default function Retentions() {
 
   return (
     <Layout>
-      <div className="space-y-6">
-        <div className="flex items-center justify-between">
+      <div className="space-y-4 md:space-y-6">
+        <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3">
           <div>
-            <h1 className="text-3xl font-bold">Retenciones</h1>
-            <p className="text-muted-foreground">
+            <h1 className="text-2xl md:text-3xl font-bold">Retenciones</h1>
+            <p className="text-sm md:text-base text-muted-foreground">
               Gestión de retenciones fiscales
             </p>
           </div>
 
-          <div className="flex gap-2">
-            <Button variant="outline">
-              <Download className="h-4 w-4 mr-2" />
-              Exportar AFIP
+          <div className="flex flex-wrap gap-2">
+            <Button variant="outline" disabled className="opacity-60 text-xs sm:text-sm" size="sm">
+              <Download className="h-4 w-4 mr-1 sm:mr-2" />
+              <span className="hidden sm:inline">Exportar AFIP</span>
+              <span className="sm:hidden">AFIP</span>
+              <Badge variant="secondary" className="ml-1 sm:ml-2 text-xs hidden sm:inline">Próximamente</Badge>
             </Button>
 
             <Dialog open={isDialogOpen} onOpenChange={setIsDialogOpen}>
@@ -275,7 +277,7 @@ export default function Retentions() {
           </div>
         </div>
 
-        <div className="grid gap-4 md:grid-cols-4">
+        <div className="grid grid-cols-2 md:grid-cols-4 gap-3 md:gap-4">
           <div className="p-6 bg-card rounded-lg border">
             <div className="flex items-center gap-2 mb-2">
               <FileText className="h-5 w-5 text-primary" />
@@ -299,17 +301,17 @@ export default function Retentions() {
           ))}
         </div>
 
-        <div className="border rounded-lg">
+        <div className="border rounded-lg overflow-x-auto">
           <Table>
             <TableHeader>
               <TableRow>
-                <TableHead>Fecha</TableHead>
-                <TableHead>Tipo</TableHead>
-                <TableHead>Certificado</TableHead>
-                <TableHead>Jurisdicción</TableHead>
-                <TableHead className="text-right">Monto</TableHead>
-                <TableHead className="text-right">Porcentaje</TableHead>
-                <TableHead>Descripción</TableHead>
+                <TableHead className="min-w-[90px]">Fecha</TableHead>
+                <TableHead className="min-w-[100px]">Tipo</TableHead>
+                <TableHead className="hidden sm:table-cell">Certificado</TableHead>
+                <TableHead className="hidden md:table-cell">Jurisdicción</TableHead>
+                <TableHead className="text-right min-w-[80px]">Monto</TableHead>
+                <TableHead className="text-right hidden sm:table-cell">%</TableHead>
+                <TableHead className="hidden lg:table-cell">Descripción</TableHead>
               </TableRow>
             </TableHeader>
             <TableBody>
