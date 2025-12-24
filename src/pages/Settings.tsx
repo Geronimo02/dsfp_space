@@ -695,17 +695,6 @@ export default function Settings() {
         </div>
 
         <Tabs defaultValue="company" className="w-full">
-<<<<<<< HEAD
-          <TabsList className="grid w-full grid-cols-7">
-            <TabsTrigger value="company">Empresa</TabsTrigger>
-            <TabsTrigger value="price-lists">Listas de Precios</TabsTrigger>
-            <TabsTrigger value="general">General</TabsTrigger>
-            <TabsTrigger value="ticket-design">Diseño de Tickets</TabsTrigger>
-            <TabsTrigger value="security">Seguridad</TabsTrigger>
-            <TabsTrigger value="integrations">Integraciones</TabsTrigger>
-            <TabsTrigger value="subscription">Suscripción</TabsTrigger>
-          </TabsList>
-=======
           <div className="overflow-x-auto -mx-4 px-4">
             <TabsList className="inline-flex w-auto min-w-full md:grid md:w-full md:grid-cols-4">
               <TabsTrigger value="company" className="text-xs sm:text-sm">Empresa</TabsTrigger>
@@ -714,7 +703,6 @@ export default function Settings() {
               <TabsTrigger value="security" className="text-xs sm:text-sm">Seguridad</TabsTrigger>
             </TabsList>
           </div>
->>>>>>> origin/main
 
           {/* Company */}
           <TabsContent value="company">
@@ -1223,147 +1211,6 @@ export default function Settings() {
 
 
           {/* Sistema - eliminado (sección no utilizada) */}
-
-<<<<<<< HEAD
-                  <div className="flex justify-end pt-4">
-                    <Button type="submit" disabled={updateSettingsMutation.isPending}>
-                      {updateSettingsMutation.isPending ? "Guardando..." : "Guardar Cambios"}
-                    </Button>
-                  </div>
-                </form>
-              </CardContent>
-            </Card>
-          </TabsContent>
-
-          {/* Sistema */}
-          <TabsContent value="system" className="space-y-6">
-            <Card className="shadow-soft">
-              <CardHeader>
-                <CardTitle className="flex items-center gap-2">
-                  <Database className="h-5 w-5 text-primary" />
-                  Información y Backup
-                </CardTitle>
-                <CardDescription>
-                  Estado del sistema y respaldos de base de datos
-                </CardDescription>
-              </CardHeader>
-              <CardContent>
-                <div className="space-y-4">
-                  <div className="border rounded-lg p-4 space-y-2">
-                    <h4 className="font-semibold flex items-center gap-2">
-                      <Database className="h-4 w-4" />
-                      Estado de Backup
-                    </h4>
-                    <div className="text-sm space-y-1">
-                      <p className="text-muted-foreground">
-                        {settings?.last_backup_date 
-                          ? `Último backup: ${new Date(settings.last_backup_date).toLocaleString('es')}`
-                          : "Sin backup realizado"}
-                      </p>
-                      <p className="text-muted-foreground">
-                        Estado: {settings?.backup_enabled ? "✓ Activado" : "✗ Desactivado"}
-                      </p>
-                    </div>
-                    <Button variant="outline" disabled>
-                      <Database className="mr-2 h-4 w-4" />
-                      Crear Backup Manual (Próximamente)
-                    </Button>
-                  </div>
-
-                  <div className="border rounded-lg p-4 space-y-2">
-                    <h4 className="font-semibold">Información del Sistema</h4>
-                    <div className="text-sm space-y-1">
-                      <p className="text-muted-foreground">Versión: 1.0.0</p>
-                      <p className="text-muted-foreground">Base de datos: Supabase (PostgreSQL)</p>
-                      <p className="text-muted-foreground">Framework: React + Vite</p>
-                    </div>
-                  </div>
-                </div>
-              </CardContent>
-            </Card>
-
-            <Card className="shadow-soft border-destructive/50">
-              <CardHeader>
-                <CardTitle className="flex items-center gap-2 text-destructive">
-                  <AlertTriangle className="h-5 w-5" />
-                  Zona de Peligro
-                </CardTitle>
-                <CardDescription>
-                  Acciones críticas que pueden afectar permanentemente tu sistema
-                </CardDescription>
-              </CardHeader>
-              <CardContent>
-                <div className="border border-destructive rounded-lg p-4 space-y-2 bg-destructive/5">
-                  <h4 className="font-semibold flex items-center gap-2">
-                    <Database className="h-4 w-4" />
-                    Reset de Base de Datos
-                  </h4>
-                  <p className="text-sm text-muted-foreground">
-                    Elimina TODOS los datos del sistema (ventas, productos, clientes, etc.)
-                  </p>
-                  <p className="text-sm font-semibold text-destructive">
-                    ⚠️ ADVERTENCIA: Esta acción es IRREVERSIBLE
-                  </p>
-                  <Button variant="destructive" disabled>
-                    <AlertTriangle className="mr-2 h-4 w-4" />
-                    Reset Completo (Deshabilitado)
-                  </Button>
-                  <p className="text-xs text-muted-foreground">
-                    Por seguridad, esta función requiere acceso directo a la base de datos en Supabase
-                  </p>
-                </div>
-              </CardContent>
-            </Card>
-          </TabsContent>
-
-          {/* Subscription */}
-          <TabsContent value="subscription">
-            <div className="space-y-6">
-              <div className="grid md:grid-cols-2 gap-6">
-                <Card className="shadow-soft">
-                  <CardHeader>
-                    <CardTitle className="flex items-center gap-2">
-                      <CreditCard className="h-5 w-5 text-primary" />
-                      Estado de Suscripción
-                    </CardTitle>
-                    <CardDescription>Plan y período de prueba</CardDescription>
-                  </CardHeader>
-                  <CardContent className="space-y-2">
-                    <p className="text-sm">Plan ID: {subscription?.plan_id ?? "-"}</p>
-                    <p className="text-sm">Provider: {subscription?.provider ?? "-"}</p>
-                    <p className="text-sm">Trial resta: {trialDaysLeft ?? "-"} días</p>
-                    <p className="text-sm">MP preapproval: {subscription?.mp_preapproval_id ? "Autorizado" : "No autorizado"}</p>
-                    <p className="text-sm">Stripe PM: {subscription?.stripe_payment_method_id ? `Guardado (${subscription.stripe_payment_method_id.substring(0, 16)}...)` : "No guardado"}</p>
-                  </CardContent>
-                </Card>
-
-                <Card className="shadow-soft">
-                  <CardHeader>
-                    <CardTitle className="flex items-center gap-2">
-                      <CreditCard className="h-5 w-5 text-primary" />
-                      Método de pago
-                    </CardTitle>
-                    <CardDescription>Guardar tarjeta para cobro automático al fin del trial</CardDescription>
-                  </CardHeader>
-                  <CardContent className="space-y-4">
-                    <div className="space-y-2">
-                      <Button variant="outline" onClick={setupMercadoPago}>Autorizar en Mercado Pago</Button>
-                    </div>
-                    <div className="space-y-2">
-                      <Button variant="outline" onClick={setupStripe}>Guardar tarjeta (Stripe)</Button>
-                    </div>
-                    {stripePromise && clientSecret && (
-                      <Elements stripe={stripePromise} options={{ clientSecret }}>
-                        <StripePaymentSetup clientSecret={clientSecret} onSaved={() => setClientSecret(null)} />
-                      </Elements>
-                    )}
-                  </CardContent>
-                </Card>
-              </div>
-            </div>
-          </TabsContent>
-=======
->>>>>>> origin/main
         </Tabs>
       </div>
     </Layout>

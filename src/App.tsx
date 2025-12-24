@@ -41,7 +41,6 @@ const BulkOperations = lazy(() => import("./pages/BulkOperations"));
 const Warehouses = lazy(() => import("./pages/Warehouses"));
 const WarehouseStock = lazy(() => import("./pages/WarehouseStock"));
 const WarehouseTransfers = lazy(() => import("./pages/WarehouseTransfers"));
-const CompanySetup = lazy(() => import("./pages/CompanySetup"));
 const ResetPassword = lazy(() => import("./pages/ResetPassword"));
 const SetPasswordToken = lazy(() => import("./pages/SetPasswordToken"));
 const POSPoints = lazy(() => import("./pages/POSPoints"));
@@ -232,64 +231,11 @@ const App = () => (
       <Sonner />
       <BrowserRouter>
         <CompanyProvider>
-<<<<<<< HEAD
-          <Routes>
-          <Route path="/signup" element={<SignupWizard />} />
-          <Route path="/signup/success" element={<SignupSuccess />} />
-          <Route path="/signup/cancel" element={<SignupCancel />} />
-          <Route path="/auth" element={<Auth />} />
-          <Route path="/reset-password" element={<ResetPassword />} />
-          <Route path="/company-setup" element={<Navigate to="/signup" replace />} />
-          <Route path="/" element={<ProtectedRoute><Dashboard /></ProtectedRoute>} />
-          <Route path="/pos" element={<ProtectedRoute><POS /></ProtectedRoute>} />
-          <Route path="/products" element={<ProtectedRoute><Products /></ProtectedRoute>} />
-          <Route path="/suppliers" element={<ProtectedRoute><Suppliers /></ProtectedRoute>} />
-          <Route path="/customers" element={<ProtectedRoute><Customers /></ProtectedRoute>} />
-          <Route path="/sales" element={<ProtectedRoute><Sales /></ProtectedRoute>} />
-          <Route path="/quotations" element={<ProtectedRoute><Quotations /></ProtectedRoute>} />
-          <Route path="/delivery-notes" element={<ProtectedRoute><DeliveryNotes /></ProtectedRoute>} />
-          <Route path="/customer-account" element={<ProtectedRoute><CustomerAccount /></ProtectedRoute>} />
-          <Route path="/promotions" element={<ProtectedRoute><Promotions /></ProtectedRoute>} />
-          <Route path="/returns" element={<ProtectedRoute><Returns /></ProtectedRoute>} />
-          <Route path="/reservations" element={<ProtectedRoute><Reservations /></ProtectedRoute>} />
-          <Route path="/technical-services" element={<ProtectedRoute><TechnicalServices /></ProtectedRoute>} />
-          <Route path="/employees" element={<ProtectedRoute><Employees /></ProtectedRoute>} />
-          <Route path="/cash-register" element={<ProtectedRoute><CashRegister /></ProtectedRoute>} />
-          <Route path="/purchases" element={<ProtectedRoute><Purchases /></ProtectedRoute>} />
-          <Route path="/reports" element={<ProtectedRoute><Reports /></ProtectedRoute>} />
-          <Route path="/audit-logs" element={<ProtectedRoute><AuditLogs /></ProtectedRoute>} />
-          <Route path="/access-logs" element={<ProtectedRoute><AccessLogs /></ProtectedRoute>} />
-          <Route path="/inventory-alerts" element={<ProtectedRoute><InventoryAlerts /></ProtectedRoute>} />
-          <Route path="/expenses" element={<ProtectedRoute><Expenses /></ProtectedRoute>} />
-          <Route path="/bulk-operations" element={<ProtectedRoute><BulkOperations /></ProtectedRoute>} />
-          <Route path="/warehouses" element={<ProtectedRoute><Warehouses /></ProtectedRoute>} />
-           <Route path="/warehouse-stock" element={<ProtectedRoute><WarehouseStock /></ProtectedRoute>} />
-           <Route path="/warehouse-transfers" element={<ProtectedRoute><WarehouseTransfers /></ProtectedRoute>} />
-           <Route path="/stock-reservations" element={<ProtectedRoute><StockReservations /></ProtectedRoute>} />
-           <Route path="/pos-points" element={<ProtectedRoute><POSPoints /></ProtectedRoute>} />
-           <Route path="/notification-settings" element={<ProtectedRoute><NotificationSettings /></ProtectedRoute>} />
-           <Route path="/checks" element={<ProtectedRoute><Checks /></ProtectedRoute>} />
-           <Route path="/monthly-closing" element={<ProtectedRoute><MonthlyClosing /></ProtectedRoute>} />
-           <Route path="/accountant-reports" element={<ProtectedRoute><AccountantReports /></ProtectedRoute>} />
-           <Route path="/commissions" element={<ProtectedRoute><Commissions /></ProtectedRoute>} />
-           <Route path="/bank-accounts" element={<ProtectedRoute><BankAccounts /></ProtectedRoute>} />
-           <Route path="/bank-movements" element={<ProtectedRoute><BankMovements /></ProtectedRoute>} />
-           <Route path="/card-movements" element={<ProtectedRoute><CardMovements /></ProtectedRoute>} />
-           <Route path="/retentions" element={<ProtectedRoute><Retentions /></ProtectedRoute>} />
-           <Route path="/integrations" element={<ProtectedRoute><Integrations /></ProtectedRoute>} />
-           <Route path="/payroll" element={<ProtectedRoute><Payroll /></ProtectedRoute>} />
-           <Route path="/admin/platform" element={<PlatformAdminRoute><PlatformAdmin /></PlatformAdminRoute>} />
-           <Route path="/ai-assistant" element={<ProtectedRoute><AIAssistantPage /></ProtectedRoute>} />
-           <Route path="/settings" element={<ProtectedRoute><Settings /></ProtectedRoute>} />           <Route path="/subscription" element={<ProtectedRoute>Subscription</ProtectedRoute>} />           {/* ADD ALL CUSTOM ROUTES ABOVE THE CATCH-ALL "*" ROUTE */}
-           <Route path="*" element={<NotFound />} />
-        </Routes>
-=======
           <Suspense fallback={<PageLoader />}>
             <Routes>
             <Route path="/auth" element={<Auth />} />
             <Route path="/reset-password" element={<ResetPassword />} />
               <Route path="/set-password/:token" element={<SetPasswordToken />} />
-            <Route path="/company-setup" element={<AuthOnlyRoute><CompanySetup /></AuthOnlyRoute>} />
             <Route path="/module-not-available" element={<ProtectedRoute><ModuleNotAvailable /></ProtectedRoute>} />
             {/* Módulos Base - siempre disponibles */}
             <Route path="/" element={<ProtectedRoute><Dashboard /></ProtectedRoute>} />
@@ -374,7 +320,6 @@ const App = () => (
             <Route path="*" element={<NotFound />} />
           </Routes>
           </Suspense>
->>>>>>> origin/main
         </CompanyProvider>
       </BrowserRouter>
     </TooltipProvider>
