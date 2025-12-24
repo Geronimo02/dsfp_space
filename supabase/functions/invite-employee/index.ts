@@ -1,7 +1,6 @@
 import { serve } from "https://deno.land/std@0.168.0/http/server.ts";
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
 
-// CORS headers (Edge Functions are called from browsers; use wildcard to avoid preview-domain mismatches)
 const corsHeaders = {
   "Access-Control-Allow-Origin": "*",
   "Access-Control-Allow-Headers":
@@ -9,7 +8,6 @@ const corsHeaders = {
 };
 
 serve(async (req: Request) => {
-  // Handle CORS preflight requests
   if (req.method === "OPTIONS") {
     return new Response(null, { headers: corsHeaders });
   }
@@ -29,7 +27,6 @@ serve(async (req: Request) => {
       }
     );
 
-    // Verify the user is authenticated
     const authHeader = req.headers.get("Authorization");
     if (!authHeader) {
       throw new Error("No authorization header");
@@ -45,7 +42,6 @@ serve(async (req: Request) => {
       throw new Error("Unauthorized");
     }
 
-    // Get email and role from request (prefer the company selected in the UI)
     const { email, full_name, role, companyId: requestedCompanyId } =
       await req.json();
 
@@ -57,12 +53,10 @@ serve(async (req: Request) => {
       throw new Error("Role is required");
     }
 
-    // Verify membership + permissions in the target company
     const baseMembershipQuery = supabaseAdmin
       .from("company_users")
       .select("company_id, role, active")
       .eq("user_id", user.id)
-      // Treat NULL as active (legacy rows)
       .or("active.eq.true,active.is.null");
 
     const { data: companyUser, error: membershipError } = requestedCompanyId
@@ -80,13 +74,11 @@ serve(async (req: Request) => {
 
     const companyId = companyUser.company_id;
 
-    // Check if user has admin or manager role in this company
     const isAdmin = companyUser.role === "admin" || companyUser.role === "manager";
     if (!isAdmin) {
       throw new Error("Only admins and managers can invite employees");
     }
 
-    // Check if user already exists
     const {
       data: { users },
       error: listError,
@@ -98,10 +90,8 @@ serve(async (req: Request) => {
     let userId: string;
 
     if (existingUser) {
-      // User already exists - just add to company
       userId = existingUser.id;
 
-      // Check if already in company
       const { data: existingCompanyUser, error: existingCompanyUserError } =
         await supabaseAdmin
           .from("company_users")
@@ -117,7 +107,6 @@ serve(async (req: Request) => {
       }
 
       if (existingCompanyUser) {
-        // Idempotent response: not an error
         return new Response(
           JSON.stringify({
             success: true,
@@ -132,7 +121,6 @@ serve(async (req: Request) => {
         );
       }
 
-      // Add user to company
       const { error: companyUserError } = await supabaseAdmin
         .from("company_users")
         .insert({
@@ -157,7 +145,7 @@ serve(async (req: Request) => {
       );
     }
 
-    // User doesn't exist - create them directly with auto-confirm
+    // User doesn't exist - create them with auto-confirm
     const tempPassword = crypto.randomUUID();
 
     const { data, error } = await supabaseAdmin.auth.admin.createUser({
@@ -176,37 +164,9 @@ serve(async (req: Request) => {
 
     userId = data.user.id;
 
-    // Generate a recovery link (preferred) so we can send a custom invite email.
-    const redirectTo = `${Deno.env.get("FRONTEND_URL") || req.headers.get("origin") || ""}/reset-password`;
+    const frontendUrl = Deno.env.get("FRONTEND_URL") || req.headers.get("origin") || "";
 
-    let actionLink: string | null = null;
-
-    try {
-      // Try to generate a recovery link with admin privileges (does not send email)
-      // Note: Supabase admin API may return the action link in different shapes; try common fields.
-      const { data: linkData, error: linkError } = await (supabaseAdmin.auth as any).admin.generateLink?.({ type: "recovery", email, redirectTo }) || { data: null, error: new Error("generateLink not available") };
-      if (!linkError && linkData) {
-        actionLink = linkData.action_link || linkData.actionLink || linkData.link || null;
-      }
-    } catch (err) {
-      console.warn("generateLink not available or failed, will fallback to resetPasswordForEmail", err);
-    }
-
-    // Fallback: request Supabase to send reset email (if generateLink not available)
-    let resetData: any = null;
-    if (!actionLink) {
-      try {
-        const res = await supabaseAdmin.auth.resetPasswordForEmail(email, { redirectTo });
-        resetData = res.data;
-        // Some Supabase setups return the action link in the response
-        actionLink = res.data?.action_link || res.data?.link || null;
-        console.log("Password reset email requested (fallback)", { email, redirectTo, resetData });
-      } catch (err) {
-        console.error("Error requesting password reset email (fallback):", err);
-      }
-    }
-
-    // Create a single-use invite token and include a link to set password without fragment
+    // Create a single-use invite token for setting password
     let inviteToken: string | null = null;
     try {
       inviteToken = crypto.randomUUID();
@@ -223,7 +183,8 @@ serve(async (req: Request) => {
       inviteToken = null;
     }
 
-    // Try to fetch company-specific SMTP/SendGrid config to also send a custom invitation email
+    // Try to send custom email via company SMTP/SendGrid
+    let emailSent = false;
     try {
       const { data: smtpRow, error: smtpError } = await supabaseAdmin
         .from("company_settings")
@@ -235,11 +196,7 @@ serve(async (req: Request) => {
 
       if (!smtpError && smtpRow?.value) {
         const cfg = smtpRow.value as any;
-        const frontendUrl = Deno.env.get("FRONTEND_URL") || req.headers.get("origin") || "";
-
-        // Compose a simple HTML invitation including the temporary password and a link to login/reset
-        const loginLink = `${frontendUrl}/auth`;
-        const setPasswordLink = inviteToken ? `${frontendUrl}/set-password/${inviteToken}` : (actionLink || loginLink);
+        const setPasswordLink = inviteToken ? `${frontendUrl}/set-password/${inviteToken}` : `${frontendUrl}/auth`;
         const html = `
           <p>Hola ${full_name || ""},</p>
           <p>Has sido invitado a la empresa. Tu usuario es <strong>${email}</strong>.</p>
@@ -250,7 +207,7 @@ serve(async (req: Request) => {
 
         if (cfg.provider === "sendgrid" && cfg.apiKey) {
           try {
-            await fetch("https://api.sendgrid.com/v3/mail/send", {
+            const response = await fetch("https://api.sendgrid.com/v3/mail/send", {
               method: "POST",
               headers: {
                 "Authorization": `Bearer ${cfg.apiKey}`,
@@ -262,35 +219,41 @@ serve(async (req: Request) => {
                 content: [{ type: "text/html", value: html }],
               }),
             });
-            console.log("Invitation email sent via SendGrid to", email);
+            if (response.ok) {
+              emailSent = true;
+              console.log("Invitation email sent via SendGrid to", email);
+            } else {
+              console.error("SendGrid error", await response.text());
+            }
           } catch (err) {
             console.error("Error sending invite via SendGrid", err);
           }
-        } else if (cfg.provider === "smtp") {
-          // Send via company SMTP using deno smtp client
+        } else if (cfg.provider === "resend" && cfg.apiKey) {
           try {
-            const { SmtpClient } = await import("https://deno.land/x/smtp/mod.ts");
-            const client = new SmtpClient();
-            await client.connect({
-              hostname: cfg.host,
-              port: Number(cfg.port) || 587,
-              username: cfg.user,
-              password: cfg.password,
-              tls: cfg.secure === true || cfg.secure === "true",
+            const response = await fetch("https://api.resend.com/emails", {
+              method: "POST",
+              headers: {
+                "Authorization": `Bearer ${cfg.apiKey}`,
+                "Content-Type": "application/json",
+              },
+              body: JSON.stringify({
+                from: cfg.from || "onboarding@resend.dev",
+                to: [email],
+                subject: "Invitación a la empresa",
+                html: html,
+              }),
             });
-            await client.send({
-              from: cfg.from || "no-reply@yourapp.com",
-              to: email,
-              subject: "Invitación a la empresa",
-              content: html,
-            });
-            await client.close();
-            console.log("Invitation email sent via SMTP to", email);
+            if (response.ok) {
+              emailSent = true;
+              console.log("Invitation email sent via Resend to", email);
+            } else {
+              console.error("Resend error", await response.text());
+            }
           } catch (err) {
-            console.error("Error sending invite via SMTP", err);
+            console.error("Error sending invite via Resend", err);
           }
         } else {
-          console.log("No supported company email provider found; rely on project's reset email or SendGrid");
+          console.log("No supported company email provider found");
         }
       }
     } catch (err) {
@@ -312,12 +275,17 @@ serve(async (req: Request) => {
       throw insertCompanyUserError;
     }
 
+    const setPasswordLink = inviteToken ? `${frontendUrl}/set-password/${inviteToken}` : null;
+
     return new Response(
       JSON.stringify({
         success: true,
         user_id: userId,
-        message:
-          "Usuario invitado. Se le ha enviado un email para configurar su contraseña",
+        email_sent: emailSent,
+        set_password_link: setPasswordLink,
+        message: emailSent
+          ? "Usuario invitado. Se le ha enviado un email para configurar su contraseña"
+          : "Usuario creado. Comparte este enlace para que configure su contraseña: " + setPasswordLink,
       }),
       {
         headers: { ...corsHeaders, "Content-Type": "application/json" },
