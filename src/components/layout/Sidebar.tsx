@@ -134,7 +134,6 @@ const navigationSections = [
       { name: "Operaciones Masivas", href: "/bulk-operations", icon: Zap },
       { name: "Puntos de Venta AFIP", href: "/pos-points", icon: Receipt },
       { name: "Notificaciones", href: "/notification-settings", icon: Bell },
-      { name: "Suscripción", href: "/subscription", icon: CreditCard },
       { name: "Configuración", href: "/settings", icon: Settings },
     ]
   }
@@ -198,7 +197,6 @@ export function Sidebar() {
       "/bulk-operations": "bulk_operations",
       "/pos-points": "pos_afip",
       "/notification-settings": "settings",
-      "/subscription": "settings",
       "/monthly-closing": "reports",
       "/accountant-reports": "reports",
       "/ai-assistant": "reports",

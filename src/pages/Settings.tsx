@@ -1,10 +1,12 @@
-import { useState } from "react";
+import { useState, useEffect, useMemo } from "react";
 import { Layout } from "@/components/layout/Layout";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Switch } from "@/components/ui/switch";
 import { Building2, DollarSign, Receipt, MessageSquare, Database, AlertTriangle, Package, Users, Palette, FileText, Upload, Eye, Lock, CreditCard } from "lucide-react";
+import { loadStripe } from "@stripe/stripe-js";
+import { Elements, PaymentElement, useElements, useStripe } from "@stripe/react-stripe-js";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Button } from "@/components/ui/button";
@@ -18,6 +20,7 @@ import { format } from "date-fns";
 
 import { CompanySettings } from "@/components/settings/CompanySettings";
 import { PriceListsSettings } from "@/components/settings/PriceListsSettings";
+import { useCompany } from "@/contexts/CompanyContext";
 
 const settingsSchema = z.object({
   company_name: z.string().trim().min(1, "El nombre de la empresa es requerido").max(200, "El nombre debe tener máximo 200 caracteres"),
@@ -42,8 +45,51 @@ const settingsSchema = z.object({
   low_stock_alert: z.boolean(),
 });
 
+function StripePaymentSetup({ clientSecret, onSaved }: { clientSecret: string; onSaved: () => void }) {
+  const stripe = useStripe();
+  const elements = useElements();
+  const [saving, setSaving] = useState(false);
+
+  const handleSubmit = async () => {
+    if (!stripe || !elements) return;
+    setSaving(true);
+    try {
+      const { setupIntent, error } = await stripe.confirmSetup({
+        elements,
+        confirmParams: {
+          return_url: window.location.href,
+        },
+        redirect: "if_required",
+      });
+      if (error) throw error;
+      const pmId = (setupIntent?.payment_method as string) || "";
+      const { error: saveErr } = await supabase.functions.invoke("save-stripe-payment-method", { body: { payment_method_id: pmId } });
+      if (saveErr) throw saveErr;
+      toast.success("Método guardado");
+      onSaved();
+    } catch (e: any) {
+      console.error(e);
+      toast.error("Error al guardar tarjeta: " + (e?.message ?? e));
+    } finally {
+      setSaving(false);
+    }
+  };
+
+  return (
+    <div className="space-y-4">
+      <PaymentElement />
+      <Button onClick={handleSubmit} disabled={saving || !stripe || !elements}>
+        {saving ? "Guardando..." : "Guardar tarjeta"}
+      </Button>
+    </div>
+  );
+}
+
 export default function Settings() {
   const queryClient = useQueryClient();
+  const { currentCompany } = useCompany();
+  const [stripePromise, setStripePromise] = useState<any>(null);
+  const [clientSecret, setClientSecret] = useState<string | null>(null);
   const [formData, setFormData] = useState({
     company_name: "",
     tax_id: "",
@@ -88,6 +134,65 @@ export default function Settings() {
     paper_width: "80mm",
     font_size: "small",
   });
+
+  const { data: subscription } = useQuery({
+    queryKey: ["subscription", currentCompany?.id],
+    enabled: !!currentCompany?.id,
+    queryFn: async () => {
+      const { data, error } = await supabase
+        .from("subscriptions")
+        .select("id, company_id, plan_id, provider, status, trial_ends_at, provider_customer_id, mp_preapproval_id, stripe_payment_method_id")
+        .eq("company_id", currentCompany!.id)
+        .maybeSingle();
+      if (error) throw error;
+      return data;
+    },
+  });
+
+  const trialDaysLeft = useMemo(() => {
+    if (!subscription?.trial_ends_at) return null;
+    const end = new Date(subscription.trial_ends_at).getTime();
+    const now = Date.now();
+    return Math.max(Math.ceil((end - now) / (1000 * 60 * 60 * 24)), 0);
+  }, [subscription?.trial_ends_at]);
+
+  useEffect(() => {
+    const key = import.meta.env.VITE_STRIPE_PUBLIC_KEY;
+    if (key) {
+      setStripePromise(loadStripe(key));
+    }
+  }, []);
+
+  const setupStripe = async () => {
+    try {
+      const { data, error } = await supabase.functions.invoke("create-stripe-setup-intent", {
+        body: { company_id: currentCompany!.id },
+      });
+      if (error) throw error;
+      if (!data?.client_secret) throw new Error("Sin client_secret");
+      setClientSecret(data.client_secret);
+    } catch (e: any) {
+      console.error(e);
+      toast.error("Error iniciando setup de Stripe: " + (e?.message ?? e));
+    }
+  };
+
+  const setupMercadoPago = async () => {
+    try {
+      const { data, error } = await supabase.functions.invoke("create-mp-preapproval", {
+        body: { company_id: currentCompany!.id },
+      });
+      if (error) throw error;
+      if (data?.redirect_url) {
+        window.location.href = data.redirect_url;
+      } else {
+        toast.error("No se obtuvo URL de autorización");
+      }
+    } catch (e: any) {
+      console.error(e);
+      toast.error("Error iniciando autorización en MP: " + (e?.message ?? e));
+    }
+  };
 
   const { data: settings, isLoading } = useQuery({
     queryKey: ["company-settings"],
@@ -1582,25 +1687,49 @@ export default function Settings() {
 
           {/* Subscription */}
           <TabsContent value="subscription">
-            <Card className="shadow-soft">
-              <CardHeader>
-                <CardTitle className="flex items-center gap-2">
-                  <CreditCard className="h-5 w-5 text-primary" />
-                  Suscripción
-                </CardTitle>
-                <CardDescription>
-                  Administra tu suscripción y método de pago
-                </CardDescription>
-              </CardHeader>
-              <CardContent>
-                <p className="text-sm text-muted-foreground mb-4">
-                  Para ver y administrar tu suscripción completa, ve a la página dedicada:
-                </p>
-                <Button onClick={() => window.location.href = "/subscription"}>
-                  Ir a Suscripción
-                </Button>
-              </CardContent>
-            </Card>
+            <div className="space-y-6">
+              <div className="grid md:grid-cols-2 gap-6">
+                <Card className="shadow-soft">
+                  <CardHeader>
+                    <CardTitle className="flex items-center gap-2">
+                      <CreditCard className="h-5 w-5 text-primary" />
+                      Estado de Suscripción
+                    </CardTitle>
+                    <CardDescription>Plan y período de prueba</CardDescription>
+                  </CardHeader>
+                  <CardContent className="space-y-2">
+                    <p className="text-sm">Plan ID: {subscription?.plan_id ?? "-"}</p>
+                    <p className="text-sm">Provider: {subscription?.provider ?? "-"}</p>
+                    <p className="text-sm">Trial resta: {trialDaysLeft ?? "-"} días</p>
+                    <p className="text-sm">MP preapproval: {subscription?.mp_preapproval_id ? "Autorizado" : "No autorizado"}</p>
+                    <p className="text-sm">Stripe PM: {subscription?.stripe_payment_method_id ? `Guardado (${subscription.stripe_payment_method_id.substring(0, 16)}...)` : "No guardado"}</p>
+                  </CardContent>
+                </Card>
+
+                <Card className="shadow-soft">
+                  <CardHeader>
+                    <CardTitle className="flex items-center gap-2">
+                      <CreditCard className="h-5 w-5 text-primary" />
+                      Método de pago
+                    </CardTitle>
+                    <CardDescription>Guardar tarjeta para cobro automático al fin del trial</CardDescription>
+                  </CardHeader>
+                  <CardContent className="space-y-4">
+                    <div className="space-y-2">
+                      <Button variant="outline" onClick={setupMercadoPago}>Autorizar en Mercado Pago</Button>
+                    </div>
+                    <div className="space-y-2">
+                      <Button variant="outline" onClick={setupStripe}>Guardar tarjeta (Stripe)</Button>
+                    </div>
+                    {stripePromise && clientSecret && (
+                      <Elements stripe={stripePromise} options={{ clientSecret }}>
+                        <StripePaymentSetup clientSecret={clientSecret} onSaved={() => setClientSecret(null)} />
+                      </Elements>
+                    )}
+                  </CardContent>
+                </Card>
+              </div>
+            </div>
           </TabsContent>
         </Tabs>
       </div>

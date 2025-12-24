@@ -55,7 +55,6 @@ import Integrations from "./pages/Integrations";
 import Payroll from "./pages/Payroll";
 import PlatformAdmin from "./pages/PlatformAdmin";
 import NotFound from "./pages/NotFound";
-import Subscription from "./pages/Subscription";
 
 const queryClient = new QueryClient();
 
