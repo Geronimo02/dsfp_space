@@ -22,6 +22,46 @@ import { useCompany } from "@/contexts/CompanyContext";
 import { CompanySettings } from "@/components/settings/CompanySettings";
 import { PriceListsSettings } from "@/components/settings/PriceListsSettings";
 
+function StripePaymentSetup({ clientSecret, onSaved }: { clientSecret: string; onSaved: () => void }) {
+  const stripe = useStripe();
+  const elements = useElements();
+  const [saving, setSaving] = useState(false);
+
+  const handleSubmit = async () => {
+    if (!stripe || !elements) return;
+    setSaving(true);
+    try {
+      const { setupIntent, error } = await stripe.confirmSetup({
+        elements,
+        confirmParams: {
+          return_url: window.location.href,
+        },
+        redirect: "if_required",
+      });
+      if (error) throw error;
+      const pmId = (setupIntent?.payment_method as string) || "";
+      const { error: saveErr } = await supabase.functions.invoke("save-stripe-payment-method", { body: { payment_method_id: pmId } });
+      if (saveErr) throw saveErr;
+      toast.success("Método guardado");
+      onSaved();
+    } catch (e: any) {
+      console.error(e);
+      toast.error("Error al guardar tarjeta: " + (e?.message ?? e));
+    } finally {
+      setSaving(false);
+    }
+  };
+
+  return (
+    <div className="space-y-4">
+      <PaymentElement />
+      <Button onClick={handleSubmit} disabled={saving || !stripe || !elements}>
+        {saving ? "Guardando..." : "Guardar tarjeta"}
+      </Button>
+    </div>
+  );
+}
+
 const settingsSchema = z.object({
   company_name: z.string().trim().min(1, "El nombre de la empresa es requerido").max(200, "El nombre debe tener máximo 200 caracteres"),
   email: z.string().trim().toLowerCase().max(255, "El email debe tener máximo 255 caracteres")
@@ -696,11 +736,12 @@ export default function Settings() {
 
         <Tabs defaultValue="company" className="w-full">
           <div className="overflow-x-auto -mx-4 px-4">
-            <TabsList className="inline-flex w-auto min-w-full md:grid md:w-full md:grid-cols-4">
+            <TabsList className="inline-flex w-auto min-w-full md:grid md:w-full md:grid-cols-5">
               <TabsTrigger value="company" className="text-xs sm:text-sm">Empresa</TabsTrigger>
               <TabsTrigger value="price-lists" className="text-xs sm:text-sm">Precios</TabsTrigger>
               <TabsTrigger value="ticket-design" className="text-xs sm:text-sm">Tickets</TabsTrigger>
               <TabsTrigger value="security" className="text-xs sm:text-sm">Seguridad</TabsTrigger>
+              <TabsTrigger value="subscription" className="text-xs sm:text-sm">Suscripción</TabsTrigger>
             </TabsList>
           </div>
 
@@ -1205,6 +1246,53 @@ export default function Settings() {
                 </form>
               </CardContent>
             </Card>
+          </TabsContent>
+
+          {/* Subscription */}
+          <TabsContent value="subscription">
+            <div className="space-y-6">
+              <div className="grid md:grid-cols-2 gap-6">
+                <Card className="shadow-soft">
+                  <CardHeader>
+                    <CardTitle className="flex items-center gap-2">
+                      <CreditCard className="h-5 w-5 text-primary" />
+                      Estado de Suscripción
+                    </CardTitle>
+                    <CardDescription>Plan y período de prueba</CardDescription>
+                  </CardHeader>
+                  <CardContent className="space-y-2">
+                    <p className="text-sm">Plan ID: {subscription?.plan_id ?? "-"}</p>
+                    <p className="text-sm">Provider: {subscription?.provider ?? "-"}</p>
+                    <p className="text-sm">Trial resta: {trialDaysLeft ?? "-"} días</p>
+                    <p className="text-sm">MP preapproval: {subscription?.mp_preapproval_id ? "Autorizado" : "No autorizado"}</p>
+                    <p className="text-sm">Stripe PM: {subscription?.stripe_payment_method_id ? `Guardado (${subscription.stripe_payment_method_id.substring(0, 16)}...)` : "No guardado"}</p>
+                  </CardContent>
+                </Card>
+
+                <Card className="shadow-soft">
+                  <CardHeader>
+                    <CardTitle className="flex items-center gap-2">
+                      <CreditCard className="h-5 w-5 text-primary" />
+                      Método de pago
+                    </CardTitle>
+                    <CardDescription>Guardar tarjeta para cobro automático al fin del trial</CardDescription>
+                  </CardHeader>
+                  <CardContent className="space-y-4">
+                    <div className="space-y-2">
+                      <Button variant="outline" onClick={setupMercadoPago}>Autorizar en Mercado Pago</Button>
+                    </div>
+                    <div className="space-y-2">
+                      <Button variant="outline" onClick={setupStripe}>Guardar tarjeta (Stripe)</Button>
+                    </div>
+                    {stripePromise && clientSecret && (
+                      <Elements stripe={stripePromise} options={{ clientSecret }}>
+                        <StripePaymentSetup clientSecret={clientSecret} onSaved={() => setClientSecret(null)} />
+                      </Elements>
+                    )}
+                  </CardContent>
+                </Card>
+              </div>
+            </div>
           </TabsContent>
 
           {/* Integraciones - eliminado (duplicaba configuración de Empresa) */}

@@ -67,6 +67,9 @@ const ModuleNotAvailable = lazy(() => import("./pages/ModuleNotAvailable"));
 const NotFound = lazy(() => import("./pages/NotFound"));
 const AccountsReceivable = lazy(() => import("./pages/AccountsReceivable"));
 const EmailConfig = lazy(() => import("./pages/EmailConfig"));
+const SignupWizard = lazy(() => import("./pages/SignupWizard"));
+const SignupSuccess = lazy(() => import("./pages/SignupSuccess"));
+const SignupCancel = lazy(() => import("./pages/SignupCancel"));
 
 const queryClient = new QueryClient();
 
@@ -233,6 +236,9 @@ const App = () => (
         <CompanyProvider>
           <Suspense fallback={<PageLoader />}>
             <Routes>
+            <Route path="/signup" element={<SignupWizard />} />
+            <Route path="/signup/success" element={<SignupSuccess />} />
+            <Route path="/signup/cancel" element={<SignupCancel />} />
             <Route path="/auth" element={<Auth />} />
             <Route path="/reset-password" element={<ResetPassword />} />
               <Route path="/set-password/:token" element={<SetPasswordToken />} />
