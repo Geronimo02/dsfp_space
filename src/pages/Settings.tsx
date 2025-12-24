@@ -4,7 +4,7 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/com
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Switch } from "@/components/ui/switch";
-import { Building2, DollarSign, Receipt, MessageSquare, Database, AlertTriangle, Package, Users, Palette, FileText, Upload, Eye, Lock } from "lucide-react";
+import { Building2, DollarSign, Receipt, MessageSquare, Database, AlertTriangle, Package, Users, Palette, FileText, Upload, Eye, Lock, CreditCard } from "lucide-react";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Button } from "@/components/ui/button";
@@ -598,13 +598,14 @@ export default function Settings() {
         </div>
 
         <Tabs defaultValue="company" className="w-full">
-          <TabsList className="grid w-full grid-cols-6">
+          <TabsList className="grid w-full grid-cols-7">
             <TabsTrigger value="company">Empresa</TabsTrigger>
             <TabsTrigger value="price-lists">Listas de Precios</TabsTrigger>
             <TabsTrigger value="general">General</TabsTrigger>
             <TabsTrigger value="ticket-design">Diseño de Tickets</TabsTrigger>
             <TabsTrigger value="security">Seguridad</TabsTrigger>
             <TabsTrigger value="integrations">Integraciones</TabsTrigger>
+            <TabsTrigger value="subscription">Suscripción</TabsTrigger>
           </TabsList>
 
           {/* Company */}
@@ -1575,6 +1576,29 @@ export default function Settings() {
                     Por seguridad, esta función requiere acceso directo a la base de datos en Supabase
                   </p>
                 </div>
+              </CardContent>
+            </Card>
+          </TabsContent>
+
+          {/* Subscription */}
+          <TabsContent value="subscription">
+            <Card className="shadow-soft">
+              <CardHeader>
+                <CardTitle className="flex items-center gap-2">
+                  <CreditCard className="h-5 w-5 text-primary" />
+                  Suscripción
+                </CardTitle>
+                <CardDescription>
+                  Administra tu suscripción y método de pago
+                </CardDescription>
+              </CardHeader>
+              <CardContent>
+                <p className="text-sm text-muted-foreground mb-4">
+                  Para ver y administrar tu suscripción completa, ve a la página dedicada:
+                </p>
+                <Button onClick={() => window.location.href = "/subscription"}>
+                  Ir a Suscripción
+                </Button>
               </CardContent>
             </Card>
           </TabsContent>

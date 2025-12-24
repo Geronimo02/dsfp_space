@@ -55,6 +55,7 @@ import Integrations from "./pages/Integrations";
 import Payroll from "./pages/Payroll";
 import PlatformAdmin from "./pages/PlatformAdmin";
 import NotFound from "./pages/NotFound";
+import Subscription from "./pages/Subscription";
 
 const queryClient = new QueryClient();
 
@@ -259,8 +260,7 @@ const App = () => (
            <Route path="/payroll" element={<ProtectedRoute><Payroll /></ProtectedRoute>} />
            <Route path="/admin/platform" element={<PlatformAdminRoute><PlatformAdmin /></PlatformAdminRoute>} />
            <Route path="/ai-assistant" element={<ProtectedRoute><AIAssistantPage /></ProtectedRoute>} />
-           <Route path="/settings" element={<ProtectedRoute><Settings /></ProtectedRoute>} />
-           {/* ADD ALL CUSTOM ROUTES ABOVE THE CATCH-ALL "*" ROUTE */}
+           <Route path="/settings" element={<ProtectedRoute><Settings /></ProtectedRoute>} />           <Route path="/subscription" element={<ProtectedRoute><Subscription /></ProtectedRoute>} />           {/* ADD ALL CUSTOM ROUTES ABOVE THE CATCH-ALL "*" ROUTE */}
            <Route path="*" element={<NotFound />} />
         </Routes>
         </CompanyProvider>

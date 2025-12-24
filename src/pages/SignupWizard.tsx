@@ -30,7 +30,7 @@ export default function SignupWizard() {
           company_name: formData.company_name,
           plan_id: formData.plan_id,
           modules: formData.modules,
-          provider: formData.provider,
+          provider: "auto",
         },
       });
 

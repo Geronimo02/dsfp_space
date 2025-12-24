@@ -62,6 +62,8 @@ export function Step4Confirmation({
   const handleConfirm = async () => {
     try {
       setIsCreating(true);
+      // Force automatic provider selection (backend decides)
+      updateFormData({ provider: "auto" as any });
       await onCreateIntent();
       nextStep();
     } catch (error) {
@@ -190,27 +192,13 @@ export function Step4Confirmation({
 
               <div>
                 <Label className="text-base mb-3 block">Método de pago</Label>
-                <RadioGroup
-                  value={formData.provider}
-                  onValueChange={(value) =>
-                    updateFormData({ provider: value as "stripe" | "mercadopago" })
-                  }
-                >
-                  <div className="flex items-center space-x-2 border rounded-lg p-3 cursor-pointer hover:bg-accent">
-                    <RadioGroupItem value="mercadopago" id="mercadopago" />
-                    <Label htmlFor="mercadopago" className="flex-1 cursor-pointer">
-                      <p className="font-medium">Mercado Pago</p>
-                      <p className="text-xs text-muted-foreground">Pago en pesos argentinos</p>
-                    </Label>
-                  </div>
-                  <div className="flex items-center space-x-2 border rounded-lg p-3 cursor-pointer hover:bg-accent">
-                    <RadioGroupItem value="stripe" id="stripe" />
-                    <Label htmlFor="stripe" className="flex-1 cursor-pointer">
-                      <p className="font-medium">Stripe</p>
-                      <p className="text-xs text-muted-foreground">Tarjeta de crédito internacional</p>
-                    </Label>
-                  </div>
-                </RadioGroup>
+                <div className="border rounded-lg p-3">
+                  <p className="text-sm">El sistema elegirá automáticamente el procesador según tu país:</p>
+                  <ul className="text-xs text-muted-foreground mt-2 list-disc pl-5">
+                    <li>Argentina → Mercado Pago (ARS)</li>
+                    <li>Otros países → Stripe (USD)</li>
+                  </ul>
+                </div>
               </div>
             </CardContent>
           </Card>

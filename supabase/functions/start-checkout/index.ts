@@ -1,5 +1,11 @@
 // supabase/functions/start-checkout/index.ts
-import { corsHeaders } from "../_shared/cors.ts";
+// Inline CORS to avoid cold-start issues
+const corsHeaders = {
+  "Access-Control-Allow-Origin": "*",
+  "Access-Control-Allow-Methods": "POST, OPTIONS",
+  "Access-Control-Allow-Headers": "authorization, x-client-info, apikey, content-type",
+};
+import { corsHeaders as sharedCors } from "../_shared/cors.ts";
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2.49.1";
 import Stripe from "https://esm.sh/stripe@14.21.0?target=deno";
 
@@ -19,7 +25,7 @@ const FREE_TRIAL_DAYS = 7;
 
 Deno.serve(async (req: Request) => {
   if (req.method === "OPTIONS") {
-    return new Response("ok", { headers: corsHeaders });
+    return new Response(null, { status: 200, headers: corsHeaders });
   }
 
   try {
@@ -44,7 +50,16 @@ Deno.serve(async (req: Request) => {
       return json({ error: "Signup intent no encontrado" }, 404);
     }
 
-    const provider: Provider = intent.provider;
+    // Decide provider automatically if requested or missing
+    const cfCountry = (req.headers.get("cf-ipcountry") || "").toUpperCase();
+    let provider: Provider = (intent.provider as Provider) || "stripe";
+    if (intent.provider === "auto" || !intent.provider) {
+      provider = cfCountry === "AR" ? "mercadopago" : "stripe";
+      await supabaseAdmin
+        .from("signup_intents")
+        .update({ provider })
+        .eq("id", intent_id);
+    }
 
     if (!["draft", "checkout_created"].includes(intent.status)) {
       return json({ error: "El intent no está en un estado válido" }, 409);
@@ -71,38 +86,13 @@ Deno.serve(async (req: Request) => {
 
       const stripe = new Stripe(stripeKey, { apiVersion: "2023-10-16" });
 
-      const customer = await stripe.customers.create({
-        email: intent.email,
-        name: intent.full_name ?? undefined,
-        metadata: { intent_id: intent.id },
-      });
-
-      // IMPORTANT: Stripe trial is set at subscription level
+      // Use Checkout in setup mode to save payment method without charging now
       const session = await stripe.checkout.sessions.create({
-        mode: "subscription",
-        customer: customer.id,
+        mode: "setup",
         payment_method_types: ["card"],
-        line_items: [
-          {
-            price_data: {
-              currency: "usd",
-              unit_amount: Math.round(Number(intent.amount_usd) * 100),
-              recurring: { interval: "month" },
-              product_data: {
-                name: `Suscripción ${plan.name}`,
-                description:
-                  trialDays > 0 ? `Prueba gratis ${trialDays} días → se cobra luego` : `Plan ${billingPlanId}`,
-              },
-            },
-            quantity: 1,
-          },
-        ],
-        subscription_data: {
-          trial_period_days: trialDays > 0 ? trialDays : undefined,
-          metadata: { intent_id: intent.id },
-        },
-        success_url,
+        success_url: `${success_url}&session_id={CHECKOUT_SESSION_ID}`,
         cancel_url,
+        customer_email: intent.email,
         metadata: { intent_id: intent.id },
       });
 
@@ -110,7 +100,6 @@ Deno.serve(async (req: Request) => {
         .from("signup_intents")
         .update({
           status: "checkout_created",
-          stripe_customer_id: customer.id,
           stripe_checkout_session_id: session.id,
           billing_plan_id: billingPlanId,
           trial_days: trialDays,
@@ -125,83 +114,43 @@ Deno.serve(async (req: Request) => {
     if (provider === "mercadopago") {
       const mpToken = Deno.env.get("MP_ACCESS_TOKEN");
       if (!mpToken) return json({ error: "MP_ACCESS_TOKEN no configurado" }, 500);
+      // Create preapproval to save payment method; charge starts at trial end
+      const usdArs = Number(Deno.env.get("DEFAULT_USD_ARS_RATE") ?? "1000");
+      const amountArsRecurring = Math.round(Number(plan.price) * usdArs);
 
-      // For free trial, we don't charge now; MercadoPago can't handle 0-amount preapprovals
-      // We'll charge after trial ends via charge-trial-subscriptions
-      const isFreeTrial = intent.plan_id === FREE_PLAN_ID || intent.amount_ars === 0;
-
-      if (isFreeTrial) {
-        // Free trial: just mark as ready for finalization, don't create preapproval yet
-        const { error: updErr } = await supabaseAdmin
-          .from("signup_intents")
-          .update({
-            status: "paid_ready", // Skip checkout_created, go straight to paid_ready for free trial
-            billing_plan_id: billingPlanId,
-            trial_days: trialDays,
-          })
-          .eq("id", intent_id);
-
-        if (updErr) return json({ error: String(updErr.message ?? updErr) }, 500);
-
-        // For free trial, return intent_id and skip checkout (frontend will handle via localStorage)
-        return json({ 
-          checkout_url: null, // No external checkout needed
-          provider: "mercadopago",
-          intent_id: intent_id, // Return intent_id so frontend can save it
-          is_free_trial: true,
-          message: "Free trial - no payment required"
-        }, 200);
-      }
-
-      // Paid plan: create preapproval as usual
-      const amountArs = Math.round(Number(intent.amount_ars));
-      if (!isFinite(amountArs) || amountArs <= 0) {
-        return json({ error: "intent.amount_ars inválido" }, 400);
-      }
-
-      const autoRecurring: any = {
-        frequency: 1,
-        frequency_type: "months",
-        transaction_amount: amountArs,
-        currency_id: "ARS",
-      };
-
-      const planPayload = {
+      const body = {
         reason: `Suscripción ${plan.name}`,
-        external_reference: intent.id,
-        auto_recurring: autoRecurring,
+        payer_email: intent.email,
         back_url: success_url,
+        auto_recurring: {
+          frequency: 1,
+          frequency_type: "months",
+          transaction_amount: amountArsRecurring,
+          currency_id: "ARS",
+          start_date: new Date(Date.now() + trialDays * 24 * 60 * 60 * 1000).toISOString(),
+        },
       };
 
-      const planRes = await fetch("https://api.mercadopago.com/preapproval_plan", {
+      const resp = await fetch("https://api.mercadopago.com/preapproval", {
         method: "POST",
         headers: {
           Authorization: `Bearer ${mpToken}`,
           "Content-Type": "application/json",
         },
-        body: JSON.stringify(planPayload),
+        body: JSON.stringify(body),
       });
 
-      if (!planRes.ok) {
-        const errTxt = await planRes.text();
-        console.log("MP plan error payload:", planPayload);
-        console.log("MP plan error response:", errTxt);
-        return json({ error: `MP plan error: ${errTxt}` }, 502);
+      const jsonResp = await resp.json();
+      if (!resp.ok) {
+        return json({ error: jsonResp?.message ?? "MercadoPago error" }, 502);
       }
 
-      const mpPlan = await planRes.json();
-
-      const checkoutUrl = mpPlan.init_point || mpPlan.sandbox_init_point;
-      if (!checkoutUrl) {
-        console.log("MP plan response (no init_point):", mpPlan);
-        return json({ error: "MP no devolvió init_point/sandbox_init_point en preapproval_plan" }, 502);
-      }
-
+      const redirectUrl = jsonResp.init_point || jsonResp.sandbox_init_point || null;
       const { error: updErr } = await supabaseAdmin
         .from("signup_intents")
         .update({
           status: "checkout_created",
-          mp_preapproval_plan_id: mpPlan.id,
+          mp_preapproval_id: jsonResp.id,
           billing_plan_id: billingPlanId,
           trial_days: trialDays,
         })
@@ -209,7 +158,7 @@ Deno.serve(async (req: Request) => {
 
       if (updErr) return json({ error: String(updErr.message ?? updErr) }, 500);
 
-      return json({ checkout_url: checkoutUrl, provider: "mercadopago" }, 200);
+      return json({ checkout_url: redirectUrl, provider: "mercadopago" }, 200);
     }
 
     return json({ error: "Provider inválido" }, 400);

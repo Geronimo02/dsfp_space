@@ -15,7 +15,7 @@ export default function SignupSuccess() {
   const intentFromStorage = typeof window !== "undefined" ? localStorage.getItem("signup_intent_id") : null;
   const intentId = intentFromUrl || intentFromStorage;
 
-  const [status, setStatus] = useState<"checking" | "paid_ready" | "timeout" | "error">("checking");
+  const [status, setStatus] = useState<"checking" | "checkout_created" | "paid_ready" | "timeout" | "error">("checking");
   const [attempts, setAttempts] = useState(0);
   const [password, setPassword] = useState("");
   const [passwordLoaded, setPasswordLoaded] = useState(false);
@@ -67,6 +67,23 @@ export default function SignupSuccess() {
           setStatus("paid_ready");
           // Automatically finalize signup
           await finalizeSignup();
+        } else if (data.status === "checkout_created") {
+          setStatus("checkout_created");
+          // Confirm intent ready (after returning from checkout)
+          const stripeSessionId = searchParams.get("session_id") || null;
+          try {
+            const { data: readyData, error: readyErr } = await supabase.functions.invoke("mark-intent-ready", {
+              body: { intent_id: intentId, stripe_session_id: stripeSessionId },
+            });
+            if (readyErr) throw readyErr;
+            console.log("[SignupSuccess] Marked intent ready:", readyData);
+            // Re-check status to proceed to finalize
+            setStatus("checking");
+            setAttempts((prev) => prev + 1);
+          } catch (e) {
+            console.error("[SignupSuccess] Error marking intent ready:", e);
+            setStatus("error");
+          }
         } else if (attempts >= 30) {
           // 30 attempts * 2s = 60s
           setStatus("timeout");
@@ -140,12 +157,14 @@ export default function SignupSuccess() {
         <CardHeader>
           <CardTitle className="text-center">
             {status === "checking" && "Verificando pago..."}
+            {status === "checkout_created" && "Guardando método de pago..."}
             {status === "paid_ready" && "¡Pago confirmado!"}
             {status === "timeout" && "Verificación en curso"}
             {status === "error" && "Error"}
           </CardTitle>
           <CardDescription className="text-center">
             {status === "checking" && "Estamos confirmando tu pago. Por favor espera..."}
+            {status === "checkout_created" && "Procesando autorización para cobros automáticos"}
             {status === "paid_ready" && "Configurando tu cuenta empresarial"}
             {status === "timeout" && "El proceso está tomando más tiempo del esperado"}
             {status === "error" && "Ocurrió un error al verificar el pago"}
