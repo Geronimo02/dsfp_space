@@ -42,12 +42,30 @@ serve(async (req: Request) => {
 
     const companyId = membership.company_id;
 
-    // Upsert into company_settings
-    const { error: upsertError } = await supabaseAdmin
+    // First try to update existing record
+    const { data: existingRecord, error: selectError } = await supabaseAdmin
       .from("company_settings")
-      .upsert({ company_id: companyId, key: "smtp", value: smtp }, { onConflict: ["company_id", "key"] });
+      .select("id")
+      .eq("company_id", companyId)
+      .eq("key", "smtp")
+      .maybeSingle();
 
-    if (upsertError) throw upsertError;
+    if (selectError) throw selectError;
+
+    if (existingRecord) {
+      // Update existing
+      const { error: updateError } = await supabaseAdmin
+        .from("company_settings")
+        .update({ value: smtp })
+        .eq("id", existingRecord.id);
+      if (updateError) throw updateError;
+    } else {
+      // Insert new
+      const { error: insertError } = await supabaseAdmin
+        .from("company_settings")
+        .insert({ company_id: companyId, key: "smtp", value: smtp });
+      if (insertError) throw insertError;
+    }
 
     return new Response(JSON.stringify({ success: true }), { headers: { ...corsHeaders, "Content-Type": "application/json" }, status: 200 });
   } catch (error) {

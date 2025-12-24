@@ -2715,6 +2715,44 @@ export type Database = {
           },
         ]
       }
+      invite_tokens: {
+        Row: {
+          company_id: string
+          created_at: string | null
+          expires_at: string
+          id: string
+          token: string
+          used: boolean | null
+          user_id: string
+        }
+        Insert: {
+          company_id: string
+          created_at?: string | null
+          expires_at: string
+          id?: string
+          token: string
+          used?: boolean | null
+          user_id: string
+        }
+        Update: {
+          company_id?: string
+          created_at?: string | null
+          expires_at?: string
+          id?: string
+          token?: string
+          used?: boolean | null
+          user_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "invite_tokens_company_id_fkey"
+            columns: ["company_id"]
+            isOneToOne: false
+            referencedRelation: "companies"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       invoice_payment_applications: {
         Row: {
           amount_applied: number
@@ -5653,6 +5691,7 @@ export type Database = {
           amount_ars: number | null
           amount_usd: number
           billing_plan_id: string | null
+          company_id: string | null
           company_name: string | null
           created_at: string
           email: string
@@ -5667,12 +5706,15 @@ export type Database = {
           provider: string
           status: string
           stripe_checkout_session_id: string | null
+          stripe_payment_method_id: string | null
           trial_days: number | null
+          trial_ends_at: string | null
         }
         Insert: {
           amount_ars?: number | null
           amount_usd: number
           billing_plan_id?: string | null
+          company_id?: string | null
           company_name?: string | null
           created_at?: string
           email: string
@@ -5687,12 +5729,15 @@ export type Database = {
           provider: string
           status: string
           stripe_checkout_session_id?: string | null
+          stripe_payment_method_id?: string | null
           trial_days?: number | null
+          trial_ends_at?: string | null
         }
         Update: {
           amount_ars?: number | null
           amount_usd?: number
           billing_plan_id?: string | null
+          company_id?: string | null
           company_name?: string | null
           created_at?: string
           email?: string
@@ -5707,9 +5752,18 @@ export type Database = {
           provider?: string
           status?: string
           stripe_checkout_session_id?: string | null
+          stripe_payment_method_id?: string | null
           trial_days?: number | null
+          trial_ends_at?: string | null
         }
         Relationships: [
+          {
+            foreignKeyName: "signup_intents_company_id_fkey"
+            columns: ["company_id"]
+            isOneToOne: false
+            referencedRelation: "companies"
+            referencedColumns: ["id"]
+          },
           {
             foreignKeyName: "signup_intents_plan_id_fkey"
             columns: ["plan_id"]
@@ -5845,11 +5899,14 @@ export type Database = {
           fx_rate_usd_ars: number | null
           id: string
           modules: Json
+          mp_preapproval_id: string | null
           plan_id: string
           provider: string
           provider_customer_id: string | null
           provider_subscription_id: string | null
           status: string
+          stripe_checkout_session_id: string | null
+          stripe_payment_method_id: string | null
           trial_ends_at: string | null
           updated_at: string
         }
@@ -5863,11 +5920,14 @@ export type Database = {
           fx_rate_usd_ars?: number | null
           id?: string
           modules?: Json
+          mp_preapproval_id?: string | null
           plan_id: string
           provider: string
           provider_customer_id?: string | null
           provider_subscription_id?: string | null
           status: string
+          stripe_checkout_session_id?: string | null
+          stripe_payment_method_id?: string | null
           trial_ends_at?: string | null
           updated_at?: string
         }
@@ -5881,11 +5941,14 @@ export type Database = {
           fx_rate_usd_ars?: number | null
           id?: string
           modules?: Json
+          mp_preapproval_id?: string | null
           plan_id?: string
           provider?: string
           provider_customer_id?: string | null
           provider_subscription_id?: string | null
           status?: string
+          stripe_checkout_session_id?: string | null
+          stripe_payment_method_id?: string | null
           trial_ends_at?: string | null
           updated_at?: string
         }

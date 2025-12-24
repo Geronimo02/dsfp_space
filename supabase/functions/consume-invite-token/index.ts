@@ -32,10 +32,10 @@ serve(async (req: Request) => {
     if (tokenRow.used) throw new Error("Token ya utilizado");
     if (new Date(tokenRow.expires_at) < new Date()) throw new Error("Token expirado");
 
-    // Update user password via Admin API
-    const { data, error: updateError } = await supabaseAdmin.auth.admin.updateUser(tokenRow.user_id, {
+    // Update user password via Admin API - use updateUserById
+    const { error: updateError } = await supabaseAdmin.auth.admin.updateUserById(tokenRow.user_id, {
       password,
-    } as any);
+    });
 
     if (updateError) throw updateError;
 
