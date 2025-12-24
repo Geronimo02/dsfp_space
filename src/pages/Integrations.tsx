@@ -637,29 +637,13 @@ const Integrations = () => {
           <h1 className="text-2xl md:text-3xl font-bold">Integraciones</h1>
         </div>
 
-        {/* Coming Soon Banner */}
-        <Card className="border-primary/20 bg-primary/5">
-          <CardContent className="flex items-center gap-4 py-4">
-            <div className="p-3 bg-primary/10 rounded-full">
-              <Clock className="h-6 w-6 text-primary" />
-            </div>
-            <div>
-              <h3 className="font-semibold text-lg">Integraciones Próximamente</h3>
-              <p className="text-muted-foreground text-sm">
-                Estamos trabajando para conectar tu sistema con las plataformas más populares. 
-                Pronto podrás sincronizar pedidos, productos e inventario automáticamente.
-              </p>
-            </div>
-          </CardContent>
-        </Card>
-
         <div className="grid gap-4 md:gap-6 sm:grid-cols-2 lg:grid-cols-3">
         {integrationTypes.map((integration) => {
           const status = getIntegrationStatus(integration.type);
           const Icon = integration.icon;
 
           return (
-            <Card key={integration.type} className={integration.comingSoon ? "opacity-75" : ""}>
+            <Card key={integration.type}>
               <CardHeader>
                 <div className="flex items-start justify-between">
                   <div className="flex items-center gap-3">
@@ -667,23 +651,15 @@ const Integrations = () => {
                       <Icon className="h-6 w-6 text-primary" />
                     </div>
                     <div>
-                      <CardTitle className="text-lg flex items-center gap-2">
-                        {integration.name}
-                        {integration.comingSoon && (
-                          <Badge variant="secondary" className="text-xs flex items-center gap-1">
-                            <Clock className="h-3 w-3" />
-                            Próximamente
-                          </Badge>
-                        )}
-                      </CardTitle>
-                      {status && !integration.comingSoon && (
+                      <CardTitle className="text-lg">{integration.name}</CardTitle>
+                      {status && (
                         <Badge variant={status.active ? "default" : "secondary"} className="mt-1">
                           {status.active ? "Activo" : "Inactivo"}
                         </Badge>
                       )}
                     </div>
                   </div>
-                  {status && !integration.comingSoon && (
+                  {status && (
                     <Switch
                       checked={status.active}
                       onCheckedChange={(checked) =>
@@ -697,23 +673,14 @@ const Integrations = () => {
                 <CardDescription className="mb-4">
                   {integration.description}
                 </CardDescription>
-                {integration.comingSoon ? (
-                  <Button variant="outline" className="w-full" disabled>
-                    <Clock className="mr-2 h-4 w-4" />
-                    Disponible Pronto
-                  </Button>
-                ) : !status ? (
-                  <Button variant="outline" className="w-full">
-                    Configurar
-                  </Button>
-                ) : (
-                  <div className="space-y-2">
-                    <Button variant="outline" size="sm" className="w-full">
-                      <Settings className="mr-2 h-4 w-4" />
-                      Configuración
-                    </Button>
-                  </div>
-                )}
+                <Button 
+                  variant="outline" 
+                  className="w-full"
+                  onClick={() => onConfigure(integration.type)}
+                >
+                  <Settings className="mr-2 h-4 w-4" />
+                  Configurar
+                </Button>
               </CardContent>
             </Card>
           );
