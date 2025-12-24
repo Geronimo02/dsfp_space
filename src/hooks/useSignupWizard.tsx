@@ -9,6 +9,7 @@ export interface SignupFormData {
   modules: string[];
   provider: "stripe" | "mercadopago" | "auto";
   stripe_payment_method_id?: string;
+  country?: string; // ISO code like 'AR'
 }
 
 export interface SignupIntent {
@@ -28,7 +29,8 @@ export function useSignupWizard() {
     password: "",
     plan_id: "",
     modules: [],
-    provider: "mercadopago",
+    provider: "auto",
+    country: "",
   });
   const [intentId, setIntentId] = useState<string | null>(null);
 

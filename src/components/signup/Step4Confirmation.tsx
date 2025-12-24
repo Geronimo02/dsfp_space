@@ -135,6 +135,7 @@ export function Step4Confirmation({
   const baseCost = Number(plan?.price || 0);
   const totalCost = baseCost + totalModulesCost;
   const isFreeTrial = formData.plan_id === "460d1274-59bc-4c99-a815-c3c1d52d0803"; // FREE_PLAN_ID
+  const isArgentina = (formData.country || "").toUpperCase() === "AR";
 
   const handleCardConfirm = async (pmId: string) => {
     try {
@@ -280,7 +281,7 @@ export function Step4Confirmation({
                   </p>
                 )}
 
-                {!publishableKey && (
+                {!publishableKey && !isArgentina && (
                   <Alert className="mb-4">
                     <AlertTitle>Falta configurar Stripe</AlertTitle>
                     <AlertDescription>
@@ -289,7 +290,13 @@ export function Step4Confirmation({
                   </Alert>
                 )}
 
-                {stripePromise ? (
+                {isArgentina ? (
+                  <div className="border rounded-lg p-3">
+                    <p className="text-sm">
+                      Serás redirigido a Mercado Pago para autorizar el método de pago. No se cobrará ahora.
+                    </p>
+                  </div>
+                ) : stripePromise ? (
                   <Elements stripe={stripePromise}>
                     <CardInput onConfirm={handleCardConfirm} isLoading={isCreating} />
                   </Elements>

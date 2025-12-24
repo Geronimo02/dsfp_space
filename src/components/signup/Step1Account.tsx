@@ -1,5 +1,6 @@
 import { Label } from "@/components/ui/label";
 import { Input } from "@/components/ui/input";
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Button } from "@/components/ui/button";
 import { SignupFormData } from "@/hooks/useSignupWizard";
 import { useState } from "react";
@@ -10,6 +11,7 @@ const accountSchema = z.object({
   full_name: z.string().min(1, "Nombre requerido"),
   company_name: z.string().min(1, "Nombre de empresa requerido"),
   password: z.string().min(8, "La contraseña debe tener al menos 8 caracteres"),
+  country: z.string().min(2, "El país es requerido"),
 });
 
 interface Step1AccountProps {
@@ -91,6 +93,25 @@ export function Step1Account({ formData, updateFormData, nextStep }: Step1Accoun
             placeholder="Mínimo 8 caracteres"
           />
           {errors.password && <p className="text-sm text-destructive mt-1">{errors.password}</p>}
+        </div>
+
+        <div>
+          <Label htmlFor="country">País *</Label>
+          <Select value={formData.country || ""} onValueChange={(v) => updateFormData({ country: v })}>
+            <SelectTrigger id="country" className="w-full">
+              <SelectValue placeholder="Selecciona tu país" />
+            </SelectTrigger>
+            <SelectContent>
+              <SelectItem value="AR">Argentina</SelectItem>
+              <SelectItem value="CL">Chile</SelectItem>
+              <SelectItem value="UY">Uruguay</SelectItem>
+              <SelectItem value="PE">Perú</SelectItem>
+              <SelectItem value="MX">México</SelectItem>
+              <SelectItem value="US">Estados Unidos</SelectItem>
+              <SelectItem value="OTHER">Otro país</SelectItem>
+            </SelectContent>
+          </Select>
+          {errors.country && <p className="text-sm text-destructive mt-1">{errors.country}</p>}
         </div>
       </div>
 
