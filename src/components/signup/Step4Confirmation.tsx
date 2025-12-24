@@ -10,15 +10,24 @@ import { toast } from "sonner";
 import { Separator } from "@/components/ui/separator";
 import { Skeleton } from "@/components/ui/skeleton";
 import { Label } from "@/components/ui/label";
+import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
 import { loadStripe } from "@stripe/stripe-js";
-import { Elements, CardElement, useStripe, useElements } from "@stripe/react-stripe-js";
+import {
+  Elements,
+  useStripe,
+  useElements,
+  CardNumberElement,
+  CardExpiryElement,
+  CardCvcElement,
+} from "@stripe/react-stripe-js";
 
 const MODULE_PRICE = 10;
 
 // Format currency to 2 decimal places
 const formatCurrency = (value: number) => value.toFixed(2);
 
-const stripePromise = loadStripe(import.meta.env.VITE_STRIPE_PUBLIC_KEY || "");
+const publishableKey = (import.meta.env.VITE_STRIPE_PUBLIC_KEY as string | undefined) || undefined;
+const stripePromise = publishableKey ? loadStripe(publishableKey) : null;
 
 function CardInput({ onConfirm, isLoading }: { onConfirm: (pmId: string) => void; isLoading: boolean }) {
   const stripe = useStripe();
@@ -26,13 +35,13 @@ function CardInput({ onConfirm, isLoading }: { onConfirm: (pmId: string) => void
 
   const handleSubmit = async () => {
     if (!stripe || !elements) return;
-    const cardElement = elements.getElement(CardElement);
-    if (!cardElement) return;
+    const numberEl = elements.getElement(CardNumberElement);
+    if (!numberEl) return;
 
     try {
       const { paymentMethod, error } = await stripe.createPaymentMethod({
         type: "card",
-        card: cardElement,
+        card: numberEl,
       });
       if (error) throw error;
       if (!paymentMethod) throw new Error("No se pudo crear el método de pago");
@@ -44,8 +53,30 @@ function CardInput({ onConfirm, isLoading }: { onConfirm: (pmId: string) => void
 
   return (
     <div className="space-y-4">
-      <div className="border rounded-lg p-4">
-        <CardElement options={{ hidePostalCode: true }} />
+      <div className="space-y-3">
+        <div>
+          <Label className="mb-2 block">Número de tarjeta</Label>
+          <div className="border rounded-lg p-3">
+            <CardNumberElement options={{
+              placeholder: "1234 1234 1234 1234",
+              showIcon: true,
+            }} />
+          </div>
+        </div>
+        <div className="grid grid-cols-2 gap-3">
+          <div>
+            <Label className="mb-2 block">Vencimiento</Label>
+            <div className="border rounded-lg p-3">
+              <CardExpiryElement />
+            </div>
+          </div>
+          <div>
+            <Label className="mb-2 block">CVC</Label>
+            <div className="border rounded-lg p-3">
+              <CardCvcElement />
+            </div>
+          </div>
+        </div>
       </div>
       <Button onClick={handleSubmit} disabled={!stripe || !elements || isLoading} className="w-full">
         {isLoading ? (
@@ -248,9 +279,21 @@ export function Step4Confirmation({
                     Procesado de forma segura con Stripe
                   </p>
                 )}
-                <Elements stripe={stripePromise}>
-                  <CardInput onConfirm={handleCardConfirm} isLoading={isCreating} />
-                </Elements>
+
+                {!publishableKey && (
+                  <Alert className="mb-4">
+                    <AlertTitle>Falta configurar Stripe</AlertTitle>
+                    <AlertDescription>
+                      Define la variable de entorno <strong>VITE_STRIPE_PUBLIC_KEY</strong> con tu clave publicable de Stripe.
+                    </AlertDescription>
+                  </Alert>
+                )}
+
+                {stripePromise ? (
+                  <Elements stripe={stripePromise}>
+                    <CardInput onConfirm={handleCardConfirm} isLoading={isCreating} />
+                  </Elements>
+                ) : null}
               </div>
             </CardContent>
           </Card>
