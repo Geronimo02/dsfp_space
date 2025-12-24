@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { useQuery } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
 import { Button } from "@/components/ui/button";
@@ -8,14 +8,58 @@ import { Loader2, Building2, Mail, User, CreditCard, Package } from "lucide-reac
 import { Badge } from "@/components/ui/badge";
 import { toast } from "sonner";
 import { Separator } from "@/components/ui/separator";
-import { Label } from "@/components/ui/label";
-import { RadioGroup, RadioGroupItem } from "@/components/ui/radio-group";
 import { Skeleton } from "@/components/ui/skeleton";
+import { Label } from "@/components/ui/label";
+import { loadStripe } from "@stripe/stripe-js";
+import { Elements, CardElement, useStripe, useElements } from "@stripe/react-stripe-js";
 
 const MODULE_PRICE = 10;
 
 // Format currency to 2 decimal places
 const formatCurrency = (value: number) => value.toFixed(2);
+
+const stripePromise = loadStripe(import.meta.env.VITE_STRIPE_PUBLIC_KEY || "");
+
+function CardInput({ onConfirm, isLoading }: { onConfirm: (pmId: string) => void; isLoading: boolean }) {
+  const stripe = useStripe();
+  const elements = useElements();
+
+  const handleSubmit = async () => {
+    if (!stripe || !elements) return;
+    const cardElement = elements.getElement(CardElement);
+    if (!cardElement) return;
+
+    try {
+      const { paymentMethod, error } = await stripe.createPaymentMethod({
+        type: "card",
+        card: cardElement,
+      });
+      if (error) throw error;
+      if (!paymentMethod) throw new Error("No se pudo crear el método de pago");
+      onConfirm(paymentMethod.id);
+    } catch (e: any) {
+      toast.error("Error al validar tarjeta: " + (e?.message ?? e));
+    }
+  };
+
+  return (
+    <div className="space-y-4">
+      <div className="border rounded-lg p-4">
+        <CardElement options={{ hidePostalCode: true }} />
+      </div>
+      <Button onClick={handleSubmit} disabled={!stripe || !elements || isLoading} className="w-full">
+        {isLoading ? (
+          <>
+            <Loader2 className="w-4 h-4 mr-2 animate-spin" />
+            Procesando...
+          </>
+        ) : (
+          "Confirmar y proceder al pago"
+        )}
+      </Button>
+    </div>
+  );
+}
 
 interface Step4ConfirmationProps {
   formData: SignupFormData;
@@ -33,6 +77,7 @@ export function Step4Confirmation({
   onCreateIntent,
 }: Step4ConfirmationProps) {
   const [isCreating, setIsCreating] = useState(false);
+  const [paymentMethodId, setPaymentMethodId] = useState<string | null>(null);
 
   const { data: plan, isLoading: isPlanLoading } = useQuery({
     queryKey: ["plan", formData.plan_id],
@@ -58,12 +103,14 @@ export function Step4Confirmation({
   const totalModulesCost = formData.modules.length * MODULE_PRICE;
   const baseCost = Number(plan?.price || 0);
   const totalCost = baseCost + totalModulesCost;
+  const isFreeTrial = formData.plan_id === "460d1274-59bc-4c99-a815-c3c1d52d0803"; // FREE_PLAN_ID
 
-  const handleConfirm = async () => {
+  const handleCardConfirm = async (pmId: string) => {
     try {
       setIsCreating(true);
-      // Force automatic provider selection (backend decides)
-      updateFormData({ provider: "auto" as any });
+      setPaymentMethodId(pmId);
+      // Store payment method ID for backend processing
+      updateFormData({ provider: "auto" as any, stripe_payment_method_id: pmId } as any);
       await onCreateIntent();
       nextStep();
     } catch (error) {
@@ -161,7 +208,7 @@ export function Step4Confirmation({
           )}
         </div>
 
-        {/* Right column - Summary & Provider */}
+        {/* Right column - Card Input or Summary */}
         <div className="space-y-4">
           <Card>
             <CardHeader>
@@ -191,23 +238,20 @@ export function Step4Confirmation({
               <Separator />
 
               <div>
-                <Label className="text-base mb-3 block">Método de pago</Label>
-                <div className="border rounded-lg p-3">
-                  <p className="text-sm">El sistema elegirá automáticamente el procesador según tu país:</p>
-                  <ul className="text-xs text-muted-foreground mt-2 list-disc pl-5">
-                    <li>Argentina → Mercado Pago (ARS)</li>
-                    <li>Otros países → Stripe (USD)</li>
-                  </ul>
-                </div>
+                <Label className="text-base mb-3 block">Datos de tarjeta</Label>
+                {isFreeTrial ? (
+                  <p className="text-xs text-muted-foreground mb-3">
+                    Necesaria para activar tu período de prueba gratuito de 7 días. Después se cobrará el plan básico.
+                  </p>
+                ) : (
+                  <p className="text-xs text-muted-foreground mb-3">
+                    Procesado de forma segura con Stripe
+                  </p>
+                )}
+                <Elements stripe={stripePromise}>
+                  <CardInput onConfirm={handleCardConfirm} isLoading={isCreating} />
+                </Elements>
               </div>
-            </CardContent>
-          </Card>
-
-          <Card className="border-primary/50 bg-primary/5">
-            <CardContent className="pt-6">
-              <p className="text-sm text-center">
-                Al confirmar, serás redirigido al procesador de pagos para completar la suscripción.
-              </p>
             </CardContent>
           </Card>
         </div>
@@ -216,16 +260,6 @@ export function Step4Confirmation({
       <div className="flex justify-between">
         <Button onClick={prevStep} variant="outline" size="lg" disabled={isCreating}>
           Atrás
-        </Button>
-        <Button onClick={handleConfirm} size="lg" disabled={isCreating}>
-          {isCreating ? (
-            <>
-              <Loader2 className="w-4 h-4 mr-2 animate-spin" />
-              Procesando...
-            </>
-          ) : (
-            "Confirmar y proceder al pago"
-          )}
         </Button>
       </div>
     </div>

@@ -29,14 +29,14 @@ Deno.serve(async (req: Request) => {
 
     const body = await req.json();
 
-    const { email, full_name, company_name, plan_id, modules, provider } = body;
+    const { email, full_name, company_name, plan_id, modules, provider, stripe_payment_method_id } = body;
 
     if (!email || !plan_id || !provider) {
       return json({ error: "email, plan_id y provider son requeridos" }, 400);
     }
 
     const providerNorm = String(provider).toLowerCase();
-    if (!["stripe", "mercadopago"].includes(providerNorm)) {
+    if (!["stripe", "mercadopago", "auto"].includes(providerNorm)) {
       return json({ error: "provider inválido" }, 400);
     }
 
@@ -107,11 +107,12 @@ Deno.serve(async (req: Request) => {
 
         modules: modulesArr,
         provider: providerNorm,
-        status: "draft",
+        status: stripe_payment_method_id ? "paid_ready" : "draft",
         amount_usd,
         amount_ars,
         fx_rate_usd_ars,
         fx_rate_at,
+        stripe_payment_method_id: stripe_payment_method_id ?? null,
       })
       .select("id")
       .single();

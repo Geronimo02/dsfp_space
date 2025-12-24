@@ -31,6 +31,7 @@ export default function SignupWizard() {
           plan_id: formData.plan_id,
           modules: formData.modules,
           provider: "auto",
+          stripe_payment_method_id: formData.stripe_payment_method_id,
         },
       });
 
@@ -47,7 +48,7 @@ export default function SignupWizard() {
 
       saveIntent(data.intent_id);
 
-      // Call start-checkout
+      // Call start-checkout (it will handle inline payment method or create redirect)
       const successUrl = `${window.location.origin}/signup/success?intent_id=${data.intent_id}`;
       const cancelUrl = `${window.location.origin}/signup/cancel?intent_id=${data.intent_id}`;
 
@@ -68,6 +69,14 @@ export default function SignupWizard() {
       }
 
       console.log("[SignupWizard] Checkout created:", checkoutData);
+
+      // If payment was captured inline, navigate to success directly
+      if (checkoutData?.is_paid_ready || formData.stripe_payment_method_id) {
+        console.log("[SignupWizard] Payment method ready, navigating to success");
+        window.location.href = `/signup/success?intent_id=${data.intent_id}`;
+        return;
+      }
+
       console.log("[SignupWizard] is_free_trial:", checkoutData?.is_free_trial);
       console.log("[SignupWizard] checkout_url:", checkoutData?.checkout_url);
       console.log("[SignupWizard] intent_id:", checkoutData?.intent_id);

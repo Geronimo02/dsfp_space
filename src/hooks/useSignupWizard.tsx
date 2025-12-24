@@ -7,7 +7,8 @@ export interface SignupFormData {
   password: string;
   plan_id: string;
   modules: string[];
-  provider: "stripe" | "mercadopago";
+  provider: "stripe" | "mercadopago" | "auto";
+  stripe_payment_method_id?: string;
 }
 
 export interface SignupIntent {

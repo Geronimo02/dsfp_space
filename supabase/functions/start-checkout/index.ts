@@ -61,8 +61,46 @@ Deno.serve(async (req: Request) => {
         .eq("id", intent_id);
     }
 
-    if (!["draft", "checkout_created"].includes(intent.status)) {
+    if (!["draft", "checkout_created", "paid_ready"].includes(intent.status)) {
       return json({ error: "El intent no está en un estado válido" }, 409);
+    }
+
+    // If payment method already captured inline, skip checkout
+    if (intent.stripe_payment_method_id) {
+      // Create Stripe customer and attach payment method
+      const stripeKey = Deno.env.get("STRIPE_SECRET_KEY");
+      if (!stripeKey) return json({ error: "STRIPE_SECRET_KEY no configurado" }, 500);
+      const stripe = new Stripe(stripeKey, { apiVersion: "2023-10-16" });
+
+      // Create or get customer
+      const customer = await stripe.customers.create({
+        email: intent.email,
+        name: intent.full_name ?? undefined,
+        metadata: { intent_id: intent.id },
+      });
+
+      // Attach payment method to customer
+      await stripe.paymentMethods.attach(intent.stripe_payment_method_id, {
+        customer: customer.id,
+      });
+
+      // Set as default payment method
+      await stripe.customers.update(customer.id, {
+        invoice_settings: { default_payment_method: intent.stripe_payment_method_id },
+      });
+
+      // Update intent to paid_ready
+      await supabaseAdmin
+        .from("signup_intents")
+        .update({
+          status: "paid_ready",
+          provider: "stripe",
+          billing_plan_id: intent.plan_id === FREE_PLAN_ID ? BASIC_PLAN_ID : (intent.billing_plan_id ?? intent.plan_id),
+          trial_days: intent.plan_id === FREE_PLAN_ID ? FREE_TRIAL_DAYS : 0,
+        })
+        .eq("id", intent_id);
+
+      return json({ is_paid_ready: true, provider: "stripe" }, 200);
     }
 
     // Determine trial & billing plan
