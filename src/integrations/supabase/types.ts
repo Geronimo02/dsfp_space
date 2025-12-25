@@ -1038,6 +1038,65 @@ export type Database = {
           },
         ]
       }
+      company_payment_methods: {
+        Row: {
+          brand: string | null
+          company_id: string
+          created_at: string | null
+          exp_month: number | null
+          exp_year: number | null
+          holder_name: string | null
+          id: string
+          is_default: boolean | null
+          last4: string | null
+          mp_payer_id: string | null
+          mp_preapproval_id: string | null
+          stripe_payment_method_id: string | null
+          type: string
+          updated_at: string | null
+        }
+        Insert: {
+          brand?: string | null
+          company_id: string
+          created_at?: string | null
+          exp_month?: number | null
+          exp_year?: number | null
+          holder_name?: string | null
+          id: string
+          is_default?: boolean | null
+          last4?: string | null
+          mp_payer_id?: string | null
+          mp_preapproval_id?: string | null
+          stripe_payment_method_id?: string | null
+          type: string
+          updated_at?: string | null
+        }
+        Update: {
+          brand?: string | null
+          company_id?: string
+          created_at?: string | null
+          exp_month?: number | null
+          exp_year?: number | null
+          holder_name?: string | null
+          id?: string
+          is_default?: boolean | null
+          last4?: string | null
+          mp_payer_id?: string | null
+          mp_preapproval_id?: string | null
+          stripe_payment_method_id?: string | null
+          type?: string
+          updated_at?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "company_payment_methods_company_id_fkey"
+            columns: ["company_id"]
+            isOneToOne: false
+            referencedRelation: "companies"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       company_subscriptions: {
         Row: {
           amount_due: number | null
