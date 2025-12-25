@@ -16,14 +16,14 @@ const AVAILABLE_MODULES = [
 
 const MODULE_PRICE = 10;
 
-interface Step3ModulesProps {
+interface Step4ModulesProps {
   formData: SignupFormData;
   updateFormData: (data: Partial<SignupFormData>) => void;
   nextStep: () => void;
   prevStep: () => void;
 }
 
-export function Step3Modules({ formData, updateFormData, nextStep, prevStep }: Step3ModulesProps) {
+export function Step4Modules({ formData, updateFormData, nextStep, prevStep }: Step4ModulesProps) {
   const toggleModule = (moduleId: string) => {
     const modules = formData.modules.includes(moduleId)
       ? formData.modules.filter((m) => m !== moduleId)

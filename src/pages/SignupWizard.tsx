@@ -2,8 +2,9 @@ import { useSignupWizard } from "@/hooks/useSignupWizard";
 import { SignupStepper } from "@/components/signup/SignupStepper";
 import { Step1Account } from "@/components/signup/Step1Account";
 import { Step2Plan } from "@/components/signup/Step2Plan";
-import { Step3Modules } from "@/components/signup/Step3Modules";
-import { Step4Confirmation } from "@/components/signup/Step4Confirmation";
+import { Step3Payment } from "@/components/signup/Step3Payment";
+import { Step4Modules } from "@/components/signup/Step4Modules";
+import { Step5Confirmation } from "@/components/signup/Step5Confirmation";
 import { Card } from "@/components/ui/card";
 import { supabase } from "@/integrations/supabase/client";
 import { toast } from "sonner";
@@ -136,7 +137,7 @@ export default function SignupWizard() {
             />
           )}
           {currentStep === 2 && (
-            <Step3Modules
+            <Step3Payment
               formData={formData}
               updateFormData={updateFormData}
               nextStep={nextStep}
@@ -144,7 +145,15 @@ export default function SignupWizard() {
             />
           )}
           {currentStep === 3 && (
-            <Step4Confirmation
+            <Step4Modules
+              formData={formData}
+              updateFormData={updateFormData}
+              nextStep={nextStep}
+              prevStep={prevStep}
+            />
+          )}
+          {currentStep === 4 && (
+            <Step5Confirmation
               formData={formData}
               updateFormData={updateFormData}
               nextStep={nextStep}

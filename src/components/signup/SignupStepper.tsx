@@ -9,9 +9,9 @@ interface Step {
 const steps: Step[] = [
   { title: "Datos de cuenta", description: "Información básica" },
   { title: "Elegir plan", description: "Selecciona tu plan" },
+  { title: "Método de pago", description: "Añade una tarjeta" },
   { title: "Módulos", description: "Personaliza funciones" },
-  { title: "Confirmación", description: "Revisa tu selección" },
-  { title: "Pago", description: "Activa tu cuenta" },
+  { title: "Confirmación", description: "Revisa y finaliza" },
 ];
 
 interface SignupStepperProps {

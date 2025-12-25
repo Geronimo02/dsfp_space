@@ -1,12 +1,12 @@
 // supabase/functions/save-stripe-payment-method/index.ts
+import { createClient } from "https://esm.sh/@supabase/supabase-js@2.49.1";
+import Stripe from "https://esm.sh/stripe@14.21.0?target=deno";
+
 const corsHeaders = {
   "Access-Control-Allow-Origin": "*",
   "Access-Control-Allow-Methods": "POST, OPTIONS",
   "Access-Control-Allow-Headers": "authorization, x-client-info, apikey, content-type",
 };
-
-import { createClient } from "https://esm.sh/@supabase/supabase-js@2.49.1";
-import Stripe from "https://esm.sh/stripe@14.21.0?target=deno";
 
 function json(payload: unknown, status = 200) {
   return new Response(JSON.stringify(payload), { status, headers: { ...corsHeaders, "Content-Type": "application/json" } });
@@ -14,33 +14,99 @@ function json(payload: unknown, status = 200) {
 
 Deno.serve(async (req: Request) => {
   if (req.method === "OPTIONS") return new Response(null, { status: 200, headers: corsHeaders });
+  
   try {
-    const { payment_method_id, company_id } = await req.json();
-    if (!payment_method_id && !company_id) return json({ error: "payment_method_id o company_id requerido" }, 400);
+    const authHeader = req.headers.get("Authorization");
+    if (!authHeader) return json({ error: "No autorizado" }, 401);
+
+    const { payment_method_id } = await req.json();
+    if (!payment_method_id) return json({ error: "payment_method_id requerido" }, 400);
 
     const url = Deno.env.get("SUPABASE_URL")!;
-    const key = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!;
+    const anonKey = Deno.env.get("SUPABASE_ANON_KEY")!;
     const stripeKey = Deno.env.get("STRIPE_SECRET_KEY")!;
-    const supabase = createClient(url, key);
+    
+    const supabase = createClient(url, anonKey, {
+      global: { headers: { Authorization: authHeader } }
+    });
     const stripe = new Stripe(stripeKey, { apiVersion: "2023-10-16" });
 
-    // Load subscription and customer
-    const { data: sub, error: subErr } = await supabase
-      .from("subscriptions")
-      .select("id, provider_customer_id")
-      .eq("company_id", company_id)
-      .maybeSingle();
-    if (subErr || !sub) return json({ error: subErr?.message ?? "Suscripción no encontrada" }, 404);
+    // Get current user
+    const { data: { user }, error: userError } = await supabase.auth.getUser();
+    if (userError || !user) return json({ error: "No autorizado" }, 401);
 
-    const customerId = sub.provider_customer_id;
-    if (!customerId) return json({ error: "Stripe customer no encontrado" }, 404);
+    // Get payment method details from Stripe
+    const pm = await stripe.paymentMethods.retrieve(payment_method_id);
 
-    // Attach payment method to customer and set default
-    await stripe.paymentMethods.attach(payment_method_id, { customer: customerId });
-    await stripe.customers.update(customerId, { invoice_settings: { default_payment_method: payment_method_id } });
+    // Get user's company
+    const { data: companyUser, error: companyError } = await supabase
+      .from("company_users")
+      .select("company_id")
+      .eq("user_id", user.id)
+      .eq("active", true)
+      .single();
 
-    return json({ ok: true });
+    if (companyError || !companyUser) {
+      return json({ error: "No se encontró empresa activa" }, 404);
+    }
+
+    // Check if this is the first payment method for the company
+    const { data: existingMethods } = await supabase
+      .from("company_payment_methods")
+      .select("id")
+      .eq("company_id", companyUser.company_id);
+
+    const isFirstMethod = !existingMethods || existingMethods.length === 0;
+
+    // Save payment method to database
+    const { data: savedMethod, error: saveError } = await supabase
+      .from("company_payment_methods")
+      .insert({
+        company_id: companyUser.company_id,
+        type: "card",
+        stripe_payment_method_id: payment_method_id,
+        brand: pm.card?.brand || null,
+        last4: pm.card?.last4 || null,
+        exp_month: pm.card?.exp_month || null,
+        exp_year: pm.card?.exp_year || null,
+        holder_name: pm.billing_details?.name || null,
+        is_default: isFirstMethod,
+      })
+      .select()
+      .single();
+
+    if (saveError) throw saveError;
+
+    // Update company subscription with the payment method if it's the default
+    if (isFirstMethod) {
+      const { data: subscription } = await supabase
+        .from("company_subscriptions")
+        .select("id, provider_customer_id")
+        .eq("company_id", companyUser.company_id)
+        .single();
+
+      if (subscription) {
+        // Attach to Stripe customer if exists
+        if (subscription.provider_customer_id) {
+          await stripe.paymentMethods.attach(payment_method_id, { 
+            customer: subscription.provider_customer_id 
+          });
+          await stripe.customers.update(subscription.provider_customer_id, { 
+            invoice_settings: { default_payment_method: payment_method_id } 
+          });
+        }
+
+        // Update subscription record
+        await supabase
+          .from("company_subscriptions")
+          .update({ stripe_payment_method_id: payment_method_id })
+          .eq("company_id", companyUser.company_id);
+      }
+    }
+
+    return json({ success: true, payment_method: savedMethod });
   } catch (e) {
+    console.error("Error saving payment method:", e);
     return json({ error: String(e) }, 500);
   }
 });

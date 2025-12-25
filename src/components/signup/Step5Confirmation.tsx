@@ -92,7 +92,7 @@ function CardInput({ onConfirm, isLoading }: { onConfirm: (pmId: string) => void
   );
 }
 
-interface Step4ConfirmationProps {
+interface Step5ConfirmationProps {
   formData: SignupFormData;
   updateFormData: (data: Partial<SignupFormData>) => void;
   nextStep: () => void;
@@ -100,13 +100,13 @@ interface Step4ConfirmationProps {
   onCreateIntent: () => Promise<void>;
 }
 
-export function Step4Confirmation({
+export function Step5Confirmation({
   formData,
   updateFormData,
   nextStep,
   prevStep,
   onCreateIntent,
-}: Step4ConfirmationProps) {
+}: Step5ConfirmationProps) {
   const [isCreating, setIsCreating] = useState(false);
   const [paymentMethodId, setPaymentMethodId] = useState<string | null>(null);
 

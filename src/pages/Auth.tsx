@@ -31,18 +31,18 @@ export default function Auth() {
     const checkSession = async () => {
       const { data: { session } } = await supabase.auth.getSession();
       if (session) {
-        navigate("/");
+        navigate("/dashboard");
       }
     };
 
     checkSession();
 
     const { data: { subscription } } = supabase.auth.onAuthStateChange(async (event, session) => {
-      // Only redirect to home if user is already logged in and comes back to auth page
+      // Only redirect to dashboard if user is already logged in and comes back to auth page
       // Don't redirect on fresh signup/login to avoid race condition with CompanyContext
       if (session && event === 'INITIAL_SESSION') {
-        // User already has a session, redirect to home
-        navigate("/");
+        // User already has a session, redirect to dashboard
+        navigate("/dashboard");
       }
     });
 
@@ -64,7 +64,7 @@ export default function Auth() {
       if (error) throw error;
       
       toast.success("Sesión iniciada correctamente");
-      navigate("/");
+      navigate("/dashboard");
     } catch (error: any) {
       if (error instanceof z.ZodError) {
         toast.error(error.errors[0].message);

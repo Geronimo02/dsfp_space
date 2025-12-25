@@ -89,11 +89,11 @@ function CompanyCheck({ children }: { children: React.ReactNode }) {
   useEffect(() => {
     if (!loading && !isLoadingAdmin && !isPlatformAdmin) {
       if (userCompanies.length === 0) {
-        // Small delay to ensure CompanyContext finishes loading before redirect
-        const timer = setTimeout(() => {
-          setShouldRedirect(true);
-        }, 300);
-        return () => clearTimeout(timer);
+        // Redirect to signup if no companies
+        setShouldRedirect(true);
+      } else {
+        // Has companies, reset redirect flag
+        setShouldRedirect(false);
       }
     }
   }, [loading, isLoadingAdmin, isPlatformAdmin, userCompanies]);
