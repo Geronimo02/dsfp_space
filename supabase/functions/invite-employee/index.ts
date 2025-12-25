@@ -150,8 +150,29 @@ serve(async (req: Request) => {
     }
 
     // User doesn't exist - use inviteUserByEmail which sends email via Supabase SMTP
-    const frontendUrl = Deno.env.get("FRONTEND_URL") || origin || "";
-    const redirectTo = `${frontendUrl}/auth`;
+    const configuredFrontendUrl = Deno.env.get("FRONTEND_URL");
+    const rawFrontendUrl = configuredFrontendUrl || origin || "";
+
+    const normalizeFrontendUrl = (value: string) => {
+      const v = (value || "").trim();
+      if (!v) return "";
+      const withoutTrailingSlash = v.replace(/\/+$/, "");
+      if (withoutTrailingSlash.startsWith("http://") || withoutTrailingSlash.startsWith("https://")) {
+        return withoutTrailingSlash;
+      }
+      // If someone configured only the domain (without scheme), force https.
+      return `https://${withoutTrailingSlash}`;
+    };
+
+    const frontendUrl = normalizeFrontendUrl(rawFrontendUrl);
+    if (!frontendUrl) {
+      throw new Error(
+        "FRONTEND_URL no está configurado y no se recibió el header Origin; no puedo construir redirectTo"
+      );
+    }
+
+    const redirectTo = new URL("/auth", frontendUrl).toString();
+
 
     console.log("Inviting new user via Supabase Auth", { email, redirectTo });
 
