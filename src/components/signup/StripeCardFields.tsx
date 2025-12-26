@@ -43,7 +43,7 @@ export function StripeCardFields({ onSuccess, onSkip, isLoading }: StripeCardFie
       const cardNumber = elements.getElement(CardNumberElement);
       if (!cardNumber) throw new Error("Card element not found");
 
-      // Create payment method
+      // Create payment method directly (no SetupIntent needed)
       const { paymentMethod, error } = await stripe.createPaymentMethod({
         type: "card",
         card: cardNumber,
@@ -57,14 +57,24 @@ export function StripeCardFields({ onSuccess, onSkip, isLoading }: StripeCardFie
         throw new Error("No se obtuvo payment method ID");
       }
 
+      // Successfully created payment method
       onSuccess(paymentMethod.id);
     } catch (e: any) {
       console.error(e);
-      setErrors({ general: e?.message ?? "Error al guardar la tarjeta" });
-      toast.error(e?.message ?? "Error al guardar la tarjeta");
+      const errorMsg = e?.message ?? "Error al guardar la tarjeta";
+      setErrors({ general: errorMsg });
+      toast.error(errorMsg);
       setSaving(false);
     }
   };
+
+  if (!stripe || !elements) {
+    return (
+      <div className="text-center py-8">
+        <p className="text-muted-foreground">Cargando formulario de pago...</p>
+      </div>
+    );
+  }
 
   return (
     <form onSubmit={handleSubmit} className="space-y-6">

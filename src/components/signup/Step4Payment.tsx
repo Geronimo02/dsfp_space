@@ -39,33 +39,10 @@ export function Step4Payment({ formData, updateFormData, nextStep, prevStep }: S
     const key = import.meta.env.VITE_STRIPE_PUBLIC_KEY;
     return key ? loadStripe(key) : null;
   });
-  const [clientSecret, setClientSecret] = useState<string | null>(null);
   const [loading, setLoading] = useState(false);
 
   const isArgentina = billingCountry === "AR";
   const provider = isArgentina ? "mercadopago" : "stripe";
-
-  const handleInitializeStripe = async () => {
-    setLoading(true);
-    try {
-      const { data, error } = await supabase.functions.invoke("create-signup-setup-intent", {
-        body: {
-          email: formData.email,
-          name: formData.full_name,
-        },
-      });
-
-      if (error) throw error;
-      if (!data?.client_secret) throw new Error("No se pudo crear el setup intent");
-
-      setClientSecret(data.client_secret);
-    } catch (e: any) {
-      console.error(e);
-      toast.error(e?.message ?? "Error al configurar el pago");
-    } finally {
-      setLoading(false);
-    }
-  };
 
   const handlePaymentSuccess = async (paymentMethodRef: string) => {
     try {
@@ -101,11 +78,6 @@ export function Step4Payment({ formData, updateFormData, nextStep, prevStep }: S
     nextStep();
   };
 
-  const handleCountryChange = (newCountry: string) => {
-    setBillingCountry(newCountry);
-    setClientSecret(null); // Reset Stripe state when country changes
-  };
-
   return (
     <div className="space-y-6">
       <div className="text-center space-y-2">
@@ -122,7 +94,7 @@ export function Step4Payment({ formData, updateFormData, nextStep, prevStep }: S
         <CardContent>
           <div className="space-y-2">
             <Label htmlFor="country">País</Label>
-            <Select value={billingCountry} onValueChange={handleCountryChange} disabled={loading}>
+            <Select value={billingCountry} onValueChange={setBillingCountry} disabled={loading}>
               <SelectTrigger id="country">
                 <SelectValue />
               </SelectTrigger>
@@ -155,24 +127,9 @@ export function Step4Payment({ formData, updateFormData, nextStep, prevStep }: S
               onSkip={handleSkip}
               isLoading={loading}
             />
-          ) : !clientSecret ? (
-            // Initialize Stripe form
-            <Button onClick={handleInitializeStripe} disabled={loading} className="w-full">
-              {loading ? (
-                <>
-                  <Loader2 className="mr-2 h-4 w-4 animate-spin" />
-                  Cargando formulario...
-                </>
-              ) : (
-                <>
-                  Cargar formulario
-                  <ArrowRight className="ml-2 h-4 w-4" />
-                </>
-              )}
-            </Button>
-          ) : stripePromise && clientSecret ? (
-            // Stripe form - same layout as Mercado Pago
-            <Elements stripe={stripePromise} options={{ clientSecret }}>
+          ) : stripePromise ? (
+            // Stripe form - same layout as Mercado Pago (no intermediate button)
+            <Elements stripe={stripePromise}>
               <StripeCardFields
                 onSuccess={handlePaymentSuccess}
                 onSkip={handleSkip}
