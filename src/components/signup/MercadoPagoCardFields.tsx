@@ -51,7 +51,7 @@ export function MercadoPagoCardFields({ onSuccess, onSkip, isLoading }: MercadoP
               const bricksBuilder = mp.bricks();
               bricksRef.current = bricksBuilder;
 
-              const bricksInstance = await bricksBuilder.create("cardPayment", {
+              const bricksInstance = await bricksBuilder.create("cardPayment", "cardPayment", {
               initialization: {
                 amount: 0, // We don't know the amount yet, it will be 0 for token-only
                 payer: {
