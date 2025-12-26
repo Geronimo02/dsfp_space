@@ -182,7 +182,7 @@ Deno.serve(async (req: Request) => {
             .insert({
               company_id: companyId,
               type: "mercadopago",
-              mp_preapproval_id: intent.mp_preapproval_id ?? null,
+              mp_preapproval_id: spm.payment_method_ref,
               is_default: isFirst,
             });
         }

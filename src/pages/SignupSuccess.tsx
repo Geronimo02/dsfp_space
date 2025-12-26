@@ -135,10 +135,31 @@ export default function SignupSuccess() {
 
       toast.success("¡Cuenta creada exitosamente!");
 
-      // Redirect to login
-      setTimeout(() => {
-        navigate("/auth");
-      }, 1500);
+      // Wait a bit longer to ensure company_users entry is committed
+      // Then reload to pick up new company in CompanyContext
+      await new Promise(resolve => setTimeout(resolve, 2000));
+
+      // Verify company was created before reloading
+      try {
+        const { data: { user } } = await supabase.auth.getUser();
+        if (user) {
+          const { data: companies } = await supabase
+            .from('company_users')
+            .select('id')
+            .eq('user_id', user.id)
+            .limit(1);
+          
+          if (companies && companies.length > 0) {
+            console.log("[SignupSuccess] Company verified, reloading...");
+          } else {
+            console.warn("[SignupSuccess] Company not found yet, but reloading anyway...");
+          }
+        }
+      } catch (e) {
+        console.warn("[SignupSuccess] Could not verify company:", e);
+      }
+
+      window.location.href = "/";
     } catch (error) {
       console.error("[SignupSuccess] Error finalizing:", error);
       toast.error(`Error al finalizar registro: ${error}`);

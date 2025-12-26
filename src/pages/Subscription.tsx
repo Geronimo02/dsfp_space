@@ -59,9 +59,23 @@ export default function Subscription() {
     queryFn: async () => {
       const { data, error } = await supabase
         .from("subscriptions")
-        .select("id, company_id, plan_id, provider, status, trial_ends_at, provider_customer_id, mp_preapproval_id, stripe_payment_method_id")
+        .select("id, company_id, plan_id, provider, status, trial_ends_at, current_period_end, provider_customer_id, mp_preapproval_id, stripe_payment_method_id")
         .eq("company_id", currentCompany!.id)
         .maybeSingle();
+      if (error) throw error;
+      return data;
+    },
+  });
+
+  const { data: plan } = useQuery({
+    queryKey: ["plan", subscription?.plan_id],
+    enabled: !!subscription?.plan_id,
+    queryFn: async () => {
+      const { data, error } = await supabase
+        .from("subscription_plans")
+        .select("id, name, price")
+        .eq("id", subscription!.plan_id)
+        .single();
       if (error) throw error;
       return data;
     },
@@ -73,6 +87,15 @@ export default function Subscription() {
     const now = Date.now();
     return Math.max(Math.ceil((end - now) / (1000 * 60 * 60 * 24)), 0);
   }, [subscription?.trial_ends_at]);
+
+  const nextBillingDate = useMemo(() => {
+    if (!subscription?.current_period_end) return null;
+    return new Date(subscription.current_period_end).toLocaleDateString("es-ES", {
+      year: "numeric",
+      month: "long",
+      day: "numeric",
+    });
+  }, [subscription?.current_period_end]);
 
   useEffect(() => {
     const key = import.meta.env.VITE_STRIPE_PUBLIC_KEY;
@@ -122,9 +145,12 @@ export default function Subscription() {
             <CardDescription>Plan y período de prueba</CardDescription>
           </CardHeader>
           <CardContent className="space-y-2">
-            <p>Plan ID: {subscription?.plan_id ?? "-"}</p>
-            <p>Provider: {subscription?.provider ?? "-"}</p>
+            <p>Plan: <strong>{plan?.name ?? subscription?.plan_id ?? "-"}</strong></p>
+            <p>Precio: ${plan?.price ?? "-"} USD/mes</p>
+            <p>Estado: <strong>{subscription?.status ?? "-"}</strong></p>
+            <p>Proveedor: {subscription?.provider ?? "-"}</p>
             <p>Trial resta: {trialDaysLeft ?? "-"} días</p>
+            {nextBillingDate && <p>Próxima facturación: <strong>{nextBillingDate}</strong></p>}
             <p>MP preapproval: {subscription?.mp_preapproval_id ? "Autorizado" : "No autorizado"}</p>
             <p>Stripe PM: {subscription?.stripe_payment_method_id ? `Guardado (${subscription.stripe_payment_method_id.substring(0, 16)}...)` : "No guardado"}</p>
           </CardContent>
