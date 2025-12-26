@@ -87,7 +87,8 @@ function CompanyCheck({ children }: { children: React.ReactNode }) {
   const [shouldRedirect, setShouldRedirect] = useState(false);
 
   useEffect(() => {
-    if (!loading && !isLoadingAdmin && !isPlatformAdmin) {
+  if (!loading && !isLoadingAdmin && !isPlatformAdmin) {
+    setTimeout(() => {
       if (userCompanies.length === 0) {
         // Redirect to signup if no companies
         setShouldRedirect(true);
@@ -95,8 +96,9 @@ function CompanyCheck({ children }: { children: React.ReactNode }) {
         // Has companies, reset redirect flag
         setShouldRedirect(false);
       }
-    }
-  }, [loading, isLoadingAdmin, isPlatformAdmin, userCompanies]);
+    }, 3000); // 3 segundos
+  }
+}, [loading, isLoadingAdmin, isPlatformAdmin, userCompanies]);
 
   if (loading || isLoadingAdmin) {
     return <div className="flex items-center justify-center min-h-screen">Cargando...</div>;
@@ -107,9 +109,9 @@ function CompanyCheck({ children }: { children: React.ReactNode }) {
     return <Navigate to="/admin/platform" replace />;
   }
 
-  /*if (shouldRedirect) {
+  if (shouldRedirect) {
     return <Navigate to="/signup" replace />;
-  }*/
+  }
 
   if (!currentCompany) {
     return <div className="flex items-center justify-center min-h-screen">Sin empresa seleccionada...</div>;
