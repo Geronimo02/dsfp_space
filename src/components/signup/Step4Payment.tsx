@@ -52,7 +52,7 @@ export function Step4Payment({ formData, updateFormData, nextStep, prevStep }: S
           email: formData.email,
           name: formData.full_name,
           billing_country: billingCountry,
-          payment_provider: provider,
+          provider: provider,
           payment_method_ref: paymentMethodRef,
         },
       });
