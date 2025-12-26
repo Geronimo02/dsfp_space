@@ -107,9 +107,9 @@ function CompanyCheck({ children }: { children: React.ReactNode }) {
     return <Navigate to="/admin/platform" replace />;
   }
 
-  if (shouldRedirect) {
+  /*if (shouldRedirect) {
     return <Navigate to="/signup" replace />;
-  }
+  }*/
 
   if (!currentCompany) {
     return <div className="flex items-center justify-center min-h-screen">Sin empresa seleccionada...</div>;
