@@ -6,7 +6,6 @@ import { Alert, AlertDescription } from "@/components/ui/alert";
 
 interface MercadoPagoCardFieldsProps {
   onSuccess: (token: string) => void;
-  onSkip: () => void;
   isLoading: boolean;
 }
 
@@ -16,17 +15,16 @@ declare global {
   }
 }
 
-export function MercadoPagoCardFields({ onSuccess, onSkip, isLoading }: MercadoPagoCardFieldsProps) {
+export function MercadoPagoCardFields({ onSuccess, isLoading }: MercadoPagoCardFieldsProps) {
   const [saving, setSaving] = useState(false);
   const [mpLoaded, setMpLoaded] = useState(false);
   const [mpError, setMpError] = useState<string | null>(null);
   const cardPaymentRef = useRef<any>(null);
-
-  const publicKey = import.meta.env.VITE_MERCADOPAGO_PUBLIC_KEY;
+  const publicKeyRef = useRef(import.meta.env.VITE_MERCADOPAGO_PUBLIC_KEY);
 
   useEffect(() => {
-    if (!publicKey) {
-      setMpError("Mercado Pago no est� configurado");
+    if (!publicKeyRef.current) {
+      setMpError("Mercado Pago no está configurado");
       return;
     }
 
@@ -38,7 +36,7 @@ export function MercadoPagoCardFields({ onSuccess, onSkip, isLoading }: MercadoP
         script.onload = async () => {
           try {
             if (window.MercadoPago) {
-              const mp = new window.MercadoPago(publicKey, { locale: "es-AR" });
+              const mp = new window.MercadoPago(publicKeyRef.current, { locale: "es-AR" });
               const bricksBuilder = mp.bricks();
 
               const bricksInstance = await bricksBuilder.create("cardPayment", "cardPayment", {
@@ -70,7 +68,7 @@ export function MercadoPagoCardFields({ onSuccess, onSkip, isLoading }: MercadoP
                           method: "POST",
                           headers: {
                             "Content-Type": "application/json",
-                            Authorization: Bearer ,
+                            Authorization: `Bearer ${publicKeyRef.current}`,
                           },
                           body: JSON.stringify({
                             cardNumber: formData.cardNumber?.replaceAll(" ", ""),
@@ -127,7 +125,7 @@ export function MercadoPagoCardFields({ onSuccess, onSkip, isLoading }: MercadoP
         }
       }
     };
-  }, [publicKey, onSuccess]);
+  }, [onSuccess]);
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -167,10 +165,7 @@ export function MercadoPagoCardFields({ onSuccess, onSkip, isLoading }: MercadoP
         )}
       </div>
 
-      <div className="flex gap-3 justify-between">
-        <Button type="button" variant="ghost" onClick={onSkip} disabled={saving || isLoading || !mpLoaded}>
-          Saltar por ahora
-        </Button>
+      <div className="flex gap-3 justify-end">
         <Button type="submit" disabled={saving || isLoading || !mpLoaded}>
           {saving ? (
             <>

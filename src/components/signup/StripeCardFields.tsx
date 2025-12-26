@@ -22,11 +22,10 @@ const elementOptions = {
 
 interface StripeCardFieldsProps {
   onSuccess: (paymentMethodId: string) => void;
-  onSkip: () => void;
   isLoading: boolean;
 }
 
-export function StripeCardFields({ onSuccess, onSkip, isLoading }: StripeCardFieldsProps) {
+export function StripeCardFields({ onSuccess, isLoading }: StripeCardFieldsProps) {
   const stripe = useStripe();
   const elements = useElements();
   const [saving, setSaving] = useState(false);
@@ -105,10 +104,7 @@ export function StripeCardFields({ onSuccess, onSkip, isLoading }: StripeCardFie
 
       {errors.general && <p className="text-sm text-red-500">{errors.general}</p>}
 
-      <div className="flex gap-3 justify-between">
-        <Button type="button" variant="ghost" onClick={onSkip} disabled={saving || isLoading}>
-          Saltar por ahora
-        </Button>
+      <div className="flex gap-3 justify-end">
         <Button type="submit" disabled={saving || isLoading || !stripe || !elements}>
           {saving ? (
             <>

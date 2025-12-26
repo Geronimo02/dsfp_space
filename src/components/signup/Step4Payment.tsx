@@ -75,10 +75,6 @@ export function Step4Payment({ formData, updateFormData, nextStep, prevStep }: S
     }
   };
 
-  const handleSkip = () => {
-    nextStep();
-  };
-
   return (
     <div className="space-y-6">
       <div className="text-center space-y-2">
@@ -125,7 +121,6 @@ export function Step4Payment({ formData, updateFormData, nextStep, prevStep }: S
             // Mercado Pago form - same layout as Stripe
             <MercadoPagoCardFields
               onSuccess={handlePaymentSuccess}
-              onSkip={handleSkip}
               isLoading={loading}
             />
           ) : !stripePromise ? (
@@ -143,7 +138,6 @@ export function Step4Payment({ formData, updateFormData, nextStep, prevStep }: S
             <Elements stripe={stripePromise}>
               <StripeCardFields
                 onSuccess={handlePaymentSuccess}
-                onSkip={handleSkip}
                 isLoading={loading}
               />
             </Elements>
