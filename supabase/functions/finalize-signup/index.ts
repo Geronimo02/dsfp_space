@@ -198,6 +198,40 @@ Deno.serve(async (req: Request) => {
       console.warn("[finalize-signup] No payment method linked:", e);
     }
 
+    // Fallback: if no signup_payment_methods found, try linking from intent directly
+    try {
+      const { data: existing } = await supabaseAdmin
+        .from("company_payment_methods")
+        .select("id")
+        .eq("company_id", companyId);
+
+      const hasAnyMethod = !!existing && existing.length > 0;
+
+      if (!hasAnyMethod) {
+        if (intent.provider === "stripe" && intent.stripe_payment_method_id) {
+          await supabaseAdmin
+            .from("company_payment_methods")
+            .insert({
+              company_id: companyId,
+              type: "card",
+              stripe_payment_method_id: intent.stripe_payment_method_id,
+              is_default: true,
+            });
+        } else if (intent.provider === "mercadopago") {
+          await supabaseAdmin
+            .from("company_payment_methods")
+            .insert({
+              company_id: companyId,
+              type: "mercadopago",
+              mp_preapproval_id: intent.mp_preapproval_id ?? null,
+              is_default: true,
+            });
+        }
+      }
+    } catch (e) {
+      console.warn("[finalize-signup] Fallback link failed:", e);
+    }
+
     // 7️⃣ Marcar intent como completado con trial info
     const { error: updErr } = await supabaseAdmin
       .from("signup_intents")
