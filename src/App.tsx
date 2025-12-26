@@ -87,13 +87,29 @@ function CompanyCheck({ children }: { children: React.ReactNode }) {
   const [shouldRedirect, setShouldRedirect] = useState(false);
   const [pendingCheck, setPendingCheck] = useState(true); // NEW: block UI/redirect until timeout
 
-useEffect(() => {
+  useEffect(() => {
     if (!loading && !isLoadingAdmin && !isPlatformAdmin) {
-      const t = setTimeout(() => {
-        setShouldRedirect(userCompanies.length === 0);
-        setPendingCheck(false); // unblock after 3s
-      }, 3000); // 3 segundos
-      return () => clearTimeout(t);
+      // Grace period: poll for companies up to 8s before deciding
+      setPendingCheck(true);
+      const start = Date.now();
+      const interval = setInterval(() => {
+        // If companies appear, stop waiting and do NOT redirect
+        if (userCompanies.length > 0) {
+          setShouldRedirect(false);
+          setPendingCheck(false);
+          clearInterval(interval);
+          return;
+        }
+
+        // If after 8s there are still no companies, redirect to signup
+        if (Date.now() - start >= 8000) {
+          setShouldRedirect(true);
+          setPendingCheck(false);
+          clearInterval(interval);
+        }
+      }, 500);
+
+      return () => clearInterval(interval);
     }
   }, [loading, isLoadingAdmin, isPlatformAdmin, userCompanies]);
 
@@ -109,6 +125,11 @@ useEffect(() => {
 
   if (shouldRedirect) {
     return <Navigate to="/signup" replace />;
+  }
+
+  // If companies exist but currentCompany hasn't been set yet, keep loading instead of showing the empty state
+  if (!currentCompany && userCompanies.length > 0) {
+    return <div className="flex items-center justify-center min-h-screen">Cargando empresa...</div>;
   }
 
   if (!currentCompany) {
