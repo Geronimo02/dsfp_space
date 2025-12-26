@@ -9,16 +9,14 @@ import { loadStripe } from "@stripe/stripe-js";
 import { Elements, PaymentElement, useElements, useStripe } from "@stripe/react-stripe-js";
 import { supabase } from "@/integrations/supabase/client";
 import { toast } from "sonner";
-import { cn } from "@/lib/utils";
 
-interface Step3PaymentProps {
+interface Step4PaymentProps {
   formData: SignupFormData;
   updateFormData: (data: Partial<SignupFormData>) => void;
   nextStep: () => void;
   prevStep: () => void;
 }
 
-// Country list (simplified, can expand)
 const COUNTRIES = [
   { code: "AR", name: "Argentina" },
   { code: "US", name: "Estados Unidos" },
@@ -33,7 +31,6 @@ const COUNTRIES = [
   { code: "OTHER", name: "Otro" },
 ];
 
-// Stripe form component (only shown for non-AR countries)
 function StripePaymentForm({
   clientSecret,
   onSuccess,
@@ -102,7 +99,6 @@ function StripePaymentForm({
   );
 }
 
-// MP Card Form placeholder (simplified - in production use MP Bricks or SDK)
 function MercadoPagoForm({
   onSuccess,
   onSkip,
@@ -129,10 +125,7 @@ function MercadoPagoForm({
         throw new Error("Por favor completa todos los campos");
       }
 
-      // In production: use MP SDK to tokenize
-      // For now, generate a mock token that will be validated by backend
       const mockToken = `mp_tok_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`;
-
       onSuccess(mockToken);
     } catch (e: any) {
       console.error(e);
@@ -151,7 +144,9 @@ function MercadoPagoForm({
           placeholder="1234 5678 9012 3456"
           maxLength={19}
           value={cardData.number}
-          onChange={(e) => setCardData({ ...cardData, number: e.target.value.replace(/\D/g, "").replace(/(\d{4})/g, "$1 ").trim() })}
+          onChange={(e) =>
+            setCardData({ ...cardData, number: e.target.value.replace(/\D/g, "").replace(/(\d{4})/g, "$1 ").trim() })
+          }
           className="w-full px-3 py-2 border rounded-md"
           disabled={saving || isLoading}
         />
@@ -190,10 +185,6 @@ function MercadoPagoForm({
         </div>
       </div>
 
-      <div className="text-xs text-muted-foreground">
-        Los datos de tu tarjeta están protegidos y encriptados de forma segura.
-      </div>
-
       <div className="flex gap-3 justify-between">
         <Button type="button" variant="ghost" onClick={onSkip} disabled={saving || isLoading}>
           Saltar por ahora
@@ -216,7 +207,7 @@ function MercadoPagoForm({
   );
 }
 
-export function Step3Payment({ formData, updateFormData, nextStep, prevStep }: Step3PaymentProps) {
+export function Step4Payment({ formData, updateFormData, nextStep, prevStep }: Step4PaymentProps) {
   const [billingCountry, setBillingCountry] = useState<string>(formData.billing_country || "AR");
   const [stripePromise] = useState(() => {
     const key = import.meta.env.VITE_STRIPE_PUBLIC_KEY;
@@ -233,7 +224,6 @@ export function Step3Payment({ formData, updateFormData, nextStep, prevStep }: S
     setLoading(true);
     try {
       if (isStripe) {
-        // Create Stripe setup intent
         const { data, error } = await supabase.functions.invoke("create-signup-setup-intent", {
           body: {
             email: formData.email,
@@ -246,7 +236,6 @@ export function Step3Payment({ formData, updateFormData, nextStep, prevStep }: S
 
         setClientSecret(data.client_secret);
       }
-      // MP doesn't need setup, form is shown directly
     } catch (e: any) {
       console.error(e);
       toast.error(e?.message ?? "Error al configurar el pago");
@@ -257,7 +246,6 @@ export function Step3Payment({ formData, updateFormData, nextStep, prevStep }: S
 
   const handlePaymentSuccess = async (paymentMethodRef: string) => {
     try {
-      // Call unified edge function to save payment method
       const { data, error } = await supabase.functions.invoke("signup-save-payment-method", {
         body: {
           email: formData.email,
@@ -270,7 +258,6 @@ export function Step3Payment({ formData, updateFormData, nextStep, prevStep }: S
 
       if (error) throw error;
 
-      // Save to form data
       updateFormData({
         payment_provider: provider,
         payment_method_ref: paymentMethodRef,
@@ -281,7 +268,7 @@ export function Step3Payment({ formData, updateFormData, nextStep, prevStep }: S
 
       setPaymentSaved(true);
       toast.success("Tarjeta guardada exitosamente");
-      setTimeout(() => nextStep(), 500);
+      setTimeout(() => nextStep(), 400);
     } catch (e: any) {
       console.error(e);
       toast.error(e?.message ?? "Error al guardar el método de pago");
@@ -295,10 +282,6 @@ export function Step3Payment({ formData, updateFormData, nextStep, prevStep }: S
   if (paymentSaved) {
     return (
       <div className="space-y-6">
-        <div className="text-center space-y-2">
-          <h2 className="text-2xl font-bold">Método de pago</h2>
-        </div>
-
         <Card className="border-green-200 bg-green-50">
           <CardContent className="py-8">
             <div className="flex flex-col items-center gap-4">
@@ -307,7 +290,7 @@ export function Step3Payment({ formData, updateFormData, nextStep, prevStep }: S
               </div>
               <div className="text-center">
                 <h3 className="font-semibold text-green-900">Tarjeta guardada exitosamente</h3>
-                <p className="text-sm text-green-700">Continuando al siguiente paso...</p>
+                <p className="text-sm text-green-700">Redirigiendo al siguiente paso...</p>
               </div>
             </div>
           </CardContent>
@@ -320,13 +303,10 @@ export function Step3Payment({ formData, updateFormData, nextStep, prevStep }: S
     <div className="space-y-6">
       <div className="text-center space-y-2">
         <h2 className="text-2xl font-bold">Método de pago</h2>
-        <p className="text-muted-foreground">
-          Agrega tu tarjeta para comenzar después del período de prueba
-        </p>
+        <p className="text-muted-foreground">Agrega tu tarjeta para comenzar después del período de prueba</p>
       </div>
 
       {!clientSecret && !isStripe ? (
-        // Country selection + MP form
         <>
           <Card>
             <CardHeader>
@@ -350,14 +330,6 @@ export function Step3Payment({ formData, updateFormData, nextStep, prevStep }: S
                     </SelectContent>
                   </Select>
                 </div>
-
-                <div className="p-3 bg-blue-50 border border-blue-200 rounded-md">
-                  <p className="text-sm text-blue-900">
-                    {billingCountry === "AR"
-                      ? "✓ Se procesará con Mercado Pago"
-                      : "✓ Se procesará con Stripe"}
-                  </p>
-                </div>
               </div>
             </CardContent>
           </Card>
@@ -380,7 +352,6 @@ export function Step3Payment({ formData, updateFormData, nextStep, prevStep }: S
           </div>
         </>
       ) : isStripe && !clientSecret ? (
-        // Country selection for Stripe
         <>
           <Card>
             <CardHeader>
@@ -403,10 +374,6 @@ export function Step3Payment({ formData, updateFormData, nextStep, prevStep }: S
                       ))}
                     </SelectContent>
                   </Select>
-                </div>
-
-                <div className="p-3 bg-blue-50 border border-blue-200 rounded-md">
-                  <p className="text-sm text-blue-900">✓ Se procesará con Stripe</p>
                 </div>
               </div>
             </CardContent>
@@ -446,7 +413,6 @@ export function Step3Payment({ formData, updateFormData, nextStep, prevStep }: S
           </div>
         </>
       ) : (
-        // Stripe form (shown after country selection)
         <>
           <Card>
             <CardHeader>
