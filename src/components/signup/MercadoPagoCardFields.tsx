@@ -40,11 +40,15 @@ export function MercadoPagoCardFields({ onSuccess, onSkip, isLoading }: MercadoP
         script.src = "https://sdk.mercadopago.com/js/v2";
         script.async = true;
         script.onload = async () => {
-          if (window.MercadoPago) {
-            window.MercadoPago.setPublishableKey(publicKey);
+          try {
+            if (window.MercadoPago) {
+              // Initialize MP with public key (new API - use constructor)
+              const mp = new window.MercadoPago(publicKey, {
+                locale: "es-AR",
+              });
 
-            // Initialize Bricks
-            const bricksBuilder = window.MercadoPago.Bricks();
+              // Initialize Bricks
+              const bricksBuilder = mp.Bricks();
             bricksRef.current = bricksBuilder;
 
             const bricksInstance = await bricksBuilder.create("cardPayment", {
@@ -103,6 +107,10 @@ export function MercadoPagoCardFields({ onSuccess, onSkip, isLoading }: MercadoP
             });
 
             cardPaymentRef.current = bricksInstance;
+          }
+          } catch (error: any) {
+            console.error("[MP] Script onload error:", error);
+            setMpError(error?.message || "Error al cargar Mercado Pago");
           }
         };
         script.onerror = () => {
