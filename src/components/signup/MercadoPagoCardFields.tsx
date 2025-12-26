@@ -52,12 +52,13 @@ export function MercadoPagoCardFields({ onSuccess, onSkip, isLoading }: MercadoP
               bricksRef.current = bricksBuilder;
 
               const bricksInstance = await bricksBuilder.create("cardPayment", "cardPayment", {
-              initialization: {
-                amount: 0, // We don't know the amount yet, it will be 0 for token-only
-                payer: {
-                  email: undefined, // Set dynamically if needed
+                initialization: {
+                  // MP Bricks requires a positive amount; use 1 for tokenization-only
+                  amount: 1,
+                  payer: {
+                    email: undefined,
+                  },
                 },
-              },
               callbacks: {
                 onReady: () => {
                   console.log("[MP] Card Payment Brick ready");
