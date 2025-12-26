@@ -41,6 +41,11 @@ Deno.serve(async (req: Request) => {
       return json({ error: "Signup intent no encontrado" }, 404);
     }
 
+    // Idempotency: if already completed, return success
+    if (intent.status === "completed") {
+      return json({ ok: true, redirect_to: "/auth" }, 200);
+    }
+
     if (intent.status !== "paid_ready") {
       return json({ error: "El pago/autorización aún no fue confirmado" }, 409);
     }
@@ -55,18 +60,40 @@ Deno.serve(async (req: Request) => {
         : (intent.trial_ends_at ?? null);
 
     // 2️⃣ Crear usuario Auth (admin)
-    const { data: createdUser, error: userErr } = await supabaseAdmin.auth.admin.createUser({
-      email: intent.email,
-      password,
-      email_confirm: true,
-      user_metadata: { full_name: intent.full_name ?? null },
-    });
+    // Try to create user; if already exists, continue (idempotent)
+    let userId: string | null = null;
+    try {
+      const { data: createdUser, error: userErr } = await supabaseAdmin.auth.admin.createUser({
+        email: intent.email,
+        password,
+        email_confirm: true,
+        user_metadata: { full_name: intent.full_name ?? null },
+      });
 
-    if (userErr || !createdUser?.user) {
-      return json({ error: String(userErr?.message ?? "No se pudo crear el usuario") }, 500);
+      if (userErr) {
+        // If user already exists, proceed without failing
+        const msg = String(userErr.message ?? userErr);
+        if (msg.toLowerCase().includes("already") || msg.toLowerCase().includes("registrado")) {
+          // Try to find existing user via auth list (best-effort)
+          const { data: usersList } = await supabaseAdmin.auth.admin.listUsers();
+          const existing = usersList?.users?.find((u: any) => (u.email || "").toLowerCase() === String(intent.email).toLowerCase());
+          userId = existing?.id ?? null;
+        } else {
+          return json({ error: msg }, 500);
+        }
+      } else {
+        userId = createdUser?.user?.id ?? null;
+      }
+    } catch (e) {
+      // Fallback: continue if intent has company already
+      if (!userId) {
+        return json({ error: String(e) }, 500);
+      }
     }
 
-    const userId = createdUser.user.id;
+    if (!userId) {
+      return json({ error: "No se pudo obtener el usuario creado" }, 500);
+    }
 
     // 3️⃣ Crear empresa
     const { data: company, error: companyErr } = await supabaseAdmin
@@ -120,7 +147,58 @@ Deno.serve(async (req: Request) => {
 
     if (subErr) return json({ error: String(subErr.message ?? subErr) }, 500);
 
-    // 6️⃣ Marcar intent como completado con trial info
+    // 6️⃣ Guardar método de pago de signup (si existe) como método de la empresa
+    try {
+      const { data: spm } = await supabaseAdmin
+        .from("signup_payment_methods")
+        .select("id, provider, payment_method_ref")
+        .eq("email", intent.email)
+        .order("created_at", { ascending: false })
+        .limit(1)
+        .single();
+
+      if (spm) {
+        // Check if company has methods already
+        const { data: existing } = await supabaseAdmin
+          .from("company_payment_methods")
+          .select("id")
+          .eq("company_id", companyId);
+
+        const isFirst = !existing || existing.length === 0;
+
+        if (spm.provider === "stripe") {
+          // Store as card without brand info (can be enriched later)
+          await supabaseAdmin
+            .from("company_payment_methods")
+            .insert({
+              company_id: companyId,
+              type: "card",
+              stripe_payment_method_id: spm.payment_method_ref,
+              is_default: isFirst,
+            });
+        } else if (spm.provider === "mercadopago") {
+          await supabaseAdmin
+            .from("company_payment_methods")
+            .insert({
+              company_id: companyId,
+              type: "mercadopago",
+              mp_preapproval_id: intent.mp_preapproval_id ?? null,
+              is_default: isFirst,
+            });
+        }
+
+        // Link temp record to company
+        await supabaseAdmin
+          .from("signup_payment_methods")
+          .update({ linked_to_company_id: companyId })
+          .eq("id", spm.id);
+      }
+    } catch (e) {
+      // Non-blocking: continue even if linking fails
+      console.warn("[finalize-signup] No payment method linked:", e);
+    }
+
+    // 7️⃣ Marcar intent como completado con trial info
     const { error: updErr } = await supabaseAdmin
       .from("signup_intents")
       .update({ 
