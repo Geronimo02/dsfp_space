@@ -26,7 +26,7 @@ export function MercadoPagoCardFields({ onSuccess, onSkip, isLoading }: MercadoP
 
   useEffect(() => {
     if (!publicKey) {
-      setMpError("Mercado Pago no está configurado");
+      setMpError("Mercado Pago no estï¿½ configurado");
       return;
     }
 
@@ -43,14 +43,14 @@ export function MercadoPagoCardFields({ onSuccess, onSkip, isLoading }: MercadoP
 
               const bricksInstance = await bricksBuilder.create("cardPayment", "cardPayment", {
                 initialization: {
-                  amount: 1, // positive amount required by MP
+                  amount: 1000, // use higher amount to enable all payment methods
                   payer: {
                     email: undefined,
                   },
                 },
                 customization: {
                   paymentMethods: {
-                    maxInstallments: 1, // avoid empty_installments error
+                    maxInstallments: 1,
                   },
                 },
                 callbacks: {
