@@ -1,4 +1,4 @@
-import { useState, useEffect } from "react";
+import { useState } from "react";
 import { useQuery } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
 import { Button } from "@/components/ui/button";
@@ -9,106 +9,25 @@ import { Badge } from "@/components/ui/badge";
 import { toast } from "sonner";
 import { Separator } from "@/components/ui/separator";
 import { Skeleton } from "@/components/ui/skeleton";
-import { Label } from "@/components/ui/label";
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
-import { loadStripe } from "@stripe/stripe-js";
-import {
-  Elements,
-  useStripe,
-  useElements,
-  CardNumberElement,
-  CardExpiryElement,
-  CardCvcElement,
-} from "@stripe/react-stripe-js";
 
 const MODULE_PRICE = 10;
 
 // Format currency to 2 decimal places
 const formatCurrency = (value: number) => value.toFixed(2);
 
-const publishableKey = (import.meta.env.VITE_STRIPE_PUBLIC_KEY as string | undefined) || undefined;
-const stripePromise = publishableKey ? loadStripe(publishableKey) : null;
-
-function CardInput({ onConfirm, isLoading }: { onConfirm: (pmId: string) => void; isLoading: boolean }) {
-  const stripe = useStripe();
-  const elements = useElements();
-
-  const handleSubmit = async () => {
-    if (!stripe || !elements) return;
-    const numberEl = elements.getElement(CardNumberElement);
-    if (!numberEl) return;
-
-    try {
-      const { paymentMethod, error } = await stripe.createPaymentMethod({
-        type: "card",
-        card: numberEl,
-      });
-      if (error) throw error;
-      if (!paymentMethod) throw new Error("No se pudo crear el método de pago");
-      onConfirm(paymentMethod.id);
-    } catch (e: any) {
-      toast.error("Error al validar tarjeta: " + (e?.message ?? e));
-    }
-  };
-
-  return (
-    <div className="space-y-4">
-      <div className="space-y-3">
-        <div>
-          <Label className="mb-2 block">Número de tarjeta</Label>
-          <div className="border rounded-lg p-3">
-            <CardNumberElement options={{
-              placeholder: "1234 1234 1234 1234",
-              showIcon: true,
-            }} />
-          </div>
-        </div>
-        <div className="grid grid-cols-2 gap-3">
-          <div>
-            <Label className="mb-2 block">Vencimiento</Label>
-            <div className="border rounded-lg p-3">
-              <CardExpiryElement />
-            </div>
-          </div>
-          <div>
-            <Label className="mb-2 block">CVC</Label>
-            <div className="border rounded-lg p-3">
-              <CardCvcElement />
-            </div>
-          </div>
-        </div>
-      </div>
-      <Button onClick={handleSubmit} disabled={!stripe || !elements || isLoading} className="w-full">
-        {isLoading ? (
-          <>
-            <Loader2 className="w-4 h-4 mr-2 animate-spin" />
-            Procesando...
-          </>
-        ) : (
-          "Confirmar y proceder al pago"
-        )}
-      </Button>
-    </div>
-  );
-}
-
 interface Step5ConfirmationProps {
   formData: SignupFormData;
-  updateFormData: (data: Partial<SignupFormData>) => void;
-  nextStep: () => void;
   prevStep: () => void;
   onCreateIntent: () => Promise<void>;
 }
 
 export function Step5Confirmation({
   formData,
-  updateFormData,
-  nextStep,
   prevStep,
   onCreateIntent,
 }: Step5ConfirmationProps) {
   const [isCreating, setIsCreating] = useState(false);
-  const [paymentMethodId, setPaymentMethodId] = useState<string | null>(null);
 
   const { data: plan, isLoading: isPlanLoading } = useQuery({
     queryKey: ["plan", formData.plan_id],
@@ -135,20 +54,16 @@ export function Step5Confirmation({
   const baseCost = Number(plan?.price || 0);
   const totalCost = baseCost + totalModulesCost;
   const isFreeTrial = formData.plan_id === "460d1274-59bc-4c99-a815-c3c1d52d0803"; // FREE_PLAN_ID
-  const isArgentina = (formData.country || "").toUpperCase() === "AR";
+  const billingCountry = (formData.billing_country || "").toUpperCase() || "N/D";
+  const hasPaymentMethod = !!formData.payment_method_ref && !!formData.payment_provider;
 
-  const handleCardConfirm = async (pmId: string) => {
+  const handleConfirm = async () => {
     try {
       setIsCreating(true);
-      setPaymentMethodId(pmId);
-      // Store payment method ID for backend processing
-      updateFormData({ provider: "auto" as any, stripe_payment_method_id: pmId } as any);
       await onCreateIntent();
-      nextStep();
     } catch (error) {
       console.error("Error creating intent:", error);
       toast.error(`Error al crear la suscripción: ${error}`);
-    } finally {
       setIsCreating(false);
     }
   };

@@ -9,8 +9,8 @@ interface Step {
 const steps: Step[] = [
   { title: "Datos de cuenta", description: "Información básica" },
   { title: "Elegir plan", description: "Selecciona tu plan" },
-  { title: "Método de pago", description: "Añade una tarjeta" },
   { title: "Módulos", description: "Personaliza funciones" },
+  { title: "Método de pago", description: "Añade una tarjeta" },
   { title: "Confirmación", description: "Revisa y finaliza" },
 ];
 

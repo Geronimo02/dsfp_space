@@ -2,8 +2,8 @@ import { useSignupWizard } from "@/hooks/useSignupWizard";
 import { SignupStepper } from "@/components/signup/SignupStepper";
 import { Step1Account } from "@/components/signup/Step1Account";
 import { Step2Plan } from "@/components/signup/Step2Plan";
-import { Step3Payment } from "@/components/signup/Step3Payment";
 import { Step4Modules } from "@/components/signup/Step4Modules";
+import { Step3Payment } from "@/components/signup/Step3Payment";
 import { Step5Confirmation } from "@/components/signup/Step5Confirmation";
 import { Card } from "@/components/ui/card";
 import { supabase } from "@/integrations/supabase/client";
@@ -25,7 +25,7 @@ export default function SignupWizard() {
 
     try {
       // Use the provider and payment method from formData
-      const providerSelected = formData.payment_provider || "stripe";
+      const providerSelected = formData.payment_provider || "auto";
       const paymentMethodRef = formData.payment_method_ref;
 
       const { data, error } = await supabase.functions.invoke("create-intent", {
@@ -141,7 +141,7 @@ export default function SignupWizard() {
             />
           )}
           {currentStep === 2 && (
-            <Step3Payment
+            <Step4Modules
               formData={formData}
               updateFormData={updateFormData}
               nextStep={nextStep}
@@ -149,7 +149,7 @@ export default function SignupWizard() {
             />
           )}
           {currentStep === 3 && (
-            <Step4Modules
+            <Step3Payment
               formData={formData}
               updateFormData={updateFormData}
               nextStep={nextStep}
@@ -159,8 +159,6 @@ export default function SignupWizard() {
           {currentStep === 4 && (
             <Step5Confirmation
               formData={formData}
-              updateFormData={updateFormData}
-              nextStep={nextStep}
               prevStep={prevStep}
               onCreateIntent={handleCreateIntent}
             />
