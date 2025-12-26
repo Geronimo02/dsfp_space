@@ -82,36 +82,44 @@ const PageLoader = () => (
 
 // Wrapper to check if user has a company or is platform admin
 function CompanyCheck({ children }: { children: React.ReactNode }) {
-  const { userCompanies, loading, currentCompany } = useCompany();
+  const { userCompanies, loading, currentCompany, refreshCompanies } = useCompany();
   const { isPlatformAdmin, isLoading: isLoadingAdmin } = usePlatformAdmin();
   const [shouldRedirect, setShouldRedirect] = useState(false);
   const [pendingCheck, setPendingCheck] = useState(true); // NEW: block UI/redirect until timeout
 
   useEffect(() => {
     if (!loading && !isLoadingAdmin && !isPlatformAdmin) {
-      // Grace period: poll for companies up to 8s before deciding
+      // Grace period: poll for companies before deciding
       setPendingCheck(true);
+      let signedTsStr: string | null = null;
+      try { signedTsStr = localStorage.getItem("just_signed_in_at"); } catch {}
+      const recentLogin = signedTsStr ? (Date.now() - Number(signedTsStr)) < 15000 : false;
+      const maxWait = recentLogin ? 15000 : 8000;
       const start = Date.now();
-      const interval = setInterval(() => {
+      const interval = setInterval(async () => {
+        try { await refreshCompanies(); } catch {}
+
         // If companies appear, stop waiting and do NOT redirect
         if (userCompanies.length > 0) {
           setShouldRedirect(false);
           setPendingCheck(false);
           clearInterval(interval);
+          // Clear recent login flag once we have companies
+          if (recentLogin) { try { localStorage.removeItem("just_signed_in_at"); } catch {} }
           return;
         }
 
-        // If after 8s there are still no companies, redirect to signup
-        if (Date.now() - start >= 8000) {
+        // If after maxWait there are still no companies, redirect to signup
+        if (Date.now() - start >= maxWait) {
           setShouldRedirect(true);
           setPendingCheck(false);
           clearInterval(interval);
         }
-      }, 500);
+      }, 1000);
 
       return () => clearInterval(interval);
     }
-  }, [loading, isLoadingAdmin, isPlatformAdmin, userCompanies]);
+  }, [loading, isLoadingAdmin, isPlatformAdmin, userCompanies, refreshCompanies]);
 
   // During the 3s wait, keep showing loader to avoid "Sin empresa seleccionada" flicker or premature redirects
   if (loading || isLoadingAdmin || pendingCheck) {

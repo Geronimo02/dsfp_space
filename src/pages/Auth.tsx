@@ -31,6 +31,7 @@ export default function Auth() {
     const checkSession = async () => {
       const { data: { session } } = await supabase.auth.getSession();
       if (session) {
+        try { localStorage.setItem("just_signed_in_at", String(Date.now())); } catch {}
         navigate("/");
       }
     };
@@ -42,6 +43,7 @@ export default function Auth() {
       // Don't redirect on fresh signup/login to avoid race condition with CompanyContext
       if (session && event === 'INITIAL_SESSION') {
         // User already has a session, redirect to dashboard
+        try { localStorage.setItem("just_signed_in_at", String(Date.now())); } catch {}
         navigate("/");
       }
     });
@@ -64,6 +66,7 @@ export default function Auth() {
       if (error) throw error;
       
       toast.success("Sesión iniciada correctamente");
+      try { localStorage.setItem("just_signed_in_at", String(Date.now())); } catch {}
       navigate("/");
     } catch (error: any) {
       if (error instanceof z.ZodError) {
