@@ -89,6 +89,13 @@ function CompanyCheck({ children }: { children: React.ReactNode }) {
 
   useEffect(() => {
     if (!loading && !isLoadingAdmin && !isPlatformAdmin) {
+      // If we already have a current company, skip waiting
+      if (currentCompany) {
+        setPendingCheck(false);
+        setShouldRedirect(false);
+        return;
+      }
+
       // Grace period: poll for companies before deciding
       setPendingCheck(true);
       let signedTsStr: string | null = null;
@@ -119,10 +126,10 @@ function CompanyCheck({ children }: { children: React.ReactNode }) {
 
       return () => clearInterval(interval);
     }
-  }, [loading, isLoadingAdmin, isPlatformAdmin, userCompanies, refreshCompanies]);
+  }, [loading, isLoadingAdmin, isPlatformAdmin, userCompanies, refreshCompanies, currentCompany]);
 
-  // During the 3s wait, keep showing loader to avoid "Sin empresa seleccionada" flicker or premature redirects
-  if (loading || isLoadingAdmin || pendingCheck) {
+  // During the wait, keep showing loader unless we already have a current company
+  if (loading || isLoadingAdmin || (pendingCheck && !currentCompany)) {
     return <div className="flex items-center justify-center min-h-screen">Cargando...</div>;
   }
 
