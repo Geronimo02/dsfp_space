@@ -214,9 +214,19 @@ export function Step5Confirmation({
         </div>
       </div>
 
-      <div className="flex justify-between">
+      <div className="flex justify-between gap-4">
         <Button onClick={prevStep} variant="outline" size="lg" disabled={isCreating}>
           Atrás
+        </Button>
+        <Button onClick={handleConfirm} size="lg" disabled={isCreating}>
+          {isCreating ? (
+            <>
+              <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+              Confirmando...
+            </>
+          ) : (
+            "Confirmar y continuar"
+          )}
         </Button>
       </div>
     </div>

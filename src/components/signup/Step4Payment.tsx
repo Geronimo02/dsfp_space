@@ -284,141 +284,85 @@ export function Step4Payment({ formData, updateFormData, nextStep, prevStep }: S
         <p className="text-muted-foreground">Agrega tu tarjeta para comenzar después del período de prueba</p>
       </div>
 
-      {!clientSecret && !isStripe ? (
-        <>
-          <Card>
-            <CardHeader>
-              <CardTitle>País de facturación</CardTitle>
-              <CardDescription>Selecciona tu país para procesamiento de pago</CardDescription>
-            </CardHeader>
-            <CardContent>
-              <div className="space-y-4">
-                <div className="space-y-2">
-                  <Label htmlFor="country">País</Label>
-                  <Select value={billingCountry} onValueChange={setBillingCountry}>
-                    <SelectTrigger id="country">
-                      <SelectValue />
-                    </SelectTrigger>
-                    <SelectContent>
-                      {COUNTRIES.map((c) => (
-                        <SelectItem key={c.code} value={c.code}>
-                          {c.name}
-                        </SelectItem>
-                      ))}
-                    </SelectContent>
-                  </Select>
-                </div>
-              </div>
-            </CardContent>
-          </Card>
-
-          <Card>
-            <CardHeader>
-              <CardTitle>Datos de la tarjeta</CardTitle>
-              <CardDescription>Ingresa los datos de tu tarjeta de forma segura</CardDescription>
-            </CardHeader>
-            <CardContent>
-              <MercadoPagoForm onSuccess={handlePaymentSuccess} onSkip={handleSkip} isLoading={loading} />
-            </CardContent>
-          </Card>
-
-          <div className="flex justify-between pt-4">
-            <Button variant="ghost" onClick={prevStep} disabled={loading}>
-              <ArrowLeft className="mr-2 h-4 w-4" />
-              Anterior
-            </Button>
+      <Card>
+        <CardHeader>
+          <CardTitle>País de facturación</CardTitle>
+          <CardDescription>Selecciona tu país para procesamiento de pago</CardDescription>
+        </CardHeader>
+        <CardContent>
+          <div className="space-y-4">
+            <div className="space-y-2">
+              <Label htmlFor="country">País</Label>
+              <Select value={billingCountry} onValueChange={setBillingCountry} disabled={loading}>
+                <SelectTrigger id="country">
+                  <SelectValue />
+                </SelectTrigger>
+                <SelectContent>
+                  {COUNTRIES.map((c) => (
+                    <SelectItem key={c.code} value={c.code}>
+                      {c.name}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            </div>
           </div>
-        </>
-      ) : isStripe && !clientSecret ? (
-        <>
-          <Card>
-            <CardHeader>
-              <CardTitle>País de facturación</CardTitle>
-              <CardDescription>Selecciona tu país para procesamiento de pago</CardDescription>
-            </CardHeader>
-            <CardContent>
-              <div className="space-y-4">
-                <div className="space-y-2">
-                  <Label htmlFor="country">País</Label>
-                  <Select value={billingCountry} onValueChange={setBillingCountry} disabled={loading}>
-                    <SelectTrigger id="country">
-                      <SelectValue />
-                    </SelectTrigger>
-                    <SelectContent>
-                      {COUNTRIES.filter((c) => c.code !== "AR").map((c) => (
-                        <SelectItem key={c.code} value={c.code}>
-                          {c.name}
-                        </SelectItem>
-                      ))}
-                    </SelectContent>
-                  </Select>
-                </div>
-              </div>
-            </CardContent>
-          </Card>
+        </CardContent>
+      </Card>
 
-          <Card>
-            <CardHeader>
-              <CardTitle className="flex items-center gap-2">
-                <CreditCard className="h-5 w-5" />
-                Datos de la tarjeta
-              </CardTitle>
-              <CardDescription>Ingresa tu tarjeta de crédito o débito</CardDescription>
-            </CardHeader>
-            <CardContent>
-              <Button onClick={handleInitializePayment} disabled={loading} className="w-full">
-                {loading ? (
-                  <>
-                    <Loader2 className="mr-2 h-4 w-4 animate-spin" />
-                    Cargando formulario...
-                  </>
-                ) : (
-                  "Continuar con Stripe"
-                )}
-              </Button>
-            </CardContent>
-          </Card>
-
-          <div className="flex justify-between pt-4">
-            <Button variant="ghost" onClick={prevStep} disabled={loading}>
-              <ArrowLeft className="mr-2 h-4 w-4" />
-              Anterior
-            </Button>
-            <Button variant="outline" onClick={handleSkip} disabled={loading}>
-              Saltar por ahora
-              <ArrowRight className="ml-2 h-4 w-4" />
-            </Button>
-          </div>
-        </>
-      ) : (
-        <>
-          <Card>
-            <CardHeader>
-              <CardTitle>Datos de la tarjeta</CardTitle>
-              <CardDescription>Tus datos están protegidos y encriptados de forma segura</CardDescription>
-            </CardHeader>
-            <CardContent>
-              {stripePromise && clientSecret && (
-                <Elements stripe={stripePromise} options={{ clientSecret }}>
-                  <StripePaymentForm
-                    clientSecret={clientSecret}
-                    onSuccess={handlePaymentSuccess}
-                    onSkip={handleSkip}
-                    isLoading={loading}
-                  />
-                </Elements>
+      <Card>
+        <CardHeader>
+          <CardTitle className="flex items-center gap-2">
+            <CreditCard className="h-5 w-5" />
+            Datos de la tarjeta
+          </CardTitle>
+          <CardDescription>Ingresa tu tarjeta de crédito o débito</CardDescription>
+        </CardHeader>
+        <CardContent>
+          {billingCountry === "AR" ? (
+            <MercadoPagoForm onSuccess={handlePaymentSuccess} onSkip={handleSkip} isLoading={loading} />
+          ) : !clientSecret ? (
+            <Button onClick={handleInitializePayment} disabled={loading} className="w-full">
+              {loading ? (
+                <>
+                  <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                  Cargando formulario...
+                </>
+              ) : (
+                <>
+                  Ingresar tarjeta
+                  <ArrowRight className="ml-2 h-4 w-4" />
+                </>
               )}
-            </CardContent>
-          </Card>
-
-          <div className="flex justify-between pt-4">
-            <Button variant="ghost" onClick={() => setClientSecret(null)} disabled={loading}>
-              <ArrowLeft className="mr-2 h-4 w-4" />
-              Atrás
             </Button>
-          </div>
-        </>
-      )}
+          ) : (
+            stripePromise &&
+            clientSecret && (
+              <Elements stripe={stripePromise} options={{ clientSecret }}>
+                <StripePaymentForm
+                  clientSecret={clientSecret}
+                  onSuccess={handlePaymentSuccess}
+                  onSkip={handleSkip}
+                  isLoading={loading}
+                />
+              </Elements>
+            )
+          )}
+        </CardContent>
+      </Card>
+
+      <div className="flex justify-between pt-4">
+        <Button variant="ghost" onClick={prevStep} disabled={loading}>
+          <ArrowLeft className="mr-2 h-4 w-4" />
+          Anterior
+        </Button>
+        {clientSecret && (
+          <Button variant="outline" onClick={() => setClientSecret(null)} disabled={loading}>
+            Cambiar país
+            <ArrowLeft className="ml-2 h-4 w-4" />
+          </Button>
+        )}
+      </div>
     </div>
   );
 }
