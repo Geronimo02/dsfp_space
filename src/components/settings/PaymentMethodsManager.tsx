@@ -24,13 +24,15 @@ interface PaymentMethod {
   mp_preapproval_id?: string;
 }
 
+interface StripePaymentFormProps {
+  clientSecret: string;
+  onSuccess: () => void;
+}
+
 function StripePaymentForm({ 
   clientSecret, 
   onSuccess 
-}: { 
-  clientSecret: string; 
-  onSuccess: () => void;
-}) {
+}: StripePaymentFormProps) {
   const stripe = useStripe();
   const elements = useElements();
   const [saving, setSaving] = useState(false);

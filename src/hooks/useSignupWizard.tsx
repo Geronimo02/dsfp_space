@@ -7,9 +7,12 @@ export interface SignupFormData {
   password: string;
   plan_id: string;
   modules: string[];
-  provider: "stripe" | "mercadopago" | "auto";
-  stripe_payment_method_id?: string;
-  country?: string; // ISO code like 'AR'
+  // Payment method (unified schema)
+  payment_provider?: "stripe" | "mercadopago";
+  payment_method_ref?: string; // PM ID for Stripe, token for MP
+  billing_country?: string; // ISO code like 'AR'
+  payment_method_last4?: string;
+  payment_method_brand?: string;
 }
 
 export interface SignupIntent {
@@ -29,8 +32,6 @@ export function useSignupWizard() {
     password: "",
     plan_id: "",
     modules: [],
-    provider: "auto",
-    country: "",
   });
   const [intentId, setIntentId] = useState<string | null>(null);
 
@@ -85,7 +86,6 @@ export function useSignupWizard() {
       password: "",
       plan_id: "",
       modules: [],
-      provider: "mercadopago",
     });
     setIntentId(null);
     setCurrentStep(0);

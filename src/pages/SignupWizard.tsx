@@ -24,7 +24,9 @@ export default function SignupWizard() {
     console.log("[SignupWizard] Creating intent with:", formData);
 
     try {
-      const providerSelected = (formData.country || "").toUpperCase() === "AR" ? "mercadopago" : "auto";
+      // Use the provider and payment method from formData
+      const providerSelected = formData.payment_provider || "stripe";
+      const paymentMethodRef = formData.payment_method_ref;
 
       const { data, error } = await supabase.functions.invoke("create-intent", {
         body: {
@@ -34,7 +36,9 @@ export default function SignupWizard() {
           plan_id: formData.plan_id,
           modules: formData.modules,
           provider: providerSelected,
-          stripe_payment_method_id: providerSelected === "mercadopago" ? undefined : formData.stripe_payment_method_id,
+          payment_provider: providerSelected,
+          payment_method_ref: paymentMethodRef,
+          billing_country: formData.billing_country,
         },
       });
 
@@ -74,7 +78,7 @@ export default function SignupWizard() {
       console.log("[SignupWizard] Checkout created:", checkoutData);
 
       // If payment was captured inline, navigate to success directly
-      if (checkoutData?.is_paid_ready || (formData.stripe_payment_method_id && providerSelected !== "mercadopago")) {
+      if (checkoutData?.is_paid_ready || (formData.payment_method_ref && formData.payment_provider)) {
         console.log("[SignupWizard] Payment method ready, navigating to success");
         window.location.href = `/signup/success?intent_id=${data.intent_id}`;
         return;

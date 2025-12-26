@@ -29,7 +29,21 @@ Deno.serve(async (req: Request) => {
 
     const body = await req.json();
 
-    const { email, full_name, company_name, plan_id, modules, provider, stripe_payment_method_id } = body;
+    // Support both old and new schemas for backward compatibility
+    const email = body.email;
+    const full_name = body.full_name;
+    const company_name = body.company_name;
+    const plan_id = body.plan_id;
+    const modules = body.modules;
+    
+    // New unified schema: payment_provider + payment_method_ref + billing_country
+    const payment_provider = body.payment_provider;
+    const payment_method_ref = body.payment_method_ref;
+    const billing_country = body.billing_country;
+    
+    // Old schema (still accepted for compatibility): provider + stripe_payment_method_id
+    const provider = body.provider || payment_provider;
+    const stripe_payment_method_id = body.stripe_payment_method_id || payment_method_ref;
 
     if (!email || !plan_id || !provider) {
       return json({ error: "email, plan_id y provider son requeridos" }, 400);
