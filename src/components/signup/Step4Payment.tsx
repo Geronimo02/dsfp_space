@@ -3,12 +3,13 @@ import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Label } from "@/components/ui/label";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
-import { CreditCard, ArrowRight, ArrowLeft, Loader2 } from "lucide-react";
+import { CreditCard, ArrowRight, ArrowLeft, AlertCircle } from "lucide-react";
 import { SignupFormData } from "@/hooks/useSignupWizard";
 import { loadStripe } from "@stripe/stripe-js";
 import { Elements } from "@stripe/react-stripe-js";
 import { supabase } from "@/integrations/supabase/client";
 import { toast } from "sonner";
+import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
 import { StripeCardFields } from "./StripeCardFields";
 import { MercadoPagoCardFields } from "./MercadoPagoCardFields";
 
@@ -127,7 +128,17 @@ export function Step4Payment({ formData, updateFormData, nextStep, prevStep }: S
               onSkip={handleSkip}
               isLoading={loading}
             />
-          ) : stripePromise ? (
+          ) : !stripePromise ? (
+            // Stripe not configured
+            <Alert variant="destructive">
+              <AlertCircle className="h-4 w-4" />
+              <AlertTitle>Stripe no configurado</AlertTitle>
+              <AlertDescription>
+                La variable de entorno <code className="text-sm font-mono">VITE_STRIPE_PUBLIC_KEY</code> no está configurada.
+                Contacta al administrador.
+              </AlertDescription>
+            </Alert>
+          ) : (
             // Stripe form - same layout as Mercado Pago (no intermediate button)
             <Elements stripe={stripePromise}>
               <StripeCardFields
@@ -136,7 +147,7 @@ export function Step4Payment({ formData, updateFormData, nextStep, prevStep }: S
                 isLoading={loading}
               />
             </Elements>
-          ) : null}
+          )}
         </CardContent>
       </Card>
 
