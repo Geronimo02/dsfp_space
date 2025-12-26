@@ -47,11 +47,11 @@ export function MercadoPagoCardFields({ onSuccess, onSkip, isLoading }: MercadoP
                 locale: "es-AR",
               });
 
-              // Initialize Bricks
-              const bricksBuilder = mp.Bricks();
-            bricksRef.current = bricksBuilder;
+              // Initialize Bricks (lowercase API in v2)
+              const bricksBuilder = mp.bricks();
+              bricksRef.current = bricksBuilder;
 
-            const bricksInstance = await bricksBuilder.create("cardPayment", {
+              const bricksInstance = await bricksBuilder.create("cardPayment", {
               initialization: {
                 amount: 0, // We don't know the amount yet, it will be 0 for token-only
                 payer: {
@@ -104,10 +104,10 @@ export function MercadoPagoCardFields({ onSuccess, onSkip, isLoading }: MercadoP
                   }
                 },
               },
-            });
+              });
 
-            cardPaymentRef.current = bricksInstance;
-          }
+              cardPaymentRef.current = bricksInstance;
+            }
           } catch (error: any) {
             console.error("[MP] Script onload error:", error);
             setMpError(error?.message || "Error al cargar Mercado Pago");
