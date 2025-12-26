@@ -85,20 +85,17 @@ function CompanyCheck({ children }: { children: React.ReactNode }) {
   const { userCompanies, loading, currentCompany } = useCompany();
   const { isPlatformAdmin, isLoading: isLoadingAdmin } = usePlatformAdmin();
   const [shouldRedirect, setShouldRedirect] = useState(false);
+  const [pendingCheck, setPendingCheck] = useState(true); // NEW: block UI/redirect until timeout
 
-  useEffect(() => {
-  if (!loading && !isLoadingAdmin && !isPlatformAdmin) {
-    setTimeout(() => {
-      if (userCompanies.length === 0) {
-        // Redirect to signup if no companies
-        setShouldRedirect(true);
-      } else {
-        // Has companies, reset redirect flag
-        setShouldRedirect(false);
-      }
-    }, 3000); // 3 segundos
-  }
-}, [loading, isLoadingAdmin, isPlatformAdmin, userCompanies]);
+useEffect(() => {
+    if (!loading && !isLoadingAdmin && !isPlatformAdmin) {
+      const t = setTimeout(() => {
+        setShouldRedirect(userCompanies.length === 0);
+        setPendingCheck(false); // unblock after 3s
+      }, 3000); // 3 segundos
+      return () => clearTimeout(t);
+    }
+  }, [loading, isLoadingAdmin, isPlatformAdmin, userCompanies]);
 
   if (loading || isLoadingAdmin) {
     return <div className="flex items-center justify-center min-h-screen">Cargando...</div>;
