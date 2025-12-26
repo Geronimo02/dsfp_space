@@ -3,6 +3,7 @@ import { Button } from "@/components/ui/button";
 import { ArrowRight, Loader2, AlertCircle } from "lucide-react";
 import { toast } from "sonner";
 import { Alert, AlertDescription } from "@/components/ui/alert";
+import { supabase } from "@/integrations/supabase/client";
 
 interface MercadoPagoCardFieldsProps {
   onSuccess: (token: string) => void;
@@ -62,30 +63,21 @@ export function MercadoPagoCardFields({ onSuccess, isLoading }: MercadoPagoCardF
                   onSubmit: async (formData: any) => {
                     setSaving(true);
                     try {
-                      const response = await fetch(
-                        "https://api.mercadopago.com/v1/card_tokens",
-                        {
-                          method: "POST",
-                          headers: {
-                            "Content-Type": "application/json",
-                            Authorization: `Bearer ${publicKeyRef.current}`,
-                          },
-                          body: JSON.stringify({
-                            cardNumber: formData.cardNumber?.replaceAll(" ", ""),
-                            cardholderName: formData.cardholderName,
-                            cardExpirationMonth: formData.cardExpirationMonth,
-                            cardExpirationYear: formData.cardExpirationYear,
-                            securityCode: formData.securityCode,
-                          }),
-                        }
-                      );
+                      // Call edge function to tokenize card (avoids CORS issues)
+                      const { data, error } = await supabase.functions.invoke("mp-create-token", {
+                        body: {
+                          cardNumber: formData.cardNumber?.replaceAll(" ", ""),
+                          cardholderName: formData.cardholderName,
+                          cardExpirationMonth: formData.cardExpirationMonth,
+                          cardExpirationYear: formData.cardExpirationYear,
+                          securityCode: formData.securityCode,
+                        },
+                      });
 
-                      if (!response.ok) {
-                        const errorData = await response.json();
-                        throw new Error(errorData?.message || "Error al tokenizar tarjeta");
+                      if (error) {
+                        throw new Error(error.message || "Error al tokenizar tarjeta");
                       }
 
-                      const data = await response.json();
                       toast.success("Tarjeta guardada exitosamente");
                       onSuccess(data.id);
                     } catch (error: any) {
