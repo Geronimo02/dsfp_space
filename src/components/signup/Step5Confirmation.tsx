@@ -11,6 +11,7 @@ import { Separator } from "@/components/ui/separator";
 import { Skeleton } from "@/components/ui/skeleton";
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
 import { Label } from "@/components/ui/label";
+import { AlertCircle } from "lucide-react";
 
 const MODULE_PRICE = 10;
 
@@ -186,37 +187,27 @@ export function Step5Confirmation({
               <Separator />
 
               <div>
-                <Label className="text-base mb-3 block">Datos de tarjeta</Label>
-                {isFreeTrial ? (
-                  <p className="text-xs text-muted-foreground mb-3">
-                    Necesaria para activar tu período de prueba gratuito de 7 días. Después se cobrará el plan básico.
-                  </p>
+                <Label className="text-base mb-3 block">Método de pago</Label>
+                {hasPaymentMethod ? (
+                  <div className="space-y-2">
+                    <div className="flex items-center gap-2 p-3 bg-green-50 border border-green-200 rounded-lg">
+                      <AlertCircle className="w-4 h-4 text-green-600" />
+                      <div>
+                        <p className="text-sm font-medium text-green-800">Tarjeta registrada</p>
+                        <p className="text-xs text-green-700">
+                          {formData.payment_method_brand?.toUpperCase() || "Tarjeta"} •••• {formData.payment_method_last4 || "****"}
+                        </p>
+                      </div>
+                    </div>
+                  </div>
                 ) : (
-                  <p className="text-xs text-muted-foreground mb-3">
-                    Procesado de forma segura con Stripe
-                  </p>
-                )}
-
-                {!publishableKey && !isArgentina && (
-                  <Alert className="mb-4">
-                    <AlertTitle>Falta configurar Stripe</AlertTitle>
+                  <Alert>
+                    <AlertTitle>Sin método de pago</AlertTitle>
                     <AlertDescription>
-                      Define la variable de entorno <strong>VITE_STRIPE_PUBLIC_KEY</strong> con tu clave publicable de Stripe.
+                      Puedes agregar un método de pago ahora o continuar con el plan gratuito
                     </AlertDescription>
                   </Alert>
                 )}
-
-                {isArgentina ? (
-                  <div className="border rounded-lg p-3">
-                    <p className="text-sm">
-                      Serás redirigido a Mercado Pago para autorizar el método de pago. No se cobrará ahora.
-                    </p>
-                  </div>
-                ) : stripePromise ? (
-                  <Elements stripe={stripePromise}>
-                    <CardInput onConfirm={handleCardConfirm} isLoading={isCreating} />
-                  </Elements>
-                ) : null}
               </div>
             </CardContent>
           </Card>
