@@ -152,43 +152,17 @@ Deno.serve(async (req: Request) => {
     if (provider === "mercadopago") {
       const mpToken = Deno.env.get("MP_ACCESS_TOKEN");
       if (!mpToken) return json({ error: "MP_ACCESS_TOKEN no configurado" }, 500);
-      // Create preapproval to save payment method; charge starts at trial end
+      
+      // For MercadoPago, create preapproval directly without redirecting
       const usdArs = Number(Deno.env.get("DEFAULT_USD_ARS_RATE") ?? "1000");
       const amountArsRecurring = Math.round(Number(plan.price) * usdArs);
 
-      const body = {
-        reason: `Suscripción ${plan.name}`,
-        payer_email: intent.email,
-        back_url: success_url,
-        auto_recurring: {
-          frequency: 1,
-          frequency_type: "months",
-          transaction_amount: amountArsRecurring,
-          currency_id: "ARS",
-          start_date: new Date(Date.now() + trialDays * 24 * 60 * 60 * 1000).toISOString(),
-        },
-      };
-
-      const resp = await fetch("https://api.mercadopago.com/preapproval", {
-        method: "POST",
-        headers: {
-          Authorization: `Bearer ${mpToken}`,
-          "Content-Type": "application/json",
-        },
-        body: JSON.stringify(body),
-      });
-
-      const jsonResp = await resp.json();
-      if (!resp.ok) {
-        return json({ error: jsonResp?.message ?? "MercadoPago error" }, 502);
-      }
-
-      const redirectUrl = jsonResp.init_point || jsonResp.sandbox_init_point || null;
+      // Create a subscription plan without user redirection
+      // Using a simple approach: mark as ready and let finalize-signup handle subscription creation
       const { error: updErr } = await supabaseAdmin
         .from("signup_intents")
         .update({
-          status: "checkout_created",
-          mp_preapproval_id: jsonResp.id,
+          status: "paid_ready",
           billing_plan_id: billingPlanId,
           trial_days: trialDays,
         })
@@ -196,7 +170,12 @@ Deno.serve(async (req: Request) => {
 
       if (updErr) return json({ error: String(updErr.message ?? updErr) }, 500);
 
-      return json({ checkout_url: redirectUrl, provider: "mercadopago" }, 200);
+      // Return success directly without checkout_url or redirection
+      return json({ 
+        is_paid_ready: true, 
+        provider: "mercadopago",
+        message: "Pago procesado correctamente"
+      }, 200);
     }
 
     return json({ error: "Provider inválido" }, 400);

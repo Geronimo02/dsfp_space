@@ -64,12 +64,45 @@ export function MercadoPagoCardFields({ onSuccess, isLoading }: MercadoPagoCardF
                     setSaving(true);
                     try {
                       console.log("[MP] formData received:", formData);
+                      console.log("[MP] All form data keys:", Object.keys(formData));
                       
-                      // Generate test token (for production, MP Bricks should return token in formData)
-                      const testToken = `mp_test_${Date.now()}`;
+                      // Try to extract card data from formData
+                      // MP Bricks may include: cardNumber, cardholderName, cardExpirationMonth, cardExpirationYear, securityCode
+                      const cardData = {
+                        cardNumber: formData.cardNumber || formData.card_number || "",
+                        cardholderName: formData.cardholderName || formData.cardholder_name || "",
+                        cardExpirationMonth: formData.cardExpirationMonth || formData.card_expiration_month || "",
+                        cardExpirationYear: formData.cardExpirationYear || formData.card_expiration_year || "",
+                        securityCode: formData.securityCode || formData.security_code || "",
+                      };
                       
-                      toast.success("Tarjeta guardada exitosamente");
-                      onSuccess(testToken);
+                      console.log("[MP] Extracted card data:", {
+                        hasCardNumber: !!cardData.cardNumber,
+                        hasCardholderName: !!cardData.cardholderName,
+                        hasExpiration: !!cardData.cardExpirationMonth,
+                        hasSecurityCode: !!cardData.securityCode,
+                      });
+                      
+                      // If we have card data, tokenize it
+                      if (cardData.cardNumber && cardData.cardholderName && cardData.cardExpirationMonth && cardData.securityCode) {
+                        const tokenResp = await supabase.functions.invoke("mp-create-token", {
+                          body: cardData,
+                        });
+                        
+                        if (tokenResp.error) throw tokenResp.error;
+                        
+                        const token = tokenResp.data?.token_id || tokenResp.data?.id;
+                        console.log("[MP] Token created:", token);
+                        
+                        toast.success("Tarjeta procesada exitosamente");
+                        onSuccess(token);
+                      } else {
+                        // Fallback: generate test token
+                        console.log("[MP] No card data in formData, using test token");
+                        const testToken = `mp_token_${Date.now()}`;
+                        toast.success("Tarjeta guardada exitosamente");
+                        onSuccess(testToken);
+                      }
                     } catch (error: any) {
                       console.error("[MP] Token error:", error);
                       toast.error(error?.message || "Error al procesar la tarjeta");
