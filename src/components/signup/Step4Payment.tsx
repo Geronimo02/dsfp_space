@@ -3,7 +3,7 @@ import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Label } from "@/components/ui/label";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
-import { CreditCard, ArrowRight, ArrowLeft, Check, Loader2 } from "lucide-react";
+import { CreditCard, ArrowRight, ArrowLeft, Loader2 } from "lucide-react";
 import { SignupFormData } from "@/hooks/useSignupWizard";
 import { loadStripe } from "@stripe/stripe-js";
 import { Elements, PaymentElement, useElements, useStripe } from "@stripe/react-stripe-js";
@@ -215,7 +215,6 @@ export function Step4Payment({ formData, updateFormData, nextStep, prevStep }: S
   });
   const [clientSecret, setClientSecret] = useState<string | null>(null);
   const [loading, setLoading] = useState(false);
-  const [paymentSaved, setPaymentSaved] = useState(false);
 
   const provider = billingCountry === "AR" ? "mercadopago" : "stripe";
   const isStripe = provider === "stripe";
@@ -266,9 +265,8 @@ export function Step4Payment({ formData, updateFormData, nextStep, prevStep }: S
         payment_method_brand: data?.brand,
       });
 
-      setPaymentSaved(true);
       toast.success("Tarjeta guardada exitosamente");
-      setTimeout(() => nextStep(), 400);
+      nextStep();
     } catch (e: any) {
       console.error(e);
       toast.error(e?.message ?? "Error al guardar el método de pago");
@@ -278,26 +276,6 @@ export function Step4Payment({ formData, updateFormData, nextStep, prevStep }: S
   const handleSkip = () => {
     nextStep();
   };
-
-  if (paymentSaved) {
-    return (
-      <div className="space-y-6">
-        <Card className="border-green-200 bg-green-50">
-          <CardContent className="py-8">
-            <div className="flex flex-col items-center gap-4">
-              <div className="rounded-full bg-green-100 p-3">
-                <Check className="h-8 w-8 text-green-600" />
-              </div>
-              <div className="text-center">
-                <h3 className="font-semibold text-green-900">Tarjeta guardada exitosamente</h3>
-                <p className="text-sm text-green-700">Redirigiendo al siguiente paso...</p>
-              </div>
-            </div>
-          </CardContent>
-        </Card>
-      </div>
-    );
-  }
 
   return (
     <div className="space-y-6">
