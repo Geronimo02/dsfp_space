@@ -1,8 +1,9 @@
-import { useState } from "react";
+import { useState, useEffect, useRef } from "react";
 import { Button } from "@/components/ui/button";
 import { Label } from "@/components/ui/label";
-import { ArrowRight, Loader2 } from "lucide-react";
+import { ArrowRight, Loader2, AlertCircle } from "lucide-react";
 import { toast } from "sonner";
+import { Alert, AlertDescription } from "@/components/ui/alert";
 
 interface MercadoPagoCardFieldsProps {
   onSuccess: (token: string) => void;
@@ -10,126 +11,164 @@ interface MercadoPagoCardFieldsProps {
   isLoading: boolean;
 }
 
+declare global {
+  interface Window {
+    MercadoPago?: any;
+  }
+}
+
 export function MercadoPagoCardFields({ onSuccess, onSkip, isLoading }: MercadoPagoCardFieldsProps) {
   const [saving, setSaving] = useState(false);
-  const [errors, setErrors] = useState<Record<string, string>>({});
-  const [cardData, setCardData] = useState({
-    number: "",
-    expiry: "",
-    cvc: "",
-  });
+  const [mpLoaded, setMpLoaded] = useState(false);
+  const [mpError, setMpError] = useState<string | null>(null);
+  const containerRef = useRef<HTMLDivElement>(null);
+  const bricksRef = useRef<any>(null);
+  const cardPaymentRef = useRef<any>(null);
+
+  const publicKey = import.meta.env.VITE_MERCADOPAGO_PUBLIC_KEY;
+
+  useEffect(() => {
+    if (!publicKey) {
+      setMpError("Mercado Pago no está configurado");
+      return;
+    }
+
+    const initMercadoPago = async () => {
+      try {
+        // Load MP SDK
+        const script = document.createElement("script");
+        script.src = "https://sdk.mercadopago.com/js/v2";
+        script.async = true;
+        script.onload = async () => {
+          if (window.MercadoPago) {
+            window.MercadoPago.setPublishableKey(publicKey);
+
+            // Initialize Bricks
+            const bricksBuilder = window.MercadoPago.Bricks();
+            bricksRef.current = bricksBuilder;
+
+            const bricksInstance = await bricksBuilder.create("cardPayment", {
+              initialization: {
+                amount: 0, // We don't know the amount yet, it will be 0 for token-only
+                payer: {
+                  email: undefined, // Set dynamically if needed
+                },
+              },
+              callbacks: {
+                onReady: () => {
+                  console.log("[MP] Card Payment Brick ready");
+                  setMpLoaded(true);
+                },
+                onError: (error: any) => {
+                  console.error("[MP] Brick error:", error);
+                  setMpError(error?.message || "Error en Mercado Pago");
+                },
+                onSubmit: async (formData: any) => {
+                  setSaving(true);
+                  try {
+                    // Create token with MP
+                    const response = await fetch(
+                      "https://api.mercadopago.com/v1/card_tokens",
+                      {
+                        method: "POST",
+                        headers: {
+                          "Content-Type": "application/json",
+                          Authorization: `Bearer ${publicKey}`,
+                        },
+                        body: JSON.stringify({
+                          cardNumber: formData.cardNumber?.replaceAll(" ", ""),
+                          cardholderName: formData.cardholderName,
+                          cardExpirationMonth: formData.cardExpirationMonth,
+                          cardExpirationYear: formData.cardExpirationYear,
+                          securityCode: formData.securityCode,
+                        }),
+                      }
+                    );
+
+                    if (!response.ok) {
+                      throw new Error("Error al tokenizar tarjeta");
+                    }
+
+                    const data = await response.json();
+                    console.log("[MP] Token created:", data.id);
+
+                    onSuccess(data.id);
+                  } catch (error: any) {
+                    console.error("[MP] Token error:", error);
+                    toast.error(error?.message || "Error al procesar la tarjeta");
+                    setSaving(false);
+                  }
+                },
+              },
+            });
+
+            cardPaymentRef.current = bricksInstance;
+          }
+        };
+        script.onerror = () => {
+          setMpError("No se pudo cargar Mercado Pago");
+        };
+        document.body.appendChild(script);
+      } catch (error: any) {
+        console.error("[MP] Init error:", error);
+        setMpError(error?.message || "Error inicializando Mercado Pago");
+      }
+    };
+
+    initMercadoPago();
+
+    return () => {
+      if (cardPaymentRef.current) {
+        cardPaymentRef.current.unmount();
+      }
+    };
+  }, [publicKey, onSuccess]);
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (saving || isLoading) return;
-
-    setSaving(true);
-    setErrors({});
+    if (!cardPaymentRef.current) return;
 
     try {
-      // Validate all fields are filled
-      if (!cardData.number.replace(/\s/g, "")) {
-        throw new Error("Ingresa el número de tarjeta");
-      }
-      if (!cardData.expiry) {
-        throw new Error("Ingresa la fecha de vencimiento");
-      }
-      if (!cardData.cvc) {
-        throw new Error("Ingresa el CVC");
-      }
-
-      // Format card number for validation
-      const cardNumber = cardData.number.replace(/\s/g, "");
-      if (cardNumber.length < 13 || cardNumber.length > 19) {
-        throw new Error("Número de tarjeta inválido");
-      }
-
-      // Parse expiry
-      const [month, year] = cardData.expiry.split("/");
-      if (!month || !year || month.length !== 2 || year.length !== 2) {
-        throw new Error("Formato de vencimiento inválido (MM/YY)");
-      }
-
-      if (cardData.cvc.length < 3 || cardData.cvc.length > 4) {
-        throw new Error("CVC debe tener 3 o 4 dígitos");
-      }
-
-      // In production, you would call MP Bricks or Fields API here to tokenize
-      // For now, generate a mock token
-      const mockToken = `mp_tok_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`;
-
-      onSuccess(mockToken);
-    } catch (e: any) {
-      console.error(e);
-      const errorMsg = e?.message ?? "Error al procesar la tarjeta";
-      setErrors({ general: errorMsg });
-      toast.error(errorMsg);
+      setSaving(true);
+      // Trigger brick's submit
+      await cardPaymentRef.current.submit();
+    } catch (error: any) {
+      console.error("[MP] Submit error:", error);
+      toast.error(error?.message || "Error al guardar la tarjeta");
       setSaving(false);
     }
   };
 
+  if (mpError) {
+    return (
+      <Alert variant="destructive">
+        <AlertCircle className="h-4 w-4" />
+        <AlertDescription>{mpError}</AlertDescription>
+      </Alert>
+    );
+  }
+
   return (
     <form onSubmit={handleSubmit} className="space-y-6">
-      <div className="space-y-2">
-        <Label htmlFor="mp-card-number">Número de tarjeta</Label>
-        <input
-          id="mp-card-number"
-          type="text"
-          placeholder="1234 5678 9012 3456"
-          maxLength={19}
-          value={cardData.number}
-          onChange={(e) => {
-            const val = e.target.value.replace(/\D/g, "").replace(/(\d{4})/g, "$1 ").trim();
-            setCardData({ ...cardData, number: val });
-          }}
-          className="w-full px-3 py-2 border rounded-md"
-          disabled={saving || isLoading}
-        />
-        {errors.number && <p className="text-sm text-red-500">{errors.number}</p>}
+      <div className="text-sm text-muted-foreground mb-4">
+        Usando Mercado Pago Bricks para procesar tu tarjeta de forma segura
       </div>
 
-      <div className="grid grid-cols-2 gap-4">
-        <div className="space-y-2">
-          <Label htmlFor="mp-expiry">Vencimiento (MM/YY)</Label>
-          <input
-            id="mp-expiry"
-            type="text"
-            placeholder="12/25"
-            maxLength={5}
-            value={cardData.expiry}
-            onChange={(e) => {
-              let val = e.target.value.replace(/\D/g, "");
-              if (val.length >= 2) val = val.slice(0, 2) + "/" + val.slice(2, 4);
-              setCardData({ ...cardData, expiry: val });
-            }}
-            className="w-full px-3 py-2 border rounded-md"
-            disabled={saving || isLoading}
-          />
-          {errors.expiry && <p className="text-sm text-red-500">{errors.expiry}</p>}
-        </div>
-        <div className="space-y-2">
-          <Label htmlFor="mp-cvc">CVC</Label>
-          <input
-            id="mp-cvc"
-            type="text"
-            placeholder="123"
-            maxLength={4}
-            value={cardData.cvc}
-            onChange={(e) => setCardData({ ...cardData, cvc: e.target.value.replace(/\D/g, "") })}
-            className="w-full px-3 py-2 border rounded-md"
-            disabled={saving || isLoading}
-          />
-          {errors.cvc && <p className="text-sm text-red-500">{errors.cvc}</p>}
-        </div>
+      {/* MP Bricks will render here */}
+      <div ref={containerRef} id="cardPayment" className="mb-4">
+        {!mpLoaded && (
+          <div className="text-center py-8 text-muted-foreground">
+            <Loader2 className="w-5 h-5 animate-spin mx-auto mb-2" />
+            Cargando formulario de Mercado Pago...
+          </div>
+        )}
       </div>
-
-      {errors.general && <p className="text-sm text-red-500">{errors.general}</p>}
 
       <div className="flex gap-3 justify-between">
-        <Button type="button" variant="ghost" onClick={onSkip} disabled={saving || isLoading}>
+        <Button type="button" variant="ghost" onClick={onSkip} disabled={saving || isLoading || !mpLoaded}>
           Saltar por ahora
         </Button>
-        <Button type="submit" disabled={saving || isLoading}>
+        <Button type="submit" disabled={saving || isLoading || !mpLoaded}>
           {saving ? (
             <>
               <Loader2 className="mr-2 h-4 w-4 animate-spin" />

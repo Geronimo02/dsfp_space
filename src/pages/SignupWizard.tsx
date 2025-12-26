@@ -55,7 +55,17 @@ export default function SignupWizard() {
 
       saveIntent(data.intent_id);
 
-      // Call start-checkout (it will handle inline payment method or create redirect)
+      // For test tokens (starting with "test_"), skip checkout and go directly to success
+      if (paymentMethodRef?.startsWith("test_")) {
+        console.log("[SignupWizard] Test payment detected, skipping checkout");
+        toast.success("¡Cuenta creada exitosamente!");
+        setTimeout(() => {
+          window.location.href = `/signup/success?intent_id=${data.intent_id}`;
+        }, 500);
+        return;
+      }
+
+      // Call start-checkout for real payments
       const successUrl = `${window.location.origin}/signup/success?intent_id=${data.intent_id}`;
       const cancelUrl = `${window.location.origin}/signup/cancel?intent_id=${data.intent_id}`;
 
@@ -108,6 +118,7 @@ export default function SignupWizard() {
       }
     } catch (error) {
       console.error("[SignupWizard] Error:", error);
+      toast.error("Error al procesar la solicitud. Por favor intenta de nuevo.");
       throw error;
     }
   };
