@@ -63,23 +63,15 @@ export function MercadoPagoCardFields({ onSuccess, isLoading }: MercadoPagoCardF
                   onSubmit: async (formData: any) => {
                     setSaving(true);
                     try {
-                      // Call edge function to tokenize card (avoids CORS issues)
-                      const { data, error } = await supabase.functions.invoke("mp-create-token", {
-                        body: {
-                          cardNumber: formData.cardNumber?.replaceAll(" ", ""),
-                          cardholderName: formData.cardholderName,
-                          cardExpirationMonth: formData.cardExpirationMonth,
-                          cardExpirationYear: formData.cardExpirationYear,
-                          securityCode: formData.securityCode,
-                        },
-                      });
-
-                      if (error) {
-                        throw new Error(error.message || "Error al tokenizar tarjeta");
+                      console.log("[MP] formData received:", formData);
+                      
+                      // MP Bricks returns token in formData
+                      if (formData.token) {
+                        toast.success("Tarjeta guardada exitosamente");
+                        onSuccess(formData.token);
+                      } else {
+                        throw new Error("No se recibió token de Mercado Pago");
                       }
-
-                      toast.success("Tarjeta guardada exitosamente");
-                      onSuccess(data.id);
                     } catch (error: any) {
                       console.error("[MP] Token error:", error);
                       toast.error(error?.message || "Error al procesar la tarjeta");
