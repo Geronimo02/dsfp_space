@@ -1,6 +1,5 @@
 import { useState, useEffect, useRef } from "react";
 import { Button } from "@/components/ui/button";
-import { Label } from "@/components/ui/label";
 import { ArrowRight, Loader2, AlertCircle } from "lucide-react";
 import { toast } from "sonner";
 import { Alert, AlertDescription } from "@/components/ui/alert";
@@ -21,90 +20,83 @@ export function MercadoPagoCardFields({ onSuccess, onSkip, isLoading }: MercadoP
   const [saving, setSaving] = useState(false);
   const [mpLoaded, setMpLoaded] = useState(false);
   const [mpError, setMpError] = useState<string | null>(null);
-  const containerRef = useRef<HTMLDivElement>(null);
-  const bricksRef = useRef<any>(null);
   const cardPaymentRef = useRef<any>(null);
 
   const publicKey = import.meta.env.VITE_MERCADOPAGO_PUBLIC_KEY;
 
   useEffect(() => {
     if (!publicKey) {
-      setMpError("Mercado Pago no estÃ¡ configurado");
+      setMpError("Mercado Pago no está configurado");
       return;
     }
 
     const initMercadoPago = async () => {
       try {
-        // Load MP SDK
         const script = document.createElement("script");
         script.src = "https://sdk.mercadopago.com/js/v2";
         script.async = true;
         script.onload = async () => {
           try {
             if (window.MercadoPago) {
-              // Initialize MP with public key (new API - use constructor)
-              const mp = new window.MercadoPago(publicKey, {
-                locale: "es-AR",
-              });
-
-              // Initialize Bricks (lowercase API in v2)
+              const mp = new window.MercadoPago(publicKey, { locale: "es-AR" });
               const bricksBuilder = mp.bricks();
-              bricksRef.current = bricksBuilder;
 
               const bricksInstance = await bricksBuilder.create("cardPayment", "cardPayment", {
                 initialization: {
-                  // MP Bricks requires a positive amount; use 1 for tokenization-only
-                  amount: 1,
+                  amount: 1, // positive amount required by MP
                   payer: {
                     email: undefined,
                   },
                 },
-              callbacks: {
-                onReady: () => {
-                  console.log("[MP] Card Payment Brick ready");
-                  setMpLoaded(true);
+                customization: {
+                  paymentMethods: {
+                    maxInstallments: 1, // avoid empty_installments error
+                  },
                 },
-                onError: (error: any) => {
-                  console.error("[MP] Brick error:", error);
-                  setMpError(error?.message || "Error en Mercado Pago");
-                },
-                onSubmit: async (formData: any) => {
-                  setSaving(true);
-                  try {
-                    // Create token with MP
-                    const response = await fetch(
-                      "https://api.mercadopago.com/v1/card_tokens",
-                      {
-                        method: "POST",
-                        headers: {
-                          "Content-Type": "application/json",
-                          Authorization: `Bearer ${publicKey}`,
-                        },
-                        body: JSON.stringify({
-                          cardNumber: formData.cardNumber?.replaceAll(" ", ""),
-                          cardholderName: formData.cardholderName,
-                          cardExpirationMonth: formData.cardExpirationMonth,
-                          cardExpirationYear: formData.cardExpirationYear,
-                          securityCode: formData.securityCode,
-                        }),
+                callbacks: {
+                  onReady: () => {
+                    setMpLoaded(true);
+                  },
+                  onError: (error: any) => {
+                    console.error("[MP] Brick error:", error);
+                    setMpError(error?.message || "Error en Mercado Pago");
+                  },
+                  onSubmit: async (formData: any) => {
+                    setSaving(true);
+                    try {
+                      const response = await fetch(
+                        "https://api.mercadopago.com/v1/card_tokens",
+                        {
+                          method: "POST",
+                          headers: {
+                            "Content-Type": "application/json",
+                            Authorization: Bearer ,
+                          },
+                          body: JSON.stringify({
+                            cardNumber: formData.cardNumber?.replaceAll(" ", ""),
+                            cardholderName: formData.cardholderName,
+                            cardExpirationMonth: formData.cardExpirationMonth,
+                            cardExpirationYear: formData.cardExpirationYear,
+                            securityCode: formData.securityCode,
+                          }),
+                        }
+                      );
+
+                      if (!response.ok) {
+                        const errorData = await response.json();
+                        throw new Error(errorData?.message || "Error al tokenizar tarjeta");
                       }
-                    );
 
-                    if (!response.ok) {
-                      throw new Error("Error al tokenizar tarjeta");
+                      const data = await response.json();
+                      toast.success("Tarjeta guardada exitosamente");
+                      onSuccess(data.id);
+                    } catch (error: any) {
+                      console.error("[MP] Token error:", error);
+                      toast.error(error?.message || "Error al procesar la tarjeta");
+                      setSaving(false);
                     }
-
-                    const data = await response.json();
-                    console.log("[MP] Token created:", data.id);
-
-                    onSuccess(data.id);
-                  } catch (error: any) {
-                    console.error("[MP] Token error:", error);
-                    toast.error(error?.message || "Error al procesar la tarjeta");
-                    setSaving(false);
-                  }
+                  },
                 },
-              },
               });
 
               cardPaymentRef.current = bricksInstance;
@@ -128,7 +120,11 @@ export function MercadoPagoCardFields({ onSuccess, onSkip, isLoading }: MercadoP
 
     return () => {
       if (cardPaymentRef.current) {
-        cardPaymentRef.current.unmount();
+        try {
+          cardPaymentRef.current.unmount();
+        } catch (e) {
+          console.log("[MP] Unmount error (ok):", e);
+        }
       }
     };
   }, [publicKey, onSuccess]);
@@ -139,7 +135,6 @@ export function MercadoPagoCardFields({ onSuccess, onSkip, isLoading }: MercadoP
 
     try {
       setSaving(true);
-      // Trigger brick's submit
       await cardPaymentRef.current.submit();
     } catch (error: any) {
       console.error("[MP] Submit error:", error);
@@ -163,8 +158,7 @@ export function MercadoPagoCardFields({ onSuccess, onSkip, isLoading }: MercadoP
         Usando Mercado Pago Bricks para procesar tu tarjeta de forma segura
       </div>
 
-      {/* MP Bricks will render here */}
-      <div ref={containerRef} id="cardPayment" className="mb-4">
+      <div id="cardPayment" className="mb-4">
         {!mpLoaded && (
           <div className="text-center py-8 text-muted-foreground">
             <Loader2 className="w-5 h-5 animate-spin mx-auto mb-2" />
