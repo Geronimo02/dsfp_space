@@ -97,7 +97,8 @@ useEffect(() => {
     }
   }, [loading, isLoadingAdmin, isPlatformAdmin, userCompanies]);
 
-  if (loading || isLoadingAdmin) {
+  // During the 3s wait, keep showing loader to avoid "Sin empresa seleccionada" flicker or premature redirects
+  if (loading || isLoadingAdmin || pendingCheck) {
     return <div className="flex items-center justify-center min-h-screen">Cargando...</div>;
   }
 
