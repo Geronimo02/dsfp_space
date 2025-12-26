@@ -106,6 +106,9 @@ Deno.serve(async (req: Request) => {
       amount_ars = round2(amount_usd * FIXED_USD_ARS);
     }
 
+    // Only store stripe_payment_method_id if provider is stripe
+    const isStripePayment = providerNorm === "stripe" && stripe_payment_method_id;
+    
     const { data: intent, error: insErr } = await supabaseAdmin
       .from("signup_intents")
       .insert({
@@ -121,12 +124,12 @@ Deno.serve(async (req: Request) => {
 
         modules: modulesArr,
         provider: providerNorm,
-        status: stripe_payment_method_id ? "paid_ready" : "draft",
+        status: isStripePayment ? "paid_ready" : "draft",
         amount_usd,
         amount_ars,
         fx_rate_usd_ars,
         fx_rate_at,
-        stripe_payment_method_id: stripe_payment_method_id ?? null,
+        stripe_payment_method_id: isStripePayment ? stripe_payment_method_id : null,
       })
       .select("id")
       .single();
