@@ -5832,6 +5832,50 @@ export type Database = {
           },
         ]
       }
+      signup_payment_methods: {
+        Row: {
+          billing_country: string
+          created_at: string | null
+          email: string
+          expires_at: string | null
+          id: string
+          linked_to_company_id: string | null
+          name: string
+          payment_method_ref: string
+          provider: string
+        }
+        Insert: {
+          billing_country: string
+          created_at?: string | null
+          email: string
+          expires_at?: string | null
+          id?: string
+          linked_to_company_id?: string | null
+          name: string
+          payment_method_ref: string
+          provider: string
+        }
+        Update: {
+          billing_country?: string
+          created_at?: string | null
+          email?: string
+          expires_at?: string | null
+          id?: string
+          linked_to_company_id?: string | null
+          name?: string
+          payment_method_ref?: string
+          provider?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "fk_company"
+            columns: ["linked_to_company_id"]
+            isOneToOne: false
+            referencedRelation: "companies"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       stock_reservations: {
         Row: {
           company_id: string
