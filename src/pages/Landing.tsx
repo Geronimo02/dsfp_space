@@ -1,29 +1,42 @@
-import { useEffect } from "react";
+import { useEffect, useState } from "react";
 import { useNavigate } from "react-router-dom";
 import { supabase } from "@/integrations/supabase/client";
 
 const Landing = () => {
   const navigate = useNavigate();
+  const [loading, setLoading] = useState(true);
 
   useEffect(() => {
     const checkSession = async () => {
       const { data: { session } } = await supabase.auth.getSession();
       if (session) {
         navigate("/app", { replace: true });
+      } else {
+        setLoading(false);
       }
     };
 
     checkSession();
   }, [navigate]);
 
-  // This component won't render for most users as the static landing page is served at /
-  return (
-    <div className="flex min-h-screen items-center justify-center bg-slate-950 text-white">
-      <div className="flex items-center gap-3">
-        <div className="h-3 w-3 rounded-full bg-emerald-400 animate-pulse" />
-        <span>Cargando...</span>
+  if (loading) {
+    return (
+      <div className="flex min-h-screen items-center justify-center bg-slate-950 text-white">
+        <div className="flex items-center gap-3">
+          <div className="h-3 w-3 rounded-full bg-emerald-400 animate-pulse" />
+          <span>Cargando...</span>
+        </div>
       </div>
-    </div>
+    );
+  }
+
+  // Render the static landing page in an iframe
+  return (
+    <iframe
+      src="/landing/index.html"
+      className="w-full h-screen border-0"
+      title="Landing Page"
+    />
   );
 };
 
