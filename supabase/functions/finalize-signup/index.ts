@@ -148,6 +148,7 @@ Deno.serve(async (req: Request) => {
     if (subErr) return json({ error: String(subErr.message ?? subErr) }, 500);
 
     // 6️⃣ Guardar método de pago de signup (si existe) como método de la empresa
+    console.log("[finalize-signup] Step 6: Looking for payment method for email:", intent.email);
     try {
       const { data: spm, error: spmErr } = await supabaseAdmin
         .from("signup_payment_methods")
