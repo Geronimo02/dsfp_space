@@ -11,6 +11,13 @@ const Landing = () => {
       if (session) {
         navigate("/app", { replace: true });
       }
+
+        return;
+      }
+
+      // No active session: load the Webflow export directly to keep all interactions intact.
+      window.location.replace("/landing/index.html");
+
     };
 
     checkSession();
@@ -22,6 +29,7 @@ const Landing = () => {
       <div className="flex items-center gap-3">
         <div className="h-3 w-3 rounded-full bg-emerald-400 animate-pulse" />
         <span>Cargando...</span>
+        <span>Preparando tu experiencia...</span>
       </div>
     </div>
   );
