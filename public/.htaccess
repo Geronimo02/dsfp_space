@@ -1,0 +1,18 @@
+<IfModule mod_rewrite.c>
+  RewriteEngine On
+  RewriteBase /
+
+  # Serve existing files or directories
+  RewriteCond %{REQUEST_FILENAME} -f [OR]
+  RewriteCond %{REQUEST_FILENAME} -d
+  RewriteRule ^ - [L]
+
+  # Landing static: direct index resolution
+  RewriteRule ^landing/?$ /landing/index.html [L]
+
+  # Auth route: send to SPA with redirect param so React navigates to /auth
+  RewriteRule ^auth/?$ /index.html?r=auth [L,QSA]
+
+  # SPA fallback: all other routes go to the app entry
+  RewriteRule ^ /index.html [L]
+</IfModule>
