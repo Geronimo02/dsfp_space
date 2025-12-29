@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useMemo, useState } from "react";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog";
@@ -119,38 +119,66 @@ export function PaymentMethodsManager({
     },
   });
 
+  // Fetch subscription to decide provider
+  const { data: subscription } = useQuery({
+    queryKey: ["subscription", companyId],
+    enabled: !!companyId,
+    queryFn: async () => {
+      const { data, error } = await supabase
+        .from("subscriptions")
+        .select("provider")
+        .eq("company_id", companyId!)
+        .maybeSingle();
+      if (error) throw error;
+      return data as { provider?: string } | null;
+    },
+  });
+
+  const { data: companyCountry } = useQuery({
+    queryKey: ["company-country", companyId],
+    enabled: !!companyId && !subscription?.provider,
+    queryFn: async () => {
+      const { data, error } = await supabase
+        .from("companies")
+        .select("country")
+        .eq("id", companyId!)
+        .maybeSingle();
+      if (error) throw error;
+      return (data as any)?.country as string | null;
+    },
+  });
+
+  const effectiveProvider = useMemo(() => {
+    const prov = subscription?.provider?.toLowerCase();
+    if (prov === "stripe" || prov === "mercadopago") return prov;
+    const country = (companyCountry || "").toUpperCase();
+    return country === "AR" ? "mercadopago" : "stripe";
+  }, [subscription?.provider, companyCountry]);
+
   const handleAddCard = async () => {
     try {
+      if (effectiveProvider === "mercadopago") {
+        const { data, error } = await supabase.functions.invoke("create-mp-preapproval", {
+          body: { company_id: companyId },
+        });
+        if (error) throw error;
+        if (data?.redirect_url) {
+          window.location.href = data.redirect_url;
+          return;
+        }
+        throw new Error("No se obtuvo URL de autorización");
+      }
+
       const { data, error } = await supabase.functions.invoke("create-stripe-setup-intent", {
         body: { company_id: companyId },
       });
-
       if (error) throw error;
       if (!data?.client_secret) throw new Error("No se pudo crear el setup intent");
-
       setClientSecret(data.client_secret);
       setAddDialogOpen(true);
     } catch (e: any) {
       console.error(e);
       toast.error(e?.message ?? "Error al iniciar configuración de pago");
-    }
-  };
-
-  const handleAddMercadoPago = async () => {
-    try {
-      const { data, error } = await supabase.functions.invoke("create-mp-preapproval", {
-        body: { company_id: companyId },
-      });
-
-      if (error) throw error;
-      if (data?.redirect_url) {
-        window.location.href = data.redirect_url;
-      } else {
-        toast.error("No se obtuvo URL de autorización");
-      }
-    } catch (e: any) {
-      console.error(e);
-      toast.error(e?.message ?? "Error al configurar Mercado Pago");
     }
   };
 
@@ -235,7 +263,7 @@ export function PaymentMethodsManager({
                   Ingresa los datos de tu tarjeta de forma segura
                 </DialogDescription>
               </DialogHeader>
-              {stripePromise && clientSecret && (
+              {effectiveProvider === "stripe" && stripePromise && clientSecret && (
                 <Elements stripe={stripePromise} options={{ clientSecret }}>
                   <StripePaymentForm
                     clientSecret={clientSecret}
@@ -350,24 +378,12 @@ export function PaymentMethodsManager({
                   <Plus className="h-4 w-4 mr-2" />
                   Añadir tarjeta
                 </Button>
-                <Button variant="outline" onClick={handleAddMercadoPago}>
-                  <Plus className="h-4 w-4 mr-2" />
-                  Mercado Pago
-                </Button>
               </div>
             </div>
           </CardContent>
         </Card>
       )}
 
-      {paymentMethods && paymentMethods.length > 0 && (
-        <div className="flex justify-center">
-          <Button variant="outline" size="sm" onClick={handleAddMercadoPago}>
-            <Plus className="h-4 w-4 mr-2" />
-            Añadir Mercado Pago
-          </Button>
-        </div>
-      )}
     </div>
   );
 }

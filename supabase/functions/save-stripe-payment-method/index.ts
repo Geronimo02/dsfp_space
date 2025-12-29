@@ -77,13 +77,13 @@ Deno.serve(async (req: Request) => {
 
     if (saveError) throw saveError;
 
-    // Update company subscription with the payment method if it's the default
+    // Update subscription with the payment method if it's the default
     if (isFirstMethod) {
       const { data: subscription } = await supabase
-        .from("company_subscriptions")
+        .from("subscriptions")
         .select("id, provider_customer_id")
         .eq("company_id", companyUser.company_id)
-        .single();
+        .maybeSingle();
 
       if (subscription) {
         // Attach to Stripe customer if exists
@@ -96,11 +96,11 @@ Deno.serve(async (req: Request) => {
           });
         }
 
-        // Update subscription record
+        // Update subscription record to reflect in UI
         await supabase
-          .from("company_subscriptions")
+          .from("subscriptions")
           .update({ stripe_payment_method_id: payment_method_id })
-          .eq("company_id", companyUser.company_id);
+          .eq("id", subscription.id);
       }
     }
 

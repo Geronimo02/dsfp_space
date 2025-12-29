@@ -176,6 +176,11 @@ Deno.serve(async (req: Request) => {
               stripe_payment_method_id: spm.payment_method_ref,
               is_default: isFirst,
             });
+          // Reflect in subscriptions for UI
+          await supabaseAdmin
+            .from("subscriptions")
+            .update({ stripe_payment_method_id: spm.payment_method_ref })
+            .eq("company_id", companyId);
         } else if (spm.provider === "mercadopago") {
           await supabaseAdmin
             .from("company_payment_methods")
@@ -185,6 +190,10 @@ Deno.serve(async (req: Request) => {
               mp_preapproval_id: spm.payment_method_ref,
               is_default: isFirst,
             });
+          await supabaseAdmin
+            .from("subscriptions")
+            .update({ mp_preapproval_id: spm.payment_method_ref })
+            .eq("company_id", companyId);
         }
 
         // Link temp record to company
@@ -217,6 +226,10 @@ Deno.serve(async (req: Request) => {
               stripe_payment_method_id: intent.stripe_payment_method_id,
               is_default: true,
             });
+          await supabaseAdmin
+            .from("subscriptions")
+            .update({ stripe_payment_method_id: intent.stripe_payment_method_id })
+            .eq("company_id", companyId);
         } else if (intent.provider === "mercadopago") {
           await supabaseAdmin
             .from("company_payment_methods")
@@ -226,6 +239,10 @@ Deno.serve(async (req: Request) => {
               mp_preapproval_id: intent.mp_preapproval_id ?? null,
               is_default: true,
             });
+          await supabaseAdmin
+            .from("subscriptions")
+            .update({ mp_preapproval_id: intent.mp_preapproval_id ?? null })
+            .eq("company_id", companyId);
         }
       }
     } catch (e) {

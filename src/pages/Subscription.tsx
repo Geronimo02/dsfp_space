@@ -67,6 +67,28 @@ export default function Subscription() {
     },
   });
 
+  // Fallback to company country when provider is missing
+  const { data: companyCountry } = useQuery({
+    queryKey: ["company-country", currentCompany?.id],
+    enabled: !!currentCompany?.id && !subscription?.provider,
+    queryFn: async () => {
+      const { data, error } = await supabase
+        .from("companies")
+        .select("country")
+        .eq("id", currentCompany!.id)
+        .maybeSingle();
+      if (error) throw error;
+      return (data as any)?.country as string | null;
+    },
+  });
+
+  const effectiveProvider = useMemo(() => {
+    const prov = subscription?.provider?.toLowerCase();
+    if (prov === "stripe" || prov === "mercadopago") return prov;
+    const country = (companyCountry || "").toUpperCase();
+    return country === "AR" ? "mercadopago" : "stripe";
+  }, [subscription?.provider, companyCountry]);
+
   const { data: plan } = useQuery({
     queryKey: ["plan", subscription?.plan_id],
     enabled: !!subscription?.plan_id,
@@ -135,6 +157,18 @@ export default function Subscription() {
     }
   };
 
+  // Single entry point: decide provider and start corresponding flow
+  const addPaymentMethod = async () => {
+    const provider = effectiveProvider;
+    if (provider === "stripe") {
+      await setupStripe();
+    } else if (provider === "mercadopago") {
+      await setupMercadoPago();
+    } else {
+      toast.error("Proveedor de pago inválido");
+    }
+  };
+
   return (
     <div className="p-6 space-y-6">
       <h1 className="text-2xl font-semibold">Suscripción</h1>
@@ -148,7 +182,7 @@ export default function Subscription() {
             <p>Plan: <strong>{plan?.name ?? subscription?.plan_id ?? "-"}</strong></p>
             <p>Precio: ${plan?.price ?? "-"} USD/mes</p>
             <p>Estado: <strong>{subscription?.status ?? "-"}</strong></p>
-            <p>Proveedor: {subscription?.provider ?? "-"}</p>
+            <p>Proveedor: {subscription?.provider ?? effectiveProvider ?? "-"}</p>
             <p>Trial resta: {trialDaysLeft ?? "-"} días</p>
             {nextBillingDate && <p>Próxima facturación: <strong>{nextBillingDate}</strong></p>}
             <p>MP preapproval: {subscription?.mp_preapproval_id ? "Autorizado" : "No autorizado"}</p>
@@ -159,14 +193,11 @@ export default function Subscription() {
         <Card>
           <CardHeader>
             <CardTitle>Método de pago</CardTitle>
-            <CardDescription>Guardar tarjeta para cobro automático al fin del trial</CardDescription>
+            <CardDescription>Agregar una tarjeta para cobro automático según tu país</CardDescription>
           </CardHeader>
           <CardContent className="space-y-4">
             <div className="space-y-2">
-              <Button variant="outline" onClick={setupMercadoPago}>Autorizar en Mercado Pago</Button>
-            </div>
-            <div className="space-y-2">
-              <Button variant="outline" onClick={setupStripe}>Guardar tarjeta (Stripe)</Button>
+              <Button variant="outline" onClick={addPaymentMethod}>Agregar tarjeta</Button>
             </div>
             {stripePromise && clientSecret && (
               <Elements stripe={stripePromise} options={{ clientSecret }}>
