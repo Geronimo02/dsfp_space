@@ -1,0 +1,24 @@
+<!doctype html>
+<html lang="es">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>Redirigiendo al acceso...</title>
+    <meta http-equiv="refresh" content="0; url=/?r=auth" />
+    <script>
+      // Fallback JS redirect in case meta refresh is blocked
+      (function () {
+        try {
+          window.location.replace('/?r=auth');
+        } catch (e) {
+          window.location.href='/?r=auth';
+        }
+      })();
+    </script>
+  </head>
+  <body>
+    <noscript>
+      Si no redirige automáticamente, <a href="/?r=auth">haz clic aquí</a>.
+    </noscript>
+  </body>
+</html>
