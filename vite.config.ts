@@ -17,8 +17,8 @@ export default defineConfig(({ mode }) => ({
       registerType: 'autoUpdate',
       includeAssets: ['favicon.ico', 'robots.txt'],
       manifest: {
-        name: 'RetailSnap Pro',
-        short_name: 'RetailSnap',
+        name: 'ventify',
+        short_name: 'ventify',
         description: 'Sistema POS Profesional',
         theme_color: '#ffffff',
         background_color: '#ffffff',
