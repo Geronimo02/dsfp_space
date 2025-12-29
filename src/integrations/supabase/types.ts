@@ -6804,16 +6804,25 @@ export type Database = {
       }
     }
     Functions: {
-      apply_payment_to_invoice: {
-        Args: {
-          p_amount_applied: number
-          p_customer_id: string
-          p_payment_id: string
-          p_sale_id: string
-          p_user_id: string
-        }
-        Returns: undefined
-      }
+      apply_payment_to_invoice:
+        | {
+            Args: {
+              p_amount: number
+              p_movement_id: string
+              p_payment_method?: string
+            }
+            Returns: boolean
+          }
+        | {
+            Args: {
+              p_amount_applied: number
+              p_customer_id: string
+              p_payment_id: string
+              p_sale_id: string
+              p_user_id: string
+            }
+            Returns: undefined
+          }
       calculate_company_subscription_price: {
         Args: {
           p_billing_cycle?: string
@@ -6851,16 +6860,27 @@ export type Database = {
         }
         Returns: string
       }
-      create_customer_payment: {
-        Args: {
-          p_amount: number
-          p_customer_id: string
-          p_notes: string
-          p_payment_method: string
-          p_user_id: string
-        }
-        Returns: string
-      }
+      create_customer_payment:
+        | {
+            Args: {
+              p_amount: number
+              p_customer_id: string
+              p_notes: string
+              p_payment_method: string
+              p_user_id: string
+            }
+            Returns: string
+          }
+        | {
+            Args: {
+              p_amount: number
+              p_customer_id: string
+              p_notes?: string
+              p_payment_method: string
+              p_sale_id?: string
+            }
+            Returns: string
+          }
       expire_old_reservations: { Args: never; Returns: undefined }
       expire_trial_modules: { Args: never; Returns: number }
       format_comprobante_number: {
@@ -6908,7 +6928,7 @@ export type Database = {
         }[]
       }
       get_customer_movements: {
-        Args: { customer_id: string }
+        Args: { p_customer_id: string }
         Returns: {
           balance: number
           credit_amount: number
