@@ -45,7 +45,7 @@ export function Step4Payment({ formData, updateFormData, nextStep, prevStep }: S
   const isArgentina = billingCountry === "AR";
   const provider = isArgentina ? "mercadopago" : "stripe";
 
-  const handlePaymentSuccess = async (paymentMethodRef: string, metadata?: { brand?: string; last4?: string; exp_month?: number; exp_year?: number }) => {
+  const handlePaymentSuccess = async (paymentMethodRef: string, metadata: { brand: string; last4: string; exp_month: number; exp_year: number }) => {
     try {
       const { data, error } = await supabase.functions.invoke("signup-save-payment-method", {
         body: {
@@ -54,10 +54,10 @@ export function Step4Payment({ formData, updateFormData, nextStep, prevStep }: S
           billing_country: billingCountry,
           provider: provider,
           payment_method_ref: paymentMethodRef,
-          brand: metadata?.brand,
-          last4: metadata?.last4,
-          exp_month: metadata?.exp_month,
-          exp_year: metadata?.exp_year,
+          brand: metadata.brand,
+          last4: metadata.last4,
+          exp_month: metadata.exp_month,
+          exp_year: metadata.exp_year,
         },
       });
 

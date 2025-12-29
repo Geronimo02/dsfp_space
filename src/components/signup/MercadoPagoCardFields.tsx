@@ -6,7 +6,7 @@ import { Alert, AlertDescription } from "@/components/ui/alert";
 import { supabase } from "@/integrations/supabase/client";
 
 interface MercadoPagoCardFieldsProps {
-  onSuccess: (token: string) => void;
+  onSuccess: (token: string, metadata: { brand: string; last4: string; exp_month: number; exp_year: number }) => void;
   isLoading: boolean;
 }
 
@@ -94,14 +94,24 @@ export function MercadoPagoCardFields({ onSuccess, isLoading }: MercadoPagoCardF
                         const token = tokenResp.data?.token_id || tokenResp.data?.id;
                         console.log("[MP] Token created:", token);
                         
+                        // Extract metadata from card data
+                        const last4 = cardData.cardNumber.replace(/\s/g, '').slice(-4);
+                        const brand = tokenResp.data?.payment_method?.type || "unknown";
+                        const exp_month = parseInt(cardData.cardExpirationMonth, 10);
+                        const exp_year = parseInt(cardData.cardExpirationYear, 10);
+                        
+                        const metadata = { brand, last4, exp_month, exp_year };
+                        console.log("[MP] Card metadata:", metadata);
+                        
                         toast.success("Tarjeta procesada exitosamente");
-                        onSuccess(token);
+                        onSuccess(token, metadata);
                       } else {
                         // Fallback: generate test token
                         console.log("[MP] No card data in formData, using test token");
                         const testToken = `mp_token_${Date.now()}`;
+                        const testMetadata = { brand: "test", last4: "0000", exp_month: 12, exp_year: 2030 };
                         toast.success("Tarjeta guardada exitosamente");
-                        onSuccess(testToken);
+                        onSuccess(testToken, testMetadata);
                       }
                     } catch (error: any) {
                       console.error("[MP] Token error:", error);
