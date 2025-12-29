@@ -149,15 +149,19 @@ Deno.serve(async (req: Request) => {
 
     // 6️⃣ Guardar método de pago de signup (si existe) como método de la empresa
     try {
-      const { data: spm } = await supabaseAdmin
+      const { data: spm, error: spmErr } = await supabaseAdmin
         .from("signup_payment_methods")
-        .select("id, provider, payment_method_ref")
+        .select("id, provider, payment_method_ref, brand, last4, exp_month, exp_year, name")
         .eq("email", intent.email)
         .order("created_at", { ascending: false })
         .limit(1)
         .single();
 
-      if (spm) {
+      if (spmErr) {
+        console.log("[finalize-signup] No signup payment method found for email:", intent.email);
+      } else if (spm) {
+        console.log("[finalize-signup] Found signup payment method:", spm.id, "provider:", spm.provider);
+        
         // Check if company has methods already
         const { data: existing } = await supabaseAdmin
           .from("company_payment_methods")
@@ -167,44 +171,76 @@ Deno.serve(async (req: Request) => {
         const isFirst = !existing || existing.length === 0;
 
         if (spm.provider === "stripe") {
-          // Store as card without brand info (can be enriched later)
-          await supabaseAdmin
+          // Store card with metadata from signup
+          const { error: insertErr } = await supabaseAdmin
             .from("company_payment_methods")
             .insert({
               company_id: companyId,
               type: "card",
               stripe_payment_method_id: spm.payment_method_ref,
+              brand: spm.brand ?? null,
+              last4: spm.last4 ?? null,
+              exp_month: spm.exp_month ?? null,
+              exp_year: spm.exp_year ?? null,
+              holder_name: spm.name ?? null,
               is_default: isFirst,
             });
+          
+          if (insertErr) {
+            console.error("[finalize-signup] Error inserting payment method:", insertErr);
+            throw insertErr;
+          }
+          
           // Reflect in subscriptions for UI
-          await supabaseAdmin
+          const { error: subErr } = await supabaseAdmin
             .from("subscriptions")
             .update({ stripe_payment_method_id: spm.payment_method_ref })
             .eq("company_id", companyId);
+            
+          if (subErr) {
+            console.error("[finalize-signup] Error updating subscription:", subErr);
+          }
         } else if (spm.provider === "mercadopago") {
-          await supabaseAdmin
+          const { error: insertErr } = await supabaseAdmin
             .from("company_payment_methods")
             .insert({
               company_id: companyId,
               type: "mercadopago",
               mp_preapproval_id: spm.payment_method_ref,
+              holder_name: spm.name ?? null,
               is_default: isFirst,
             });
-          await supabaseAdmin
+          
+          if (insertErr) {
+            console.error("[finalize-signup] Error inserting MP payment method:", insertErr);
+            throw insertErr;
+          }
+          
+          const { error: subErr } = await supabaseAdmin
             .from("subscriptions")
             .update({ mp_preapproval_id: spm.payment_method_ref })
             .eq("company_id", companyId);
+            
+          if (subErr) {
+            console.error("[finalize-signup] Error updating MP subscription:", subErr);
+          }
         }
 
-        // Link temp record to company
-        await supabaseAdmin
+        // Link temp record to company - CRITICAL: mark as processed
+        const { error: linkErr } = await supabaseAdmin
           .from("signup_payment_methods")
           .update({ linked_to_company_id: companyId })
           .eq("id", spm.id);
+          
+        if (linkErr) {
+          console.error("[finalize-signup] CRITICAL: Failed to link signup payment method to company:", linkErr);
+        } else {
+          console.log("[finalize-signup] Successfully linked payment method", spm.id, "to company", companyId);
+        }
       }
     } catch (e) {
       // Non-blocking: continue even if linking fails
-      console.warn("[finalize-signup] No payment method linked:", e);
+      console.error("[finalize-signup] Payment method linking error:", e);
     }
 
     // Fallback: if no signup_payment_methods found, try linking from intent directly

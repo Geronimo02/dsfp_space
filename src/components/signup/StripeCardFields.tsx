@@ -21,7 +21,7 @@ const elementOptions = {
 };
 
 interface StripeCardFieldsProps {
-  onSuccess: (paymentMethodId: string) => void;
+  onSuccess: (paymentMethodId: string, metadata?: { brand?: string; last4?: string; exp_month?: number; exp_year?: number }) => void;
   isLoading: boolean;
 }
 
@@ -56,8 +56,16 @@ export function StripeCardFields({ onSuccess, isLoading }: StripeCardFieldsProps
         throw new Error("No se obtuvo payment method ID");
       }
 
+      // Extract card metadata
+      const metadata = {
+        brand: paymentMethod.card?.brand,
+        last4: paymentMethod.card?.last4,
+        exp_month: paymentMethod.card?.exp_month,
+        exp_year: paymentMethod.card?.exp_year,
+      };
+
       // Successfully created payment method
-      onSuccess(paymentMethod.id);
+      onSuccess(paymentMethod.id, metadata);
     } catch (e: any) {
       console.error(e);
       const errorMsg = e?.message ?? "Error al guardar la tarjeta";
