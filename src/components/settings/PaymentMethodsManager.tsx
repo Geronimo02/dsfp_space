@@ -27,11 +27,13 @@ interface PaymentMethod {
 interface StripePaymentFormProps {
   clientSecret: string;
   onSuccess: () => void;
+  companyId: string;
 }
 
 function StripePaymentForm({ 
   clientSecret, 
-  onSuccess 
+  onSuccess,
+  companyId,
 }: StripePaymentFormProps) {
   const stripe = useStripe();
   const elements = useElements();
@@ -56,7 +58,7 @@ function StripePaymentForm({
       const pmId = (setupIntent?.payment_method as string) || "";
       
       const { error: saveErr } = await supabase.functions.invoke("save-stripe-payment-method", { 
-        body: { payment_method_id: pmId } 
+        body: { payment_method_id: pmId, company_id: companyId } 
       });
       
       if (saveErr) throw saveErr;
@@ -208,14 +210,14 @@ export function PaymentMethodsManager({
 
   const handleDelete = async (methodId: string) => {
     try {
-      const { error } = await supabase
-        .from("company_payment_methods")
-        .delete()
-        .eq("id", methodId);
+      const { error } = await supabase.functions.invoke("delete-payment-method", {
+        body: { method_id: methodId },
+      });
 
       if (error) throw error;
 
       await queryClient.invalidateQueries({ queryKey: ["payment-methods", companyId] });
+      await queryClient.invalidateQueries({ queryKey: ["subscription", companyId] });
       toast.success("Método de pago eliminado");
     } catch (e: any) {
       console.error(e);
@@ -267,6 +269,7 @@ export function PaymentMethodsManager({
                 <Elements stripe={stripePromise} options={{ clientSecret }}>
                   <StripePaymentForm
                     clientSecret={clientSecret}
+                    companyId={companyId!}
                     onSuccess={() => {
                       setAddDialogOpen(false);
                       setClientSecret(null);

@@ -154,7 +154,7 @@ Deno.serve(async (req: Request) => {
 
     const { data: sub, error: subErr } = await supabaseAdmin
       .from("subscriptions")
-      .select("id, status")
+      .select("id, status, company_id, mp_preapproval_id")
       .eq("provider", "mercadopago")
       .eq("provider_subscription_id", providerSubId)
       .maybeSingle();
@@ -169,6 +169,25 @@ Deno.serve(async (req: Request) => {
         .eq("id", sub.id);
 
       if (updSubErr) throw updSubErr;
+
+      // When authorized/active, reflect as a saved method for the company
+      if (internalStatus === "active" && sub.company_id) {
+        const { data: existing } = await supabaseAdmin
+          .from("company_payment_methods")
+          .select("id")
+          .eq("company_id", sub.company_id);
+
+        const isFirst = !existing || existing.length === 0;
+
+        await supabaseAdmin
+          .from("company_payment_methods")
+          .insert({
+            company_id: sub.company_id,
+            type: "mercadopago",
+            mp_preapproval_id: sub.mp_preapproval_id ?? providerSubId,
+            is_default: isFirst,
+          });
+      }
     }
 
     return json({ ok: true }, 200);

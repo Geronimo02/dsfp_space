@@ -19,36 +19,49 @@ Deno.serve(async (req: Request) => {
     const authHeader = req.headers.get("Authorization");
     if (!authHeader) return json({ error: "No autorizado" }, 401);
 
-    const { payment_method_id } = await req.json();
+    const { payment_method_id, company_id } = await req.json();
     if (!payment_method_id) return json({ error: "payment_method_id requerido" }, 400);
 
     const url = Deno.env.get("SUPABASE_URL")!;
     const anonKey = Deno.env.get("SUPABASE_ANON_KEY")!;
+    const serviceRoleKey = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!;
     const stripeKey = Deno.env.get("STRIPE_SECRET_KEY")!;
-    
-    const supabase = createClient(url, anonKey, {
-      global: { headers: { Authorization: authHeader } }
-    });
+
+    const supabaseUser = createClient(url, anonKey, { global: { headers: { Authorization: authHeader } } });
+    const supabaseAdmin = createClient(url, serviceRoleKey);
     const stripe = new Stripe(stripeKey, { apiVersion: "2023-10-16" });
 
     // Get current user
-    const { data: { user }, error: userError } = await supabase.auth.getUser();
+    const { data: { user }, error: userError } = await supabaseUser.auth.getUser();
     if (userError || !user) return json({ error: "No autorizado" }, 401);
 
     // Get payment method details from Stripe
     const pm = await stripe.paymentMethods.retrieve(payment_method_id);
 
-    // Get user's company
-    const { data: companyUser, error: companyError } = await supabase
-      .from("company_users")
-      .select("company_id")
-      .eq("user_id", user.id)
-      .eq("active", true)
-      .single();
-
-    if (companyError || !companyUser) {
-      return json({ error: "No se encontró empresa activa" }, 404);
+    // Resolve company_id: prefer explicit, otherwise fallback to first active
+    let targetCompanyId: string | null = null;
+    if (company_id) {
+      const { data: cuForCompany } = await supabaseAdmin
+        .from("company_users")
+        .select("company_id")
+        .eq("company_id", company_id)
+        .eq("user_id", user.id)
+        .eq("active", true)
+        .maybeSingle();
+      if (!cuForCompany) return json({ error: "No tienes acceso a la empresa indicada" }, 403);
+      targetCompanyId = company_id;
+    } else {
+      const { data: companyUser } = await supabaseAdmin
+        .from("company_users")
+        .select("company_id")
+        .eq("user_id", user.id)
+        .eq("active", true)
+        .limit(1)
+        .maybeSingle();
+      targetCompanyId = companyUser?.company_id ?? null;
     }
+
+    if (!targetCompanyId) return json({ error: "No se encontró empresa activa" }, 404);
 
     // Check if this is the first payment method for the company
     const { data: existingMethods } = await supabase
@@ -59,10 +72,10 @@ Deno.serve(async (req: Request) => {
     const isFirstMethod = !existingMethods || existingMethods.length === 0;
 
     // Save payment method to database
-    const { data: savedMethod, error: saveError } = await supabase
+    const { data: savedMethod, error: saveError } = await supabaseAdmin
       .from("company_payment_methods")
       .insert({
-        company_id: companyUser.company_id,
+        company_id: targetCompanyId,
         type: "card",
         stripe_payment_method_id: payment_method_id,
         brand: pm.card?.brand || null,
@@ -79,10 +92,10 @@ Deno.serve(async (req: Request) => {
 
     // Update subscription with the payment method if it's the default
     if (isFirstMethod) {
-      const { data: subscription } = await supabase
+      const { data: subscription } = await supabaseAdmin
         .from("subscriptions")
         .select("id, provider_customer_id")
-        .eq("company_id", companyUser.company_id)
+        .eq("company_id", targetCompanyId)
         .maybeSingle();
 
       if (subscription) {
@@ -97,7 +110,7 @@ Deno.serve(async (req: Request) => {
         }
 
         // Update subscription record to reflect in UI
-        await supabase
+        await supabaseAdmin
           .from("subscriptions")
           .update({ stripe_payment_method_id: payment_method_id })
           .eq("id", subscription.id);

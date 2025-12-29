@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useState } from "react";
-import { useQuery } from "@tanstack/react-query";
+import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
 import { useCompany } from "@/contexts/CompanyContext";
 import { Card, CardHeader, CardTitle, CardContent, CardDescription } from "@/components/ui/card";
@@ -8,7 +8,7 @@ import { toast } from "sonner";
 import { loadStripe } from "@stripe/stripe-js";
 import { Elements, PaymentElement, useElements, useStripe } from "@stripe/react-stripe-js";
 
-function StripePaymentSetup({ clientSecret, onSaved }: { clientSecret: string; onSaved: () => void }) {
+function StripePaymentSetup({ clientSecret, onSaved, companyId, onInvalidate }: { clientSecret: string; onSaved: () => void; companyId: string; onInvalidate: () => void }) {
   const stripe = useStripe();
   const elements = useElements();
   const [saving, setSaving] = useState(false);
@@ -26,9 +26,10 @@ function StripePaymentSetup({ clientSecret, onSaved }: { clientSecret: string; o
       });
       if (error) throw error;
       const pmId = (setupIntent?.payment_method as string) || "";
-      const { error: saveErr } = await supabase.functions.invoke("save-stripe-payment-method", { body: { payment_method_id: pmId } });
+      const { error: saveErr } = await supabase.functions.invoke("save-stripe-payment-method", { body: { payment_method_id: pmId, company_id: companyId } });
       if (saveErr) throw saveErr;
       toast.success("Método guardado");
+      onInvalidate();
       onSaved();
     } catch (e: any) {
       console.error(e);
@@ -50,6 +51,7 @@ function StripePaymentSetup({ clientSecret, onSaved }: { clientSecret: string; o
 
 export default function Subscription() {
   const { currentCompany } = useCompany();
+  const queryClient = useQueryClient();
   const [stripePromise, setStripePromise] = useState<any>(null);
   const [clientSecret, setClientSecret] = useState<string | null>(null);
 
@@ -126,6 +128,23 @@ export default function Subscription() {
     }
   }, []);
 
+  const { data: defaultPaymentMethod } = useQuery({
+    queryKey: ["default-payment-method", currentCompany?.id],
+    enabled: !!currentCompany?.id,
+    queryFn: async () => {
+      const { data, error } = await supabase
+        .from("company_payment_methods")
+        .select("id, type, brand, last4, exp_month, exp_year, holder_name, mp_preapproval_id, is_default, created_at")
+        .eq("company_id", currentCompany!.id)
+        .order("is_default", { ascending: false })
+        .order("created_at", { ascending: false })
+        .limit(1)
+        .maybeSingle();
+      if (error) throw error;
+      return data;
+    },
+  });
+
   const setupStripe = async () => {
     try {
       const { data, error } = await supabase.functions.invoke("create-stripe-setup-intent", {
@@ -185,8 +204,11 @@ export default function Subscription() {
             <p>Proveedor: {subscription?.provider ?? effectiveProvider ?? "-"}</p>
             <p>Trial resta: {trialDaysLeft ?? "-"} días</p>
             {nextBillingDate && <p>Próxima facturación: <strong>{nextBillingDate}</strong></p>}
-            <p>MP preapproval: {subscription?.mp_preapproval_id ? "Autorizado" : "No autorizado"}</p>
-            <p>Stripe PM: {subscription?.stripe_payment_method_id ? `Guardado (${subscription.stripe_payment_method_id.substring(0, 16)}...)` : "No guardado"}</p>
+            <p>Método guardado: {defaultPaymentMethod
+              ? defaultPaymentMethod.type === "card"
+                ? `${defaultPaymentMethod.brand?.toUpperCase() ?? "Tarjeta"} •••• ${defaultPaymentMethod.last4}`
+                : "Mercado Pago"
+              : "No guardado"}</p>
           </CardContent>
         </Card>
 
@@ -201,7 +223,15 @@ export default function Subscription() {
             </div>
             {stripePromise && clientSecret && (
               <Elements stripe={stripePromise} options={{ clientSecret }}>
-                <StripePaymentSetup clientSecret={clientSecret} onSaved={() => setClientSecret(null)} />
+                <StripePaymentSetup
+                  clientSecret={clientSecret}
+                  companyId={currentCompany!.id}
+                  onInvalidate={() => {
+                    queryClient.invalidateQueries({ queryKey: ["default-payment-method", currentCompany?.id] });
+                    queryClient.invalidateQueries({ queryKey: ["subscription", currentCompany?.id] });
+                  }}
+                  onSaved={() => setClientSecret(null)}
+                />
               </Elements>
             )}
           </CardContent>
