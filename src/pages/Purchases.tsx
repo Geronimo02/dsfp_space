@@ -1,4 +1,5 @@
 import { useState } from "react";
+import { useNavigate } from "react-router-dom";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
 import { Layout } from "@/components/layout/Layout";
@@ -11,7 +12,7 @@ import { Label } from "@/components/ui/label";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Textarea } from "@/components/ui/textarea";
 import { Badge } from "@/components/ui/badge";
-import { Plus, Search, Eye, Trash2, ShoppingCart, Package, DollarSign, AlertCircle, CheckCircle2, Info, TrendingUp } from "lucide-react";
+import { Plus, Search, Eye, Trash2, ShoppingCart, Package, DollarSign, AlertCircle, CheckCircle2, Info, TrendingUp, BarChart3 } from "lucide-react";
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip";
 import { toast } from "sonner";
 import { sanitizeSearchQuery } from "@/lib/searchUtils";
@@ -27,6 +28,7 @@ interface PurchaseItem {
 }
 
 const Purchases = () => {
+  const navigate = useNavigate();
   const { currentCompany } = useCompany();
   const queryClient = useQueryClient();
   const [searchQuery, setSearchQuery] = useState("");
@@ -269,9 +271,15 @@ const Purchases = () => {
   return (
     <Layout>
       <div className="space-y-6">
-        <div>
-          <h1 className="text-3xl font-bold">Gestión de Compras</h1>
-          <p className="text-muted-foreground">Administra las compras a proveedores</p>
+        <div className="flex items-center justify-between">
+          <div>
+            <h1 className="text-3xl font-bold">Gestión de Compras</h1>
+            <p className="text-muted-foreground">Administra las compras a proveedores</p>
+          </div>
+          <Button variant="outline" onClick={() => navigate("/reports?tab=purchases")}>
+            <BarChart3 className="h-4 w-4 mr-2" />
+            Ver Reportes
+          </Button>
         </div>
 
         <Card>

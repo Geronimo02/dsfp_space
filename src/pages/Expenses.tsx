@@ -1,4 +1,5 @@
 import { useState } from "react";
+import { useNavigate } from "react-router-dom";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
 import { Layout } from "@/components/layout/Layout";
@@ -12,7 +13,7 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from 
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { Badge } from "@/components/ui/badge";
-import { Plus, DollarSign, TrendingUp, FileText, AlertCircle, CheckCircle2, Info, Wallet, CreditCard, Banknote } from "lucide-react";
+import { Plus, DollarSign, TrendingUp, FileText, AlertCircle, CheckCircle2, Info, Wallet, CreditCard, Banknote, BarChart3 } from "lucide-react";
 import { toast } from "sonner";
 import { format } from "date-fns";
 import { es } from "date-fns/locale";
@@ -20,6 +21,7 @@ import { usePermissions } from "@/hooks/usePermissions";
 import { useCompany } from "@/contexts/CompanyContext";
 
 export default function Expenses() {
+  const navigate = useNavigate();
   const { currentCompany } = useCompany();
   const [dialogOpen, setDialogOpen] = useState(false);
   const [formData, setFormData] = useState({
@@ -182,7 +184,11 @@ export default function Expenses() {
             <h1 className="text-3xl font-bold">Gestión de Gastos</h1>
             <p className="text-muted-foreground">Control y seguimiento de gastos operativos</p>
           </div>
-          {canCreate && (
+            <Button variant="outline" onClick={() => navigate("/reports")}>
+              <BarChart3 className="h-4 w-4 mr-2" />
+              Ver Reportes
+            </Button>
+            {canCreate && (
             <Dialog open={dialogOpen} onOpenChange={setDialogOpen}>
               <TooltipProvider>
                 <Tooltip>
