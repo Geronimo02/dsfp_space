@@ -1107,6 +1107,10 @@ export default function Products() {
             <p className="text-xs sm:text-sm text-muted-foreground">Gestiona tu inventario</p>
           </div>
           <div className="flex flex-wrap gap-2">
+            <Button variant="outline" size="sm" onClick={() => navigate("/reports?tab=products")}>
+              <BarChart3 className="h-4 w-4 sm:mr-2" />
+              <span className="hidden sm:inline">Ver Reportes</span>
+            </Button>
             {canEdit && (
               <Button 
                 variant="outline" 

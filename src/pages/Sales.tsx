@@ -6,7 +6,7 @@ import { Button } from "@/components/ui/button";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { useQuery } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
-import { Search, Receipt, Eye, Printer, Truck, AlertCircle, CheckCircle2, Info, CreditCard, Wallet, User, FileText, RotateCcw } from "lucide-react";
+import { Search, Receipt, Eye, Printer, Truck, AlertCircle, CheckCircle2, Info, CreditCard, Wallet, User, FileText, RotateCcw, BarChart3 } from "lucide-react";
 import { useNavigate } from "react-router-dom";
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip";
 import { Badge } from "@/components/ui/badge";
@@ -213,9 +213,15 @@ export default function Sales() {
   return (
     <Layout>
       <div className="space-y-6">
-        <div>
-          <h1 className="text-3xl font-bold text-foreground">Ventas</h1>
-          <p className="text-muted-foreground">Historial de transacciones</p>
+        <div className="flex items-center justify-between">
+          <div>
+            <h1 className="text-3xl font-bold text-foreground">Ventas</h1>
+            <p className="text-muted-foreground">Historial de transacciones</p>
+          </div>
+          <Button variant="outline" onClick={() => navigate("/reports?tab=sales")}>
+            <BarChart3 className="h-4 w-4 mr-2" />
+            Ver Reportes
+          </Button>
         </div>
 
         <Card className="shadow-soft">

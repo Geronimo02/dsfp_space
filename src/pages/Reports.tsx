@@ -5,10 +5,15 @@ import { Layout } from "@/components/layout/Layout";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
+import { Button } from "@/components/ui/button";
+import { Calendar } from "@/components/ui/calendar";
+import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
 import { BarChart, Bar, LineChart, Line, PieChart, Pie, Cell, XAxis, YAxis, CartesianGrid, Tooltip, Legend, ResponsiveContainer } from "recharts";
-import { TrendingUp, DollarSign, Package, ShoppingCart, Wallet, ArrowUpRight, ArrowDownRight, RotateCw, AlertTriangle, Zap } from "lucide-react";
+import { TrendingUp, DollarSign, Package, ShoppingCart, Wallet, ArrowUpRight, ArrowDownRight, RotateCw, AlertTriangle, Zap, CalendarIcon } from "lucide-react";
 import { format, subDays, startOfDay, endOfDay } from "date-fns";
 import { es } from "date-fns/locale";
+import { cn } from "@/lib/utils";
+import { DateRange } from "react-day-picker";
 
 const COLORS = ['hsl(var(--chart-1))', 'hsl(var(--chart-2))', 'hsl(var(--chart-3))', 'hsl(var(--chart-4))', 'hsl(var(--chart-5))'];
 
@@ -16,11 +21,21 @@ import { useCompany } from "@/contexts/CompanyContext";
 
 const Reports = () => {
   const { currentCompany } = useCompany();
-  const [dateRange, setDateRange] = useState("7");
+  const [dateRangeType, setDateRangeType] = useState("7");
   const [reportCurrency, setReportCurrency] = useState("ARS");
+  const [customDateRange, setCustomDateRange] = useState<DateRange | undefined>({
+    from: subDays(new Date(), 7),
+    to: new Date(),
+  });
 
   const getDateRange = () => {
-    const days = parseInt(dateRange);
+    if (dateRangeType === "custom" && customDateRange?.from && customDateRange?.to) {
+      return {
+        start: startOfDay(customDateRange.from),
+        end: endOfDay(customDateRange.to),
+      };
+    }
+    const days = parseInt(dateRangeType);
     return {
       start: startOfDay(subDays(new Date(), days)),
       end: endOfDay(new Date()),
@@ -61,7 +76,7 @@ const Reports = () => {
 
   // Ventas por día
   const { data: salesData } = useQuery({
-    queryKey: ["reports-sales", dateRange, currentCompany?.id, reportCurrency],
+    queryKey: ["reports-sales", dateRangeType, customDateRange, currentCompany?.id, reportCurrency],
     queryFn: async () => {
       const { start, end } = getDateRange();
       const { data, error } = await supabase
@@ -91,7 +106,7 @@ const Reports = () => {
 
   // Métodos de pago
   const { data: paymentMethodsData } = useQuery({
-    queryKey: ["reports-payment-methods", dateRange, currentCompany?.id, reportCurrency],
+    queryKey: ["reports-payment-methods", dateRangeType, customDateRange, currentCompany?.id, reportCurrency],
     queryFn: async () => {
       const { start, end } = getDateRange();
       const { data, error } = await supabase
@@ -118,7 +133,7 @@ const Reports = () => {
 
   // Productos más vendidos
   const { data: topProductsData } = useQuery({
-    queryKey: ["reports-top-products", dateRange, currentCompany?.id, reportCurrency],
+    queryKey: ["reports-top-products", dateRangeType, customDateRange, currentCompany?.id, reportCurrency],
     queryFn: async () => {
       const { start, end } = getDateRange();
       const { data, error } = await supabase
@@ -154,7 +169,7 @@ const Reports = () => {
 
   // Ventas por cliente
   const { data: salesByCustomer } = useQuery({
-    queryKey: ["reports-sales-by-customer", dateRange, currentCompany?.id],
+    queryKey: ["reports-sales-by-customer", dateRangeType, customDateRange, currentCompany?.id],
     queryFn: async () => {
       const { start, end } = getDateRange();
       const { data, error } = await supabase
@@ -202,7 +217,7 @@ const Reports = () => {
 
   // Resumen general
   const { data: summary } = useQuery({
-    queryKey: ["reports-summary", dateRange, currentCompany?.id],
+    queryKey: ["reports-summary", dateRangeType, customDateRange, currentCompany?.id],
     queryFn: async () => {
       const { start, end } = getDateRange();
 
@@ -255,7 +270,7 @@ const Reports = () => {
 
   // Compras por día
   const { data: purchasesData } = useQuery({
-    queryKey: ["reports-purchases", dateRange, currentCompany?.id],
+    queryKey: ["reports-purchases", dateRangeType, customDateRange, currentCompany?.id],
     queryFn: async () => {
       const { start, end } = getDateRange();
       const { data, error } = await supabase
@@ -368,18 +383,60 @@ const Reports = () => {
             <h1 className="text-2xl md:text-3xl font-bold">Reportes</h1>
             <p className="text-sm text-muted-foreground hidden sm:block">Visualiza el rendimiento de tu negocio</p>
           </div>
-          <div className="flex gap-2">
-            <Select value={dateRange} onValueChange={setDateRange}>
+          <div className="flex flex-wrap gap-2">
+            <Select value={dateRangeType} onValueChange={setDateRangeType}>
               <SelectTrigger className="w-[130px] md:w-[180px]">
                 <SelectValue />
               </SelectTrigger>
               <SelectContent>
-                <SelectItem value="7">7 días</SelectItem>
-                <SelectItem value="15">15 días</SelectItem>
-                <SelectItem value="30">30 días</SelectItem>
-                <SelectItem value="90">90 días</SelectItem>
+                <SelectItem value="7">Últimos 7 días</SelectItem>
+                <SelectItem value="15">Últimos 15 días</SelectItem>
+                <SelectItem value="30">Últimos 30 días</SelectItem>
+                <SelectItem value="90">Últimos 90 días</SelectItem>
+                <SelectItem value="custom">Rango personalizado</SelectItem>
               </SelectContent>
             </Select>
+            
+            {dateRangeType === "custom" && (
+              <Popover>
+                <PopoverTrigger asChild>
+                  <Button
+                    variant="outline"
+                    className={cn(
+                      "justify-start text-left font-normal min-w-[240px]",
+                      !customDateRange && "text-muted-foreground"
+                    )}
+                  >
+                    <CalendarIcon className="mr-2 h-4 w-4" />
+                    {customDateRange?.from ? (
+                      customDateRange.to ? (
+                        <>
+                          {format(customDateRange.from, "dd/MM/yyyy", { locale: es })} -{" "}
+                          {format(customDateRange.to, "dd/MM/yyyy", { locale: es })}
+                        </>
+                      ) : (
+                        format(customDateRange.from, "dd/MM/yyyy", { locale: es })
+                      )
+                    ) : (
+                      <span>Seleccionar fechas</span>
+                    )}
+                  </Button>
+                </PopoverTrigger>
+                <PopoverContent className="w-auto p-0" align="start">
+                  <Calendar
+                    initialFocus
+                    mode="range"
+                    defaultMonth={customDateRange?.from}
+                    selected={customDateRange}
+                    onSelect={setCustomDateRange}
+                    numberOfMonths={2}
+                    locale={es}
+                    className="pointer-events-auto"
+                  />
+                </PopoverContent>
+              </Popover>
+            )}
+            
             <Select value={reportCurrency} onValueChange={setReportCurrency}>
               <SelectTrigger className="w-[100px] md:w-[140px]">
                 <SelectValue />
