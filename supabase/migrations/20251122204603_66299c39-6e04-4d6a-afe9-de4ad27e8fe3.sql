@@ -125,7 +125,7 @@ CREATE INDEX idx_platform_admins_user_id ON public.platform_admins(user_id);
 CREATE INDEX idx_company_subscriptions_company_id ON public.company_subscriptions(company_id);
 CREATE INDEX idx_company_subscriptions_status ON public.company_subscriptions(status);
 
--- Note: After creating your account with email geronimoserratti@hotmail.com in Supabase Auth,
--- run this query to add yourself as platform admin (replace YOUR_USER_ID):
+-- Note: After creating your account in Supabase Auth,
+-- run this query to add yourself as platform admin (replace YOUR_USER_ID and EMAIL):
 -- INSERT INTO public.platform_admins (user_id, email) 
--- VALUES ('YOUR_USER_ID', 'geronimoserratti@hotmail.com');
+-- VALUES ('YOUR_USER_ID', 'your@email.com');

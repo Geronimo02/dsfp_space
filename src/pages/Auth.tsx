@@ -35,7 +35,7 @@ export default function Auth() {
     const checkSession = async () => {
       const { data: { session } } = await supabase.auth.getSession();
       if (session) {
-        navigate("/");
+        navigate("/app");
       }
     };
 
@@ -46,7 +46,7 @@ export default function Auth() {
       // Don't redirect on fresh signup/login to avoid race condition with CompanyContext
       if (session && event === 'INITIAL_SESSION') {
         // User already has a session, redirect to home
-        navigate("/");
+        navigate("/app");
       }
     });
 
@@ -68,7 +68,7 @@ export default function Auth() {
       if (error) throw error;
       
       toast.success("Sesión iniciada correctamente");
-      navigate("/");
+      navigate("/app");
     } catch (error: any) {
       if (error instanceof z.ZodError) {
         toast.error(error.errors[0].message);
@@ -87,7 +87,7 @@ export default function Auth() {
     try {
       authSchema.parse({ email, password, fullName });
       
-      const redirectUrl = `${window.location.origin}/`;
+      const redirectUrl = `${window.location.origin}/auth`;
       
       const { error, data } = await supabase.auth.signUp({
         email,

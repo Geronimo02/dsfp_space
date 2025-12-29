@@ -77,7 +77,7 @@ export default function ModuleNotAvailable() {
             </Button>
             <Button
               className="flex-1"
-              onClick={() => navigate("/")}
+              onClick={() => navigate("/app")}
             >
               Ir al Dashboard
             </Button>
