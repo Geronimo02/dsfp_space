@@ -1,10 +1,22 @@
 import { useEffect } from "react";
+import { useNavigate } from "react-router-dom";
 
 const Landing = () => {
+  const navigate = useNavigate();
+
   useEffect(() => {
-    // Cargar la landing estática como página principal
+    const params = new URLSearchParams(window.location.search);
+    const redirect = params.get("r");
+
+    // Si viene con ?r=auth, navega dentro de la SPA al login
+    if (redirect === "auth") {
+      navigate("/auth", { replace: true });
+      return;
+    }
+
+    // Caso por defecto: mostrar la landing estática
     window.location.replace("/landing/index.html");
-  }, []);
+  }, [navigate]);
 
   // Loader mientras redirige
   return (
