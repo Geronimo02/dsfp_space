@@ -163,8 +163,22 @@ export function EmployeeRoleAssignment() {
 
       if (result?.already_member) {
         toast.info(result?.message || "El usuario ya pertenece a esta empresa");
+      } else if (result?.email_sent) {
+        toast.success("Invitación enviada correctamente. El usuario recibirá un email para configurar su contraseña.");
+      } else if (result?.set_password_link) {
+        // Email not sent - show link to share manually
+        toast.success(
+          <div>
+            <p>Usuario creado correctamente.</p>
+            <p className="text-sm mt-1">Comparte este enlace para que configure su contraseña:</p>
+            <code className="text-xs bg-muted p-1 rounded block mt-1 break-all">
+              {result.set_password_link}
+            </code>
+          </div>,
+          { duration: 15000 }
+        );
       } else {
-        toast.success("Invitación enviada correctamente");
+        toast.success("Usuario invitado correctamente");
       }
 
       setInviteDialogOpen(false);

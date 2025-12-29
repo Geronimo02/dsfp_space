@@ -1038,6 +1038,65 @@ export type Database = {
           },
         ]
       }
+      company_payment_methods: {
+        Row: {
+          brand: string | null
+          company_id: string
+          created_at: string | null
+          exp_month: number | null
+          exp_year: number | null
+          holder_name: string | null
+          id: string
+          is_default: boolean | null
+          last4: string | null
+          mp_payer_id: string | null
+          mp_preapproval_id: string | null
+          stripe_payment_method_id: string | null
+          type: string
+          updated_at: string | null
+        }
+        Insert: {
+          brand?: string | null
+          company_id: string
+          created_at?: string | null
+          exp_month?: number | null
+          exp_year?: number | null
+          holder_name?: string | null
+          id: string
+          is_default?: boolean | null
+          last4?: string | null
+          mp_payer_id?: string | null
+          mp_preapproval_id?: string | null
+          stripe_payment_method_id?: string | null
+          type: string
+          updated_at?: string | null
+        }
+        Update: {
+          brand?: string | null
+          company_id?: string
+          created_at?: string | null
+          exp_month?: number | null
+          exp_year?: number | null
+          holder_name?: string | null
+          id?: string
+          is_default?: boolean | null
+          last4?: string | null
+          mp_payer_id?: string | null
+          mp_preapproval_id?: string | null
+          stripe_payment_method_id?: string | null
+          type?: string
+          updated_at?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "company_payment_methods_company_id_fkey"
+            columns: ["company_id"]
+            isOneToOne: false
+            referencedRelation: "companies"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       company_subscriptions: {
         Row: {
           amount_due: number | null
@@ -2708,6 +2767,44 @@ export type Database = {
         Relationships: [
           {
             foreignKeyName: "integrations_company_id_fkey"
+            columns: ["company_id"]
+            isOneToOne: false
+            referencedRelation: "companies"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      invite_tokens: {
+        Row: {
+          company_id: string
+          created_at: string | null
+          expires_at: string
+          id: string
+          token: string
+          used: boolean | null
+          user_id: string
+        }
+        Insert: {
+          company_id: string
+          created_at?: string | null
+          expires_at: string
+          id?: string
+          token: string
+          used?: boolean | null
+          user_id: string
+        }
+        Update: {
+          company_id?: string
+          created_at?: string | null
+          expires_at?: string
+          id?: string
+          token?: string
+          used?: boolean | null
+          user_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "invite_tokens_company_id_fkey"
             columns: ["company_id"]
             isOneToOne: false
             referencedRelation: "companies"
@@ -5653,6 +5750,7 @@ export type Database = {
           amount_ars: number | null
           amount_usd: number
           billing_plan_id: string | null
+          company_id: string | null
           company_name: string | null
           created_at: string
           email: string
@@ -5667,12 +5765,15 @@ export type Database = {
           provider: string
           status: string
           stripe_checkout_session_id: string | null
+          stripe_payment_method_id: string | null
           trial_days: number | null
+          trial_ends_at: string | null
         }
         Insert: {
           amount_ars?: number | null
           amount_usd: number
           billing_plan_id?: string | null
+          company_id?: string | null
           company_name?: string | null
           created_at?: string
           email: string
@@ -5687,12 +5788,15 @@ export type Database = {
           provider: string
           status: string
           stripe_checkout_session_id?: string | null
+          stripe_payment_method_id?: string | null
           trial_days?: number | null
+          trial_ends_at?: string | null
         }
         Update: {
           amount_ars?: number | null
           amount_usd?: number
           billing_plan_id?: string | null
+          company_id?: string | null
           company_name?: string | null
           created_at?: string
           email?: string
@@ -5707,14 +5811,67 @@ export type Database = {
           provider?: string
           status?: string
           stripe_checkout_session_id?: string | null
+          stripe_payment_method_id?: string | null
           trial_days?: number | null
+          trial_ends_at?: string | null
         }
         Relationships: [
+          {
+            foreignKeyName: "signup_intents_company_id_fkey"
+            columns: ["company_id"]
+            isOneToOne: false
+            referencedRelation: "companies"
+            referencedColumns: ["id"]
+          },
           {
             foreignKeyName: "signup_intents_plan_id_fkey"
             columns: ["plan_id"]
             isOneToOne: false
             referencedRelation: "subscription_plans"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      signup_payment_methods: {
+        Row: {
+          billing_country: string
+          created_at: string | null
+          email: string
+          expires_at: string | null
+          id: string
+          linked_to_company_id: string | null
+          name: string
+          payment_method_ref: string
+          provider: string
+        }
+        Insert: {
+          billing_country: string
+          created_at?: string | null
+          email: string
+          expires_at?: string | null
+          id?: string
+          linked_to_company_id?: string | null
+          name: string
+          payment_method_ref: string
+          provider: string
+        }
+        Update: {
+          billing_country?: string
+          created_at?: string | null
+          email?: string
+          expires_at?: string | null
+          id?: string
+          linked_to_company_id?: string | null
+          name?: string
+          payment_method_ref?: string
+          provider?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "fk_company"
+            columns: ["linked_to_company_id"]
+            isOneToOne: false
+            referencedRelation: "companies"
             referencedColumns: ["id"]
           },
         ]
@@ -5845,11 +6002,14 @@ export type Database = {
           fx_rate_usd_ars: number | null
           id: string
           modules: Json
+          mp_preapproval_id: string | null
           plan_id: string
           provider: string
           provider_customer_id: string | null
           provider_subscription_id: string | null
           status: string
+          stripe_checkout_session_id: string | null
+          stripe_payment_method_id: string | null
           trial_ends_at: string | null
           updated_at: string
         }
@@ -5863,11 +6023,14 @@ export type Database = {
           fx_rate_usd_ars?: number | null
           id?: string
           modules?: Json
+          mp_preapproval_id?: string | null
           plan_id: string
           provider: string
           provider_customer_id?: string | null
           provider_subscription_id?: string | null
           status: string
+          stripe_checkout_session_id?: string | null
+          stripe_payment_method_id?: string | null
           trial_ends_at?: string | null
           updated_at?: string
         }
@@ -5881,11 +6044,14 @@ export type Database = {
           fx_rate_usd_ars?: number | null
           id?: string
           modules?: Json
+          mp_preapproval_id?: string | null
           plan_id?: string
           provider?: string
           provider_customer_id?: string | null
           provider_subscription_id?: string | null
           status?: string
+          stripe_checkout_session_id?: string | null
+          stripe_payment_method_id?: string | null
           trial_ends_at?: string | null
           updated_at?: string
         }
@@ -6638,16 +6804,25 @@ export type Database = {
       }
     }
     Functions: {
-      apply_payment_to_invoice: {
-        Args: {
-          p_amount_applied: number
-          p_customer_id: string
-          p_payment_id: string
-          p_sale_id: string
-          p_user_id: string
-        }
-        Returns: undefined
-      }
+      apply_payment_to_invoice:
+        | {
+            Args: {
+              p_amount: number
+              p_movement_id: string
+              p_payment_method?: string
+            }
+            Returns: boolean
+          }
+        | {
+            Args: {
+              p_amount_applied: number
+              p_customer_id: string
+              p_payment_id: string
+              p_sale_id: string
+              p_user_id: string
+            }
+            Returns: undefined
+          }
       calculate_company_subscription_price: {
         Args: {
           p_billing_cycle?: string
@@ -6685,16 +6860,27 @@ export type Database = {
         }
         Returns: string
       }
-      create_customer_payment: {
-        Args: {
-          p_amount: number
-          p_customer_id: string
-          p_notes: string
-          p_payment_method: string
-          p_user_id: string
-        }
-        Returns: string
-      }
+      create_customer_payment:
+        | {
+            Args: {
+              p_amount: number
+              p_customer_id: string
+              p_notes: string
+              p_payment_method: string
+              p_user_id: string
+            }
+            Returns: string
+          }
+        | {
+            Args: {
+              p_amount: number
+              p_customer_id: string
+              p_notes?: string
+              p_payment_method: string
+              p_sale_id?: string
+            }
+            Returns: string
+          }
       expire_old_reservations: { Args: never; Returns: undefined }
       expire_trial_modules: { Args: never; Returns: number }
       format_comprobante_number: {
@@ -6742,7 +6928,7 @@ export type Database = {
         }[]
       }
       get_customer_movements: {
-        Args: { customer_id: string }
+        Args: { p_customer_id: string }
         Returns: {
           balance: number
           credit_amount: number

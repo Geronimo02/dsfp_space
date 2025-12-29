@@ -10,7 +10,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
-import { Plus, Edit, Search, Receipt, Eye, Printer, DollarSign, CreditCard, AlertCircle, CheckCircle2, Info, Wallet, TrendingUp, TrendingDown, FileText, Truck } from "lucide-react";
+import { Plus, Edit, Search, Receipt, Eye, Printer, DollarSign, CreditCard, AlertCircle, CheckCircle2, Info, Wallet, TrendingUp, TrendingDown, FileText, Truck, BarChart3 } from "lucide-react";
 import { useNavigate } from "react-router-dom";
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip";
 import { ReceiptPDF } from "@/components/pos/ReceiptPDF";
@@ -515,7 +515,11 @@ export default function Customers() {
             <h1 className="text-3xl font-bold text-foreground">Clientes</h1>
             <p className="text-muted-foreground">Gestiona tu base de clientes</p>
           </div>
-          {canCreate && (
+            <Button variant="outline" onClick={() => navigate("/reports?tab=customers")}>
+              <BarChart3 className="h-4 w-4 mr-2" />
+              Ver Reportes
+            </Button>
+            {canCreate && (
             <Dialog open={isDialogOpen} onOpenChange={setIsDialogOpen}>
               <TooltipProvider>
                 <Tooltip>
