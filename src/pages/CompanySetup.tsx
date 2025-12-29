@@ -22,7 +22,7 @@ export default function CompanySetup() {
   useEffect(() => {
     if (!companyLoading && userCompanies.length > 0) {
       toast.info("Ya tienes acceso a una empresa. Redirigiendo...");
-      navigate("/");
+      navigate("/app");
     }
   }, [companyLoading, userCompanies, navigate]);
 

@@ -721,7 +721,7 @@ export default function PlatformAdmin() {
 
   // Redirect if not platform admin
   if (!isPlatformAdmin) {
-    return <Navigate to="/" replace />;
+    return <Navigate to="/app" replace />;
   }
 
   const handleLogout = async () => {

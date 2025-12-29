@@ -81,7 +81,7 @@ export default function ResetPassword() {
       
       // Esperar un momento antes de redirigir
       setTimeout(() => {
-        navigate("/");
+        navigate("/auth");
       }, 1500);
       
     } catch (error: any) {
