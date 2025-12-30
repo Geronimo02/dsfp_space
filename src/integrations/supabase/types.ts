@@ -1062,7 +1062,7 @@ export type Database = {
           exp_month?: number | null
           exp_year?: number | null
           holder_name?: string | null
-          id: string
+          id?: string
           is_default?: boolean | null
           last4?: string | null
           mp_payer_id?: string | null
@@ -5835,10 +5835,14 @@ export type Database = {
       signup_payment_methods: {
         Row: {
           billing_country: string
+          brand: string | null
           created_at: string | null
           email: string
+          exp_month: number | null
+          exp_year: number | null
           expires_at: string | null
           id: string
+          last4: string | null
           linked_to_company_id: string | null
           name: string
           payment_method_ref: string
@@ -5846,10 +5850,14 @@ export type Database = {
         }
         Insert: {
           billing_country: string
+          brand?: string | null
           created_at?: string | null
           email: string
+          exp_month?: number | null
+          exp_year?: number | null
           expires_at?: string | null
           id?: string
+          last4?: string | null
           linked_to_company_id?: string | null
           name: string
           payment_method_ref: string
@@ -5857,10 +5865,14 @@ export type Database = {
         }
         Update: {
           billing_country?: string
+          brand?: string | null
           created_at?: string | null
           email?: string
+          exp_month?: number | null
+          exp_year?: number | null
           expires_at?: string | null
           id?: string
+          last4?: string | null
           linked_to_company_id?: string | null
           name?: string
           payment_method_ref?: string
