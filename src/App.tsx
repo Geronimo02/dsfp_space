@@ -9,6 +9,7 @@ import { CompanyProvider, useCompany } from "@/contexts/CompanyContext";
 import { User, Session } from "@supabase/supabase-js";
 import { usePlatformAdmin } from "@/hooks/usePlatformAdmin";
 import { ModuleProtectedRoute } from "./components/ModuleProtectedRoute";
+import { usePermissions } from "@/hooks/usePermissions";
 
 // Lazy load all page components
 const Dashboard = lazy(() => import("./pages/Dashboard"));
@@ -97,6 +98,11 @@ function CompanyCheck({ children }: { children: React.ReactNode }) {
   const [shouldRedirect, setShouldRedirect] = useState(false);
   const [pendingCheck, setPendingCheck] = useState(true); // NEW: block UI/redirect until timeout
 
+  // LOGS para depuración
+  // useEffect(() => {
+  //   console.log("[CompanyCheck] loading:", loading, "isLoadingAdmin:", isLoadingAdmin, "isPlatformAdmin:", isPlatformAdmin, "currentCompany:", currentCompany, "userCompanies:", userCompanies);
+  // }, [loading, isLoadingAdmin, isPlatformAdmin, currentCompany, userCompanies]);
+
   useEffect(() => {
     if (!loading && !isLoadingAdmin && !isPlatformAdmin) {
       // If we already have a current company, skip waiting
@@ -143,10 +149,7 @@ function CompanyCheck({ children }: { children: React.ReactNode }) {
     return <div className="flex items-center justify-center min-h-screen">Cargando...</div>;
   }
 
-  // Platform admins bypass company check and go to platform admin
-  if (isPlatformAdmin) {
-    return <Navigate to="/admin/platform" replace />;
-  }
+  // La redirección de admin ahora se maneja en ProtectedRoute
 
   if (shouldRedirect) {
     return <Navigate to="/signup" replace />;
@@ -257,6 +260,8 @@ function ProtectedRoute({ children }: { children: React.ReactNode }) {
   const [user, setUser] = useState<User | null>(null);
   const [session, setSession] = useState<Session | null>(null);
   const [loading, setLoading] = useState(true);
+  const { isPlatformAdmin } = usePlatformAdmin();
+  const { isAdmin } = usePermissions();
 
   useEffect(() => {
     const { data: { subscription } } = supabase.auth.onAuthStateChange(
@@ -284,6 +289,13 @@ function ProtectedRoute({ children }: { children: React.ReactNode }) {
     return <Navigate to="/auth" />;
   }
 
+  // Si es platform_admin y NO es admin de empresa, redirige a /admin/platform
+  if (isPlatformAdmin && !isAdmin) {
+    // console.log("[ProtectedRoute] Redirigiendo a /admin/platform por isPlatformAdmin");
+    return <Navigate to="/admin/platform" replace />;
+  }
+
+  // Si es admin de empresa (aunque sea platform_admin), entra a /app
   return <CompanyCheck>{children}</CompanyCheck>;
 }
 
