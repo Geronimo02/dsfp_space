@@ -32,13 +32,7 @@ export default function Auth() {
       const { data: { session } } = await supabase.auth.getSession();
       if (session) {
         try { localStorage.setItem("just_signed_in_at", String(Date.now())); } catch {}
-        // Chequeo si es admin
-        const { data: { user } } = await supabase.auth.getUser();
-        if (user && user.user_metadata && user.user_metadata.role === "platform_admin") {
-          navigate("/admin/platform");
-        } else {
-          navigate("/app");
-        }
+        navigate("/app");
       }
     };
 
@@ -47,12 +41,7 @@ export default function Auth() {
     const { data: { subscription } } = supabase.auth.onAuthStateChange(async (event, session) => {
       if (session && event === 'INITIAL_SESSION') {
         try { localStorage.setItem("just_signed_in_at", String(Date.now())); } catch {}
-        const { data: { user } } = await supabase.auth.getUser();
-        if (user && user.user_metadata && user.user_metadata.role === "platform_admin") {
-          navigate("/admin/platform");
-        } else {
-          navigate("/app");
-        }
+        navigate("/app");
       }
     });
 
@@ -75,13 +64,7 @@ export default function Auth() {
       
       toast.success("Sesión iniciada correctamente");
       try { localStorage.setItem("just_signed_in_at", String(Date.now())); } catch {}
-      // Chequeo si es admin
-      const { data: { user } } = await supabase.auth.getUser();
-      if (user && user.user_metadata && user.user_metadata.role === "platform_admin") {
-        navigate("/admin/platform");
-      } else {
-        navigate("/app");
-      }
+      navigate("/app");
     } catch (error: any) {
       if (error instanceof z.ZodError) {
         toast.error(error.errors[0].message);
