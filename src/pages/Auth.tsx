@@ -32,19 +32,27 @@ export default function Auth() {
       const { data: { session } } = await supabase.auth.getSession();
       if (session) {
         try { localStorage.setItem("just_signed_in_at", String(Date.now())); } catch {}
-        navigate("/");
+        // Chequeo si es admin
+        const { data: { user } } = await supabase.auth.getUser();
+        if (user && user.user_metadata && user.user_metadata.role === "platform_admin") {
+          navigate("/admin/platform");
+        } else {
+          navigate("/app");
+        }
       }
     };
 
     checkSession();
 
     const { data: { subscription } } = supabase.auth.onAuthStateChange(async (event, session) => {
-      // Only redirect to dashboard if user is already logged in and comes back to auth page
-      // Don't redirect on fresh signup/login to avoid race condition with CompanyContext
       if (session && event === 'INITIAL_SESSION') {
-        // User already has a session, redirect to dashboard
         try { localStorage.setItem("just_signed_in_at", String(Date.now())); } catch {}
-        navigate("/");
+        const { data: { user } } = await supabase.auth.getUser();
+        if (user && user.user_metadata && user.user_metadata.role === "platform_admin") {
+          navigate("/admin/platform");
+        } else {
+          navigate("/app");
+        }
       }
     });
 
@@ -67,7 +75,13 @@ export default function Auth() {
       
       toast.success("Sesión iniciada correctamente");
       try { localStorage.setItem("just_signed_in_at", String(Date.now())); } catch {}
-      navigate("/");
+      // Chequeo si es admin
+      const { data: { user } } = await supabase.auth.getUser();
+      if (user && user.user_metadata && user.user_metadata.role === "platform_admin") {
+        navigate("/admin/platform");
+      } else {
+        navigate("/app");
+      }
     } catch (error: any) {
       if (error instanceof z.ZodError) {
         toast.error(error.errors[0].message);
