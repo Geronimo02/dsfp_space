@@ -277,10 +277,12 @@ const App = () => (
             <Route path="/signup/cancel" element={<SignupCancel />} />
             <Route path="/auth" element={<Auth />} />
             <Route path="/reset-password" element={<ResetPassword />} />
-              <Route path="/set-password/:token" element={<SetPasswordToken />} />
+            <Route path="/set-password/:token" element={<SetPasswordToken />} />
             <Route path="/module-not-available" element={<ProtectedRoute><ModuleNotAvailable /></ProtectedRoute>} />
-            {/* Módulos Base - siempre disponibles */}
-            <Route path="/" element={<ProtectedRoute><Dashboard /></ProtectedRoute>} />
+            {/* Redirección a la landing HTML estática en la raíz */}
+            <Route path="/" element={<Navigate to="/landing/index.html" replace />} />
+            {/* Dashboard privado en /app */}
+            <Route path="/app" element={<ProtectedRoute><Dashboard /></ProtectedRoute>} />
             <Route path="/pos" element={<ProtectedRoute><ModuleProtectedRoute moduleCode="pos"><POS /></ModuleProtectedRoute></ProtectedRoute>} />
             <Route path="/products" element={<ProtectedRoute><ModuleProtectedRoute moduleCode="products"><Products /></ModuleProtectedRoute></ProtectedRoute>} />
             <Route path="/customers" element={<ProtectedRoute><ModuleProtectedRoute moduleCode="customers"><Customers /></ModuleProtectedRoute></ProtectedRoute>} />

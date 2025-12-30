@@ -116,7 +116,7 @@ export default function Auth() {
             <ShoppingCart className="w-7 h-7 text-primary-foreground" />
           </div>
           <div>
-            <CardTitle className="text-2xl font-bold">RetailSnap Pro</CardTitle>
+            <CardTitle className="text-2xl font-bold">Ventify.Space</CardTitle>
             <CardDescription>Sistema de Punto de Venta</CardDescription>
           </div>
         </CardHeader>

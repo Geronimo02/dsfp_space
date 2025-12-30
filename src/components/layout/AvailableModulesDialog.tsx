@@ -317,7 +317,7 @@ export function AvailableModulesDialog({
 
   return (
     <Dialog open={open} onOpenChange={handleClose}>
-      <DialogContent className="sm:max-w-2xl max-h-[80vh]">
+      <DialogContent className="w-full max-w-full sm:max-w-2xl max-h-[80vh] p-0 sm:p-6">
         <DialogHeader>
           <DialogTitle className="flex items-center gap-2">
             <Sparkles className="w-5 h-5 text-primary" />
@@ -421,7 +421,7 @@ export function AvailableModulesDialog({
             {selectedModules.length > 0 && (
               <div className="p-3 bg-primary/5 rounded-lg border border-primary/20">
                 <div className="text-sm font-medium">
-                  {selectedModules.length} módulo{selectedModules.length > 1 ? 's' : ''} seleccionado{selectedModules.length > 1 ? 's' : ''}
+                  {selectedModules.length} módulos seleccionados
                 </div>
               </div>
             )}

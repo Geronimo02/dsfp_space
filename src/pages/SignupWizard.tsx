@@ -130,7 +130,7 @@ export default function SignupWizard() {
         <div className="text-center mb-8">
           <div className="flex items-center justify-center gap-2 mb-4">
             <Building2 className="w-8 h-8 text-primary" />
-            <h1 className="text-3xl font-bold">DSFP</h1>
+            <h1 className="text-3xl font-bold">Ventify</h1>
           </div>
           <h2 className="text-xl text-muted-foreground">Crea tu cuenta empresarial</h2>
         </div>
