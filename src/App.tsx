@@ -12,7 +12,6 @@ import { ModuleProtectedRoute } from "./components/ModuleProtectedRoute";
 
 // Lazy load all page components
 const Dashboard = lazy(() => import("./pages/Dashboard"));
-const Landing = lazy(() => import("./pages/Landing"));
 const Auth = lazy(() => import("./pages/Auth"));
 const POS = lazy(() => import("./pages/POS"));
 const Products = lazy(() => import("./pages/Products"));
@@ -42,7 +41,6 @@ const BulkOperations = lazy(() => import("./pages/BulkOperations"));
 const Warehouses = lazy(() => import("./pages/Warehouses"));
 const WarehouseStock = lazy(() => import("./pages/WarehouseStock"));
 const WarehouseTransfers = lazy(() => import("./pages/WarehouseTransfers"));
-const CompanySetup = lazy(() => import("./pages/CompanySetup"));
 const ResetPassword = lazy(() => import("./pages/ResetPassword"));
 const SetPasswordToken = lazy(() => import("./pages/SetPasswordToken"));
 const POSPoints = lazy(() => import("./pages/POSPoints"));
@@ -69,6 +67,9 @@ const ModuleNotAvailable = lazy(() => import("./pages/ModuleNotAvailable"));
 const NotFound = lazy(() => import("./pages/NotFound"));
 const AccountsReceivable = lazy(() => import("./pages/AccountsReceivable"));
 const EmailConfig = lazy(() => import("./pages/EmailConfig"));
+const SignupWizard = lazy(() => import("./pages/SignupWizard"));
+const SignupSuccess = lazy(() => import("./pages/SignupSuccess"));
+const SignupCancel = lazy(() => import("./pages/SignupCancel"));
 
 const queryClient = new QueryClient();
 
@@ -81,17 +82,54 @@ const PageLoader = () => (
 
 // Wrapper to check if user has a company or is platform admin
 function CompanyCheck({ children }: { children: React.ReactNode }) {
-  const { userCompanies, loading, currentCompany } = useCompany();
+  const { userCompanies, loading, currentCompany, refreshCompanies } = useCompany();
   const { isPlatformAdmin, isLoading: isLoadingAdmin } = usePlatformAdmin();
   const [shouldRedirect, setShouldRedirect] = useState(false);
+  const [pendingCheck, setPendingCheck] = useState(true); // NEW: block UI/redirect until timeout
 
   useEffect(() => {
-    if (!loading && !isLoadingAdmin && !isPlatformAdmin && userCompanies.length === 0) {
-      setShouldRedirect(true);
-    }
-  }, [loading, isLoadingAdmin, isPlatformAdmin, userCompanies]);
+    if (!loading && !isLoadingAdmin && !isPlatformAdmin) {
+      // If we already have a current company, skip waiting
+      if (currentCompany) {
+        setPendingCheck(false);
+        setShouldRedirect(false);
+        return;
+      }
 
-  if (loading || isLoadingAdmin) {
+      // Grace period: poll for companies before deciding
+      setPendingCheck(true);
+      let signedTsStr: string | null = null;
+      try { signedTsStr = localStorage.getItem("just_signed_in_at"); } catch {}
+      const recentLogin = signedTsStr ? (Date.now() - Number(signedTsStr)) < 15000 : false;
+      const maxWait = recentLogin ? 15000 : 8000;
+      const start = Date.now();
+      const interval = setInterval(async () => {
+        try { await refreshCompanies(); } catch {}
+
+        // If companies appear, stop waiting and do NOT redirect
+        if (userCompanies.length > 0) {
+          setShouldRedirect(false);
+          setPendingCheck(false);
+          clearInterval(interval);
+          // Clear recent login flag once we have companies
+          if (recentLogin) { try { localStorage.removeItem("just_signed_in_at"); } catch {} }
+          return;
+        }
+
+        // If after maxWait there are still no companies, redirect to signup
+        if (Date.now() - start >= maxWait) {
+          setShouldRedirect(true);
+          setPendingCheck(false);
+          clearInterval(interval);
+        }
+      }, 1000);
+
+      return () => clearInterval(interval);
+    }
+  }, [loading, isLoadingAdmin, isPlatformAdmin, userCompanies, refreshCompanies, currentCompany]);
+
+  // During the wait, keep showing loader unless we already have a current company
+  if (loading || isLoadingAdmin || (pendingCheck && !currentCompany)) {
     return <div className="flex items-center justify-center min-h-screen">Cargando...</div>;
   }
 
@@ -101,7 +139,12 @@ function CompanyCheck({ children }: { children: React.ReactNode }) {
   }
 
   if (shouldRedirect) {
-    return <Navigate to="/company-setup" replace />;
+    return <Navigate to="/signup" replace />;
+  }
+
+  // If companies exist but currentCompany hasn't been set yet, keep loading instead of showing the empty state
+  if (!currentCompany && userCompanies.length > 0) {
+    return <div className="flex items-center justify-center min-h-screen">Cargando empresa...</div>;
   }
 
   if (!currentCompany) {
@@ -229,15 +272,15 @@ const App = () => (
         <CompanyProvider>
           <Suspense fallback={<PageLoader />}>
             <Routes>
-            <Route path="/" element={<Landing />} />
+            <Route path="/signup" element={<SignupWizard />} />
+            <Route path="/signup/success" element={<SignupSuccess />} />
+            <Route path="/signup/cancel" element={<SignupCancel />} />
             <Route path="/auth" element={<Auth />} />
             <Route path="/reset-password" element={<ResetPassword />} />
               <Route path="/set-password/:token" element={<SetPasswordToken />} />
-            <Route path="/company-setup" element={<AuthOnlyRoute><CompanySetup /></AuthOnlyRoute>} />
             <Route path="/module-not-available" element={<ProtectedRoute><ModuleNotAvailable /></ProtectedRoute>} />
             {/* Módulos Base - siempre disponibles */}
-            <Route path="/app" element={<ProtectedRoute><Dashboard /></ProtectedRoute>} />
-            <Route path="/dashboard" element={<Navigate to="/app" replace />} />
+            <Route path="/" element={<ProtectedRoute><Dashboard /></ProtectedRoute>} />
             <Route path="/pos" element={<ProtectedRoute><ModuleProtectedRoute moduleCode="pos"><POS /></ModuleProtectedRoute></ProtectedRoute>} />
             <Route path="/products" element={<ProtectedRoute><ModuleProtectedRoute moduleCode="products"><Products /></ModuleProtectedRoute></ProtectedRoute>} />
             <Route path="/customers" element={<ProtectedRoute><ModuleProtectedRoute moduleCode="customers"><Customers /></ModuleProtectedRoute></ProtectedRoute>} />

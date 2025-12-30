@@ -1,10 +1,10 @@
-import { useState, useEffect } from "react";
+import { useState, useEffect, useMemo } from "react";
 import { Layout } from "@/components/layout/Layout";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Switch } from "@/components/ui/switch";
-import { Building2, DollarSign, Receipt, MessageSquare, Database, AlertTriangle, Package, Users, Palette, FileText, Upload, Eye, Lock } from "lucide-react";
+import { Building2, DollarSign, Receipt, MessageSquare, Database, AlertTriangle, Package, Users, Palette, FileText, Upload, Eye, Lock, CreditCard } from "lucide-react";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Button } from "@/components/ui/button";
@@ -19,6 +19,7 @@ import { useCompany } from "@/contexts/CompanyContext";
 
 import { CompanySettings } from "@/components/settings/CompanySettings";
 import { PriceListsSettings } from "@/components/settings/PriceListsSettings";
+import { PaymentMethodsManager } from "@/components/settings/PaymentMethodsManager";
 
 const settingsSchema = z.object({
   company_name: z.string().trim().min(1, "El nombre de la empresa es requerido").max(200, "El nombre debe tener máximo 200 caracteres"),
@@ -43,7 +44,6 @@ const settingsSchema = z.object({
   low_stock_alert: z.boolean(),
 });
 
-// Settings page with mobile responsive design
 export default function Settings() {
   const queryClient = useQueryClient();
   const { currentCompany } = useCompany();
@@ -91,6 +91,27 @@ export default function Settings() {
     paper_width: "80mm",
     font_size: "small",
   });
+
+  const { data: subscription } = useQuery({
+    queryKey: ["subscription", currentCompany?.id],
+    enabled: !!currentCompany?.id,
+    queryFn: async () => {
+      const { data, error } = await supabase
+        .from("subscriptions")
+        .select("id, company_id, plan_id, provider, status, trial_ends_at, provider_customer_id, mp_preapproval_id, stripe_payment_method_id")
+        .eq("company_id", currentCompany!.id)
+        .maybeSingle();
+      if (error) throw error;
+      return data;
+    },
+  });
+
+  const trialDaysLeft = useMemo(() => {
+    if (!subscription?.trial_ends_at) return null;
+    const end = new Date(subscription.trial_ends_at).getTime();
+    const now = Date.now();
+    return Math.max(Math.ceil((end - now) / (1000 * 60 * 60 * 24)), 0);
+  }, [subscription?.trial_ends_at]);
 
   const { data: settings, isLoading } = useQuery({
     queryKey: ["company-settings", currentCompany?.id],
@@ -633,11 +654,12 @@ export default function Settings() {
 
         <Tabs defaultValue="company" className="w-full">
           <div className="overflow-x-auto -mx-4 px-4">
-            <TabsList className="inline-flex w-auto min-w-full md:grid md:w-full md:grid-cols-4">
+            <TabsList className="inline-flex w-auto min-w-full md:grid md:w-full md:grid-cols-5">
               <TabsTrigger value="company" className="text-xs sm:text-sm">Empresa</TabsTrigger>
               <TabsTrigger value="price-lists" className="text-xs sm:text-sm">Precios</TabsTrigger>
               <TabsTrigger value="ticket-design" className="text-xs sm:text-sm">Tickets</TabsTrigger>
               <TabsTrigger value="security" className="text-xs sm:text-sm">Seguridad</TabsTrigger>
+              <TabsTrigger value="subscription" className="text-xs sm:text-sm">Suscripción</TabsTrigger>
             </TabsList>
           </div>
 
@@ -1144,11 +1166,51 @@ export default function Settings() {
             </Card>
           </TabsContent>
 
+          {/* Subscription */}
+          <TabsContent value="subscription">
+            <div className="space-y-6">
+              {/* Subscription Status */}
+              <Card className="shadow-soft">
+                <CardHeader>
+                  <CardTitle className="flex items-center gap-2">
+                    <CreditCard className="h-5 w-5 text-primary" />
+                    Estado de Suscripción
+                  </CardTitle>
+                  <CardDescription>Información de tu plan y período de prueba</CardDescription>
+                </CardHeader>
+                <CardContent className="space-y-3">
+                  <div className="grid grid-cols-2 gap-4">
+                    <div>
+                      <p className="text-sm font-medium text-muted-foreground">Plan</p>
+                      <p className="text-lg font-semibold">{subscription?.plan_id ?? "Sin plan"}</p>
+                    </div>
+                    <div>
+                      <p className="text-sm font-medium text-muted-foreground">Proveedor</p>
+                      <p className="text-lg font-semibold capitalize">{subscription?.provider ?? "-"}</p>
+                    </div>
+                    <div>
+                      <p className="text-sm font-medium text-muted-foreground">Prueba gratuita</p>
+                      <p className="text-lg font-semibold">
+                        {trialDaysLeft !== null ? `${trialDaysLeft} días restantes` : "No activa"}
+                      </p>
+                    </div>
+                    <div>
+                      <p className="text-sm font-medium text-muted-foreground">Estado</p>
+                      <p className="text-lg font-semibold capitalize">{subscription?.status ?? "Inactivo"}</p>
+                    </div>
+                  </div>
+                </CardContent>
+              </Card>
+
+              {/* Payment Methods */}
+              <PaymentMethodsManager companyId={currentCompany?.id} />
+            </div>
+          </TabsContent>
+
           {/* Integraciones - eliminado (duplicaba configuración de Empresa) */}
 
 
           {/* Sistema - eliminado (sección no utilizada) */}
-
         </Tabs>
       </div>
     </Layout>
