@@ -4,28 +4,7 @@
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>Redirecting...</title>
-  <script>
-    // Check if user has session, redirect to app, otherwise load landing
-    async function checkAuth() {
-      try {
-        // Simple check - if accessing from /app route, let React handle it
-        if (window.location.pathname.startsWith('/app') || 
-            window.location.pathname.startsWith('/auth') ||
-            window.location.pathname === '/company-setup') {
-          return; // Let the main app handle these routes
-        }
-        
-        // For root path, redirect to landing
-        if (window.location.pathname === '/' || window.location.pathname === '/index.html') {
-          window.location.replace('/landing/index.html');
-        }
-      } catch (e) {
-        console.error('Error checking auth:', e);
-      }
-    }
-    
-    checkAuth();
-  </script>
+  
 </head>
 <body>
   <div style="display: flex; align-items: center; justify-content: center; min-height: 100vh; background: #020617; color: white; font-family: system-ui, -apple-system, sans-serif;">
