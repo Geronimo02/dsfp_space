@@ -2,7 +2,7 @@ import { Toaster } from "@/components/ui/toaster";
 import { Toaster as Sonner } from "@/components/ui/sonner";
 import { TooltipProvider } from "@/components/ui/tooltip";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
-import { BrowserRouter, Routes, Route, Navigate } from "react-router-dom";
+import { BrowserRouter, Routes, Route, Navigate, useLocation } from "react-router-dom";
 import { useEffect, useState, lazy, Suspense } from "react";
 import { supabase } from "@/integrations/supabase/client";
 import { CompanyProvider, useCompany } from "@/contexts/CompanyContext";
@@ -81,8 +81,9 @@ const PageLoader = () => (
   </div>
 );
 
-// Componente para redirigir a la landing estática
-function RedirectToLanding() {
+
+// Componente para mostrar la landing solo en la ruta exacta '/'
+function LandingRoute() {
   useEffect(() => {
     window.location.replace('/landing/index.html');
   }, []);
@@ -188,12 +189,19 @@ function AuthOnlyRoute({ children }: { children: React.ReactNode }) {
     return () => subscription.unsubscribe();
   }, []);
 
+
   if (loading || isLoadingAdmin) {
     return <div className="flex items-center justify-center min-h-screen">Cargando...</div>;
   }
 
   if (!user) {
-    return <Navigate to="/auth" />;
+    console.warn("No hay usuario autenticado. Redirigiendo a login.");
+    return (
+      <div className="flex flex-col items-center justify-center min-h-screen">
+        <p className="text-lg text-destructive font-bold mb-4">No hay sesión activa. Por favor inicia sesión.</p>
+        <Navigate to="/auth" />
+      </div>
+    );
   }
 
   // Platform admins bypass company setup and go to platform admin
@@ -225,12 +233,19 @@ function PlatformAdminRoute({ children }: { children: React.ReactNode }) {
     return () => subscription.unsubscribe();
   }, []);
 
+
   if (loading) {
     return <div className="flex items-center justify-center min-h-screen">Cargando...</div>;
   }
 
   if (!user) {
-    return <Navigate to="/auth" />;
+    console.warn("No hay usuario autenticado (admin route). Redirigiendo a login.");
+    return (
+      <div className="flex flex-col items-center justify-center min-h-screen">
+        <p className="text-lg text-destructive font-bold mb-4">No hay sesión activa. Por favor inicia sesión.</p>
+        <Navigate to="/auth" />
+      </div>
+    );
   }
 
   // No redirect here - just render the children (PlatformAdmin will handle admin check)
@@ -288,8 +303,8 @@ const App = () => (
             <Route path="/reset-password" element={<ResetPassword />} />
             <Route path="/set-password/:token" element={<SetPasswordToken />} />
             <Route path="/module-not-available" element={<ProtectedRoute><ModuleNotAvailable /></ProtectedRoute>} />
-            {/* Redirección a la landing HTML estática en la raíz */}
-            <Route path="/" element={<RedirectToLanding />} />
+            {/* Mostrar landing solo en la raíz */}
+            <Route path="/" element={<LandingRoute />} />
 
             {/* Dashboard privado en /app */}
             <Route path="/app" element={<ProtectedRoute><Dashboard /></ProtectedRoute>} />

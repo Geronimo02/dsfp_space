@@ -317,7 +317,7 @@ export function AvailableModulesDialog({
 
   return (
     <Dialog open={open} onOpenChange={handleClose}>
-      <DialogContent className="w-full max-w-full sm:max-w-2xl max-h-[80vh] p-0 sm:p-6">
+      <DialogContent className="w-full max-w-full sm:max-w-2xl max-h-[100vh] h-[100vh] sm:h-auto p-0 sm:p-6 overflow-y-auto">
         <DialogHeader>
           <DialogTitle className="flex items-center gap-2">
             <Sparkles className="w-5 h-5 text-primary" />
@@ -337,7 +337,7 @@ export function AvailableModulesDialog({
           </div>
         ) : (
           <>
-            <div className="space-y-2 max-h-[350px] overflow-y-auto pr-2">
+            <div className="space-y-2 max-h-[40vh] sm:max-h-[350px] overflow-y-auto pr-2">
               {Object.entries(modulesByCategory).map(([category, modules]) => {
                 const CategoryIcon = CATEGORY_ICONS[category] || Package;
                 const isOpen = openCategories.includes(category);
