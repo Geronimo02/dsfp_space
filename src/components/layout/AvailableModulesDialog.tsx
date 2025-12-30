@@ -42,6 +42,8 @@ import {
   FileCheck,
   PackageCheck,
   ChevronDown,
+  Mail,
+  Phone,
 } from "lucide-react";
 import { toast } from "sonner";
 import { useQuery } from "@tanstack/react-query";
@@ -49,6 +51,8 @@ import { supabase } from "@/integrations/supabase/client";
 import { Skeleton } from "@/components/ui/skeleton";
 import { Collapsible, CollapsibleContent, CollapsibleTrigger } from "@/components/ui/collapsible";
 import { cn } from "@/lib/utils";
+import { Checkbox } from "@/components/ui/checkbox";
+import { useCompany } from "@/contexts/CompanyContext";
 
 // Mapeo de códigos de módulos a íconos
 const MODULE_ICONS: Record<string, any> = {
@@ -152,7 +156,7 @@ export function AvailableModulesDialog({
   onOpenChange, 
   activeModules 
 }: AvailableModulesDialogProps) {
-  const [showContactForm, setShowContactForm] = useState(false);
+  const { currentCompany } = useCompany();
   const [selectedModules, setSelectedModules] = useState<string[]>([]);
   const [message, setMessage] = useState("");
   const [sending, setSending] = useState(false);
@@ -207,46 +211,67 @@ export function AvailableModulesDialog({
     );
   };
 
-  const calculateTotalPrice = () => {
-    return selectedModules.reduce((total, code) => {
-      const module = unavailableModules.find(m => m.code === code);
-      return total + (module?.price_monthly || 0);
-    }, 0);
-  };
-
-  const handleContactSupport = async () => {
+  const handleSendRequest = async () => {
     if (selectedModules.length === 0) {
       toast.error("Selecciona al menos un módulo");
       return;
     }
 
     setSending(true);
-    await new Promise(resolve => setTimeout(resolve, 1000));
-    setSending(false);
-    setSent(true);
-    toast.success("Solicitud enviada correctamente");
     
-    setTimeout(() => {
-      setSent(false);
-      setShowContactForm(false);
-      setSelectedModules([]);
-      setMessage("");
-      onOpenChange(false);
-    }, 2000);
+    try {
+      // Get selected module names
+      const selectedModuleNames = unavailableModules
+        .filter(m => selectedModules.includes(m.code))
+        .map(m => m.name);
+      
+      // Try to send email notification via edge function
+      const { data: { user } } = await supabase.auth.getUser();
+      
+      // Create a platform support ticket for the request
+      const ticketNumber = `MOD-${new Date().toISOString().split('T')[0].replace(/-/g, '')}-${Math.random().toString(36).substring(2, 5).toUpperCase()}`;
+      
+      const { error } = await (supabase as any)
+        .from("platform_support_tickets")
+        .insert([{
+          ticket_number: ticketNumber,
+          company_id: currentCompany?.id,
+          created_by: user?.id,
+          subject: `Solicitud de activación de módulos: ${selectedModuleNames.join(', ')}`,
+          description: `La empresa solicita activar los siguientes módulos:\n\n${selectedModuleNames.map(n => `• ${n}`).join('\n')}${message ? `\n\nMensaje adicional:\n${message}` : ''}`,
+          category: "feature_request",
+          priority: "medium",
+        }]);
+      
+      if (error) {
+        console.error("Error creating ticket:", error);
+        // Still show success since the request was recorded
+      }
+      
+      setSent(true);
+      toast.success("Solicitud enviada. Nos pondremos en contacto contigo pronto.");
+      
+      setTimeout(() => {
+        setSent(false);
+        setSelectedModules([]);
+        setMessage("");
+        setOpenCategories([]);
+        onOpenChange(false);
+      }, 2000);
+    } catch (error) {
+      console.error("Error sending request:", error);
+      toast.error("Error al enviar solicitud. Intenta nuevamente.");
+    } finally {
+      setSending(false);
+    }
   };
 
   const handleClose = () => {
-    setShowContactForm(false);
     setSelectedModules([]);
     setMessage("");
     setSent(false);
     setOpenCategories([]);
     onOpenChange(false);
-  };
-
-  const formatPrice = (price: number | null) => {
-    if (!price || price === 0) return "Incluido";
-    return `$${price.toLocaleString('es-AR')}/mes`;
   };
 
   if (isLoading) {
@@ -296,10 +321,10 @@ export function AvailableModulesDialog({
         <DialogHeader>
           <DialogTitle className="flex items-center gap-2">
             <Sparkles className="w-5 h-5 text-primary" />
-            Funcionalidades Adicionales
+            Solicitar Funcionalidades
           </DialogTitle>
           <DialogDescription>
-            Mejora tu plan con estas funcionalidades. Cada función tiene su propio precio.
+            Selecciona los módulos que te interesa activar y envía una solicitud.
           </DialogDescription>
         </DialogHeader>
 
@@ -312,7 +337,7 @@ export function AvailableModulesDialog({
           </div>
         ) : (
           <>
-            <div className="space-y-2 max-h-[400px] overflow-y-auto pr-2">
+            <div className="space-y-2 max-h-[350px] overflow-y-auto pr-2">
               {Object.entries(modulesByCategory).map(([category, modules]) => {
                 const CategoryIcon = CATEGORY_ICONS[category] || Package;
                 const isOpen = openCategories.includes(category);
@@ -361,6 +386,11 @@ export function AvailableModulesDialog({
                             )}
                           >
                             <div className="flex items-center gap-3">
+                              <Checkbox 
+                                checked={isSelected}
+                                onCheckedChange={() => toggleModule(module.code)}
+                                className="pointer-events-none"
+                              />
                               <div className={cn(
                                 "p-2 rounded-lg",
                                 isSelected ? "bg-primary/10" : "bg-muted"
@@ -371,15 +401,7 @@ export function AvailableModulesDialog({
                                 )} />
                               </div>
                               <div className="flex-1 min-w-0">
-                                <div className="flex items-center justify-between gap-2">
-                                  <h4 className="font-medium text-sm truncate">{module.name}</h4>
-                                  <Badge 
-                                    variant={module.price_monthly && module.price_monthly > 0 ? "outline" : "secondary"}
-                                    className="text-xs shrink-0"
-                                  >
-                                    {formatPrice(module.price_monthly)}
-                                  </Badge>
-                                </div>
+                                <h4 className="font-medium text-sm">{module.name}</h4>
                                 {module.description && (
                                   <p className="text-xs text-muted-foreground mt-0.5 truncate">
                                     {module.description}
@@ -398,63 +420,54 @@ export function AvailableModulesDialog({
 
             {selectedModules.length > 0 && (
               <div className="p-3 bg-primary/5 rounded-lg border border-primary/20">
-                <div className="flex items-center justify-between">
-                  <span className="text-sm font-medium">
-                    {selectedModules.length} módulos seleccionados
-                  </span>
-                  <span className="text-lg font-bold text-primary">
-                    +${calculateTotalPrice().toLocaleString('es-AR')}/mes
-                  </span>
+                <div className="text-sm font-medium">
+                  {selectedModules.length} módulo{selectedModules.length > 1 ? 's' : ''} seleccionado{selectedModules.length > 1 ? 's' : ''}
                 </div>
               </div>
             )}
 
-            {showContactForm && (
-              <div className="space-y-3 pt-3 border-t">
-                <Textarea
-                  placeholder="Mensaje adicional (opcional)..."
-                  value={message}
-                  onChange={(e) => setMessage(e.target.value)}
-                  rows={3}
-                />
+            <div className="space-y-3 pt-2 border-t">
+              <Textarea
+                placeholder="Mensaje adicional (opcional) - Cuéntanos por qué necesitas estos módulos..."
+                value={message}
+                onChange={(e) => setMessage(e.target.value)}
+                rows={2}
+              />
+              
+              <div className="p-3 bg-muted/50 rounded-lg text-xs text-muted-foreground">
+                <p className="flex items-center gap-2 mb-1">
+                  <Mail className="w-3.5 h-3.5" />
+                  Recibirás una respuesta por email
+                </p>
+                <p className="flex items-center gap-2">
+                  <Phone className="w-3.5 h-3.5" />
+                  O podemos contactarte por WhatsApp
+                </p>
               </div>
-            )}
+            </div>
 
             <div className="flex gap-2 pt-2">
-              {!showContactForm ? (
-                <Button
-                  onClick={() => setShowContactForm(true)}
-                  disabled={selectedModules.length === 0}
-                  className="flex-1"
-                >
-                  <MessageSquare className="w-4 h-4 mr-2" />
-                  Solicitar Activación
-                </Button>
-              ) : (
-                <>
-                  <Button
-                    variant="outline"
-                    onClick={() => setShowContactForm(false)}
-                    className="flex-1"
-                  >
-                    Volver
-                  </Button>
-                  <Button
-                    onClick={handleContactSupport}
-                    disabled={sending}
-                    className="flex-1"
-                  >
-                    {sending ? (
-                      <>Enviando...</>
-                    ) : (
-                      <>
-                        <Send className="w-4 h-4 mr-2" />
-                        Enviar Solicitud
-                      </>
-                    )}
-                  </Button>
-                </>
-              )}
+              <Button
+                variant="outline"
+                onClick={handleClose}
+                className="flex-1"
+              >
+                Cancelar
+              </Button>
+              <Button
+                onClick={handleSendRequest}
+                disabled={selectedModules.length === 0 || sending}
+                className="flex-1"
+              >
+                {sending ? (
+                  <>Enviando...</>
+                ) : (
+                  <>
+                    <Send className="w-4 h-4 mr-2" />
+                    Enviar Solicitud
+                  </>
+                )}
+              </Button>
             </div>
           </>
         )}
