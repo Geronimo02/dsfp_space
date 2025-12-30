@@ -280,7 +280,7 @@ const App = () => (
             <Route path="/set-password/:token" element={<SetPasswordToken />} />
             <Route path="/module-not-available" element={<ProtectedRoute><ModuleNotAvailable /></ProtectedRoute>} />
             {/* Redirección a la landing HTML estática en la raíz */}
-            <Route path="/" element={<Navigate to="/landing/index.html" replace />} />
+            <Route path="/" element={<Navigate to="/index-landing.html" replace />} />
             {/* Dashboard privado en /app */}
             <Route path="/app" element={<ProtectedRoute><Dashboard /></ProtectedRoute>} />
             <Route path="/pos" element={<ProtectedRoute><ModuleProtectedRoute moduleCode="pos"><POS /></ModuleProtectedRoute></ProtectedRoute>} />
