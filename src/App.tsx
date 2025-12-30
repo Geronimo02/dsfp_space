@@ -2,7 +2,7 @@ import { Toaster } from "@/components/ui/toaster";
 import { Toaster as Sonner } from "@/components/ui/sonner";
 import { TooltipProvider } from "@/components/ui/tooltip";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
-import { BrowserRouter, Routes, Route, Navigate } from "react-router-dom";
+import { BrowserRouter, Routes, Route, Navigate, useLocation } from "react-router-dom";
 import { useEffect, useState, lazy, Suspense } from "react";
 import { supabase } from "@/integrations/supabase/client";
 import { CompanyProvider, useCompany } from "@/contexts/CompanyContext";
@@ -83,9 +83,12 @@ const PageLoader = () => (
 
 // Componente para redirigir a la landing estática
 function RedirectToLanding() {
+  const location = useLocation();
   useEffect(() => {
-    window.location.replace('/landing/index.html');
-  }, []);
+    if (location.pathname === "/") {
+      window.location.replace('/landing/index.html');
+    }
+  }, [location.pathname]);
   return null;
 }
 
