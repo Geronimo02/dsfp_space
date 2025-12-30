@@ -91,7 +91,7 @@ export function CompanyModuleSelector({ companyId, onModulesChange }: CompanyMod
           </CardDescription>
         </CardHeader>
         <CardContent className="pt-6">
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
+          <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-3">
             {baseModules.map((module) => (
               <div
                 key={module.id}
@@ -120,11 +120,9 @@ export function CompanyModuleSelector({ companyId, onModulesChange }: CompanyMod
           </CardDescription>
         </CardHeader>
         <CardContent>
-          <div className="space-y-3">
+          <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-3">
             {additionalModules.map((module) => {
               const isActive = activeModuleIds.includes(module.id);
-              const price = billingCycle === "annual" ? module.price_annual : module.price_monthly;
-
               return (
                 <div
                   key={module.id}
@@ -154,14 +152,6 @@ export function CompanyModuleSelector({ companyId, onModulesChange }: CompanyMod
                       </Badge>
                     </div>
                     <p className="text-sm text-muted-foreground mb-2">{module.description}</p>
-                    <div className="flex items-center gap-2">
-                      <p className={`text-sm font-bold ${isActive ? "text-green-700" : "text-gray-600"}`}>
-                        +{formatCurrency(price)}
-                      </p>
-                      <span className="text-xs text-muted-foreground">
-                        {billingCycle === "monthly" ? "/mes" : "/año"}
-                      </span>
-                    </div>
                   </div>
 
                   <Switch
@@ -176,71 +166,6 @@ export function CompanyModuleSelector({ companyId, onModulesChange }: CompanyMod
           </div>
         </CardContent>
       </Card>
-
-      {/* Resumen de Precio */}
-      {priceBreakdown && (
-        <Card>
-          <CardHeader>
-            <CardTitle>Resumen de Suscripción</CardTitle>
-            <CardDescription>Precio calculado según módulos activos</CardDescription>
-          </CardHeader>
-          <CardContent>
-            <div className="space-y-4">
-              <div className="grid grid-cols-3 gap-4 text-center">
-                <div className="p-4 bg-muted rounded-lg">
-                  <p className="text-xs text-muted-foreground mb-1">Paquete Base</p>
-                  <p className="text-lg font-semibold">
-                    {formatCurrency(priceBreakdown.base_price)}
-                  </p>
-                </div>
-                <div className="p-4 bg-muted rounded-lg">
-                  <p className="text-xs text-muted-foreground mb-1">Módulos</p>
-                  <p className="text-lg font-semibold">
-                    {formatCurrency(priceBreakdown.modules_price)}
-                  </p>
-                </div>
-                <div className="p-4 bg-muted rounded-lg">
-                  <p className="text-xs text-muted-foreground mb-1">Volumen</p>
-                  <p className="text-lg font-semibold">
-                    {formatCurrency(priceBreakdown.volume_price)}
-                  </p>
-                </div>
-              </div>
-
-              <Separator />
-
-              <div className="p-6 bg-primary/5 rounded-lg text-center">
-                <p className="text-sm text-muted-foreground mb-2">Precio Total</p>
-                <p className="text-3xl font-bold text-primary">
-                  {formatCurrency(priceBreakdown.total_price)}
-                </p>
-                <p className="text-sm text-muted-foreground mt-1">
-                  {billingCycle === "monthly" ? "por mes" : "por año"}
-                </p>
-              </div>
-
-              <div className="flex items-start gap-2 p-3 bg-amber-50 border border-amber-200 rounded-lg">
-                <AlertCircle className="h-4 w-4 text-amber-600 mt-0.5 flex-shrink-0" />
-                <p className="text-xs text-amber-800">
-                  Los cambios en los módulos afectarán el precio de suscripción de la empresa.
-                  Asegúrate de comunicar estos cambios al cliente.
-                </p>
-              </div>
-            </div>
-          </CardContent>
-        </Card>
-      )}
-
-      {!priceBreakdown && (
-        <Button
-          onClick={handleCalculatePrice}
-          disabled={calculating}
-          className="w-full"
-          variant="outline"
-        >
-          Calcular Precio de Suscripción
-        </Button>
-      )}
     </div>
   );
 }
