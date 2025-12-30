@@ -73,12 +73,21 @@ const SignupCancel = lazy(() => import("./pages/SignupCancel"));
 
 const queryClient = new QueryClient();
 
+
 // Loading fallback component
 const PageLoader = () => (
   <div className="flex items-center justify-center min-h-screen">
     <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-primary"></div>
   </div>
 );
+
+// Componente para redirigir a la landing estática
+function RedirectToLanding() {
+  useEffect(() => {
+    window.location.replace('/landing/index.html');
+  }, []);
+  return null;
+}
 
 // Wrapper to check if user has a company or is platform admin
 function CompanyCheck({ children }: { children: React.ReactNode }) {
@@ -280,7 +289,8 @@ const App = () => (
             <Route path="/set-password/:token" element={<SetPasswordToken />} />
             <Route path="/module-not-available" element={<ProtectedRoute><ModuleNotAvailable /></ProtectedRoute>} />
             {/* Redirección a la landing HTML estática en la raíz */}
-            <Route path="/" element={<Navigate to="/index-landing.html" replace />} />
+            <Route path="/" element={<RedirectToLanding />} />
+
             {/* Dashboard privado en /app */}
             <Route path="/app" element={<ProtectedRoute><Dashboard /></ProtectedRoute>} />
             <Route path="/pos" element={<ProtectedRoute><ModuleProtectedRoute moduleCode="pos"><POS /></ModuleProtectedRoute></ProtectedRoute>} />
