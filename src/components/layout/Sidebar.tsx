@@ -138,7 +138,7 @@ export function Sidebar() {
       items: [
         {
           title: "Dashboard",
-          href: "/",
+          href: "/app",
           icon: LayoutDashboard,
           module: "dashboard",
         },
