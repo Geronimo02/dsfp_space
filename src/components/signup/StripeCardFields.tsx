@@ -63,28 +63,7 @@ export function StripeCardFields({ onSuccess, isLoading, email, planId }: Stripe
         throw new Error("No se obtuvieron datos de la tarjeta");
       }
 
-      // CRITICAL: CHARGE the subscription amount IMMEDIATELY
-      // This charges the user and validates the card (insufficient funds, invalid card, etc.)
-      console.log("[Stripe] Charging payment for plan...");
-      
-      const testResult = await supabase.functions.invoke("stripe-test-payment", {
-        body: {
-          payment_method_id: paymentMethod.id,
-          email: email,
-          plan_id: planId,
-        },
-      });
-
-      if (testResult.error) {
-        throw new Error(testResult.error.message || "Error al verificar la tarjeta");
-      }
-
-      if (!testResult.data?.verified) {
-        const errorMsg = testResult.data?.error || "Tarjeta rechazada";
-        throw new Error(errorMsg);
-      }
-
-      console.log("[Stripe] Payment charged successfully!", testResult.data);
+      console.log("[Stripe] PaymentMethod created (not charged yet):", paymentMethod.id);
 
       // Extract card metadata
       const metadata = {
@@ -94,7 +73,9 @@ export function StripeCardFields({ onSuccess, isLoading, email, planId }: Stripe
         exp_year: paymentMethod.card.exp_year,
       };
 
-      // Successfully created and verified payment method
+      toast.success("Tarjeta guardada. Confirma tu cuenta en el siguiente paso.");
+
+      // Pass PaymentMethod ID to parent (will charge in finalize-signup)
       onSuccess(paymentMethod.id, metadata);
     } catch (e: any) {
       console.error(e);

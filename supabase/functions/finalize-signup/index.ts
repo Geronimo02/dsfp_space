@@ -1,12 +1,32 @@
 // supabase/functions/finalize-signup/index.ts
 import { corsHeaders } from "../_shared/cors.ts";
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2.49.1";
+import Stripe from "https://esm.sh/stripe@15.0.0";
 
 function json(payload: unknown, status = 200) {
   return new Response(JSON.stringify(payload), {
     status,
     headers: { ...corsHeaders, "Content-Type": "application/json" },
   });
+}
+
+// Map MP status_detail codes to user-friendly messages
+function getMPErrorMessage(statusDetail: string | null): string {
+  const errorMap: Record<string, string> = {
+    "cc_rejected_insufficient_amount": "Fondos insuficientes",
+    "cc_rejected_call_for_authorize": "Validación requerida - contacte su banco",
+    "cc_rejected_invalid_installments": "Cuotas no válidas",
+    "cc_rejected_other_reason": "Tarjeta rechazada",
+    "cc_rejected_fraud": "Transacción bloqueada por seguridad",
+    "cc_rejected_high_risk": "Transacción de alto riesgo",
+    "cc_rejected_blacklist": "Tarjeta rechazada",
+    "cc_rejected_card_error": "Error en la tarjeta",
+    "cc_rejected_by_bank": "Banco rechazó la transacción",
+    "cc_rejected_insufficient_data": "Datos insuficientes",
+    "invalid_token": "Token inválido o expirado",
+  };
+  if (!statusDetail) return "Tarjeta rechazada";
+  return errorMap[statusDetail.toLowerCase()] || `Tarjeta rechazada: ${statusDetail}`;
 }
 
 // Business constants
@@ -45,6 +65,196 @@ Deno.serve(async (req: Request) => {
     if (intent.status === "completed") {
       return json({ ok: true, redirect_to: "/auth" }, 200);
     }
+
+    // =================================================================
+    // STEP 1: CHARGE PAYMENT FIRST (before creating anything)
+    // =================================================================
+    console.log(`[finalize-signup] Step 1: Looking for payment method for email: ${intent.email}`);
+    
+    const { data: spm, error: spmErr } = await supabaseAdmin
+      .from("signup_payment_methods")
+      .select("*")
+      .eq("email", intent.email)
+      .is("linked_to_company_id", null)
+      .order("created_at", { ascending: false })
+      .limit(1)
+      .single();
+
+    if (spmErr || !spm) {
+      console.error("[finalize-signup] No payment method found:", spmErr);
+      return json({ error: "No se encontró método de pago. Por favor, vuelve al paso anterior." }, 404);
+    }
+
+    console.log(`[finalize-signup] Found payment method: ${spm.id} provider: ${spm.provider}`);
+
+    let paymentId: string | null = null;
+    let amountCharged = 0;
+    let currencyCharged = "USD";
+
+    // === CRITICAL: CHARGE THE PAYMENT FIRST ===
+    if (spm.provider === "stripe") {
+      console.log("[finalize-signup] Processing Stripe payment...");
+      
+      try {
+        const stripe = new Stripe(Deno.env.get("STRIPE_SECRET_KEY") || "", {
+          apiVersion: "2023-10-16",
+        });
+
+        // Get plan amount
+        const { data: plan } = await supabaseAdmin
+          .from("subscription_plans")
+          .select("price, currency")
+          .eq("id", spm.plan_id)
+          .single();
+
+        if (!plan) throw new Error("Plan not found");
+
+        const amountCents = Math.round(plan.price * 100);
+        amountCharged = plan.price;
+        currencyCharged = plan.currency || "USD";
+
+        console.log(`[finalize-signup] Charging Stripe PaymentIntent: ${currencyCharged} ${plan.price}`);
+
+        const paymentIntent = await stripe.paymentIntents.create({
+          amount: amountCents,
+          currency: currencyCharged.toLowerCase(),
+          payment_method: spm.payment_method_ref,
+          confirm: true,
+          off_session: true,
+          description: `Subscription payment for ${intent.email}`,
+          metadata: {
+            signup_intent_id: intent_id,
+            plan_id: spm.plan_id,
+            email: intent.email,
+          },
+        });
+
+        if (paymentIntent.status !== "succeeded") {
+          const errorMsg = `Payment failed: ${paymentIntent.status}`;
+          console.error("[finalize-signup] Stripe payment failed:", errorMsg);
+          
+          // Update payment method with error
+          await supabaseAdmin
+            .from("signup_payment_methods")
+            .update({ payment_verified: false, payment_error: errorMsg })
+            .eq("id", spm.id);
+
+          return json({ error: `Pago rechazado: ${errorMsg}` }, 400);
+        }
+
+        paymentId = paymentIntent.id;
+        console.log(`[finalize-signup] ✅ Stripe payment succeeded: ${paymentId}`);
+
+      } catch (err: any) {
+        console.error("[finalize-signup] Stripe charge failed:", err);
+        const errorMsg = err.message || "Pago rechazado";
+        
+        // Update signup_payment_methods with error
+        await supabaseAdmin
+          .from("signup_payment_methods")
+          .update({ payment_verified: false, payment_error: errorMsg })
+          .eq("id", spm.id);
+
+        return json({ error: `Pago rechazado: ${errorMsg}` }, 400);
+      }
+
+    } else if (spm.provider === "mercadopago") {
+      console.log("[finalize-signup] Processing MercadoPago payment...");
+      
+      const mpAccessToken = Deno.env.get("MP_ACCESS_TOKEN");
+      if (!mpAccessToken) {
+        return json({ error: "MP_ACCESS_TOKEN not configured" }, 500);
+      }
+
+      try {
+        // Get plan amount
+        const { data: plan } = await supabaseAdmin
+          .from("subscription_plans")
+          .select("price")
+          .eq("id", spm.plan_id)
+          .single();
+
+        if (!plan) throw new Error("Plan not found");
+
+        // MP only supports ARS for Argentina
+        const usdArsRate = Number(Deno.env.get("DEFAULT_USD_ARS_RATE") ?? "1000");
+        const amountARS = Math.round(plan.price * usdArsRate);
+        amountCharged = amountARS;
+        currencyCharged = "ARS";
+
+        console.log(`[finalize-signup] Charging MP Payment: ARS ${amountARS}`);
+
+        const paymentPayload = {
+          token: spm.payment_method_ref,
+          transaction_amount: amountARS,
+          description: `Subscription payment for ${intent.email}`,
+          installments: 1,
+          payer: { email: intent.email },
+          external_reference: intent_id,
+          metadata: {
+            signup_intent_id: intent_id,
+            plan_id: spm.plan_id,
+          },
+        };
+
+        const paymentResponse = await fetch("https://api.mercadopago.com/v1/payments", {
+          method: "POST",
+          headers: {
+            "Authorization": `Bearer ${mpAccessToken}`,
+            "Content-Type": "application/json",
+            "X-Idempotency-Key": `finalize-${intent_id}-${Date.now()}`,
+          },
+          body: JSON.stringify(paymentPayload),
+        });
+
+        const mpData = await paymentResponse.json();
+
+        if (!paymentResponse.ok || mpData.status !== "approved") {
+          const errorMsg = getMPErrorMessage(mpData.status_detail);
+          console.error("[finalize-signup] MP payment failed:", errorMsg);
+          
+          // Update payment method with error
+          await supabaseAdmin
+            .from("signup_payment_methods")
+            .update({ payment_verified: false, payment_error: errorMsg })
+            .eq("id", spm.id);
+
+          return json({ error: `Pago rechazado: ${errorMsg}` }, 400);
+        }
+
+        paymentId = String(mpData.id);
+        console.log(`[finalize-signup] ✅ MP payment succeeded: ${paymentId}`);
+
+      } catch (err: any) {
+        console.error("[finalize-signup] MP charge failed:", err);
+        const errorMsg = err.message || "Pago rechazado";
+        
+        // Update signup_payment_methods with error
+        await supabaseAdmin
+          .from("signup_payment_methods")
+          .update({ payment_verified: false, payment_error: errorMsg })
+          .eq("id", spm.id);
+
+        return json({ error: `Pago rechazado: ${errorMsg}` }, 400);
+      }
+    }
+
+    // Update payment method with success
+    await supabaseAdmin
+      .from("signup_payment_methods")
+      .update({
+        payment_verified: true,
+        payment_id: paymentId,
+        amount: amountCharged,
+        currency: currencyCharged,
+      })
+      .eq("id", spm.id);
+
+    console.log("[finalize-signup] ✅ Payment charged successfully, proceeding to create account...");
+
+    // =================================================================
+    // STEP 2: CREATE ACCOUNT (only after successful payment)
+    // =================================================================
 
     if (intent.status !== "paid_ready") {
       return json({ error: "El pago/autorización aún no fue confirmado" }, 409);
@@ -147,165 +357,61 @@ Deno.serve(async (req: Request) => {
 
     if (subErr) return json({ error: String(subErr.message ?? subErr) }, 500);
 
-    // 6️⃣ Guardar método de pago de signup (si existe) como método de la empresa
-    console.log("[finalize-signup] Step 6: Looking for payment method for email:", intent.email);
-    try {
-      const { data: spm, error: spmErr } = await supabaseAdmin
-        .from("signup_payment_methods")
-        .select("id, provider, payment_method_ref, payment_id, brand, last4, exp_month, exp_year, name, payment_verified, payment_error, amount, plan_id")
-        .eq("email", intent.email)
-        .order("created_at", { ascending: false })
-        .limit(1)
-        .single();
-
-      if (spmErr) {
-        console.log("[finalize-signup] No signup payment method found for email:", intent.email);
-      } else if (spm) {
-        console.log("[finalize-signup] Found signup payment method:", spm.id, "provider:", spm.provider, "payment_id:", spm.payment_id);
-        
-        // CRITICAL SECURITY CHECK: Verify payment was actually charged and confirmed
-        if (!spm.payment_verified) {
-          console.error("[finalize-signup] SECURITY: Payment not verified for", spm.id, "error:", spm.payment_error);
-          return json({ 
-            error: "El pago no fue procesado. Por favor intenta nuevamente en Settings/Suscripción.",
-            verification_error: spm.payment_error 
-          }, 400);
-        }
-
-        if (!spm.payment_id) {
-          console.error("[finalize-signup] SECURITY: No payment ID found for", spm.id);
-          return json({ 
-            error: "El pago no fue registrado. Por favor contacta al soporte.",
-          }, 400);
-        }
-
-        console.log("[finalize-signup] Payment verified and charged - amount:", spm.amount, "plan_id:", spm.plan_id);
-        
-        // Check if company has methods already
-        const { data: existing } = await supabaseAdmin
-          .from("company_payment_methods")
-          .select("id")
-          .eq("company_id", companyId);
-
-        const isFirst = !existing || existing.length === 0;
-
-        if (spm.provider === "stripe") {
-          // Store card with metadata from signup
-          const { error: insertErr } = await supabaseAdmin
-            .from("company_payment_methods")
-            .insert({
-              company_id: companyId,
-              type: "card",
-              stripe_payment_method_id: spm.payment_method_ref,
-              stripe_payment_intent_id: spm.payment_id, // Store the PaymentIntent ID
-              brand: spm.brand ?? null,
-              last4: spm.last4 ?? null,
-              exp_month: spm.exp_month ?? null,
-              exp_year: spm.exp_year ?? null,
-              holder_name: spm.name ?? null,
-              is_default: isFirst,
-            });
-          
-          if (insertErr) {
-            console.error("[finalize-signup] Error inserting payment method:", insertErr);
-            throw insertErr;
-          }
-          
-          // Reflect in subscriptions for UI
-          const { error: subErr } = await supabaseAdmin
-            .from("subscriptions")
-            .update({ stripe_payment_method_id: spm.payment_method_ref })
-            .eq("company_id", companyId);
-            
-          if (subErr) {
-            console.error("[finalize-signup] Error updating subscription:", subErr);
-          }
-        } else if (spm.provider === "mercadopago") {
-          const { error: insertErr } = await supabaseAdmin
-            .from("company_payment_methods")
-            .insert({
-              company_id: companyId,
-              type: "mercadopago",
-              mp_payment_id: spm.payment_id, // Store the actual payment ID (charged)
-              holder_name: spm.name ?? null,
-              is_default: isFirst,
-            });
-          
-          if (insertErr) {
-            console.error("[finalize-signup] Error inserting MP payment method:", insertErr);
-            throw insertErr;
-          }
-          
-          const { error: subErr } = await supabaseAdmin
-            .from("subscriptions")
-            .update({ mp_payment_id: spm.payment_id })
-            .eq("company_id", companyId);
-            
-          if (subErr) {
-            console.error("[finalize-signup] Error updating MP subscription:", subErr);
-          }
-        }
-
-        // Link temp record to company - CRITICAL: mark as processed
-        const { error: linkErr } = await supabaseAdmin
-          .from("signup_payment_methods")
-          .update({ linked_to_company_id: companyId })
-          .eq("id", spm.id);
-          
-        if (linkErr) {
-          console.error("[finalize-signup] CRITICAL: Failed to link signup payment method to company:", linkErr);
-        } else {
-          console.log("[finalize-signup] Successfully linked payment method", spm.id, "to company", companyId, "with payment_id:", spm.payment_id);
-        }
-      }
-    } catch (e) {
-      // Non-blocking: continue even if linking fails
-      console.error("[finalize-signup] Payment method linking error:", e);
-    }
-
-    // Fallback: if no signup_payment_methods found, try linking from intent directly
-    try {
-      const { data: existing } = await supabaseAdmin
+    // 6️⃣ Link the payment method we already charged to the company
+    console.log("[finalize-signup] Step 6: Linking payment method to company:", companyId);
+    
+    if (spm.provider === "stripe") {
+      // Store card with metadata from signup
+      const { error: insertErr } = await supabaseAdmin
         .from("company_payment_methods")
-        .select("id")
-        .eq("company_id", companyId);
+        .insert({
+          company_id: companyId,
+          type: "card",
+          stripe_payment_method_id: spm.payment_method_ref,
+          stripe_payment_intent_id: paymentId, // Store the PaymentIntent ID
+          brand: spm.brand,
+          last4: spm.last4,
+          exp_month: spm.exp_month,
+          exp_year: spm.exp_year,
+          is_default: true,
+        });
 
-      const hasAnyMethod = !!existing && existing.length > 0;
-
-      if (!hasAnyMethod) {
-        if (intent.provider === "stripe" && intent.stripe_payment_method_id) {
-          await supabaseAdmin
-            .from("company_payment_methods")
-            .insert({
-              company_id: companyId,
-              type: "card",
-              stripe_payment_method_id: intent.stripe_payment_method_id,
-              is_default: true,
-            });
-          await supabaseAdmin
-            .from("subscriptions")
-            .update({ stripe_payment_method_id: intent.stripe_payment_method_id })
-            .eq("company_id", companyId);
-        } else if (intent.provider === "mercadopago") {
-          await supabaseAdmin
-            .from("company_payment_methods")
-            .insert({
-              company_id: companyId,
-              type: "mercadopago",
-              mp_preapproval_id: intent.mp_preapproval_id ?? null,
-              is_default: true,
-            });
-          await supabaseAdmin
-            .from("subscriptions")
-            .update({ mp_preapproval_id: intent.mp_preapproval_id ?? null })
-            .eq("company_id", companyId);
-        }
+      if (insertErr) {
+        console.error("[finalize-signup] Error saving Stripe payment method:", insertErr);
+      } else {
+        console.log("[finalize-signup] Stripe payment method saved to company");
       }
-    } catch (e) {
-      console.warn("[finalize-signup] Fallback link failed:", e);
+    } else if (spm.provider === "mercadopago") {
+      // Store MP payment method
+      const { error: insertErr } = await supabaseAdmin
+        .from("company_payment_methods")
+        .insert({
+          company_id: companyId,
+          type: "card",
+          mp_payment_id: paymentId, // Store the MP payment ID
+          brand: spm.brand,
+          last4: spm.last4,
+          exp_month: spm.exp_month,
+          exp_year: spm.exp_year,
+          is_default: true,
+        });
+
+      if (insertErr) {
+        console.error("[finalize-signup] Error saving MP payment method:", insertErr);
+      } else {
+        console.log("[finalize-signup] MP payment method saved to company");
+      }
     }
 
-    // 7️⃣ Marcar intent como completado con trial info
+    // Mark payment method as linked to this company
+    await supabaseAdmin
+      .from("signup_payment_methods")
+      .update({ linked_to_company_id: companyId })
+      .eq("id", spm.id);
+
+    console.log("[finalize-signup] ✅ Payment method linked to company");
+
+    // 7️⃣ Mark intent as completed with trial info
     const { error: updErr } = await supabaseAdmin
       .from("signup_intents")
       .update({ 
@@ -317,8 +423,16 @@ Deno.serve(async (req: Request) => {
 
     if (updErr) return json({ error: String(updErr.message ?? updErr) }, 500);
 
-    return json({ ok: true, redirect_to: "/auth" }, 200);
+    console.log(`[finalize-signup] ✅ Signup complete! Company: ${companyId}, Payment: ${paymentId}`);
+
+    return json({ 
+      ok: true, 
+      redirect_to: "/auth",
+      company_id: companyId,
+      payment_id: paymentId,
+    }, 200);
   } catch (e) {
+    console.error("[finalize-signup] Error:", e);
     return json({ error: String(e) }, 500);
   }
 });

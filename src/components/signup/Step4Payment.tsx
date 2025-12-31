@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Label } from "@/components/ui/label";
@@ -41,14 +41,35 @@ export function Step4Payment({ formData, updateFormData, nextStep, prevStep }: S
     return key ? loadStripe(key) : null;
   });
   const [loading, setLoading] = useState(false);
+  const [planPrice, setPlanPrice] = useState<number>(0);
+
+  // Fetch plan details
+  useEffect(() => {
+    const fetchPlan = async () => {
+      if (!formData.plan_id) return;
+      
+      const { data, error } = await supabase
+        .from("subscription_plans")
+        .select("price")
+        .eq("id", formData.plan_id)
+        .single();
+      
+      if (data && !error) {
+        setPlanPrice(data.price);
+      }
+    };
+    
+    fetchPlan();
+  }, [formData.plan_id]);
 
   const isArgentina = billingCountry === "AR";
   const provider = isArgentina ? "mercadopago" : "stripe";
+  const planAmountARS = Math.round(planPrice * 1000); // Convert USD to ARS
 
   const handlePaymentSuccess = async (paymentMethodRef: string, metadata: { brand: string; last4: string; exp_month: number; exp_year: number }) => {
     setLoading(true);
     try {
-      // Step 1: Save payment method to staging table
+      // Save payment method to staging table (will charge in Step 5)
       const { data, error } = await supabase.functions.invoke("signup-save-payment-method", {
         body: {
           email: formData.email,
@@ -60,38 +81,23 @@ export function Step4Payment({ formData, updateFormData, nextStep, prevStep }: S
           last4: metadata.last4,
           exp_month: metadata.exp_month,
           exp_year: metadata.exp_year,
+          plan_id: formData.plan_id,
         },
       });
 
       if (error) throw error;
 
-      // Step 2: Verify the payment method is valid
-      console.log("[Step4Payment] Verifying payment method...");
-      const { data: verifyData, error: verifyError } = await supabase.functions.invoke("verify-signup-payment", {
-        body: {
-          payment_method_id: paymentMethodRef,
-          provider: provider,
-          email: formData.email,
-        },
-      });
-
-      if (verifyError) throw verifyError;
-
-      if (!verifyData?.verified) {
-        throw new Error(verifyData?.error || "La tarjeta no pudo ser verificada. Por favor intenta de nuevo.");
-      }
-
-      console.log("[Step4Payment] Payment verified successfully");
+      console.log("[Step4Payment] Payment method saved, will charge in Step 5");
       
       updateFormData({
         payment_provider: provider,
         payment_method_ref: paymentMethodRef,
         billing_country: billingCountry,
-        payment_method_last4: data?.last4,
-        payment_method_brand: data?.brand,
+        payment_method_last4: metadata.last4,
+        payment_method_brand: metadata.brand,
       });
 
-      toast.success("Tarjeta verificada exitosamente");
+      toast.success("Método de pago guardado. Procede al siguiente paso.");
       nextStep();
     } catch (e: any) {
       console.error("[Step4Payment] Payment error:", e);
@@ -150,6 +156,7 @@ export function Step4Payment({ formData, updateFormData, nextStep, prevStep }: S
               isLoading={loading}
               email={formData.email}
               planId={formData.plan_id || ""}
+              planAmount={planAmountARS}
             />
           ) : !stripePromise ? (
             // Stripe not configured

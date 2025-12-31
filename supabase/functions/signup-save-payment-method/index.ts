@@ -29,6 +29,7 @@ serve(async (req) => {
       last4,
       exp_month,
       exp_year,
+      plan_id,
     } = await req.json();
 
     if (!provider || !payment_method_ref) {
@@ -136,6 +137,7 @@ serve(async (req) => {
         last4: last4 ?? null,
         exp_month: exp_month ?? null,
         exp_year: exp_year ?? null,
+        plan_id: plan_id ?? null,
       })
       .select()
       .single();

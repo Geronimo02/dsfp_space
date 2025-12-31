@@ -10,6 +10,7 @@ interface MercadoPagoCardFieldsProps {
   isLoading: boolean;
   email: string;
   planId: string;
+  planAmount: number;
 }
 
 declare global {
@@ -18,7 +19,7 @@ declare global {
   }
 }
 
-export function MercadoPagoCardFields({ onSuccess, isLoading, email, planId }: MercadoPagoCardFieldsProps) {
+export function MercadoPagoCardFields({ onSuccess, isLoading, email, planId, planAmount }: MercadoPagoCardFieldsProps) {
   const [saving, setSaving] = useState(false);
   const [mpLoaded, setMpLoaded] = useState(false);
   const [mpError, setMpError] = useState<string | null>(null);
@@ -44,7 +45,7 @@ export function MercadoPagoCardFields({ onSuccess, isLoading, email, planId }: M
 
               const bricksInstance = await bricksBuilder.create("cardPayment", "cardPayment", {
                 initialization: {
-                  amount: 1000,
+                  amount: planAmount,
                   payer: { email: undefined },
                 },
                 customization: {
@@ -69,42 +70,19 @@ export function MercadoPagoCardFields({ onSuccess, isLoading, email, planId }: M
                         throw new Error("No token from MP Bricks");
                       }
 
-                      // CRITICAL: CHARGE the subscription amount IMMEDIATELY
-                      // This charges the user and validates the card (insufficient funds, invalid card, etc.)
-                      console.log("[MP] Charging payment for plan...");
-                      
-                      const testResult = await supabase.functions.invoke("mp-test-card-token", {
-                        body: {
-                          token: token,
-                          email: email,
-                          plan_id: planId,
-                        },
-                      });
-
-                      if (testResult.error) {
-                        throw new Error(testResult.error.message || "Error al verificar la tarjeta");
-                      }
-
-                      if (!testResult.data?.verified) {
-                        const errorMsg = testResult.data?.error || "Tarjeta rechazada";
-                        throw new Error(errorMsg);
-                      }
-
-                      // Payment charged! Use the payment ID instead of the token
-                      const paymentId = testResult.data.payment_id;
-                      console.log("[MP] Payment successful, payment ID:", paymentId);
+                      console.log("[MP] Card tokenized successfully, will charge in Step 5...");
 
                       // Extract metadata from MP Bricks response
                       const brand = formData.payment_method_id || "unknown";
-                      const last4 = "****"; // MP doesn't give us this
+                      const last4 = "****"; // MP doesn't expose this
                       const exp_month = 0;
                       const exp_year = 0;
 
                       const metadata = { brand, last4, exp_month, exp_year };
-                      console.log("[MP] Passing payment ID and metadata to parent");
+                      console.log("[MP] Passing token to parent (not charged yet)");
 
-                      toast.success("Pago procesado exitosamente");
-                      onSuccess(String(paymentId), metadata); // Pass payment ID, not token
+                      toast.success("Tarjeta guardada. Confirma tu cuenta en el siguiente paso.");
+                      onSuccess(token, metadata); // Pass token, will charge in finalize-signup
                     } catch (error: any) {
                       console.error("[MP] Submit error:", error);
                       toast.error(error?.message || "Error al procesar la tarjeta");
@@ -142,7 +120,7 @@ export function MercadoPagoCardFields({ onSuccess, isLoading, email, planId }: M
         }
       }
     };
-  }, [onSuccess]);
+  }, [onSuccess, planAmount]);
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();

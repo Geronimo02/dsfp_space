@@ -1,4 +1,5 @@
 import { serve } from "https://deno.land/std@0.168.0/http/server.ts";
+import { createClient } from "https://esm.sh/@supabase/supabase-js@2.49.1";
 
 const corsHeaders = {
   "Access-Control-Allow-Origin": "*",
@@ -13,156 +14,103 @@ function json(payload: unknown, status = 200) {
   });
 }
 
+// Map MP status_detail codes to user-friendly messages
+function getMPErrorMessage(statusDetail: string | null): string {
+  const errorMap: Record<string, string> = {
+    "cc_rejected_insufficient_amount": "Fondos insuficientes",
+    "cc_rejected_call_for_authorize": "Validación requerida - contacte su banco",
+    "cc_rejected_invalid_installments": "Cuotas no válidas para esta tarjeta",
+    "cc_rejected_other_reason": "Tarjeta rechazada - motivo desconocido",
+    "cc_rejected_fraud": "Transacción bloqueada por seguridad",
+    "cc_rejected_high_risk": "Transacción de alto riesgo",
+    "cc_rejected_blacklist": "Tarjeta rechazada",
+    "cc_rejected_card_error": "Error en la tarjeta",
+    "cc_rejected_by_bank": "Banco rechazó la transacción",
+    "cc_rejected_insufficient_data": "Datos insuficientes para procesar",
+    "invalid_token": "Token inválido o expirado",
+    "bad_request": "Solicitud inválida",
+  };
+
+  if (!statusDetail) return "Tarjeta rechazada";
+  
+  return errorMap[statusDetail.toLowerCase()] || `Tarjeta rechazada: ${statusDetail}`;
+}
+
 serve(async (req) => {
   if (req.method === "OPTIONS") return new Response(null, { status: 200, headers: corsHeaders });
 
   try {
     const { token, email, plan_id } = await req.json();
 
-    console.log(`[mp-test-card-token] Processing charge for plan ${plan_id}, email: ${email}`);
+    console.log(`[mp-test-card-token] Charging MP payment - email: ${email}, plan: ${plan_id}`);
 
     if (!token || !email || !plan_id) {
-      return json({ error: "Missing token, email or plan_id" }, 400);
+      return json({ verified: false, error: "Missing required fields" }, 400);
     }
 
     const mpAccessToken = Deno.env.get("MP_ACCESS_TOKEN");
     if (!mpAccessToken) {
-      return json({ error: "MP not configured" }, 500);
+      return json({ verified: false, error: "MP not configured" }, 500);
     }
 
-    // Get Supabase client to fetch plan details
-    const { createClient } = await import("https://esm.sh/@supabase/supabase-js@2.49.1");
     const supabase = createClient(
       Deno.env.get("SUPABASE_URL")!,
       Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!
     );
 
-    // Fetch plan details
-    const { data: plan, error: planError } = await supabase
+    // Get plan details
+    const { data: plan, error: planErr } = await supabase
       .from("subscription_plans")
-      .select("id, name, price")
+      .select("price")
       .eq("id", plan_id)
       .single();
 
-    if (planError || !plan) {
-      console.error("[mp-test-card-token] Plan not found:", plan_id);
-      return json({ error: "Plan no encontrado" }, 404);
+    if (planErr || !plan) {
+      console.error("[mp-test-card-token] Plan not found");
+      return json({ verified: false, error: "Plan not found" }, 404);
     }
 
-    // Convert USD to ARS (get exchange rate from env or default)
+    // Convert USD to ARS
     const usdArsRate = Number(Deno.env.get("DEFAULT_USD_ARS_RATE") ?? "1000");
     const amountARS = Math.round(plan.price * usdArsRate);
 
-    console.log(`[mp-test-card-token] Charging $${plan.price} USD (${amountARS} ARS) for ${plan.name}`);
+    console.log(`[mp-test-card-token] Creating payment - Amount: ${amountARS} ARS`);
 
-    try {
-      // Create a PAYMENT (not preapproval) to ACTUALLY CHARGE the subscription amount
-      const paymentPayload = {
-        transaction_amount: amountARS,
-        description: `Suscripción ${plan.name}`,
-        payment_method_id: "master", // This will be auto-detected from token
-        token: token,
-        installments: 1,
-        payer: {
-          email: email,
-        },
-        metadata: {
-          email: email,
-          plan_id: plan_id,
-          plan_name: plan.name,
-        },
-      };
+    // Create payment with the token
+    const paymentPayload = {
+      token: token,
+      transaction_amount: amountARS,
+      description: `Suscripción - ${email}`,
+      installments: 1,
+      payer: {
+        email: email,
+      },
+    };
 
-      console.log(`[mp-test-card-token] Creating payment...`);
+    const mpResponse = await fetch("https://api.mercadopago.com/v1/payments", {
+      method: "POST",
+      headers: {
+        "Authorization": `Bearer ${mpAccessToken}`,
+        "Content-Type": "application/json",
+        "X-Idempotency-Key": `${email}-${plan_id}-${Date.now()}`,
+      },
+      body: JSON.stringify(paymentPayload),
+    });
 
-      const mpResponse = await fetch("https://api.mercadopago.com/v1/payments", {
-        method: "POST",
-        headers: {
-          "Authorization": `Bearer ${mpAccessToken}`,
-          "Content-Type": "application/json",
-        },
-        body: JSON.stringify(paymentPayload),
-      });
+    const mpData = await mpResponse.json();
 
-      const mpData = await mpResponse.json();
+    console.log(`[mp-test-card-token] MP response status:`, mpResponse.status);
+    console.log(`[mp-test-card-token] Payment status:`, mpData.status, "Detail:", mpData.status_detail);
 
-      console.log(`[mp-test-card-token] MP payment response status:`, mpResponse.status, "status_detail:", mpData.status_detail);
-
-      if (mpData.status === "approved") {
-        console.log(`[mp-test-card-token] Payment successful! ID:`, mpData.id);
-
-        // Update signup_payment_methods with payment info
-        await supabase
-          .from("signup_payment_methods")
-          .update({
-            payment_verified: true,
-            payment_id: String(mpData.id),
-            amount: plan.price,
-            currency: "USD",
-            plan_id: plan_id,
-          })
-          .eq("email", email)
-          .eq("provider", "mercadopago");
-
-        return json({
-          verified: true,
-          payment_id: mpData.id,
-          amount: plan.price,
-        });
-      } else {
-        // Payment was rejected or failed
-        let errorMsg = mpData.status_detail || mpData.message || "Pago rechazado";
-
-        // Map common MP error codes
-        if (mpData.cause && Array.isArray(mpData.cause)) {
-          const codes = mpData.cause.map((c: any) => c.code).join(", ");
-          
-          if (codes.includes("FUND") || codes.includes("2067")) {
-            errorMsg = "Fondos insuficientes";
-          } else if (codes.includes("CALL")) {
-            errorMsg = "Comunicate con tu banco";
-          } else if (codes.includes("SECU") || codes.includes("E301")) {
-            errorMsg = "Código de seguridad inválido";
-          } else if (codes.includes("EXPI") || codes.includes("E203")) {
-            errorMsg = "Tarjeta vencida";
-          } else if (codes.includes("E205")) {
-            errorMsg = "Número de tarjeta inválido";
-          } else {
-            errorMsg = `Tarjeta rechazada: ${codes}`;
-          }
-        } else if (mpData.status_detail) {
-          // Map status_detail codes
-          if (mpData.status_detail === "cc_rejected_insufficient_amount") {
-            errorMsg = "Fondos insuficientes";
-          } else if (mpData.status_detail === "cc_rejected_bad_filled_security_code") {
-            errorMsg = "Código de seguridad incorrecto";
-          } else if (mpData.status_detail === "cc_rejected_call_for_authorize") {
-            errorMsg = "Comunicate con tu banco para autorizar el pago";
-          } else if (mpData.status_detail === "cc_rejected_card_disabled") {
-            errorMsg = "Tarjeta deshabilitada";
-          }
-        }
-
-        console.error(`[mp-test-card-token] Payment rejected:`, errorMsg);
-
-        // Save error to database
-        await supabase
-          .from("signup_payment_methods")
-          .update({
-            payment_verified: false,
-            payment_error: errorMsg,
-          })
-          .eq("email", email)
-          .eq("provider", "mercadopago");
-
-        return json({ verified: false, error: errorMsg });
+    // Check if the request itself failed
+    if (!mpResponse.ok) {
+      console.error("[mp-test-card-token] MP API error:", mpData);
+      
+      let errorMsg = "Error al procesar la tarjeta";
+      if (mpData.message) {
+        errorMsg = mpData.message;
       }
-    } catch (mpError: any) {
-      console.error("[mp-test-card-token] MP error:", mpError.message);
 
-      const errorMsg = mpError.message || "Error al procesar el pago";
-
-      // Save error to database
       await supabase
         .from("signup_payment_methods")
         .update({
@@ -172,11 +120,56 @@ serve(async (req) => {
         .eq("email", email)
         .eq("provider", "mercadopago");
 
-      return json({ verified: false, error: errorMsg });
+      return json({
+        verified: false,
+        error: errorMsg,
+      });
     }
-  } catch (e: any) {
-    console.error("[mp-test-card-token] Unexpected error:", e.message);
-    return json({ error: e.message || "Error inesperado" }, 500);
+
+    // Check payment status - approved means it went through
+    if (mpData.status !== "approved") {
+      console.log("[mp-test-card-token] Payment rejected. Status:", mpData.status);
+      
+      const userFriendlyError = getMPErrorMessage(mpData.status_detail);
+
+      await supabase
+        .from("signup_payment_methods")
+        .update({
+          payment_verified: false,
+          payment_error: userFriendlyError,
+        })
+        .eq("email", email)
+        .eq("provider", "mercadopago");
+
+      return json({
+        verified: false,
+        error: userFriendlyError,
+      });
+    }
+
+    console.log("[mp-test-card-token] Payment approved! ID:", mpData.id);
+
+    await supabase
+      .from("signup_payment_methods")
+      .update({
+        payment_verified: true,
+        payment_id: String(mpData.id),
+        amount: amountARS,
+        currency: "ARS",
+        plan_id: plan_id,
+      })
+      .eq("email", email)
+      .eq("provider", "mercadopago");
+
+    return json({
+      verified: true,
+      payment_id: mpData.id,
+    });
+  } catch (e) {
+    console.error("[mp-test-card-token] Unexpected error:", e);
+    return json({ verified: false, error: String(e) }, 500);
   }
 });
+
+
 
