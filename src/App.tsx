@@ -12,6 +12,7 @@ import { ModuleProtectedRoute } from "./components/ModuleProtectedRoute";
 import { usePermissions } from "@/hooks/usePermissions";
 
 // Lazy load all page components
+const Landing = lazy(() => import("./pages/Landing"));
 const Dashboard = lazy(() => import("./pages/Dashboard"));
 const Auth = lazy(() => import("./pages/Auth"));
 const POS = lazy(() => import("./pages/POS"));
@@ -83,13 +84,7 @@ const PageLoader = () => (
 );
 
 
-// Componente para mostrar la landing solo en la ruta exacta '/'
-function LandingRoute() {
-  useEffect(() => {
-    window.location.replace('/landing/index.html');
-  }, []);
-  return null;
-}
+// Landing (static) routing is handled in src/pages/Landing.tsx
 
 // Wrapper to check if user has a company or is platform admin
 function CompanyCheck({ children }: { children: React.ReactNode }) {
@@ -316,7 +311,7 @@ const App = () => (
             <Route path="/set-password/:token" element={<SetPasswordToken />} />
             <Route path="/module-not-available" element={<ProtectedRoute><ModuleNotAvailable /></ProtectedRoute>} />
             {/* Mostrar landing solo en la raíz */}
-            <Route path="/" element={<LandingRoute />} />
+            <Route path="/" element={<Landing />} />
 
             {/* Dashboard privado en /app */}
             <Route path="/app" element={<ProtectedRoute><Dashboard /></ProtectedRoute>} />
