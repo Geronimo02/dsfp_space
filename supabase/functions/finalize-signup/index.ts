@@ -152,7 +152,7 @@ Deno.serve(async (req: Request) => {
     try {
       const { data: spm, error: spmErr } = await supabaseAdmin
         .from("signup_payment_methods")
-        .select("id, provider, payment_method_ref, brand, last4, exp_month, exp_year, name")
+        .select("id, provider, payment_method_ref, brand, last4, exp_month, exp_year, name, payment_verified, payment_error")
         .eq("email", intent.email)
         .order("created_at", { ascending: false })
         .limit(1)
@@ -162,6 +162,15 @@ Deno.serve(async (req: Request) => {
         console.log("[finalize-signup] No signup payment method found for email:", intent.email);
       } else if (spm) {
         console.log("[finalize-signup] Found signup payment method:", spm.id, "provider:", spm.provider);
+        
+        // CRITICAL SECURITY CHECK: Verify payment was actually confirmed
+        if (!spm.payment_verified) {
+          console.error("[finalize-signup] SECURITY: Payment not verified for", spm.id, "error:", spm.payment_error);
+          return json({ 
+            error: "La verificación del método de pago falló. Por favor intenta nuevamente en Settings/Suscripción.",
+            verification_error: spm.payment_error 
+          }, 400);
+        }
         
         // Check if company has methods already
         const { data: existing } = await supabaseAdmin

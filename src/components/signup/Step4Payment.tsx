@@ -46,7 +46,9 @@ export function Step4Payment({ formData, updateFormData, nextStep, prevStep }: S
   const provider = isArgentina ? "mercadopago" : "stripe";
 
   const handlePaymentSuccess = async (paymentMethodRef: string, metadata: { brand: string; last4: string; exp_month: number; exp_year: number }) => {
+    setLoading(true);
     try {
+      // Step 1: Save payment method to staging table
       const { data, error } = await supabase.functions.invoke("signup-save-payment-method", {
         body: {
           email: formData.email,
@@ -63,6 +65,24 @@ export function Step4Payment({ formData, updateFormData, nextStep, prevStep }: S
 
       if (error) throw error;
 
+      // Step 2: Verify the payment method is valid
+      console.log("[Step4Payment] Verifying payment method...");
+      const { data: verifyData, error: verifyError } = await supabase.functions.invoke("verify-signup-payment", {
+        body: {
+          payment_method_id: paymentMethodRef,
+          provider: provider,
+          email: formData.email,
+        },
+      });
+
+      if (verifyError) throw verifyError;
+
+      if (!verifyData?.verified) {
+        throw new Error(verifyData?.error || "La tarjeta no pudo ser verificada. Por favor intenta de nuevo.");
+      }
+
+      console.log("[Step4Payment] Payment verified successfully");
+      
       updateFormData({
         payment_provider: provider,
         payment_method_ref: paymentMethodRef,
@@ -71,11 +91,13 @@ export function Step4Payment({ formData, updateFormData, nextStep, prevStep }: S
         payment_method_brand: data?.brand,
       });
 
-      toast.success("Tarjeta guardada exitosamente");
+      toast.success("Tarjeta verificada exitosamente");
       nextStep();
     } catch (e: any) {
-      console.error(e);
-      toast.error(e?.message ?? "Error al guardar el método de pago");
+      console.error("[Step4Payment] Payment error:", e);
+      toast.error(e?.message ?? "Error al procesar el método de pago");
+    } finally {
+      setLoading(false);
     }
   };
 
