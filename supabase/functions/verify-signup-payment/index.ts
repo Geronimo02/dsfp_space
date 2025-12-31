@@ -61,81 +61,26 @@ serve(async (req) => {
       }
     } else if (provider === "mercadopago") {
       try {
-        // For MP, the payment_method_id is the token created by MP Bricks
-        // MP Bricks has already validated the card, so we just need to verify it's a valid token
-        // by attempting to use it in a test preapproval
+        // For MP, payment_method_id is now the preapproval ID (not token)
+        // The card was already validated in Step 4 when creating the preapproval
+        // We just verify it exists in our DB
         
-        const mpAccessToken = Deno.env.get("MP_ACCESS_TOKEN");
+        console.log(`[verify-signup-payment] Verifying MP preapproval exists:`, payment_method_id);
         
-        if (!mpAccessToken) {
-          paymentError = "Mercado Pago access token not configured";
-          console.error(`[verify-signup-payment] MP token not configured`);
+        const { data: pmRecord, error: pmErr } = await supabase
+          .from("signup_payment_methods")
+          .select("id, payment_method_ref, brand")
+          .eq("payment_method_ref", payment_method_id)
+          .eq("email", email)
+          .single();
+
+        if (pmErr || !pmRecord) {
+          paymentError = "Payment method record not found";
+          console.error(`[verify-signup-payment] MP record not found:`, pmErr);
         } else {
-          // Try to create a minimal preapproval to verify the token is valid
-          const preapprovalPayload = {
-            payer_email: email,
-            reason: "Signup verification",
-            external_reference: `verify_${Date.now()}`,
-            auto_recurring: {
-              frequency: 1,
-              frequency_type: "months",
-              transaction_amount: 0.01,
-              start_date: new Date().toISOString(),
-            },
-            card_token_id: payment_method_id, // This is the token from MP Bricks
-          };
-          
-          console.log(`[verify-signup-payment] Verifying MP token:`, {
-            email,
-            token: payment_method_id.substring(0, 20) + "...",
-          });
-          
-          const mpResponse = await fetch("https://api.mercadopago.com/preapproval", {
-            method: "POST",
-            headers: {
-              "Authorization": `Bearer ${mpAccessToken}`,
-              "Content-Type": "application/json",
-            },
-            body: JSON.stringify(preapprovalPayload),
-          });
-          
-          const mpData = await mpResponse.json();
-          
-          console.log(`[verify-signup-payment] MP Response status:`, mpResponse.status);
-          
-          if (!mpResponse.ok) {
-            // MP API returned an error - card is invalid
-            const errorMsg = mpData.message || `MP error: ${mpResponse.status}`;
-            
-            if (mpData.cause && Array.isArray(mpData.cause)) {
-              const codes = mpData.cause.map((c: any) => c.code).join(", ");
-              paymentError = `Tarjeta rechazada: ${codes}`;
-            } else {
-              paymentError = errorMsg;
-            }
-            console.error(`[verify-signup-payment] MP card rejected:`, paymentError);
-          } else if (mpData.id) {
-            // Preapproval created successfully - card is valid
-            paymentVerified = true;
-            console.log(`[verify-signup-payment] MP token verified:`, mpData.id);
-            
-            // Store the preapproval ID for later use
-            const { error: updateErr } = await supabase
-              .from("signup_payment_methods")
-              .update({
-                payment_method_ref: mpData.id, // Store preapproval ID
-                payment_verified: true,
-              })
-              .eq("payment_method_ref", payment_method_id)
-              .eq("email", email);
-              
-            if (updateErr) {
-              console.warn(`[verify-signup-payment] Failed to update preapproval ID:`, updateErr);
-            }
-          } else {
-            paymentError = `Unexpected MP response: ${mpData.status}`;
-            console.warn(`[verify-signup-payment] Unexpected response:`, mpData);
-          }
+          // Preapproval exists in DB - card was validated in Step 4
+          paymentVerified = true;
+          console.log(`[verify-signup-payment] MP preapproval verified: ${pmRecord.id}`);
         }
       } catch (err: any) {
         paymentError = err.message || "MercadoPago verification failed";

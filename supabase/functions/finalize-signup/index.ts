@@ -152,7 +152,7 @@ Deno.serve(async (req: Request) => {
     try {
       const { data: spm, error: spmErr } = await supabaseAdmin
         .from("signup_payment_methods")
-        .select("id, provider, payment_method_ref, brand, last4, exp_month, exp_year, name, payment_verified, payment_error")
+        .select("id, provider, payment_method_ref, payment_id, brand, last4, exp_month, exp_year, name, payment_verified, payment_error, amount, plan_id")
         .eq("email", intent.email)
         .order("created_at", { ascending: false })
         .limit(1)
@@ -161,16 +161,25 @@ Deno.serve(async (req: Request) => {
       if (spmErr) {
         console.log("[finalize-signup] No signup payment method found for email:", intent.email);
       } else if (spm) {
-        console.log("[finalize-signup] Found signup payment method:", spm.id, "provider:", spm.provider);
+        console.log("[finalize-signup] Found signup payment method:", spm.id, "provider:", spm.provider, "payment_id:", spm.payment_id);
         
-        // CRITICAL SECURITY CHECK: Verify payment was actually confirmed
+        // CRITICAL SECURITY CHECK: Verify payment was actually charged and confirmed
         if (!spm.payment_verified) {
           console.error("[finalize-signup] SECURITY: Payment not verified for", spm.id, "error:", spm.payment_error);
           return json({ 
-            error: "La verificación del método de pago falló. Por favor intenta nuevamente en Settings/Suscripción.",
+            error: "El pago no fue procesado. Por favor intenta nuevamente en Settings/Suscripción.",
             verification_error: spm.payment_error 
           }, 400);
         }
+
+        if (!spm.payment_id) {
+          console.error("[finalize-signup] SECURITY: No payment ID found for", spm.id);
+          return json({ 
+            error: "El pago no fue registrado. Por favor contacta al soporte.",
+          }, 400);
+        }
+
+        console.log("[finalize-signup] Payment verified and charged - amount:", spm.amount, "plan_id:", spm.plan_id);
         
         // Check if company has methods already
         const { data: existing } = await supabaseAdmin
@@ -188,6 +197,7 @@ Deno.serve(async (req: Request) => {
               company_id: companyId,
               type: "card",
               stripe_payment_method_id: spm.payment_method_ref,
+              stripe_payment_intent_id: spm.payment_id, // Store the PaymentIntent ID
               brand: spm.brand ?? null,
               last4: spm.last4 ?? null,
               exp_month: spm.exp_month ?? null,
@@ -216,7 +226,7 @@ Deno.serve(async (req: Request) => {
             .insert({
               company_id: companyId,
               type: "mercadopago",
-              mp_preapproval_id: spm.payment_method_ref,
+              mp_payment_id: spm.payment_id, // Store the actual payment ID (charged)
               holder_name: spm.name ?? null,
               is_default: isFirst,
             });
@@ -228,7 +238,7 @@ Deno.serve(async (req: Request) => {
           
           const { error: subErr } = await supabaseAdmin
             .from("subscriptions")
-            .update({ mp_preapproval_id: spm.payment_method_ref })
+            .update({ mp_payment_id: spm.payment_id })
             .eq("company_id", companyId);
             
           if (subErr) {
@@ -245,7 +255,7 @@ Deno.serve(async (req: Request) => {
         if (linkErr) {
           console.error("[finalize-signup] CRITICAL: Failed to link signup payment method to company:", linkErr);
         } else {
-          console.log("[finalize-signup] Successfully linked payment method", spm.id, "to company", companyId);
+          console.log("[finalize-signup] Successfully linked payment method", spm.id, "to company", companyId, "with payment_id:", spm.payment_id);
         }
       }
     } catch (e) {

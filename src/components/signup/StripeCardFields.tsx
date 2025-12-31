@@ -4,6 +4,7 @@ import { Button } from "@/components/ui/button";
 import { Label } from "@/components/ui/label";
 import { ArrowRight, Loader2 } from "lucide-react";
 import { toast } from "sonner";
+import { supabase } from "@/integrations/supabase/client";
 
 const elementOptions = {
   style: {
@@ -23,9 +24,11 @@ const elementOptions = {
 interface StripeCardFieldsProps {
   onSuccess: (paymentMethodId: string, metadata: { brand: string; last4: string; exp_month: number; exp_year: number }) => void;
   isLoading: boolean;
+  email: string;
+  planId: string;
 }
 
-export function StripeCardFields({ onSuccess, isLoading }: StripeCardFieldsProps) {
+export function StripeCardFields({ onSuccess, isLoading, email, planId }: StripeCardFieldsProps) {
   const stripe = useStripe();
   const elements = useElements();
   const [saving, setSaving] = useState(false);
@@ -60,6 +63,29 @@ export function StripeCardFields({ onSuccess, isLoading }: StripeCardFieldsProps
         throw new Error("No se obtuvieron datos de la tarjeta");
       }
 
+      // CRITICAL: CHARGE the subscription amount IMMEDIATELY
+      // This charges the user and validates the card (insufficient funds, invalid card, etc.)
+      console.log("[Stripe] Charging payment for plan...");
+      
+      const testResult = await supabase.functions.invoke("stripe-test-payment", {
+        body: {
+          payment_method_id: paymentMethod.id,
+          email: email,
+          plan_id: planId,
+        },
+      });
+
+      if (testResult.error) {
+        throw new Error(testResult.error.message || "Error al verificar la tarjeta");
+      }
+
+      if (!testResult.data?.verified) {
+        const errorMsg = testResult.data?.error || "Tarjeta rechazada";
+        throw new Error(errorMsg);
+      }
+
+      console.log("[Stripe] Payment charged successfully!", testResult.data);
+
       // Extract card metadata
       const metadata = {
         brand: paymentMethod.card.brand || "unknown",
@@ -68,7 +94,7 @@ export function StripeCardFields({ onSuccess, isLoading }: StripeCardFieldsProps
         exp_year: paymentMethod.card.exp_year,
       };
 
-      // Successfully created payment method
+      // Successfully created and verified payment method
       onSuccess(paymentMethod.id, metadata);
     } catch (e: any) {
       console.error(e);

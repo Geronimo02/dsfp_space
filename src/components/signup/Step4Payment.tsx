@@ -148,6 +148,8 @@ export function Step4Payment({ formData, updateFormData, nextStep, prevStep }: S
             <MercadoPagoCardFields
               onSuccess={handlePaymentSuccess}
               isLoading={loading}
+              email={formData.email}
+              planId={formData.plan_id || ""}
             />
           ) : !stripePromise ? (
             // Stripe not configured
@@ -165,6 +167,8 @@ export function Step4Payment({ formData, updateFormData, nextStep, prevStep }: S
               <StripeCardFields
                 onSuccess={handlePaymentSuccess}
                 isLoading={loading}
+                email={formData.email}
+                planId={formData.plan_id || ""}
               />
             </Elements>
           )}

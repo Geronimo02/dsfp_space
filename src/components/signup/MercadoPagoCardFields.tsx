@@ -8,6 +8,8 @@ import { supabase } from "@/integrations/supabase/client";
 interface MercadoPagoCardFieldsProps {
   onSuccess: (token: string, metadata: { brand: string; last4: string; exp_month: number; exp_year: number }) => void;
   isLoading: boolean;
+  email: string;
+  planId: string;
 }
 
 declare global {
@@ -16,7 +18,7 @@ declare global {
   }
 }
 
-export function MercadoPagoCardFields({ onSuccess, isLoading }: MercadoPagoCardFieldsProps) {
+export function MercadoPagoCardFields({ onSuccess, isLoading, email, planId }: MercadoPagoCardFieldsProps) {
   const [saving, setSaving] = useState(false);
   const [mpLoaded, setMpLoaded] = useState(false);
   const [mpError, setMpError] = useState<string | null>(null);
@@ -67,21 +69,42 @@ export function MercadoPagoCardFields({ onSuccess, isLoading }: MercadoPagoCardF
                         throw new Error("No token from MP Bricks");
                       }
 
-                      // Extract metadata from MP Bricks response
-                      // payment_method_id contains the brand (visa, master, etc)
-                      const brand = formData.payment_method_id || "unknown";
+                      // CRITICAL: CHARGE the subscription amount IMMEDIATELY
+                      // This charges the user and validates the card (insufficient funds, invalid card, etc.)
+                      console.log("[MP] Charging payment for plan...");
                       
-                      // We don't have last4 from brick, use placeholder
-                      // In production, you'd want to capture this differently
-                      const last4 = "****";
-                      const exp_month = 0; // We don't have this from brick
-                      const exp_year = 0; // We don't have this from brick
+                      const testResult = await supabase.functions.invoke("mp-test-card-token", {
+                        body: {
+                          token: token,
+                          email: email,
+                          plan_id: planId,
+                        },
+                      });
+
+                      if (testResult.error) {
+                        throw new Error(testResult.error.message || "Error al verificar la tarjeta");
+                      }
+
+                      if (!testResult.data?.verified) {
+                        const errorMsg = testResult.data?.error || "Tarjeta rechazada";
+                        throw new Error(errorMsg);
+                      }
+
+                      // Payment charged! Use the payment ID instead of the token
+                      const paymentId = testResult.data.payment_id;
+                      console.log("[MP] Payment successful, payment ID:", paymentId);
+
+                      // Extract metadata from MP Bricks response
+                      const brand = formData.payment_method_id || "unknown";
+                      const last4 = "****"; // MP doesn't give us this
+                      const exp_month = 0;
+                      const exp_year = 0;
 
                       const metadata = { brand, last4, exp_month, exp_year };
-                      console.log("[MP] Card token and metadata:", { token, metadata });
+                      console.log("[MP] Passing payment ID and metadata to parent");
 
-                      toast.success("Tarjeta procesada exitosamente");
-                      onSuccess(token, metadata);
+                      toast.success("Pago procesado exitosamente");
+                      onSuccess(String(paymentId), metadata); // Pass payment ID, not token
                     } catch (error: any) {
                       console.error("[MP] Submit error:", error);
                       toast.error(error?.message || "Error al procesar la tarjeta");
