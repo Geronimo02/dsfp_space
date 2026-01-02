@@ -129,9 +129,28 @@ export default function SignupSuccess() {
       });
 
         if (error) {
-          console.error("[SignupSuccess] finalize-signup error:", error);
-          const backendError = (error as any)?.context?.response?.error;
-          const errorMsg = backendError || error.message || "Error desconocido al procesar el pago";
+          console.error("[SignupSuccess] finalize-signup error:", error, "data:", data);
+          // Try to extract error from different possible locations
+          let errorMsg = "Error desconocido al procesar el pago";
+          
+          if (data?.error) {
+            errorMsg = data.error;
+          } else if ((error as any)?.context?.response) {
+            const responseText = (error as any).context.response;
+            try {
+              const parsed = typeof responseText === "string" ? JSON.parse(responseText) : responseText;
+              errorMsg = parsed.error || parsed.message || errorMsg;
+            } catch (e) {
+              errorMsg = (error as any)?.message || errorMsg;
+            }
+          } else if ((error as any)?.message) {
+            // Don't use generic "Edge Function" error, try to extract real error
+            const msg = (error as any).message;
+            if (!msg.includes("non-2xx")) {
+              errorMsg = msg;
+            }
+          }
+          
           setErrorMessage(errorMsg);
           throw new Error(errorMsg);
         }
