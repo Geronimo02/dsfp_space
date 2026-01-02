@@ -50,8 +50,8 @@ export function MercadoPagoCardFields({ onSuccess, isLoading, email, planId, pla
                 },
                 customization: {
                   paymentMethods: { maxInstallments: 1 },
-                  visual: {
-                    hidePaymentButton: true, // Ocultar el botón "Pagar" de MP Bricks
+                  texts: {
+                    formSubmit: "Guardar y continuar", // Cambia texto del botón de MP
                   },
                 },
                 callbacks: {
@@ -127,16 +127,7 @@ export function MercadoPagoCardFields({ onSuccess, isLoading, email, planId, pla
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (!cardPaymentRef.current) return;
-
-    try {
-      setSaving(true);
-      await cardPaymentRef.current.submit();
-    } catch (error: any) {
-      console.error("[MP] Submit error:", error);
-      toast.error(error?.message || "Error al guardar la tarjeta");
-      setSaving(false);
-    }
+    // No-op: usamos el botón del Brick
   };
 
   if (mpError) {
@@ -149,7 +140,7 @@ export function MercadoPagoCardFields({ onSuccess, isLoading, email, planId, pla
   }
 
   return (
-    <form onSubmit={handleSubmit} className="space-y-6">
+    <div className="space-y-6">
       <div className="text-sm text-muted-foreground mb-4">
         Usando Mercado Pago para procesar tu tarjeta de forma segura
       </div>
@@ -162,22 +153,6 @@ export function MercadoPagoCardFields({ onSuccess, isLoading, email, planId, pla
           </div>
         )}
       </div>
-
-      <div className="flex gap-3 justify-end">
-        <Button type="submit" disabled={saving || isLoading || !mpLoaded}>
-          {saving ? (
-            <>
-              <Loader2 className="mr-2 h-4 w-4 animate-spin" />
-              Guardando...
-            </>
-          ) : (
-            <>
-              Guardar y continuar
-              <ArrowRight className="ml-2 h-4 w-4" />
-            </>
-          )}
-        </Button>
-      </div>
-    </form>
+    </div>
   );
 }
