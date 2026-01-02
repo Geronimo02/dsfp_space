@@ -128,38 +128,42 @@ export default function SignupSuccess() {
         },
       });
 
-        if (error) {
-          console.error("[SignupSuccess] finalize-signup error:", error, "data:", data);
-          // Try to extract error from different possible locations
-          let errorMsg = "Error desconocido al procesar el pago";
-          
-          if (data?.error) {
-            errorMsg = data.error;
-          } else if ((error as any)?.context?.response) {
-            const responseText = (error as any).context.response;
-            try {
-              const parsed = typeof responseText === "string" ? JSON.parse(responseText) : responseText;
-              errorMsg = parsed.error || parsed.message || errorMsg;
-            } catch (e) {
-              errorMsg = (error as any)?.message || errorMsg;
-            }
-          } else if ((error as any)?.message) {
-            // Don't use generic "Edge Function" error, try to extract real error
-            const msg = (error as any).message;
-            if (!msg.includes("non-2xx")) {
-              errorMsg = msg;
-            }
-          }
-          
-          setErrorMessage(errorMsg);
-          throw new Error(errorMsg);
-        }
+      console.log("[SignupSuccess] finalize-signup response:", { data, error });
 
-        if (data?.error) {
-          console.error("[SignupSuccess] finalize-signup returned error:", data.error);
-          setErrorMessage(data.error);
-          throw new Error(data.error);
+      // When Supabase Functions returns a non-2xx status, it comes as error
+      // But the actual JSON response is in error.context.response
+      if (error) {
+        console.error("[SignupSuccess] finalize-signup error object:", error);
+        let errorMsg = "No pudimos procesar tu tarjeta. Verifica los datos y que tengas fondos disponibles";
+        
+        // Supabase Functions returns response body in error.context.response
+        if ((error as any)?.context?.response) {
+          try {
+            const response = (error as any).context.response;
+            console.log("[SignupSuccess] Error response body:", response);
+            const parsed = typeof response === "string" ? JSON.parse(response) : response;
+            if (parsed.error) {
+              errorMsg = parsed.error;
+              console.log("[SignupSuccess] Extracted error message:", errorMsg);
+            }
+          } catch (parseErr) {
+            console.error("[SignupSuccess] Could not parse error response:", parseErr);
+          }
         }
+        
+        setErrorMessage(errorMsg);
+        console.log("[SignupSuccess] Setting error status with message:", errorMsg);
+        setStatus("error");
+        return;
+      }
+
+      // If no error but data has error field, also handle it
+      if (data?.error) {
+        console.error("[SignupSuccess] finalize-signup returned error in data:", data.error);
+        setErrorMessage(data.error);
+        setStatus("error");
+        return;
+      }
 
       console.log("[SignupSuccess] Signup finalized:", data);
       setStatus("paid_ready");
@@ -196,9 +200,12 @@ export default function SignupSuccess() {
 
       window.location.href = "/";
     } catch (error) {
-      console.error("[SignupSuccess] Error finalizing:", error);
-        const errorMsg = errorMessage || (error instanceof Error ? error.message : String(error));
-        toast.error(errorMsg);
+      console.error("[SignupSuccess] Unexpected error during finalization:", error);
+      // Only update error if not already set (in case early return didn't execute for some reason)
+      if (!errorMessage) {
+        const msg = error instanceof Error ? error.message : String(error);
+        setErrorMessage(msg);
+      }
       setStatus("error");
     }
   };

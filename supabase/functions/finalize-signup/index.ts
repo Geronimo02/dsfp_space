@@ -11,22 +11,34 @@ function json(payload: unknown, status = 200) {
 }
 
 // Map MP status_detail codes to user-friendly messages
-function getMPErrorMessage(statusDetail: string | null): string {
+function getMPErrorMessage(statusDetail: string | null, message: string | null): string {
+  // Priority 1: Map specific status_detail codes
   const errorMap: Record<string, string> = {
-    "cc_rejected_insufficient_amount": "Fondos insuficientes",
-    "cc_rejected_call_for_authorize": "Validación requerida - contacte su banco",
-    "cc_rejected_invalid_installments": "Cuotas no válidas",
-    "cc_rejected_other_reason": "Tarjeta rechazada",
-    "cc_rejected_fraud": "Transacción bloqueada por seguridad",
-    "cc_rejected_high_risk": "Transacción de alto riesgo",
-    "cc_rejected_blacklist": "Tarjeta rechazada",
-    "cc_rejected_card_error": "Error en la tarjeta",
-    "cc_rejected_by_bank": "Banco rechazó la transacción",
-    "cc_rejected_insufficient_data": "Datos insuficientes",
-    "invalid_token": "Token inválido o expirado",
+    "cc_rejected_insufficient_amount": "Fondos insuficientes en tu tarjeta",
+    "cc_rejected_call_for_authorize": "Tu banco requiere validación. Contacta a tu banco",
+    "cc_rejected_invalid_installments": "Cuotas no válidas para esta tarjeta",
+    "cc_rejected_other_reason": "Tu tarjeta fue rechazada. Verifica los datos",
+    "cc_rejected_fraud": "La transacción fue bloqueada por seguridad",
+    "cc_rejected_high_risk": "Transacción de alto riesgo. Intenta más tarde",
+    "cc_rejected_blacklist": "Tu tarjeta no puede ser utilizada",
+    "cc_rejected_card_error": "Error en los datos de la tarjeta",
+    "cc_rejected_by_bank": "Tu banco rechazó la transacción",
+    "cc_rejected_insufficient_data": "Faltan datos de la tarjeta. Verifica",
+    "invalid_token": "Tarjeta inválida o expirada",
+    "bad_request": "Datos inválidos. Verifica tu información",
   };
-  if (!statusDetail) return "Tarjeta rechazada";
-  return errorMap[statusDetail.toLowerCase()] || `Tarjeta rechazada: ${statusDetail}`;
+
+  if (statusDetail && errorMap[statusDetail.toLowerCase()]) {
+    return errorMap[statusDetail.toLowerCase()];
+  }
+
+  // Priority 2: Use MP message if it's user-friendly
+  if (message && !message.includes("error") && message.length < 100) {
+    return message;
+  }
+
+  // Priority 3: Generic helpful message
+  return "No pudimos procesar tu tarjeta. Verifica los datos y que tengas fondos disponibles";
 }
 
 // Business constants
@@ -130,7 +142,7 @@ Deno.serve(async (req: Request) => {
         });
 
         if (paymentIntent.status !== "succeeded") {
-          const errorMsg = `Payment failed: ${paymentIntent.status}`;
+          const errorMsg = `No pudimos procesar tu pago. Estado: ${paymentIntent.status}`;
           console.error("[finalize-signup] Stripe payment failed:", errorMsg);
           
           // Update payment method with error
@@ -139,7 +151,7 @@ Deno.serve(async (req: Request) => {
             .update({ payment_verified: false, payment_error: errorMsg })
             .eq("id", spm.id);
 
-          return json({ error: `Pago rechazado: ${errorMsg}` }, 400);
+          return json({ error: errorMsg }, 400);
         }
 
         paymentId = paymentIntent.id;
@@ -147,7 +159,7 @@ Deno.serve(async (req: Request) => {
 
       } catch (err: any) {
         console.error("[finalize-signup] Stripe charge failed:", err);
-        const errorMsg = err.message || "Pago rechazado";
+        const errorMsg = err.message || "No pudimos procesar tu tarjeta. Verifica los datos y que tengas fondos disponibles";
         
         // Update signup_payment_methods with error
         await supabaseAdmin
@@ -155,7 +167,7 @@ Deno.serve(async (req: Request) => {
           .update({ payment_verified: false, payment_error: errorMsg })
           .eq("id", spm.id);
 
-        return json({ error: `Pago rechazado: ${errorMsg}` }, 400);
+        return json({ error: errorMsg }, 400);
       }
 
     } else if (spm.provider === "mercadopago") {
@@ -209,17 +221,26 @@ Deno.serve(async (req: Request) => {
 
         const mpData = await paymentResponse.json();
 
+        console.log("[finalize-signup] MP Response:", {
+          status: mpData.status,
+          status_detail: mpData.status_detail,
+          message: mpData.message,
+        });
+
         if (!paymentResponse.ok || mpData.status !== "approved") {
-          const errorMsg = getMPErrorMessage(mpData.status_detail);
-          console.error("[finalize-signup] MP payment failed:", errorMsg);
+          const errorMsg = getMPErrorMessage(
+            mpData.status_detail || null,
+            mpData.message || null
+          );
           
-          // Update payment method with error
+          console.error("[finalize-signup] MP charge failed:", errorMsg);
+          
           await supabaseAdmin
             .from("signup_payment_methods")
             .update({ payment_verified: false, payment_error: errorMsg })
             .eq("id", spm.id);
 
-          return json({ error: `Pago rechazado: ${errorMsg}` }, 400);
+          return json({ error: errorMsg }, 400);
         }
 
         paymentId = String(mpData.id);
@@ -227,7 +248,7 @@ Deno.serve(async (req: Request) => {
 
       } catch (err: any) {
         console.error("[finalize-signup] MP charge failed:", err);
-        const errorMsg = err.message || "Pago rechazado";
+        const errorMsg = err.message || "No pudimos procesar tu tarjeta. Verifica los datos y que tengas fondos disponibles";
         
         // Update signup_payment_methods with error
         await supabaseAdmin
@@ -235,7 +256,7 @@ Deno.serve(async (req: Request) => {
           .update({ payment_verified: false, payment_error: errorMsg })
           .eq("id", spm.id);
 
-        return json({ error: `Pago rechazado: ${errorMsg}` }, 400);
+        return json({ error: errorMsg }, 400);
       }
     }
 
