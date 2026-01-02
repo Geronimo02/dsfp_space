@@ -32,6 +32,9 @@ serve(async (req) => {
       plan_id,
       payment_method_id,
       issuer_id,
+      full_name,
+      company_name,
+      modules,
     } = await req.json();
 
     if (!provider || !payment_method_ref) {
@@ -142,6 +145,9 @@ serve(async (req) => {
         plan_id: plan_id ?? null,
         payment_method_id: payment_method_id ?? null,
         issuer_id: issuer_id ?? null,
+        full_name: full_name ?? null,
+        company_name: company_name ?? null,
+        modules: modules ?? null,
       })
       .select()
       .single();

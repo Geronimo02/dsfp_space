@@ -3,8 +3,7 @@ import { SignupStepper } from "@/components/signup/SignupStepper";
 import { Step1Account } from "@/components/signup/Step1Account";
 import { Step2Plan } from "@/components/signup/Step2Plan";
 import { Step4Modules } from "@/components/signup/Step4Modules";
-import { Step4Payment } from "@/components/signup/Step4Payment";
-import { Step5Confirmation } from "@/components/signup/Step5Confirmation";
+import { Step4Combined } from "@/components/signup/Step4Combined";
 import { Card } from "@/components/ui/card";
 import { supabase } from "@/integrations/supabase/client";
 import { toast } from "sonner";
@@ -19,6 +18,12 @@ export default function SignupWizard() {
     prevStep,
     saveIntent,
   } = useSignupWizard();
+
+  const handleSignupSuccess = () => {
+    console.log("[SignupWizard] Signup completed successfully");
+    toast.success("¡Bienvenido a RetailSnap Pro!");
+    window.location.href = "/";
+  };
 
   const handleCreateIntent = async () => {
     console.log("[SignupWizard] Creating intent with:", formData);
@@ -160,18 +165,11 @@ export default function SignupWizard() {
             />
           )}
           {currentStep === 3 && (
-            <Step4Payment
+            <Step4Combined
               formData={formData}
               updateFormData={updateFormData}
-              nextStep={nextStep}
+              onSuccess={handleSignupSuccess}
               prevStep={prevStep}
-            />
-          )}
-          {currentStep === 4 && (
-            <Step5Confirmation
-              formData={formData}
-              prevStep={prevStep}
-              onCreateIntent={handleCreateIntent}
             />
           )}
         </Card>
