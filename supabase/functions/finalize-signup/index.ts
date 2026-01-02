@@ -225,6 +225,7 @@ Deno.serve(async (req: Request) => {
           status: mpData.status,
           status_detail: mpData.status_detail,
           message: mpData.message,
+          card: mpData.card,
         });
 
         if (!paymentResponse.ok || mpData.status !== "approved") {
@@ -244,7 +245,24 @@ Deno.serve(async (req: Request) => {
         }
 
         paymentId = String(mpData.id);
-        console.log(`[finalize-signup] ✅ MP payment succeeded: ${paymentId}`);
+        
+        // Extract card details from MP payment response
+        const cardLast4 = mpData.card?.last_four_digits || null;
+        const cardBrand = mpData.payment_method_id || spm.brand;
+        
+        console.log(`[finalize-signup] ✅ MP payment succeeded: ${paymentId}, last4: ${cardLast4}`);
+
+        // Update payment method with card details
+        if (cardLast4) {
+          await supabaseAdmin
+            .from("signup_payment_methods")
+            .update({ 
+              last4: cardLast4,
+              brand: cardBrand,
+              payment_verified: true,
+            })
+            .eq("id", spm.id);
+        }
 
       } catch (err: any) {
         console.error("[finalize-signup] MP charge failed:", err);
@@ -381,19 +399,28 @@ Deno.serve(async (req: Request) => {
     // 6️⃣ Link the payment method we already charged to the company
     console.log("[finalize-signup] Step 6: Linking payment method to company:", companyId);
     
-    if (spm.provider === "stripe") {
+    // Refresh spm to get updated card details (for MP, last4 is set after payment)
+    const { data: refreshedSpm } = await supabaseAdmin
+      .from("signup_payment_methods")
+      .select("*")
+      .eq("id", spm.id)
+      .single();
+    
+    const spmData = refreshedSpm || spm; // Use refreshed data if available
+    
+    if (spmData.provider === "stripe") {
       // Store card with metadata from signup
       const { error: insertErr } = await supabaseAdmin
         .from("company_payment_methods")
         .insert({
           company_id: companyId,
           type: "card",
-          stripe_payment_method_id: spm.payment_method_ref,
+          stripe_payment_method_id: spmData.payment_method_ref,
           stripe_payment_intent_id: paymentId, // Store the PaymentIntent ID
-          brand: spm.brand,
-          last4: spm.last4,
-          exp_month: spm.exp_month,
-          exp_year: spm.exp_year,
+          brand: spmData.brand,
+          last4: spmData.last4,
+          exp_month: spmData.exp_month,
+          exp_year: spmData.exp_year,
           is_default: true,
         });
 
@@ -402,7 +429,7 @@ Deno.serve(async (req: Request) => {
       } else {
         console.log("[finalize-signup] Stripe payment method saved to company");
       }
-    } else if (spm.provider === "mercadopago") {
+    } else if (spmData.provider === "mercadopago") {
       // Store MP payment method
       const { error: insertErr } = await supabaseAdmin
         .from("company_payment_methods")
@@ -410,10 +437,10 @@ Deno.serve(async (req: Request) => {
           company_id: companyId,
           type: "card",
           mp_payment_id: paymentId, // Store the MP payment ID
-          brand: spm.brand,
-          last4: spm.last4,
-          exp_month: spm.exp_month,
-          exp_year: spm.exp_year,
+          brand: spmData.brand,
+          last4: spmData.last4,
+          exp_month: spmData.exp_month,
+          exp_year: spmData.exp_year,
           is_default: true,
         });
 
@@ -428,7 +455,7 @@ Deno.serve(async (req: Request) => {
     await supabaseAdmin
       .from("signup_payment_methods")
       .update({ linked_to_company_id: companyId })
-      .eq("id", spm.id);
+      .eq("id", spmData.id);
 
     console.log("[finalize-signup] ✅ Payment method linked to company");
 
