@@ -3,7 +3,7 @@ import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Label } from "@/components/ui/label";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
-import { CreditCard, ArrowRight, ArrowLeft, AlertCircle } from "lucide-react";
+import { CreditCard, ArrowRight, ArrowLeft, AlertCircle, Loader2 } from "lucide-react";
 import { SignupFormData } from "@/hooks/useSignupWizard";
 import { loadStripe } from "@stripe/stripe-js";
 import { Elements } from "@stripe/react-stripe-js";
@@ -41,13 +41,18 @@ export function Step4Payment({ formData, updateFormData, nextStep, prevStep }: S
     return key ? loadStripe(key) : null;
   });
   const [loading, setLoading] = useState(false);
-  const [planPrice, setPlanPrice] = useState<number>(0);
+  const [planPrice, setPlanPrice] = useState<number | null>(null);
+  const [loadingPlan, setLoadingPlan] = useState(true);
 
   // Fetch plan details
   useEffect(() => {
     const fetchPlan = async () => {
-      if (!formData.plan_id) return;
+      if (!formData.plan_id) {
+        setLoadingPlan(false);
+        return;
+      }
       
+      setLoadingPlan(true);
       const { data, error } = await supabase
         .from("subscription_plans")
         .select("price")
@@ -57,6 +62,7 @@ export function Step4Payment({ formData, updateFormData, nextStep, prevStep }: S
       if (data && !error) {
         setPlanPrice(data.price);
       }
+      setLoadingPlan(false);
     };
     
     fetchPlan();
@@ -64,7 +70,7 @@ export function Step4Payment({ formData, updateFormData, nextStep, prevStep }: S
 
   const isArgentina = billingCountry === "AR";
   const provider = isArgentina ? "mercadopago" : "stripe";
-  const planAmountARS = Math.round(planPrice * 1000); // Convert USD to ARS
+  const planAmountARS = planPrice ? Math.round(planPrice * 1000) : 0; // Convert USD to ARS
 
   const handlePaymentSuccess = async (paymentMethodRef: string, metadata: { brand: string; last4: string; exp_month: number; exp_year: number }) => {
     setLoading(true);
@@ -149,7 +155,13 @@ export function Step4Payment({ formData, updateFormData, nextStep, prevStep }: S
           <CardDescription>Ingresa tu tarjeta de crédito o débito</CardDescription>
         </CardHeader>
         <CardContent>
-          {isArgentina ? (
+          {loadingPlan ? (
+            // Loading plan details
+            <div className="text-center py-8 text-muted-foreground">
+              <Loader2 className="w-5 h-5 animate-spin mx-auto mb-2" />
+              Cargando información del plan...
+            </div>
+          ) : isArgentina ? (
             // Mercado Pago form - same layout as Stripe
             <MercadoPagoCardFields
               onSuccess={handlePaymentSuccess}
