@@ -249,8 +249,9 @@ Deno.serve(async (req: Request) => {
         if (spm.payment_method_id) {
           paymentPayload.payment_method_id = spm.payment_method_id;
         }
+        // issuer_id MUST be a number, not a string
         if (spm.issuer_id) {
-          paymentPayload.issuer_id = spm.issuer_id;
+          paymentPayload.issuer_id = parseInt(spm.issuer_id, 10);
         }
 
         console.log("[finalize-signup] MP Payment payload:", JSON.stringify(paymentPayload, null, 2));

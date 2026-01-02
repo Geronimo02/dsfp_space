@@ -78,7 +78,7 @@ export function Step4Payment({ formData, updateFormData, nextStep, prevStep }: S
   const provider = isArgentina ? "mercadopago" : "stripe";
   const planAmountARS = planPrice ? Math.round(planPrice * 1000) : 0; // Convert USD to ARS
 
-  const handlePaymentSuccess = async (paymentMethodRef: string, metadata: { brand: string; last4: string; exp_month: number; exp_year: number; payment_method_id?: string; issuer_id?: string }) => {
+  const handlePaymentSuccess = async (paymentMethodRef: string, metadata: { brand: string; last4: string; exp_month: number; exp_year: number; payment_method_id?: string; issuer_id?: number }) => {
     setLoading(true);
     console.log("[Step4Payment] handlePaymentSuccess received metadata:", JSON.stringify(metadata, null, 2));
     try {

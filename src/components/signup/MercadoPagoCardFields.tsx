@@ -12,7 +12,7 @@ interface MercadoPagoCardFieldsProps {
     exp_month: number; 
     exp_year: number;
     payment_method_id?: string;
-    issuer_id?: string;
+    issuer_id?: number;
   }) => void;
   isLoading: boolean;
   email: string;
@@ -90,7 +90,7 @@ export function MercadoPagoCardFields({ onSuccess, isLoading, email, planId, pla
                       const exp_month = 0; // MP doesn't expose expiration in token response
                       const exp_year = 0;
                       const payment_method_id = formData.payment_method_id;
-                      const issuer_id = formData.issuer_id;
+                      const issuer_id = formData.issuer_id ? parseInt(formData.issuer_id, 10) : undefined;
 
                       console.log("[MP] Raw formData values:", {
                         payment_method_id: formData.payment_method_id,
