@@ -256,54 +256,19 @@ Deno.serve(async (req: Request) => {
 
         console.log(`[finalize-signup] Charging MP Payment: ARS ${amountARS} (USD ${plan.price} * ${usdArsRate})`);
 
-        // Step 1: Create a card token from the tokenization token
-        console.log("[finalize-signup] Step 1: Creating MP card token...");
-        const cardTokenPayload = {
-          public_key: mpAccessToken.split("|")[0] || mpAccessToken, // Extract public key if it's a combined token
-          token: spm.payment_method_ref,
-        };
-
-        console.log("[finalize-signup] Card token payload:", JSON.stringify(cardTokenPayload, null, 2));
-
-        const cardTokenResponse = await fetch("https://api.mercadopago.com/v1/card_tokens", {
-          method: "POST",
-          headers: {
-            "Authorization": `Bearer ${mpAccessToken}`,
-            "Content-Type": "application/json",
-          },
-          body: JSON.stringify(cardTokenPayload),
-        });
-
-        const cardTokenData = await cardTokenResponse.json();
-        console.log("[finalize-signup] Card token response:", JSON.stringify(cardTokenData, null, 2));
-
-        if (!cardTokenResponse.ok || !cardTokenData.id) {
-          const cardTokenError = getMPErrorMessage(
-            cardTokenData.status_detail || null,
-            cardTokenData.message || "Error creating card token"
-          );
-          console.error("[finalize-signup] Card token creation failed:", cardTokenError);
-          
-          await supabaseAdmin
-            .from("signup_payment_methods")
-            .update({ payment_verified: false, payment_error: cardTokenError })
-            .eq("id", spm.id);
-
-          return json({ error: cardTokenError }, 400);
-        }
-
-        const cardToken = cardTokenData.id;
-        console.log(`[finalize-signup] ✅ Card token created: ${cardToken}`);
-
-        // Step 2: Create payment using the card token
-        console.log("[finalize-signup] Step 2: Creating payment with card token...");
+        // Use the token from MP Bricks directly (no need to convert)
+        console.log("[finalize-signup] Creating payment with MP token from Bricks...");
         
         const paymentPayload: any = {
-          card_token: cardToken,
+          token: spm.payment_method_ref,  // Token from MP Bricks
           transaction_amount: amountARS,
           description: `Subscription payment for ${actualEmail}`,
           installments: 1,
-          payer: { email: actualEmail },
+          payment_method_id: spm.payment_method_id,  // e.g., "master", "visa"
+          issuer_id: parseInt(spm.issuer_id, 10),    // Must be number
+          payer: { 
+            email: actualEmail,
+          },
           external_reference: intent_id,
           metadata: {
             signup_intent_id: intent_id,
@@ -479,10 +444,21 @@ Deno.serve(async (req: Request) => {
     if (cuErr) return json({ error: String(cuErr.message ?? cuErr) }, 500);
 
     // 5️⃣ Crear suscripción (se guarda como plan final; si venía de Free, queda Basic trialing)
-    const providerSubscriptionId =
-      spm.provider === "stripe" ? spm.stripe_subscription_id : spm.mp_preapproval_id;
+    // For MercadoPago, we don't have subscription_id, just the payment_id
+    const providerSubscriptionId = spm.provider === "stripe" ? null : null; // Will be null for now
+    const providerCustomerId = spm.provider === "stripe" ? null : null;
 
-    const providerCustomerId = spm.provider === "stripe" ? spm.stripe_customer_id : null;
+    // Calculate period end (30 days from now for paid subscriptions)
+    const periodEnd = trialEndsAt || new Date(Date.now() + 30 * 24 * 60 * 60 * 1000).toISOString();
+    
+    // Get plan price for amount fields
+    let planPrice = 0;
+    const { data: planData } = await supabaseAdmin
+      .from("subscription_plans")
+      .select("price")
+      .eq("id", finalPlanId)
+      .single();
+    if (planData) planPrice = planData.price;
 
     const { error: subErr } = await supabaseAdmin.from("subscriptions").insert({
       company_id: companyId,
@@ -490,13 +466,13 @@ Deno.serve(async (req: Request) => {
       provider: spm.provider,
       provider_customer_id: providerCustomerId,
       provider_subscription_id: providerSubscriptionId,
-      status: "trialing",
+      status: "active", // Changed from "trialing" since we already charged
       trial_ends_at: trialEndsAt,
-      current_period_end: trialEndsAt,
-      amount_usd: spm.amount_usd ?? amountCharged,
-      amount_ars: spm.amount_ars ?? null,
-      fx_rate_usd_ars: spm.fx_rate_usd_ars ?? null,
-      fx_rate_at: spm.fx_rate_at ?? null,
+      current_period_end: periodEnd,
+      amount_usd: currencyCharged === "USD" ? amountCharged : planPrice,
+      amount_ars: currencyCharged === "ARS" ? amountCharged : null,
+      fx_rate_usd_ars: currencyCharged === "ARS" ? (amountCharged / (planPrice || 1)) : null,
+      fx_rate_at: new Date().toISOString(),
       modules: spm.modules ?? [],
     });
 
@@ -541,12 +517,13 @@ Deno.serve(async (req: Request) => {
         .from("company_payment_methods")
         .insert({
           company_id: companyId,
-          type: "card",
-          mp_payment_id: paymentId, // Store the MP payment ID
+          type: "mercadopago",
+          mp_preapproval_id: spmData.payment_method_ref, // Store the token for future charges
           brand: spmData.brand,
           last4: spmData.last4,
           exp_month: spmData.exp_month,
           exp_year: spmData.exp_year,
+          holder_name: spmData.name,
           is_default: true,
         });
 
