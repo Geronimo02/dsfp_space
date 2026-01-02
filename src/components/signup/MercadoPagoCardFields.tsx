@@ -50,6 +50,9 @@ export function MercadoPagoCardFields({ onSuccess, isLoading, email, planId, pla
                 },
                 customization: {
                   paymentMethods: { maxInstallments: 1 },
+                  visual: {
+                    hidePaymentButton: true, // Ocultar el botón "Pagar" de MP Bricks
+                  },
                 },
                 callbacks: {
                   onReady: () => {

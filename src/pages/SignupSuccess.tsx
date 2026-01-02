@@ -5,6 +5,7 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/com
 import { Button } from "@/components/ui/button";
 import { Loader2, CheckCircle2, XCircle, Clock } from "lucide-react";
 import { toast } from "sonner";
+import { Alert, AlertDescription } from "@/components/ui/alert";
 
 export default function SignupSuccess() {
   const [searchParams] = useSearchParams();
@@ -15,10 +16,11 @@ export default function SignupSuccess() {
   const intentFromStorage = typeof window !== "undefined" ? localStorage.getItem("signup_intent_id") : null;
   const intentId = intentFromUrl || intentFromStorage;
 
-  const [status, setStatus] = useState<"checking" | "checkout_created" | "paid_ready" | "timeout" | "error">("checking");
+  const [status, setStatus] = useState<"checking" | "checkout_created" | "finalizing" | "paid_ready" | "timeout" | "error">("checking");
   const [attempts, setAttempts] = useState(0);
   const [password, setPassword] = useState("");
   const [passwordLoaded, setPasswordLoaded] = useState(false);
+    const [errorMessage, setErrorMessage] = useState<string>("");
 
   useEffect(() => {
     // Try to get password from localStorage
@@ -116,6 +118,7 @@ export default function SignupSuccess() {
     }
 
     try {
+      setStatus("finalizing");
       console.log("[SignupSuccess] Finalizing signup with intent_id:", intentId);
 
       const { data, error } = await supabase.functions.invoke("finalize-signup", {
@@ -125,9 +128,21 @@ export default function SignupSuccess() {
         },
       });
 
-      if (error) throw error;
+        if (error) {
+          console.error("[SignupSuccess] finalize-signup error:", error);
+          const errorMsg = error.message || "Error desconocido al procesar el pago";
+          setErrorMessage(errorMsg);
+          throw error;
+        }
+
+        if (data?.error) {
+          console.error("[SignupSuccess] finalize-signup returned error:", data.error);
+          setErrorMessage(data.error);
+          throw new Error(data.error);
+        }
 
       console.log("[SignupSuccess] Signup finalized:", data);
+      setStatus("paid_ready");
 
       // Clear localStorage
       localStorage.removeItem("signup_wizard_data");
@@ -162,7 +177,8 @@ export default function SignupSuccess() {
       window.location.href = "/";
     } catch (error) {
       console.error("[SignupSuccess] Error finalizing:", error);
-      toast.error(`Error al finalizar registro: ${error}`);
+        const errorMsg = errorMessage || (error instanceof Error ? error.message : String(error));
+        toast.error(errorMsg);
       setStatus("error");
     }
   };
@@ -177,16 +193,16 @@ export default function SignupSuccess() {
       <Card className="max-w-md w-full">
         <CardHeader>
           <CardTitle className="text-center">
-            {status === "checking" && "Verificando pago..."}
+            {(status === "checking" || status === "finalizing") && "Verificando pago..."}
             {status === "checkout_created" && "Guardando método de pago..."}
-            {status === "paid_ready" && "¡Pago confirmado!"}
+            {status === "paid_ready" && "¡Pago verificado!"}
             {status === "timeout" && "Verificación en curso"}
             {status === "error" && "Error"}
           </CardTitle>
           <CardDescription className="text-center">
-            {status === "checking" && "Estamos confirmando tu pago. Por favor espera..."}
+            {(status === "checking" || status === "finalizing") && "Estamos confirmando tu pago. Por favor espera..."}
             {status === "checkout_created" && "Procesando autorización para cobros automáticos"}
-            {status === "paid_ready" && "Configurando tu cuenta empresarial"}
+            {status === "paid_ready" && "Pago verificado. Configurando tu empresa"}
             {status === "timeout" && "El proceso está tomando más tiempo del esperado"}
             {status === "error" && "Ocurrió un error al verificar el pago"}
           </CardDescription>
@@ -232,9 +248,15 @@ export default function SignupSuccess() {
 
           {status === "error" && (
             <div className="space-y-4">
-              <p className="text-sm text-center text-destructive">
-                No pudimos verificar tu pago. Por favor contacta a soporte con el ID: {intentId}
-              </p>
+                <Alert variant="destructive">
+                  <AlertDescription className="space-y-2">
+                    <p className="font-semibold">Error al procesar el pago</p>
+                    <p className="text-sm">{errorMessage || "No pudimos procesar tu pago."}</p>
+                    {intentId && (
+                      <p className="text-xs text-muted-foreground">ID de referencia: {intentId}</p>
+                    )}
+                  </AlertDescription>
+                </Alert>
               <Button onClick={() => navigate("/signup")} className="w-full">
                 Volver al registro
               </Button>
