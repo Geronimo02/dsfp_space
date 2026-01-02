@@ -130,9 +130,10 @@ export default function SignupSuccess() {
 
         if (error) {
           console.error("[SignupSuccess] finalize-signup error:", error);
-          const errorMsg = error.message || "Error desconocido al procesar el pago";
+          const backendError = (error as any)?.context?.response?.error;
+          const errorMsg = backendError || error.message || "Error desconocido al procesar el pago";
           setErrorMessage(errorMsg);
-          throw error;
+          throw new Error(errorMsg);
         }
 
         if (data?.error) {
