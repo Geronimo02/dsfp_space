@@ -53,16 +53,22 @@ export function Step4Payment({ formData, updateFormData, nextStep, prevStep }: S
       }
       
       setLoadingPlan(true);
-      const { data, error } = await supabase
-        .from("subscription_plans")
-        .select("price")
-        .eq("id", formData.plan_id)
-        .single();
-      
-      if (data && !error) {
-        setPlanPrice(data.price);
+      try {
+        const { data, error } = await supabase.functions.invoke("list-plans");
+        
+        if (error) throw error;
+        
+        const plans = data?.plans || [];
+        const selectedPlan = plans.find((p: any) => p.id === formData.plan_id);
+        
+        if (selectedPlan) {
+          setPlanPrice(selectedPlan.price);
+        }
+      } catch (err) {
+        console.error("Error fetching plan:", err);
+      } finally {
+        setLoadingPlan(false);
       }
-      setLoadingPlan(false);
     };
     
     fetchPlan();
