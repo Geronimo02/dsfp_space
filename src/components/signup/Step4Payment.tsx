@@ -78,23 +78,31 @@ export function Step4Payment({ formData, updateFormData, nextStep, prevStep }: S
   const provider = isArgentina ? "mercadopago" : "stripe";
   const planAmountARS = planPrice ? Math.round(planPrice * 1000) : 0; // Convert USD to ARS
 
-  const handlePaymentSuccess = async (paymentMethodRef: string, metadata: { brand: string; last4: string; exp_month: number; exp_year: number }) => {
+  const handlePaymentSuccess = async (paymentMethodRef: string, metadata: { brand: string; last4: string; exp_month: number; exp_year: number; payment_method_id?: string; issuer_id?: string }) => {
     setLoading(true);
+    console.log("[Step4Payment] handlePaymentSuccess received metadata:", JSON.stringify(metadata, null, 2));
     try {
       // Save payment method to staging table (will charge in Step 5)
+      const requestBody = {
+        email: formData.email,
+        name: formData.full_name,
+        billing_country: billingCountry,
+        provider: provider,
+        payment_method_ref: paymentMethodRef,
+        brand: metadata.brand,
+        last4: metadata.last4,
+        exp_month: metadata.exp_month,
+        exp_year: metadata.exp_year,
+        plan_id: formData.plan_id,
+        // MP-specific fields
+        payment_method_id: metadata.payment_method_id,
+        issuer_id: metadata.issuer_id,
+      };
+      
+      console.log("[Step4Payment] Sending to signup-save-payment-method:", JSON.stringify(requestBody, null, 2));
+      
       const { data, error } = await supabase.functions.invoke("signup-save-payment-method", {
-        body: {
-          email: formData.email,
-          name: formData.full_name,
-          billing_country: billingCountry,
-          provider: provider,
-          payment_method_ref: paymentMethodRef,
-          brand: metadata.brand,
-          last4: metadata.last4,
-          exp_month: metadata.exp_month,
-          exp_year: metadata.exp_year,
-          plan_id: formData.plan_id,
-        },
+        body: requestBody,
       });
 
       if (error) throw error;

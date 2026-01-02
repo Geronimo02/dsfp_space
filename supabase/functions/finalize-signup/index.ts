@@ -98,6 +98,21 @@ Deno.serve(async (req: Request) => {
     }
 
     console.log(`[finalize-signup] Found payment method: ${spm.id} provider: ${spm.provider}`);
+    console.log(`[finalize-signup] Payment method details:`, {
+      id: spm.id,
+      provider: spm.provider,
+      plan_id: spm.plan_id,
+      payment_method_ref: spm.payment_method_ref,
+      email: spm.email,
+      payment_method_id: spm.payment_method_id,
+      issuer_id: spm.issuer_id,
+    });
+
+    // Verify plan_id exists
+    if (!spm.plan_id) {
+      console.error("[finalize-signup] No plan_id in payment method:", spm);
+      return json({ error: "No se encontró el plan seleccionado. Por favor, vuelve al paso anterior." }, 400);
+    }
 
     let paymentId: string | null = null;
     let amountCharged = 0;
@@ -113,21 +128,31 @@ Deno.serve(async (req: Request) => {
         });
 
         // Get plan amount
-        const { data: plan } = await supabaseAdmin
+        console.log(`[finalize-signup] Fetching plan details for plan_id: ${spm.plan_id}`);
+        const { data: plan, error: planError } = await supabaseAdmin
           .from("subscription_plans")
           .select("price, currency")
           .eq("id", spm.plan_id)
           .single();
 
-        if (!plan) throw new Error("Plan not found");
+        if (planError || !plan) {
+          console.error("[finalize-signup] Plan fetch error:", planError);
+          throw new Error(`Plan not found: ${spm.plan_id}`);
+        }
 
         const amountCents = Math.round(plan.price * 100);
         amountCharged = plan.price;
         currencyCharged = plan.currency || "USD";
 
-        console.log(`[finalize-signup] Charging Stripe PaymentIntent: ${currencyCharged} ${plan.price}`);
+        console.log(`[finalize-signup] Charging Stripe PaymentIntent: ${currencyCharged} ${plan.price} (${amountCents} cents)`);
 
-        const paymentIntent = await stripe.paymentIntents.create({
+        // Get the payment method to check if it has a customer
+        const paymentMethod = await stripe.paymentMethods.retrieve(spm.payment_method_ref);
+        const customerId = typeof paymentMethod.customer === 'string' ? paymentMethod.customer : paymentMethod.customer?.id;
+        
+        console.log(`[finalize-signup] PaymentMethod customer: ${customerId}`);
+
+        const paymentIntentParams: any = {
           amount: amountCents,
           currency: currencyCharged.toLowerCase(),
           payment_method: spm.payment_method_ref,
@@ -139,7 +164,14 @@ Deno.serve(async (req: Request) => {
             plan_id: spm.plan_id,
             email: intent.email,
           },
-        });
+        };
+
+        // If payment method has a customer, include it
+        if (customerId) {
+          paymentIntentParams.customer = customerId;
+        }
+
+        const paymentIntent = await stripe.paymentIntents.create(paymentIntentParams);
 
         if (paymentIntent.status !== "succeeded") {
           const errorMsg = `No pudimos procesar tu pago. Estado: ${paymentIntent.status}`;
@@ -180,13 +212,17 @@ Deno.serve(async (req: Request) => {
 
       try {
         // Get plan amount
-        const { data: plan } = await supabaseAdmin
+        console.log(`[finalize-signup] Fetching plan details for plan_id: ${spm.plan_id}`);
+        const { data: plan, error: planError } = await supabaseAdmin
           .from("subscription_plans")
           .select("price")
           .eq("id", spm.plan_id)
           .single();
 
-        if (!plan) throw new Error("Plan not found");
+        if (planError || !plan) {
+          console.error("[finalize-signup] Plan fetch error:", planError);
+          throw new Error(`Plan not found: ${spm.plan_id}`);
+        }
 
         // MP only supports ARS for Argentina
         const usdArsRate = Number(Deno.env.get("DEFAULT_USD_ARS_RATE") ?? "1000");
@@ -194,9 +230,9 @@ Deno.serve(async (req: Request) => {
         amountCharged = amountARS;
         currencyCharged = "ARS";
 
-        console.log(`[finalize-signup] Charging MP Payment: ARS ${amountARS}`);
+        console.log(`[finalize-signup] Charging MP Payment: ARS ${amountARS} (USD ${plan.price} * ${usdArsRate})`);
 
-        const paymentPayload = {
+        const paymentPayload: any = {
           token: spm.payment_method_ref,
           transaction_amount: amountARS,
           description: `Subscription payment for ${intent.email}`,
@@ -208,6 +244,16 @@ Deno.serve(async (req: Request) => {
             plan_id: spm.plan_id,
           },
         };
+
+        // Add MP-specific fields if available
+        if (spm.payment_method_id) {
+          paymentPayload.payment_method_id = spm.payment_method_id;
+        }
+        if (spm.issuer_id) {
+          paymentPayload.issuer_id = spm.issuer_id;
+        }
+
+        console.log("[finalize-signup] MP Payment payload:", JSON.stringify(paymentPayload, null, 2));
 
         const paymentResponse = await fetch("https://api.mercadopago.com/v1/payments", {
           method: "POST",
@@ -221,12 +267,8 @@ Deno.serve(async (req: Request) => {
 
         const mpData = await paymentResponse.json();
 
-        console.log("[finalize-signup] MP Response:", {
-          status: mpData.status,
-          status_detail: mpData.status_detail,
-          message: mpData.message,
-          card: mpData.card,
-        });
+        console.log("[finalize-signup] MP Response status:", paymentResponse.status);
+        console.log("[finalize-signup] MP Response data:", JSON.stringify(mpData, null, 2));
 
         if (!paymentResponse.ok || mpData.status !== "approved") {
           const errorMsg = getMPErrorMessage(
