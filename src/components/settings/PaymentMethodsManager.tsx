@@ -305,15 +305,12 @@ export function PaymentMethodsManager({
                 <div className="flex items-center justify-between">
                   <div className="flex items-center gap-4 flex-1">
                     <div className="flex items-center justify-center w-12 h-12 rounded-lg bg-gradient-to-br from-slate-700 to-slate-900 text-white text-2xl">
-                      {method.type === "mercadopago" ? "🔵" : getCardBrandIcon(method.brand)}
+                      {getCardBrandIcon(method.brand)}
                     </div>
                     <div className="flex-1">
                       <div className="flex items-center gap-2 mb-1">
                         <p className="font-semibold">
-                          {method.type === "mercadopago" 
-                            ? "Mercado Pago" 
-                            : `${method.brand?.toUpperCase() ?? "Tarjeta"} •••• ${method.last4}`
-                          }
+                          {method.brand?.charAt(0).toUpperCase() + method.brand?.slice(1).toLowerCase() ?? "Tarjeta"} •••• {method.last4 ?? "****"}
                         </p>
                         {method.is_default && (
                           <Badge variant="default" className="text-xs">
@@ -323,11 +320,10 @@ export function PaymentMethodsManager({
                         )}
                       </div>
                       <p className="text-sm text-muted-foreground">
-                        {method.type === "mercadopago" 
-                          ? `Autorizado • ${new Date(method.created_at).toLocaleDateString()}`
-                          : method.holder_name 
-                            ? `${method.holder_name} • Vence ${method.exp_month}/${method.exp_year}`
-                            : `Vence ${method.exp_month}/${method.exp_year}`
+                        {method.holder_name && `${method.holder_name} • `}
+                        {method.exp_month && method.exp_year 
+                          ? `Vence ${String(method.exp_month).padStart(2, '0')}/${method.exp_year}`
+                          : `Autorizado • ${new Date(method.created_at).toLocaleDateString()}`
                         }
                       </p>
                     </div>

@@ -98,7 +98,16 @@ export default function Settings() {
     queryFn: async () => {
       const { data, error } = await supabase
         .from("subscriptions")
-        .select("id, company_id, plan_id, provider, status, trial_ends_at, current_period_end, provider_customer_id, mp_preapproval_id, stripe_payment_method_id")
+        .select(`
+          id, 
+          company_id, 
+          plan_id, 
+          provider, 
+          status, 
+          trial_ends_at, 
+          current_period_end,
+          subscription_plans!inner(name, price)
+        `)
         .eq("company_id", currentCompany!.id)
         .maybeSingle();
       if (error) throw error;
@@ -1182,17 +1191,17 @@ export default function Settings() {
                   <div className="grid grid-cols-2 gap-4">
                     <div>
                       <p className="text-sm font-medium text-muted-foreground">Plan</p>
-                      <p className="text-lg font-semibold">{subscription?.plan_id ?? "Sin plan"}</p>
-                    </div>
-                    <div>
-                      <p className="text-sm font-medium text-muted-foreground">Proveedor</p>
-                      <p className="text-lg font-semibold capitalize">{subscription?.provider ?? "-"}</p>
+                      <p className="text-lg font-semibold">
+                        {subscription?.subscription_plans?.name ?? "Sin plan"}
+                      </p>
                     </div>
                     <div>
                       <p className="text-sm font-medium text-muted-foreground">Estado</p>
-                      <p className="text-lg font-semibold capitalize">{subscription?.status ?? "Inactivo"}</p>
+                      <p className="text-lg font-semibold capitalize">
+                        {subscription?.status === "active" ? "Activo" : subscription?.status ?? "Inactivo"}
+                      </p>
                     </div>
-                    <div>
+                    <div className="col-span-2">
                       <p className="text-sm font-medium text-muted-foreground">Próxima fecha de cobro</p>
                       <p className="text-lg font-semibold">
                         {subscription?.current_period_end 
