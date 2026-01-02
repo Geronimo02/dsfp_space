@@ -66,6 +66,7 @@ export function MercadoPagoCardFields({ onSuccess, isLoading, email, planId, pla
                     setSaving(true);
                     try {
                       console.log("[MP] formData received:", formData);
+                      console.log("[MP] Full formData structure:", JSON.stringify(formData, null, 2));
                       
                       // MP Bricks returns the token directly in formData.token
                       const token = formData.token;
@@ -76,13 +77,14 @@ export function MercadoPagoCardFields({ onSuccess, isLoading, email, planId, pla
                       console.log("[MP] Card tokenized successfully, will charge in Step 5...");
 
                       // Extract metadata from MP Bricks response
+                      // MP Bricks exposes last 4 digits in formData.lastFourDigits or formData.bin
                       const brand = formData.payment_method_id || "unknown";
-                      const last4 = "****"; // MP doesn't expose this
-                      const exp_month = 0;
+                      const last4 = formData.lastFourDigits || formData.bin?.slice(-4) || "****";
+                      const exp_month = 0; // MP doesn't expose expiration in token response
                       const exp_year = 0;
 
                       const metadata = { brand, last4, exp_month, exp_year };
-                      console.log("[MP] Passing token to parent (not charged yet)");
+                      console.log("[MP] Extracted metadata:", metadata);
 
                       toast.success("Tarjeta guardada. Confirma tu cuenta en el siguiente paso.");
                       onSuccess(token, metadata); // Pass token, will charge in finalize-signup
