@@ -55,29 +55,18 @@ export default function Subscription() {
   const [stripePromise, setStripePromise] = useState<any>(null);
   const [clientSecret, setClientSecret] = useState<string | null>(null);
 
-  const { data: subscription, isLoading: subscriptionLoading, fetchStatus } = useQuery({
+  const { data: subscription, isLoading: subscriptionLoading } = useQuery({
     queryKey: ["subscription", currentCompany?.id],
     enabled: !!currentCompany?.id,
     queryFn: async () => {
-      console.log("🔍 Fetching subscription for company:", currentCompany?.id);
       const { data, error } = await supabase
         .from("subscriptions")
         .select("*")
         .eq("company_id", currentCompany!.id)
         .maybeSingle();
       if (error) throw error;
-      console.log("✅ Subscription data:", data);
       return data;
     },
-  });
-
-  console.log("📊 Subscription Query State:", {
-    companyLoading,
-    currentCompanyId: currentCompany?.id,
-    subscriptionLoading,
-    fetchStatus,
-    hasSubscription: !!subscription,
-    subscription
   });
 
   const { data: subscriptionPlan, isLoading: planLoading } = useQuery({
@@ -209,7 +198,7 @@ export default function Subscription() {
             <CardDescription>Plan y período de prueba</CardDescription>
           </CardHeader>
           <CardContent className="space-y-2">
-            {companyLoading || !currentCompany || subscriptionLoading || planLoading ? (
+            {subscriptionLoading || planLoading ? (
               <div className="space-y-2">
                 <div className="h-4 w-32 bg-muted animate-pulse rounded" />
                 <div className="h-4 w-40 bg-muted animate-pulse rounded" />

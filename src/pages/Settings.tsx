@@ -95,59 +95,27 @@ export default function Settings() {
   const { data: subscription, isLoading: subscriptionLoading } = useQuery({
     queryKey: ["subscription", currentCompany?.id],
     enabled: !!currentCompany?.id,
-    staleTime: 5 * 60 * 1000, // 5 minutos
-    gcTime: 10 * 60 * 1000, // 10 minutos
-    retry: 3,
-    retryDelay: (attemptIndex) => Math.min(1000 * 2 ** attemptIndex, 30000),
     queryFn: async () => {
-      console.log("🔍 [Settings] Fetching subscription for company:", currentCompany?.id);
       const { data, error } = await supabase
         .from("subscriptions")
         .select("*")
         .eq("company_id", currentCompany!.id)
         .maybeSingle();
-      if (error) {
-        console.error("❌ [Settings] Error fetching subscription:", error);
-        throw error;
-      }
-      console.log("✅ [Settings] Subscription data:", data);
+      if (error) throw error;
       return data;
     },
-  });
-
-  console.log("📊 [Settings] Subscription Query State DETAILED:", {
-    companyLoading,
-    currentCompanyId: currentCompany?.id,
-    subscriptionLoading,
-    planLoading,
-    hasSubscription: !!subscription,
-    subscriptionStatus: subscription?.status,
-    planId: subscription?.plan_id,
-    planName: subscriptionPlan?.name,
-    showingSkeleton: companyLoading || !currentCompany || subscriptionLoading || planLoading,
-    subscriptionData: subscription,
-    planData: subscriptionPlan
   });
 
   const { data: subscriptionPlan, isLoading: planLoading } = useQuery({
     queryKey: ["subscription-plan", subscription?.plan_id],
     enabled: !!subscription?.plan_id,
-    staleTime: 5 * 60 * 1000, // 5 minutos
-    gcTime: 10 * 60 * 1000, // 10 minutos
-    retry: 3,
-    retryDelay: (attemptIndex) => Math.min(1000 * 2 ** attemptIndex, 30000),
     queryFn: async () => {
-      console.log("🔍 [Settings] Fetching plan for id:", subscription?.plan_id);
       const { data, error } = await supabase
         .from("subscription_plans")
         .select("name, price")
         .eq("id", subscription!.plan_id)
         .single();
-      if (error) {
-        console.error("❌ [Settings] Error fetching plan:", error);
-        throw error;
-      }
-      console.log("✅ [Settings] Plan data:", data);
+      if (error) throw error;
       return data;
     },
   });
@@ -1225,7 +1193,7 @@ export default function Settings() {
                   <CardDescription>Información de tu plan y período de prueba</CardDescription>
                 </CardHeader>
                 <CardContent className="space-y-3">
-                  {companyLoading || !currentCompany || subscriptionLoading || planLoading ? (
+                  {subscriptionLoading || planLoading ? (
                     <div className="grid grid-cols-2 gap-4">
                       <div className="space-y-2">
                         <div className="h-4 w-16 bg-muted animate-pulse rounded" />
@@ -1240,16 +1208,12 @@ export default function Settings() {
                         <div className="h-6 w-32 bg-muted animate-pulse rounded" />
                       </div>
                     </div>
-                  ) : !subscription ? (
-                    <div className="text-muted-foreground py-4">
-                      <p>No hay suscripción activa</p>
-                    </div>
                   ) : (
                     <div className="grid grid-cols-2 gap-4">
                       <div>
                         <p className="text-sm font-medium text-muted-foreground">Plan</p>
                         <p className="text-lg font-semibold">
-                          {subscriptionPlan?.name ? subscriptionPlan.name : (subscription?.plan_id ? `Cargando plan (${subscription.plan_id.slice(0, 8)}...)` : "Sin plan")}
+                          {subscriptionPlan?.name ?? "Sin plan"}
                         </p>
                       </div>
                       <div>
