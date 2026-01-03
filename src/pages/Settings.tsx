@@ -1188,36 +1188,53 @@ export default function Settings() {
                   <CardDescription>Información de tu plan y período de prueba</CardDescription>
                 </CardHeader>
                 <CardContent className="space-y-3">
-                  <div className="grid grid-cols-2 gap-4">
-                    <div>
-                      <p className="text-sm font-medium text-muted-foreground">Plan</p>
-                      <p className="text-lg font-semibold">
-                        {subscription?.subscription_plans?.name ?? "Sin plan"}
-                      </p>
+                  {!subscription ? (
+                    <div className="grid grid-cols-2 gap-4">
+                      <div className="space-y-2">
+                        <div className="h-4 w-16 bg-muted animate-pulse rounded" />
+                        <div className="h-6 w-32 bg-muted animate-pulse rounded" />
+                      </div>
+                      <div className="space-y-2">
+                        <div className="h-4 w-16 bg-muted animate-pulse rounded" />
+                        <div className="h-6 w-24 bg-muted animate-pulse rounded" />
+                      </div>
+                      <div className="col-span-2 space-y-2">
+                        <div className="h-4 w-40 bg-muted animate-pulse rounded" />
+                        <div className="h-6 w-32 bg-muted animate-pulse rounded" />
+                      </div>
                     </div>
-                    <div>
-                      <p className="text-sm font-medium text-muted-foreground">Estado</p>
-                      <p className="text-lg font-semibold capitalize">
-                        {subscription?.status === "active" ? "Activo" : subscription?.status ?? "Inactivo"}
-                      </p>
-                    </div>
-                    <div className="col-span-2">
-                      <p className="text-sm font-medium text-muted-foreground">Próxima fecha de cobro</p>
-                      <p className="text-lg font-semibold">
-                        {subscription?.current_period_end 
-                          ? format(new Date(subscription.current_period_end), "dd/MM/yyyy")
-                          : "-"}
-                      </p>
-                    </div>
-                    {trialDaysLeft !== null && trialDaysLeft > 0 && (
-                      <div className="col-span-2">
-                        <p className="text-sm font-medium text-muted-foreground">Prueba gratuita</p>
-                        <p className="text-lg font-semibold text-primary">
-                          {trialDaysLeft} días restantes
+                  ) : (
+                    <div className="grid grid-cols-2 gap-4">
+                      <div>
+                        <p className="text-sm font-medium text-muted-foreground">Plan</p>
+                        <p className="text-lg font-semibold">
+                          {subscription?.subscription_plans?.name ?? "Sin plan"}
                         </p>
                       </div>
-                    )}
-                  </div>
+                      <div>
+                        <p className="text-sm font-medium text-muted-foreground">Estado</p>
+                        <p className="text-lg font-semibold capitalize">
+                          {subscription?.status === "active" ? "Activo" : subscription?.status ?? "Inactivo"}
+                        </p>
+                      </div>
+                      <div className="col-span-2">
+                        <p className="text-sm font-medium text-muted-foreground">Próxima fecha de cobro</p>
+                        <p className="text-lg font-semibold">
+                          {subscription?.current_period_end 
+                            ? format(new Date(subscription.current_period_end), "dd/MM/yyyy")
+                            : "-"}
+                        </p>
+                      </div>
+                      {trialDaysLeft !== null && trialDaysLeft > 0 && (
+                        <div className="col-span-2">
+                          <p className="text-sm font-medium text-muted-foreground">Prueba gratuita</p>
+                          <p className="text-lg font-semibold text-primary">
+                            {trialDaysLeft} días restantes
+                          </p>
+                        </div>
+                      )}
+                    </div>
+                  )}
                 </CardContent>
               </Card>
 

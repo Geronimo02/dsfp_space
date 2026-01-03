@@ -314,20 +314,22 @@ Deno.serve(async (req: Request) => {
         // Extract card details from MP payment response
         const cardLast4 = mpData.card?.last_four_digits || null;
         const cardBrand = mpData.payment_method_id || spm.brand;
+        const cardExpMonth = mpData.card?.expiration_month || spm.exp_month || null;
+        const cardExpYear = mpData.card?.expiration_year || spm.exp_year || null;
         
-        console.log(`[finalize-signup] ✅ MP payment succeeded: ${paymentId}, last4: ${cardLast4}`);
+        console.log(`[finalize-signup] ✅ MP payment succeeded: ${paymentId}, last4: ${cardLast4}, exp: ${cardExpMonth}/${cardExpYear}`);
 
         // Update payment method with card details
-        if (cardLast4) {
-          await supabaseAdmin
-            .from("signup_payment_methods")
-            .update({ 
-              last4: cardLast4,
-              brand: cardBrand,
-              payment_verified: true,
-            })
-            .eq("id", spm.id);
-        }
+        await supabaseAdmin
+          .from("signup_payment_methods")
+          .update({ 
+            last4: cardLast4,
+            brand: cardBrand,
+            exp_month: cardExpMonth,
+            exp_year: cardExpYear,
+            payment_verified: true,
+          })
+          .eq("id", spm.id);
 
       } catch (err: any) {
         console.error("[finalize-signup] MP charge failed:", err);
