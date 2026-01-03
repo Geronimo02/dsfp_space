@@ -56,6 +56,7 @@ export default function Settings() {
       setSessionReady(true);
     });
   }, []);
+
   const [formData, setFormData] = useState({
     company_name: "",
     tax_id: "",
