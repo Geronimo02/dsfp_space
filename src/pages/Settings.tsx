@@ -46,7 +46,16 @@ const settingsSchema = z.object({
 
 export default function Settings() {
   const queryClient = useQueryClient();
+  const [sessionReady, setSessionReady] = useState(false);
   const { currentCompany, loading: companyLoading } = useCompany();
+  
+  // Esperar a que la sesión esté lista
+  useEffect(() => {
+    supabase.auth.getSession().then(() => {
+      console.log("✅ Sesión lista");
+      setSessionReady(true);
+    });
+  }, []);
   const [formData, setFormData] = useState({
     company_name: "",
     tax_id: "",
@@ -94,7 +103,11 @@ export default function Settings() {
 
   const { data: subscription, isLoading: subscriptionLoading } = useQuery({
     queryKey: ["subscription", currentCompany?.id],
-    enabled: !!currentCompany?.id,
+    enabled: !!currentCompany?.id && sessionReady,
+    staleTime: 5 * 60 * 1000, // 5 minutos
+    gcTime: 10 * 60 * 1000, // 10 minutos
+    retry: 3,
+    retryDelay: (attemptIndex) => Math.min(1000 * 2 ** attemptIndex, 30000),
     queryFn: async () => {
       console.log("🔍 [Settings] Fetching subscription for company:", currentCompany?.id);
       const { data, error } = await supabase
@@ -111,17 +124,27 @@ export default function Settings() {
     },
   });
 
-  console.log("📊 [Settings] Subscription Query State:", {
+  console.log("📊 [Settings] Subscription Query State DETAILED:", {
     companyLoading,
     currentCompanyId: currentCompany?.id,
     subscriptionLoading,
+    planLoading,
     hasSubscription: !!subscription,
-    subscriptionData: subscription
+    subscriptionStatus: subscription?.status,
+    planId: subscription?.plan_id,
+    planName: subscriptionPlan?.name,
+    showingSkeleton: companyLoading || !currentCompany || subscriptionLoading || planLoading,
+    subscriptionData: subscription,
+    planData: subscriptionPlan
   });
 
   const { data: subscriptionPlan, isLoading: planLoading } = useQuery({
     queryKey: ["subscription-plan", subscription?.plan_id],
     enabled: !!subscription?.plan_id,
+    staleTime: 5 * 60 * 1000, // 5 minutos
+    gcTime: 10 * 60 * 1000, // 10 minutos
+    retry: 3,
+    retryDelay: (attemptIndex) => Math.min(1000 * 2 ** attemptIndex, 30000),
     queryFn: async () => {
       console.log("🔍 [Settings] Fetching plan for id:", subscription?.plan_id);
       const { data, error } = await supabase
@@ -1226,12 +1249,16 @@ export default function Settings() {
                         <div className="h-6 w-32 bg-muted animate-pulse rounded" />
                       </div>
                     </div>
+                  ) : !subscription ? (
+                    <div className="text-muted-foreground py-4">
+                      <p>No hay suscripción activa</p>
+                    </div>
                   ) : (
                     <div className="grid grid-cols-2 gap-4">
                       <div>
                         <p className="text-sm font-medium text-muted-foreground">Plan</p>
                         <p className="text-lg font-semibold">
-                          {subscriptionPlan?.name ?? "Sin plan"}
+                          {subscriptionPlan?.name ? subscriptionPlan.name : (subscription?.plan_id ? `Cargando plan (${subscription.plan_id.slice(0, 8)}...)` : "Sin plan")}
                         </p>
                       </div>
                       <div>

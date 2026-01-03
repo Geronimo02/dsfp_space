@@ -51,13 +51,22 @@ function StripePaymentSetup({ clientSecret, onSaved, companyId, onInvalidate }: 
 
 export default function Subscription() {
   const { currentCompany, loading: companyLoading } = useCompany();
+  const [sessionReady, setSessionReady] = useState(false);
   const queryClient = useQueryClient();
   const [stripePromise, setStripePromise] = useState<any>(null);
   const [clientSecret, setClientSecret] = useState<string | null>(null);
 
+  // Esperar a que la sesión esté lista
+  useEffect(() => {
+    supabase.auth.getSession().then(() => {
+      console.log("✅ Sesión lista [Subscription]");
+      setSessionReady(true);
+    });
+  }, []);
+
   const { data: subscription, isLoading: subscriptionLoading, fetchStatus } = useQuery({
     queryKey: ["subscription", currentCompany?.id],
-    enabled: !!currentCompany?.id,
+    enabled: !!currentCompany?.id && sessionReady,
     queryFn: async () => {
       console.log("🔍 Fetching subscription for company:", currentCompany?.id);
       const { data, error } = await supabase
