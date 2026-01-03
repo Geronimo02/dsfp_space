@@ -61,7 +61,16 @@ export default function Subscription() {
     queryFn: async () => {
       const { data, error } = await supabase
         .from("subscriptions")
-        .select("id, company_id, plan_id, provider, status, trial_ends_at, current_period_end, provider_customer_id, mp_preapproval_id, stripe_payment_method_id")
+        .select(`
+          id, 
+          company_id, 
+          plan_id, 
+          provider, 
+          status, 
+          trial_ends_at, 
+          current_period_end,
+          subscription_plans!inner(name, price)
+        `)
         .eq("company_id", currentCompany!.id)
         .maybeSingle();
       if (error) throw error;
@@ -90,20 +99,6 @@ export default function Subscription() {
     const country = (companyCountry || "").toUpperCase();
     return country === "AR" ? "mercadopago" : "stripe";
   }, [subscription?.provider, companyCountry]);
-
-  const { data: plan } = useQuery({
-    queryKey: ["plan", subscription?.plan_id],
-    enabled: !!subscription?.plan_id,
-    queryFn: async () => {
-      const { data, error } = await supabase
-        .from("subscription_plans")
-        .select("id, name, price")
-        .eq("id", subscription!.plan_id)
-        .single();
-      if (error) throw error;
-      return data;
-    },
-  });
 
   const trialDaysLeft = useMemo(() => {
     if (!subscription?.trial_ends_at) return null;
@@ -198,11 +193,13 @@ export default function Subscription() {
             <CardDescription>Plan y período de prueba</CardDescription>
           </CardHeader>
           <CardContent className="space-y-2">
-            <p>Plan: <strong>{plan?.name ?? subscription?.plan_id ?? "-"}</strong></p>
-            <p>Precio: ${plan?.price ?? "-"} USD/mes</p>
-            <p>Estado: <strong>{subscription?.status ?? "-"}</strong></p>
+            <p>Plan: <strong>{subscription?.subscription_plans?.name ?? "Sin plan"}</strong></p>
+            <p>Precio: ${subscription?.subscription_plans?.price ?? "-"} USD/mes</p>
+            <p>Estado: <strong>{subscription?.status === "active" ? "Activo" : subscription?.status ?? "Inactivo"}</strong></p>
             <p>Proveedor: {subscription?.provider ?? effectiveProvider ?? "-"}</p>
-            <p>Trial resta: {trialDaysLeft ?? "-"} días</p>
+            {trialDaysLeft !== null && trialDaysLeft > 0 && (
+              <p>Trial resta: {trialDaysLeft} días</p>
+            )}
             {nextBillingDate && <p>Próxima facturación: <strong>{nextBillingDate}</strong></p>}
             <p>Método guardado: {defaultPaymentMethod
               ? defaultPaymentMethod.type === "card"
