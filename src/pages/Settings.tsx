@@ -96,26 +96,44 @@ export default function Settings() {
     queryKey: ["subscription", currentCompany?.id],
     enabled: !!currentCompany?.id,
     queryFn: async () => {
+      console.log("🔍 [Settings] Fetching subscription for company:", currentCompany?.id);
       const { data, error } = await supabase
         .from("subscriptions")
         .select("*")
         .eq("company_id", currentCompany!.id)
         .maybeSingle();
-      if (error) throw error;
+      if (error) {
+        console.error("❌ [Settings] Error fetching subscription:", error);
+        throw error;
+      }
+      console.log("✅ [Settings] Subscription data:", data);
       return data;
     },
+  });
+
+  console.log("📊 [Settings] Subscription Query State:", {
+    companyLoading,
+    currentCompanyId: currentCompany?.id,
+    subscriptionLoading,
+    hasSubscription: !!subscription,
+    subscriptionData: subscription
   });
 
   const { data: subscriptionPlan, isLoading: planLoading } = useQuery({
     queryKey: ["subscription-plan", subscription?.plan_id],
     enabled: !!subscription?.plan_id,
     queryFn: async () => {
+      console.log("🔍 [Settings] Fetching plan for id:", subscription?.plan_id);
       const { data, error } = await supabase
         .from("subscription_plans")
         .select("name, price")
         .eq("id", subscription!.plan_id)
         .single();
-      if (error) throw error;
+      if (error) {
+        console.error("❌ [Settings] Error fetching plan:", error);
+        throw error;
+      }
+      console.log("✅ [Settings] Plan data:", data);
       return data;
     },
   });
