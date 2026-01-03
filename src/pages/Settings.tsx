@@ -46,17 +46,7 @@ const settingsSchema = z.object({
 
 export default function Settings() {
   const queryClient = useQueryClient();
-  const [sessionReady, setSessionReady] = useState(false);
   const { currentCompany, loading: companyLoading } = useCompany();
-  
-  // Esperar a que la sesión esté lista
-  useEffect(() => {
-    supabase.auth.getSession().then(() => {
-      console.log("✅ Sesión lista");
-      setSessionReady(true);
-    });
-  }, []);
-
   const [formData, setFormData] = useState({
     company_name: "",
     tax_id: "",
@@ -104,7 +94,7 @@ export default function Settings() {
 
   const { data: subscription, isLoading: subscriptionLoading } = useQuery({
     queryKey: ["subscription", currentCompany?.id],
-    enabled: !!currentCompany?.id && sessionReady,
+    enabled: !!currentCompany?.id,
     staleTime: 5 * 60 * 1000, // 5 minutos
     gcTime: 10 * 60 * 1000, // 10 minutos
     retry: 3,
