@@ -92,24 +92,29 @@ export default function Settings() {
     font_size: "small",
   });
 
-  const { data: subscription } = useQuery({
+  const { data: subscription, isLoading: subscriptionLoading } = useQuery({
     queryKey: ["subscription", currentCompany?.id],
     enabled: !!currentCompany?.id,
     queryFn: async () => {
       const { data, error } = await supabase
         .from("subscriptions")
-        .select(`
-          id, 
-          company_id, 
-          plan_id, 
-          provider, 
-          status, 
-          trial_ends_at, 
-          current_period_end,
-          subscription_plans!inner(name, price)
-        `)
+        .select("*")
         .eq("company_id", currentCompany!.id)
         .maybeSingle();
+      if (error) throw error;
+      return data;
+    },
+  });
+
+  const { data: subscriptionPlan, isLoading: planLoading } = useQuery({
+    queryKey: ["subscription-plan", subscription?.plan_id],
+    enabled: !!subscription?.plan_id,
+    queryFn: async () => {
+      const { data, error } = await supabase
+        .from("subscription_plans")
+        .select("name, price")
+        .eq("id", subscription!.plan_id)
+        .single();
       if (error) throw error;
       return data;
     },
@@ -1188,7 +1193,7 @@ export default function Settings() {
                   <CardDescription>Información de tu plan y período de prueba</CardDescription>
                 </CardHeader>
                 <CardContent className="space-y-3">
-                  {!subscription ? (
+                  {subscriptionLoading || planLoading ? (
                     <div className="grid grid-cols-2 gap-4">
                       <div className="space-y-2">
                         <div className="h-4 w-16 bg-muted animate-pulse rounded" />
@@ -1208,7 +1213,7 @@ export default function Settings() {
                       <div>
                         <p className="text-sm font-medium text-muted-foreground">Plan</p>
                         <p className="text-lg font-semibold">
-                          {subscription?.subscription_plans?.name ?? "Sin plan"}
+                          {subscriptionPlan?.name ?? "Sin plan"}
                         </p>
                       </div>
                       <div>

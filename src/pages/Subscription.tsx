@@ -55,24 +55,29 @@ export default function Subscription() {
   const [stripePromise, setStripePromise] = useState<any>(null);
   const [clientSecret, setClientSecret] = useState<string | null>(null);
 
-  const { data: subscription } = useQuery({
+  const { data: subscription, isLoading: subscriptionLoading } = useQuery({
     queryKey: ["subscription", currentCompany?.id],
     enabled: !!currentCompany?.id,
     queryFn: async () => {
       const { data, error } = await supabase
         .from("subscriptions")
-        .select(`
-          id, 
-          company_id, 
-          plan_id, 
-          provider, 
-          status, 
-          trial_ends_at, 
-          current_period_end,
-          subscription_plans!inner(name, price)
-        `)
+        .select("*")
         .eq("company_id", currentCompany!.id)
         .maybeSingle();
+      if (error) throw error;
+      return data;
+    },
+  });
+
+  const { data: subscriptionPlan, isLoading: planLoading } = useQuery({
+    queryKey: ["subscription-plan", subscription?.plan_id],
+    enabled: !!subscription?.plan_id,
+    queryFn: async () => {
+      const { data, error } = await supabase
+        .from("subscription_plans")
+        .select("name, price")
+        .eq("id", subscription!.plan_id)
+        .single();
       if (error) throw error;
       return data;
     },
@@ -193,8 +198,8 @@ export default function Subscription() {
             <CardDescription>Plan y período de prueba</CardDescription>
           </CardHeader>
           <CardContent className="space-y-2">
-            <p>Plan: <strong>{subscription?.subscription_plans?.name ?? "Sin plan"}</strong></p>
-            <p>Precio: ${subscription?.subscription_plans?.price ?? "-"} USD/mes</p>
+            <p>Plan: <strong>{subscriptionPlan?.name ?? "Sin plan"}</strong></p>
+            <p>Precio: ${subscriptionPlan?.price ?? "-"} USD/mes</p>
             <p>Estado: <strong>{subscription?.status === "active" ? "Activo" : subscription?.status ?? "Inactivo"}</strong></p>
             <p>Proveedor: {subscription?.provider ?? effectiveProvider ?? "-"}</p>
             {trialDaysLeft !== null && trialDaysLeft > 0 && (
