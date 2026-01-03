@@ -50,7 +50,7 @@ function StripePaymentSetup({ clientSecret, onSaved, companyId, onInvalidate }: 
 }
 
 export default function Subscription() {
-  const { currentCompany } = useCompany();
+  const { currentCompany, loading: companyLoading } = useCompany();
   const queryClient = useQueryClient();
   const [stripePromise, setStripePromise] = useState<any>(null);
   const [clientSecret, setClientSecret] = useState<string | null>(null);
@@ -198,19 +198,30 @@ export default function Subscription() {
             <CardDescription>Plan y período de prueba</CardDescription>
           </CardHeader>
           <CardContent className="space-y-2">
-            <p>Plan: <strong>{subscriptionPlan?.name ?? "Sin plan"}</strong></p>
-            <p>Precio: ${subscriptionPlan?.price ?? "-"} USD/mes</p>
-            <p>Estado: <strong>{subscription?.status === "active" ? "Activo" : subscription?.status ?? "Inactivo"}</strong></p>
-            <p>Proveedor: {subscription?.provider ?? effectiveProvider ?? "-"}</p>
-            {trialDaysLeft !== null && trialDaysLeft > 0 && (
-              <p>Trial resta: {trialDaysLeft} días</p>
+            {companyLoading || subscriptionLoading || planLoading ? (
+              <div className="space-y-2">
+                <div className="h-4 w-32 bg-muted animate-pulse rounded" />
+                <div className="h-4 w-40 bg-muted animate-pulse rounded" />
+                <div className="h-4 w-36 bg-muted animate-pulse rounded" />
+                <div className="h-4 w-44 bg-muted animate-pulse rounded" />
+              </div>
+            ) : (
+              <>
+                <p>Plan: <strong>{subscriptionPlan?.name ?? "Sin plan"}</strong></p>
+                <p>Precio: ${subscriptionPlan?.price ?? "-"} USD/mes</p>
+                <p>Estado: <strong>{subscription?.status === "active" ? "Activo" : subscription?.status ?? "Inactivo"}</strong></p>
+                <p>Proveedor: {subscription?.provider ?? effectiveProvider ?? "-"}</p>
+                {trialDaysLeft !== null && trialDaysLeft > 0 && (
+                  <p>Trial resta: {trialDaysLeft} días</p>
+                )}
+                {nextBillingDate && <p>Próxima facturación: <strong>{nextBillingDate}</strong></p>}
+                <p>Método guardado: {defaultPaymentMethod
+                  ? defaultPaymentMethod.type === "card"
+                    ? `${defaultPaymentMethod.brand?.toUpperCase() ?? "Tarjeta"} •••• ${defaultPaymentMethod.last4}`
+                    : "Mercado Pago"
+                  : "No guardado"}</p>
+              </>
             )}
-            {nextBillingDate && <p>Próxima facturación: <strong>{nextBillingDate}</strong></p>}
-            <p>Método guardado: {defaultPaymentMethod
-              ? defaultPaymentMethod.type === "card"
-                ? `${defaultPaymentMethod.brand?.toUpperCase() ?? "Tarjeta"} •••• ${defaultPaymentMethod.last4}`
-                : "Mercado Pago"
-              : "No guardado"}</p>
           </CardContent>
         </Card>
 
