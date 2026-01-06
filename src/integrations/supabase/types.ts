@@ -5834,54 +5834,81 @@ export type Database = {
       }
       signup_payment_methods: {
         Row: {
+          amount: number | null
           billing_country: string
           brand: string | null
+          company_name: string | null
           created_at: string | null
+          currency: string | null
           email: string
           exp_month: number | null
           exp_year: number | null
           expires_at: string | null
+          full_name: string | null
           id: string
+          issuer_id: string | null
           last4: string | null
           linked_to_company_id: string | null
+          modules: Json | null
           name: string
           payment_error: string | null
+          payment_id: string | null
+          payment_method_id: string | null
           payment_method_ref: string
           payment_verified: boolean | null
+          plan_id: string | null
           provider: string
         }
         Insert: {
+          amount?: number | null
           billing_country: string
           brand?: string | null
+          company_name?: string | null
           created_at?: string | null
+          currency?: string | null
           email: string
           exp_month?: number | null
           exp_year?: number | null
           expires_at?: string | null
+          full_name?: string | null
           id?: string
+          issuer_id?: string | null
           last4?: string | null
           linked_to_company_id?: string | null
+          modules?: Json | null
           name: string
           payment_error?: string | null
+          payment_id?: string | null
+          payment_method_id?: string | null
           payment_method_ref: string
           payment_verified?: boolean | null
+          plan_id?: string | null
           provider: string
         }
         Update: {
+          amount?: number | null
           billing_country?: string
           brand?: string | null
+          company_name?: string | null
           created_at?: string | null
+          currency?: string | null
           email?: string
           exp_month?: number | null
           exp_year?: number | null
           expires_at?: string | null
+          full_name?: string | null
           id?: string
+          issuer_id?: string | null
           last4?: string | null
           linked_to_company_id?: string | null
+          modules?: Json | null
           name?: string
           payment_error?: string | null
+          payment_id?: string | null
+          payment_method_id?: string | null
           payment_method_ref?: string
           payment_verified?: boolean | null
+          plan_id?: string | null
           provider?: string
         }
         Relationships: [
@@ -5890,6 +5917,13 @@ export type Database = {
             columns: ["linked_to_company_id"]
             isOneToOne: false
             referencedRelation: "companies"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "signup_payment_methods_plan_id_fkey"
+            columns: ["plan_id"]
+            isOneToOne: false
+            referencedRelation: "subscription_plans"
             referencedColumns: ["id"]
           },
         ]
