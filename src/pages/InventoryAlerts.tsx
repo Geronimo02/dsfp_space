@@ -301,7 +301,7 @@ export default function InventoryAlerts() {
                   <Button
                     variant="outline"
                     size="sm"
-                    onClick={() => navigate("/products")}
+                    onClick={() => navigate(`/products?search=${encodeURIComponent(product.name)}`)}
                   >
                     Ver Detalles
                   </Button>
@@ -353,7 +353,7 @@ export default function InventoryAlerts() {
                   <Button
                     variant="outline"
                     size="sm"
-                    onClick={() => navigate("/products")}
+                    onClick={() => navigate(`/products?search=${encodeURIComponent(product.name)}`)}
                   >
                     Ver Detalles
                   </Button>

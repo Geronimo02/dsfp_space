@@ -30,7 +30,7 @@ import {
 } from "@/components/ui/select";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
-import { Plus, Search, Wrench } from "lucide-react";
+import { Plus, Search, Wrench, MessageSquare, Send } from "lucide-react";
 import { toast } from "sonner";
 import { format } from "date-fns";
 import { useCompany } from "@/contexts/CompanyContext";
@@ -58,7 +58,7 @@ interface TechnicalService {
   notes: string | null;
   user_id: string;
   created_at: string;
-  customers?: { name: string } | null;
+  customers?: { name: string; phone?: string } | null;
 }
 
 const statusLabels: Record<ServiceStatus, string> = {
@@ -82,6 +82,9 @@ export default function TechnicalServices() {
   const [searchQuery, setSearchQuery] = useState("");
   const [dialogOpen, setDialogOpen] = useState(false);
   const [editingService, setEditingService] = useState<TechnicalService | null>(null);
+  const [messageDialogOpen, setMessageDialogOpen] = useState(false);
+  const [selectedServiceForMessage, setSelectedServiceForMessage] = useState<TechnicalService | null>(null);
+  const [messageContent, setMessageContent] = useState("");
   const [formData, setFormData] = useState({
     customer_id: "",
     device_type: "",
@@ -104,7 +107,7 @@ export default function TechnicalServices() {
     queryFn: async () => {
       let query = supabase
         .from("technical_services")
-        .select("*, customers(name)")
+        .select("*, customers(name, phone)")
         .eq("company_id", currentCompany?.id)
         .order("created_at", { ascending: false });
 
@@ -266,6 +269,77 @@ export default function TechnicalServices() {
     });
     setDialogOpen(true);
   };
+
+  const handleSendMessage = (service: TechnicalService) => {
+    if (!service.customer_id) {
+      toast.error("Este servicio no tiene un cliente asignado");
+      return;
+    }
+    
+    if (!service.customers?.phone) {
+      toast.error("El cliente no tiene un número de teléfono registrado");
+      return;
+    }
+    
+    setSelectedServiceForMessage(service);
+    
+    // Pre-fill message based on status
+    let defaultMessage = "";
+    switch (service.status) {
+      case "in_diagnosis":
+        defaultMessage = `Hola, tu ${service.device_type} ${service.brand ? service.brand : ""} está en diagnóstico. Te contactaremos pronto con más información.`;
+        break;
+      case "in_repair":
+        defaultMessage = `Tu ${service.device_type} ${service.brand ? service.brand : ""} está en reparación. ${service.estimated_completion_date ? `Estimamos tenerlo listo para el ${format(new Date(service.estimated_completion_date), "dd/MM/yyyy")}.` : ""}`;
+        break;
+      case "ready":
+        defaultMessage = `¡Tu ${service.device_type} ${service.brand ? service.brand : ""} está listo! Puedes pasar a retirarlo cuando quieras. Costo total: $${service.total_cost.toFixed(2)}`;
+        break;
+      default:
+        defaultMessage = `Actualización sobre tu ${service.device_type} ${service.brand ? service.brand : ""} - Servicio #${service.service_number}`;
+    }
+    
+    setMessageContent(defaultMessage);
+    setMessageDialogOpen(true);
+  };
+
+  const sendMessageMutation = useMutation({
+    mutationFn: async () => {
+      if (!selectedServiceForMessage) throw new Error("No hay servicio seleccionado");
+      
+      const customerPhone = selectedServiceForMessage.customers?.phone;
+      if (!customerPhone) throw new Error("El cliente no tiene teléfono registrado");
+      
+      // Clean phone number (remove spaces, dashes, etc.)
+      const cleanPhone = customerPhone.replace(/[\s\-\(\)]/g, "");
+      
+      // Save message to notes
+      const { error } = await supabase
+        .from("technical_services")
+        .update({
+          notes: (selectedServiceForMessage.notes || "") + `\n\n[${format(new Date(), "dd/MM/yyyy HH:mm")}] Mensaje enviado por WhatsApp: ${messageContent}`
+        })
+        .eq("id", selectedServiceForMessage.id);
+      
+      if (error) throw error;
+      
+      // Open WhatsApp with pre-filled message
+      const whatsappUrl = `https://wa.me/${cleanPhone}?text=${encodeURIComponent(messageContent)}`;
+      window.open(whatsappUrl, '_blank');
+      
+      return { success: true };
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["technical-services"] });
+      toast.success("Abriendo WhatsApp...");
+      setMessageDialogOpen(false);
+      setMessageContent("");
+      setSelectedServiceForMessage(null);
+    },
+    onError: (error) => {
+      toast.error("Error al enviar mensaje: " + error.message);
+    },
+  });
 
   return (
     <Layout>
@@ -540,13 +614,25 @@ export default function TechnicalServices() {
                       </TableCell>
                       <TableCell>${service.total_cost.toFixed(2)}</TableCell>
                       <TableCell>
-                        <Button
-                          variant="outline"
-                          size="sm"
-                          onClick={() => handleEdit(service)}
-                        >
-                          <Wrench className="h-4 w-4" />
-                        </Button>
+                        <div className="flex gap-2">
+                          {service.customer_id && (service.status === "in_diagnosis" || service.status === "in_repair" || service.status === "ready") && (
+                            <Button
+                              variant="outline"
+                              size="sm"
+                              onClick={() => handleSendMessage(service)}
+                              title="Enviar mensaje al cliente"
+                            >
+                              <MessageSquare className="h-4 w-4" />
+                            </Button>
+                          )}
+                          <Button
+                            variant="outline"
+                            size="sm"
+                            onClick={() => handleEdit(service)}
+                          >
+                            <Wrench className="h-4 w-4" />
+                          </Button>
+                        </div>
                       </TableCell>
                     </TableRow>
                   ))}
@@ -562,6 +648,82 @@ export default function TechnicalServices() {
             </div>
           </CardContent>
         </Card>
+
+        {/* Diálogo para enviar mensajes */}
+        <Dialog open={messageDialogOpen} onOpenChange={setMessageDialogOpen}>
+          <DialogContent>
+            <DialogHeader>
+              <DialogTitle className="flex items-center gap-2">
+                <MessageSquare className="h-5 w-5" />
+                Enviar Mensaje al Cliente
+              </DialogTitle>
+            </DialogHeader>
+            <div className="space-y-4">
+              {selectedServiceForMessage && (
+                <>
+                  <div className="bg-muted p-4 rounded-lg space-y-2">
+                    <div className="flex items-center justify-between">
+                      <span className="text-sm font-medium">Cliente:</span>
+                      <span className="text-sm">{selectedServiceForMessage.customers?.name}</span>
+                    </div>
+                    {selectedServiceForMessage.customers?.phone && (
+                      <div className="flex items-center justify-between">
+                        <span className="text-sm font-medium">Teléfono:</span>
+                        <span className="text-sm">{selectedServiceForMessage.customers.phone}</span>
+                      </div>
+                    )}
+                    <div className="flex items-center justify-between">
+                      <span className="text-sm font-medium">Servicio:</span>
+                      <span className="text-sm">{selectedServiceForMessage.service_number}</span>
+                    </div>
+                    <div className="flex items-center justify-between">
+                      <span className="text-sm font-medium">Estado:</span>
+                      <Badge className={statusColors[selectedServiceForMessage.status]}>
+                        {statusLabels[selectedServiceForMessage.status]}
+                      </Badge>
+                    </div>
+                  </div>
+
+                  <div className="space-y-2">
+                    <Label htmlFor="message">Mensaje de WhatsApp</Label>
+                    <Textarea
+                      id="message"
+                      value={messageContent}
+                      onChange={(e) => setMessageContent(e.target.value)}
+                      placeholder="Escribe tu mensaje aquí..."
+                      rows={6}
+                    />
+                    <p className="text-xs text-muted-foreground">
+                      📱 El mensaje se abrirá en WhatsApp Web y quedará registrado en las notas del servicio.
+                    </p>
+                  </div>
+
+                  <div className="flex justify-end gap-2">
+                    <Button
+                      type="button"
+                      variant="outline"
+                      onClick={() => {
+                        setMessageDialogOpen(false);
+                        setMessageContent("");
+                        setSelectedServiceForMessage(null);
+                      }}
+                    >
+                      Cancelar
+                    </Button>
+                    <Button
+                      onClick={() => sendMessageMutation.mutate()}
+                      disabled={!messageContent.trim()}
+                      className="bg-green-600 hover:bg-green-700"
+                    >
+                      <Send className="h-4 w-4 mr-2" />
+                      Enviar por WhatsApp
+                    </Button>
+                  </div>
+                </>
+              )}
+            </div>
+          </DialogContent>
+        </Dialog>
       </div>
     </Layout>
   );

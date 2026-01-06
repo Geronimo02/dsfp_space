@@ -14,7 +14,7 @@ import { Label } from "@/components/ui/label";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { toast } from "sonner";
-import { Users, Plus, Edit, Trash2, Shield, UserCog } from "lucide-react";
+import { Users, Plus, Edit, Trash2, Shield, UserCog, Mail, CheckCircle2 } from "lucide-react";
 import { format } from "date-fns";
 import { es } from "date-fns/locale";
 import { EmployeePermissionsManager } from "@/components/employees/EmployeePermissionsManager";
@@ -53,8 +53,11 @@ const Employees = () => {
   const { hasPermission, isAdmin, loading: permissionsLoading } = usePermissions();
   const queryClient = useQueryClient();
   const [dialogOpen, setDialogOpen] = useState(false);
+  const [inviteDialogOpen, setInviteDialogOpen] = useState(false);
   const [editingEmployee, setEditingEmployee] = useState<any>(null);
   const [formData, setFormData] = useState<EmployeeFormData>(initialFormData);
+  const [inviteEmail, setInviteEmail] = useState("");
+  const [inviteRole, setInviteRole] = useState<"employee" | "manager">("employee");
 
   const canCreate = hasPermission("employees", "create");
   const canEdit = hasPermission("employees", "edit");
@@ -64,14 +67,19 @@ const Employees = () => {
     queryKey: ["employees", currentCompany?.id],
     queryFn: async () => {
       if (!currentCompany?.id) return [];
-      const { data, error } = await supabase
+      
+      // Obtener empleados de la tabla employees
+      const { data: employeesData, error: employeesError } = await supabase
         .from("employees")
         .select("*")
         .eq("company_id", currentCompany.id)
         .order("created_at", { ascending: false });
       
-      if (error) throw error;
-      return data;
+      if (employeesError) throw employeesError;
+
+      // No necesitamos verificar company_users en el cliente
+      // El badge se agregará desde el servidor cuando implementemos RPC
+      return employeesData || [];
     },
     enabled: !!currentCompany?.id,
   });
@@ -137,6 +145,44 @@ const Employees = () => {
     },
     onError: () => {
       toast.error("Error al eliminar el empleado");
+    },
+  });
+
+  // Nueva mutación para invitar empleado y crear acceso
+  const inviteEmployeeMutation = useMutation({
+    mutationFn: async ({ email, role }: { email: string, role: string }) => {
+      if (!currentCompany?.id) throw new Error("No hay empresa seleccionada");
+      
+      // Llamar a la edge function para invitar al empleado
+      const { data: { session } } = await supabase.auth.getSession();
+      if (!session) throw new Error("No hay sesión activa");
+
+      const response = await supabase.functions.invoke('invite-employee', {
+        body: {
+          email,
+          role,
+          companyId: currentCompany.id,
+          full_name: email.split("@")[0], // Nombre temporal
+        },
+      });
+
+      if (response.error) {
+        throw new Error(response.error.message || "Error al invitar empleado");
+      }
+
+      return response.data;
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["employees"] });
+      queryClient.invalidateQueries({ queryKey: ["company-users"] });
+      toast.success("Invitación enviada exitosamente. El empleado recibirá un email para configurar su contraseña.");
+      setInviteDialogOpen(false);
+      setInviteEmail("");
+      setInviteRole("employee");
+    },
+    onError: (error: any) => {
+      console.error("Error al invitar empleado:", error);
+      toast.error("Error al invitar empleado: " + (error.message || "Error desconocido"));
     },
   });
 
@@ -236,12 +282,77 @@ const Employees = () => {
                     </CardDescription>
                   </div>
                   {canCreate && (
-                    <Dialog open={dialogOpen} onOpenChange={setDialogOpen}>
-                      <DialogTrigger asChild>
-                        <Button onClick={handleOpenDialog} size="sm" className="w-full sm:w-auto">
-                          <Plus className="mr-2 h-4 w-4" />
-                          <span className="sm:inline">Nuevo Empleado</span>
-                        </Button>
+                    <div className="flex flex-col sm:flex-row gap-2">
+                      <Dialog open={inviteDialogOpen} onOpenChange={setInviteDialogOpen}>
+                        <DialogTrigger asChild>
+                          <Button variant="outline" size="sm" className="w-full sm:w-auto">
+                            <Mail className="mr-2 h-4 w-4" />
+                            <span className="sm:inline">Invitar por Email</span>
+                          </Button>
+                        </DialogTrigger>
+                        <DialogContent>
+                          <DialogHeader>
+                            <DialogTitle>Invitar Empleado</DialogTitle>
+                            <DialogDescription>
+                              El empleado recibirá un email para crear su cuenta y acceder al sistema.
+                            </DialogDescription>
+                          </DialogHeader>
+                          <div className="space-y-4 py-4">
+                            <div className="space-y-2">
+                              <Label htmlFor="invite-email">Email</Label>
+                              <Input
+                                id="invite-email"
+                                type="email"
+                                placeholder="empleado@empresa.com"
+                                value={inviteEmail}
+                                onChange={(e) => setInviteEmail(e.target.value)}
+                              />
+                            </div>
+                            <div className="space-y-2">
+                              <Label htmlFor="invite-role">Rol</Label>
+                              <Select value={inviteRole} onValueChange={(v: any) => setInviteRole(v)}>
+                                <SelectTrigger id="invite-role">
+                                  <SelectValue />
+                                </SelectTrigger>
+                                <SelectContent>
+                                  <SelectItem value="employee">Empleado</SelectItem>
+                                  <SelectItem value="manager">Manager</SelectItem>
+                                </SelectContent>
+                              </Select>
+                            </div>
+                            <div className="flex gap-2">
+                              <Button
+                                onClick={() => {
+                                  if (!inviteEmail) {
+                                    toast.error("Ingresa un email");
+                                    return;
+                                  }
+                                  inviteEmployeeMutation.mutate({ email: inviteEmail, role: inviteRole });
+                                }}
+                                disabled={inviteEmployeeMutation.isPending}
+                                className="flex-1"
+                              >
+                                {inviteEmployeeMutation.isPending ? "Enviando..." : "Enviar Invitación"}
+                              </Button>
+                              <Button
+                                variant="outline"
+                                onClick={() => {
+                                  setInviteDialogOpen(false);
+                                  setInviteEmail("");
+                                }}
+                              >
+                                Cancelar
+                              </Button>
+                            </div>
+                          </div>
+                        </DialogContent>
+                      </Dialog>
+                      <Dialog open={dialogOpen} onOpenChange={setDialogOpen}>
+                        <DialogTrigger asChild>
+                          <Button onClick={handleOpenDialog} size="sm" className="w-full sm:w-auto">
+                            <Plus className="mr-2 h-4 w-4" />
+                            <span className="sm:inline">Nuevo Empleado</span>
+                          </Button>
                       </DialogTrigger>
                       <DialogContent className="max-w-2xl max-h-[90vh] overflow-y-auto">
                         <DialogHeader>
@@ -389,6 +500,7 @@ const Employees = () => {
                         </div>
                       </DialogContent>
                     </Dialog>
+                    </div>
                   )}
                 </div>
               </CardHeader>
@@ -411,7 +523,12 @@ const Employees = () => {
                       {employees.map((employee) => (
                         <TableRow key={employee.id}>
                           <TableCell className="font-medium">
-                            {employee.first_name} {employee.last_name}
+                            <div className="flex flex-col gap-1">
+                              <span>{employee.first_name} {employee.last_name}</span>
+                              {employee.email && (
+                                <span className="text-xs text-muted-foreground">{employee.email}</span>
+                              )}
+                            </div>
                           </TableCell>
                           <TableCell className="hidden sm:table-cell text-xs sm:text-sm">
                             {employee.document_type} {employee.document_number}
