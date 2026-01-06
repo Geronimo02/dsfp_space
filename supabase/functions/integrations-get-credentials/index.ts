@@ -45,6 +45,18 @@ Deno.serve(async (req) => {
 
   if (error) return json({ error: error.message }, 500);
 
-  const webhookSecret = (data as any)?.credentials?.webhookSecret ?? null;
+  const creds = (data as any)?.credentials ?? null;
+
+  // Backwards compatible: if webhookSecret present (google_forms), return it
+  const webhookSecret = creds?.webhookSecret ?? null;
+
+  // Gmail credentials stored under creds.gmail = { clientId, clientSecret }
+  const gmail = creds?.gmail ?? null;
+  if (gmail) {
+    const clientId = gmail.clientId ?? null;
+    const hasClientSecret = Boolean(gmail.clientSecret);
+    return json({ ok: true, gmail: { clientId, hasClientSecret } }, 200);
+  }
+
   return json({ ok: true, webhookSecret }, 200);
 });

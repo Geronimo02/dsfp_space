@@ -75,6 +75,44 @@ Deno.serve(async (req) => {
       return json({ error: "Missing integrationId/type/credentials" }, 400);
     }
 
+    // If saving Gmail secrets, encrypt clientSecret server-side using ENCRYPTION_KEY
+    if (type === "gmail" && credentials?.gmail?.clientSecret) {
+      const encKeyBase64 = Deno.env.get("ENCRYPTION_KEY") || null;
+      if (!encKeyBase64) {
+        return json({ error: "Server encryption key not configured (ENCRYPTION_KEY)" }, 500);
+      }
+
+      // helper: base64 -> Uint8Array
+      const base64ToBytes = (b64: string) => Uint8Array.from(atob(b64), (c) => c.charCodeAt(0));
+
+      // derive CryptoKey
+      const keyBytes = base64ToBytes(encKeyBase64);
+      const cryptoKey = await crypto.subtle.importKey("raw", keyBytes.buffer, "AES-GCM", false, ["encrypt"]);
+
+      // encrypt function: returns base64(iv|ciphertext)
+      const encrypt = async (plaintext: string) => {
+        const iv = crypto.getRandomValues(new Uint8Array(12));
+        const ptBytes = new TextEncoder().encode(plaintext);
+        const ct = await crypto.subtle.encrypt({ name: "AES-GCM", iv }, cryptoKey, ptBytes);
+        // concat iv + ct
+        const combined = new Uint8Array(iv.length + ct.byteLength);
+        combined.set(iv, 0);
+        combined.set(new Uint8Array(ct), iv.length);
+        // base64
+        let binary = "";
+        for (let i = 0; i < combined.byteLength; i++) binary += String.fromCharCode(combined[i]);
+        return btoa(binary);
+      };
+
+      try {
+        const encrypted = await encrypt(String(credentials.gmail.clientSecret));
+        // store encrypted secret in the same property name (so getters check presence)
+        credentials.gmail.clientSecret = encrypted;
+      } catch (e: any) {
+        return json({ error: "Encryption failed" }, 500);
+      }
+    }
+
     // --- Load integration
     const { data: integ, error: integErr } = await supabaseAdmin
       .from("integrations")
@@ -83,7 +121,7 @@ Deno.serve(async (req) => {
       .single();
 
 // ADD LOGGING HERE
-console.log("Integration query result:", { integ, integErr });
+// no logging of sensitive data to stdout
 
 
     if (integErr || !integ) return json({ error: "Integration not found" }, 404);
