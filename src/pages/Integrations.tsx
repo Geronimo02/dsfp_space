@@ -11,9 +11,10 @@ import { Separator } from "@/components/ui/separator";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import { toast } from "sonner";
 import { useMemo, useState, useEffect } from "react";
-import { Settings, ShoppingCart, Store, FileText, BarChart3, Clock } from "lucide-react";
+import { Settings, ShoppingCart, Store, FileText, BarChart3, Clock, Mail } from "lucide-react";
+import { GmailConfig } from "@/components/integrations/GmailConfig";
 
-type IntegrationType = "mercadolibre" | "tiendanube" | "woocommerce" | "google_forms";
+type IntegrationType = "mercadolibre" | "tiendanube" | "woocommerce" | "google_forms" | "gmail";
 
 type IntegrationRow = {
   id: string;
@@ -48,7 +49,8 @@ type IntegrationOrderRow = {
 
 type ConfigModalState =
   | { open: false }
-  | { open: true; type: "google_forms"; integrationId: string; integrationName: string };
+  | { open: true; type: "google_forms"; integrationId: string; integrationName: string }
+  | { open: true; type: "gmail"; integrationId: string; integrationName: string };
 
 const genSecret = () =>
   Array.from(crypto.getRandomValues(new Uint8Array(24)))
@@ -65,6 +67,12 @@ function isGoogleFormsModal(
   m: ConfigModalState
 ): m is { open: true; type: "google_forms"; integrationId: string; integrationName: string } {
   return (m as any)?.open === true && (m as any)?.type === "google_forms";
+}
+
+function isGmailModal(
+  m: ConfigModalState
+): m is { open: true; type: "gmail"; integrationId: string; integrationName: string } {
+  return (m as any)?.open === true && (m as any)?.type === "gmail";
 }
 
 const secretCacheKey = (integrationId: string) => `gf_secret_${integrationId}`;
@@ -272,6 +280,12 @@ const Integrations = () => {
         icon: FileText,
         description: "Crea clientes y presupuestos desde formularios",
       },
+      {
+        type: "gmail" as const,
+        name: "Gmail",
+        icon: Mail,
+        description: "Configura acceso seguro a Gmail (Client ID y Client Secret)",
+      },
     ],
     []
   );
@@ -312,6 +326,7 @@ const Integrations = () => {
     tiendanube: true,
     woocommerce: true,
     google_forms: true,
+    gmail: true,
   });
 
   // si un módulo deja de estar activo, apago su filtro automáticamente
@@ -428,6 +443,7 @@ const Integrations = () => {
       tiendanube: 0,
       woocommerce: 0,
       google_forms: 0,
+      gmail: 0,
     };
 
     (countsRows ?? []).forEach((r) => {
@@ -537,6 +553,16 @@ const Integrations = () => {
           type: "google_forms",
           integrationId: row.id,
           integrationName: row.name ?? "Google Forms",
+        });
+        return;
+      }
+
+      if (type === "gmail") {
+        setConfigModal({
+          open: true,
+          type: "gmail",
+          integrationId: row.id,
+          integrationName: row.name ?? "Gmail",
         });
         return;
       }
@@ -687,6 +713,59 @@ const Integrations = () => {
         })}
         </div>
       </div>
+
+      {/* Google Forms Config Modal */}
+      <Dialog open={isGoogleFormsModal(configModal)} onOpenChange={(open) => !open && setConfigModal({ open: false })}>
+        <DialogContent className="max-w-md">
+          <DialogHeader>
+            <DialogTitle>Configurar Google Forms</DialogTitle>
+            <DialogDescription>
+              Configura el webhook secret para recibir respuestas del formulario.
+            </DialogDescription>
+          </DialogHeader>
+          <div className="space-y-4">
+            <p className="text-sm text-muted-foreground">
+              Copía el siguiente código Google Apps Script en tu Sheet vinculada al formulario.
+            </p>
+            <div className="bg-muted p-3 rounded-md border">
+              <pre className="text-xs overflow-auto max-h-40 whitespace-pre-wrap break-words">
+                {appsScript}
+              </pre>
+            </div>
+            <Button 
+              onClick={() => copyToClipboard(appsScript, "Apps Script")} 
+              variant="outline"
+              className="w-full"
+            >
+              Copiar Script
+            </Button>
+            <Button 
+              onClick={saveGoogleFormsCredentials}
+              className="w-full"
+            >
+              Guardar y Cerrar
+            </Button>
+          </div>
+        </DialogContent>
+      </Dialog>
+
+      {/* Gmail Config Modal */}
+      <Dialog open={isGmailModal(configModal)} onOpenChange={(open) => !open && setConfigModal({ open: false })}>
+        <DialogContent className="max-w-md">
+          <DialogHeader>
+            <DialogTitle>Configurar Gmail</DialogTitle>
+            <DialogDescription>
+              Ingresa tus credenciales de OAuth de Google de forma segura.
+            </DialogDescription>
+          </DialogHeader>
+          {isGmailModal(configModal) && (
+            <GmailConfig
+              integrationId={configModal.integrationId}
+              onSaved={() => setConfigModal({ open: false })}
+            />
+          )}
+        </DialogContent>
+      </Dialog>
     </Layout>
   );
 }
