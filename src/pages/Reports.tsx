@@ -357,15 +357,15 @@ const Reports = () => {
 
       // Calcular estadísticas
       const totalRepairs = data?.length || 0;
-      const totalRevenue = data?.reduce((sum, r) => sum + Number(r.service_cost || 0), 0) || 0;
+      const totalRevenue = data?.reduce((sum, r) => sum + Number(r.total_cost || 0), 0) || 0;
       const byStatus = data?.reduce((acc: any, r) => {
         acc[r.status] = (acc[r.status] || 0) + 1;
         return acc;
       }, {});
       const avgRepairTime = data?.reduce((sum, r) => {
-        if (r.status === 'delivered' && r.ready_date) {
+        if (r.status === 'delivered' && r.completed_date) {
           const start = new Date(r.created_at);
-          const end = new Date(r.ready_date);
+          const end = new Date(r.completed_date);
           return sum + Math.floor((end.getTime() - start.getTime()) / (1000 * 60 * 60 * 24));
         }
         return sum;

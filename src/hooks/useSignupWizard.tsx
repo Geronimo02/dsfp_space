@@ -5,6 +5,7 @@ export interface SignupFormData {
   full_name: string;
   company_name: string;
   password: string;
+  country?: string;
   plan_id: string;
   modules: string[];
   // Payment method (unified schema)

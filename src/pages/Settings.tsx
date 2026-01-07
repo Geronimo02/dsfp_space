@@ -21,6 +21,13 @@ import { CompanySettings } from "@/components/settings/CompanySettings";
 import { PriceListsSettings } from "@/components/settings/PriceListsSettings";
 import { PaymentMethodsManager } from "@/components/settings/PaymentMethodsManager";
 
+// HTML escape function to prevent XSS attacks in print templates
+const escapeHtml = (text: string | null | undefined): string => {
+  if (!text) return '';
+  const div = document.createElement('div');
+  div.textContent = text;
+  return div.innerHTML;
+};
 const settingsSchema = z.object({
   company_name: z.string().trim().min(1, "El nombre de la empresa es requerido").max(200, "El nombre debe tener máximo 200 caracteres"),
   email: z.string().trim().toLowerCase().max(255, "El email debe tener máximo 255 caracteres")
@@ -233,14 +240,17 @@ export default function Settings() {
   });
 
   const { data: ticketConfigData, isLoading: isLoadingTicketConfig } = useQuery({
-    queryKey: ["ticket-config"],
+    queryKey: ["ticket-config", currentCompany?.id],
     queryFn: async () => {
+      if (!currentCompany?.id) return null;
+      
       const { data, error } = await supabase
         .from("ticket_config" as any)
         .select("*")
-        .single();
+        .eq("company_id", currentCompany.id)
+        .maybeSingle();
       
-      if (error && error.code !== 'PGRST116') { // PGRST116 = no rows found
+      if (error) {
         throw error;
       }
       
@@ -265,15 +275,19 @@ export default function Settings() {
       
       return data;
     },
+    enabled: !!currentCompany?.id,
   });
 
   const saveTicketConfigMutation = useMutation({
     mutationFn: async (config: typeof ticketConfig) => {
+      if (!currentCompany?.id) throw new Error("No company selected");
+      
       // Intentar actualizar primero
       const { data: existingConfig } = await supabase
         .from("ticket_config" as any)
         .select("id")
-        .single();
+        .eq("company_id", currentCompany.id)
+        .maybeSingle();
 
       if (existingConfig) {
         // Actualizar configuración existente
@@ -298,10 +312,11 @@ export default function Settings() {
 
         if (error) throw error;
       } else {
-        // Crear nueva configuración
+        // Crear nueva configuración con company_id
         const { error } = await supabase
           .from("ticket_config" as any)
           .insert({
+            company_id: currentCompany.id,
             logo_url: config.logo_url || null,
             company_name: config.company_name,
             company_address: config.company_address || null,
@@ -324,10 +339,10 @@ export default function Settings() {
     },
     onSuccess: () => {
       toast.success("Configuración de diseño guardada exitosamente");
-      queryClient.invalidateQueries({ queryKey: ["ticket-config"] });
+      queryClient.invalidateQueries({ queryKey: ["ticket-config", currentCompany?.id] });
     },
     onError: (error: any) => {
-      toast.error("Error al guardar la configuración de diseño");
+      toast.error("Error al guardar la configuración de diseño: " + (error?.message || "Error desconocido"));
       console.error("Error saving ticket config:", error);
     },
   });
@@ -546,15 +561,15 @@ export default function Settings() {
             ${ticketConfig.show_logo ? `
               <div class="logo">
                 ${ticketConfig.logo_url ? 
-                  `<img src="${ticketConfig.logo_url}" alt="Logo" />` : 
+                  `<img src="${escapeHtml(ticketConfig.logo_url)}" alt="Logo" />` : 
                   'LOGO'
                 }
               </div>
             ` : ''}
-            <div class="company-name">${ticketConfig.company_name || "NOMBRE EMPRESA"}</div>
-            ${ticketConfig.company_address ? `<div class="company-info">${ticketConfig.company_address}</div>` : ''}
-            ${ticketConfig.company_phone ? `<div class="company-info">${ticketConfig.company_phone}</div>` : ''}
-            ${ticketConfig.company_email ? `<div class="company-info">${ticketConfig.company_email}</div>` : ''}
+            <div class="company-name">${escapeHtml(ticketConfig.company_name) || "NOMBRE EMPRESA"}</div>
+            ${ticketConfig.company_address ? `<div class="company-info">${escapeHtml(ticketConfig.company_address)}</div>` : ''}
+            ${ticketConfig.company_phone ? `<div class="company-info">${escapeHtml(ticketConfig.company_phone)}</div>` : ''}
+            ${ticketConfig.company_email ? `<div class="company-info">${escapeHtml(ticketConfig.company_email)}</div>` : ''}
           </div>
 
           <div class="sale-info">
@@ -608,7 +623,7 @@ export default function Settings() {
           <hr>
 
           <div class="footer">
-            <div>${ticketConfig.footer_message}</div>
+            <div>${escapeHtml(ticketConfig.footer_message)}</div>
             ${ticketConfig.show_qr ? `
               <div class="qr-placeholder">QR</div>
             ` : ''}

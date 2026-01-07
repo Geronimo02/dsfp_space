@@ -2,6 +2,14 @@ import { format } from "date-fns";
 import { es } from "date-fns/locale";
 import { supabase } from "@/integrations/supabase/client";
 
+// HTML escape function to prevent XSS attacks
+const escapeHtml = (text: string | null | undefined): string => {
+  if (!text) return '';
+  const div = document.createElement('div');
+  div.textContent = text;
+  return div.innerHTML;
+};
+
 // Función para obtener configuración de ticket
 const getTicketConfig = async () => {
   try {
@@ -174,10 +182,10 @@ export const ReceiptPDF = async (saleData: any) => {
     </head>
     <body>
       <!-- Encabezado -->
-      <div class="header" style="background-color: ${config.header_color}; color: white; padding: 10px; border-radius: 4px; margin-bottom: 15px; text-align: center;">
+      <div class="header" style="background-color: ${escapeHtml(config.header_color)}; color: white; padding: 10px; border-radius: 4px; margin-bottom: 15px; text-align: center;">
         ${config.show_logo && config.logo_url ? `
           <div style="margin-bottom: 10px;">
-            <img src="${config.logo_url}" alt="Logo" style="max-width: 80px; max-height: 60px; object-fit: contain;" />
+            <img src="${escapeHtml(config.logo_url)}" alt="Logo" style="max-width: 80px; max-height: 60px; object-fit: contain;" />
           </div>
         ` : config.show_logo ? `
           <div style="margin-bottom: 5px;">
@@ -186,17 +194,17 @@ export const ReceiptPDF = async (saleData: any) => {
             </div>
           </div>
         ` : ''}
-        <div class="company-name" style="font-size: 1.2em; font-weight: bold; margin: 5px 0;">${config.company_name}</div>
-        ${config.company_address ? `<div class="company-info" style="font-size: 0.9em; margin: 2px 0; opacity: 0.9;">${config.company_address}</div>` : ''}
-        ${config.company_phone ? `<div class="company-info" style="font-size: 0.9em; margin: 2px 0; opacity: 0.9;">${config.company_phone}</div>` : ''}
-        ${config.company_email ? `<div class="company-info" style="font-size: 0.9em; margin: 2px 0; opacity: 0.9;">${config.company_email}</div>` : ''}
+        <div class="company-name" style="font-size: 1.2em; font-weight: bold; margin: 5px 0;">${escapeHtml(config.company_name)}</div>
+        ${config.company_address ? `<div class="company-info" style="font-size: 0.9em; margin: 2px 0; opacity: 0.9;">${escapeHtml(config.company_address)}</div>` : ''}
+        ${config.company_phone ? `<div class="company-info" style="font-size: 0.9em; margin: 2px 0; opacity: 0.9;">${escapeHtml(config.company_phone)}</div>` : ''}
+        ${config.company_email ? `<div class="company-info" style="font-size: 0.9em; margin: 2px 0; opacity: 0.9;">${escapeHtml(config.company_email)}</div>` : ''}
       </div>
 
       <!-- Información de la venta -->
       <div class="sale-info">
         <div class="total-line">
           <span>Ticket #:</span>
-          <span>${saleData.sale_number || 'N/A'}</span>
+          <span>${escapeHtml(saleData.sale_number) || 'N/A'}</span>
         </div>
         <div class="total-line">
           <span>Fecha:</span>
@@ -209,7 +217,7 @@ export const ReceiptPDF = async (saleData: any) => {
         ${saleData.customer ? `
         <div class="total-line">
           <span>Cliente:</span>
-          <span>${saleData.customer.name}</span>
+          <span>${escapeHtml(saleData.customer.name)}</span>
         </div>
         ` : ''}
       </div>
@@ -220,7 +228,7 @@ export const ReceiptPDF = async (saleData: any) => {
       <div class="items">
         ${saleData.items ? saleData.items.map((item: any) => `
           <div class="item">
-            <span>${item.product?.name || item.name || 'Producto'}</span>
+            <span>${escapeHtml(item.product?.name || item.name || 'Producto')}</span>
             <span>$${Number(item.total || item.price * item.quantity).toFixed(2)}</span>
           </div>
           <div style="font-size: 0.8em; color: #666; margin-left: 10px;">
@@ -251,7 +259,7 @@ export const ReceiptPDF = async (saleData: any) => {
 
       <!-- Pie -->
       <div class="footer">
-        <div>${config.footer_message}</div>
+        <div>${escapeHtml(config.footer_message)}</div>
         ${config.show_qr ? `
         <div class="qr-code">
           <div style="width: 50px; height: 50px; border: 1px solid #000; margin: 10px auto; display: flex; align-items: center; justify-content: center;">
