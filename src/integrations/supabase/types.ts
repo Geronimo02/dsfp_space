@@ -2183,6 +2183,54 @@ export type Database = {
           },
         ]
       }
+      employee_time_entries: {
+        Row: {
+          clock_in: string
+          clock_out: string | null
+          company_id: string
+          created_at: string
+          employee_id: string
+          id: string
+          notes: string | null
+          updated_at: string
+        }
+        Insert: {
+          clock_in?: string
+          clock_out?: string | null
+          company_id: string
+          created_at?: string
+          employee_id: string
+          id?: string
+          notes?: string | null
+          updated_at?: string
+        }
+        Update: {
+          clock_in?: string
+          clock_out?: string | null
+          company_id?: string
+          created_at?: string
+          employee_id?: string
+          id?: string
+          notes?: string | null
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "employee_time_entries_company_id_fkey"
+            columns: ["company_id"]
+            isOneToOne: false
+            referencedRelation: "companies"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "employee_time_entries_employee_id_fkey"
+            columns: ["employee_id"]
+            isOneToOne: false
+            referencedRelation: "employees"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       employees: {
         Row: {
           active: boolean | null
@@ -6440,6 +6488,7 @@ export type Database = {
           accent_color: string | null
           company_address: string | null
           company_email: string | null
+          company_id: string | null
           company_name: string
           company_phone: string | null
           created_at: string | null
@@ -6458,6 +6507,7 @@ export type Database = {
           accent_color?: string | null
           company_address?: string | null
           company_email?: string | null
+          company_id?: string | null
           company_name?: string
           company_phone?: string | null
           created_at?: string | null
@@ -6476,6 +6526,7 @@ export type Database = {
           accent_color?: string | null
           company_address?: string | null
           company_email?: string | null
+          company_id?: string | null
           company_name?: string
           company_phone?: string | null
           created_at?: string | null
@@ -6490,7 +6541,15 @@ export type Database = {
           text_color?: string | null
           updated_at?: string | null
         }
-        Relationships: []
+        Relationships: [
+          {
+            foreignKeyName: "ticket_config_company_id_fkey"
+            columns: ["company_id"]
+            isOneToOne: false
+            referencedRelation: "companies"
+            referencedColumns: ["id"]
+          },
+        ]
       }
       user_roles: {
         Row: {

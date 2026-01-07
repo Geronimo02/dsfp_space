@@ -357,6 +357,100 @@ const Reports = () => {
     },
   });
 
+  // Devoluciones por día
+  const { data: returnsData } = useQuery({
+    queryKey: ["reports-returns", dateRangeType, customDateRange, currentCompany?.id],
+    queryFn: async () => {
+      const { start, end } = getDateRange();
+      const { data, error } = await supabase
+        .from("returns")
+        .select("created_at, total, status, reason")
+        .eq("company_id", currentCompany?.id)
+        .gte("created_at", start.toISOString())
+        .lte("created_at", end.toISOString())
+        .order("created_at");
+
+      if (error) throw error;
+
+      // Agrupar por día
+      const groupedByDay = data.reduce((acc: any, ret) => {
+        const day = format(new Date(ret.created_at), "dd/MMM", { locale: es });
+        if (!acc[day]) {
+          acc[day] = { day, total: 0, count: 0 };
+        }
+        acc[day].total += Number(ret.total);
+        acc[day].count += 1;
+        return acc;
+      }, {});
+
+      // Agrupar por razón
+      const byReason = data.reduce((acc: any, ret) => {
+        const reason = ret.reason || "Sin especificar";
+        if (!acc[reason]) {
+          acc[reason] = { name: reason, value: 0, count: 0 };
+        }
+        acc[reason].value += Number(ret.total);
+        acc[reason].count += 1;
+        return acc;
+      }, {});
+
+      return {
+        byDay: Object.values(groupedByDay),
+        byReason: Object.values(byReason),
+        totalReturns: data.length,
+        totalAmount: data.reduce((sum, r) => sum + Number(r.total), 0),
+      };
+    },
+    enabled: !!currentCompany?.id,
+  });
+
+  // Servicios técnicos
+  const { data: servicesData } = useQuery({
+    queryKey: ["reports-services", dateRangeType, customDateRange, currentCompany?.id],
+    queryFn: async () => {
+      const { start, end } = getDateRange();
+      const { data, error } = await supabase
+        .from("technical_services")
+        .select("created_at, total_cost, status, device_type")
+        .eq("company_id", currentCompany?.id)
+        .gte("created_at", start.toISOString())
+        .lte("created_at", end.toISOString())
+        .order("created_at");
+
+      if (error) throw error;
+
+      // Agrupar por estado
+      const byStatus = data.reduce((acc: any, svc) => {
+        const status = svc.status || "Sin estado";
+        if (!acc[status]) {
+          acc[status] = { name: status, value: 0, count: 0 };
+        }
+        acc[status].value += Number(svc.total_cost || 0);
+        acc[status].count += 1;
+        return acc;
+      }, {});
+
+      // Agrupar por tipo de dispositivo
+      const byDevice = data.reduce((acc: any, svc) => {
+        const device = svc.device_type || "Otro";
+        if (!acc[device]) {
+          acc[device] = { name: device, value: 0, count: 0 };
+        }
+        acc[device].value += Number(svc.total_cost || 0);
+        acc[device].count += 1;
+        return acc;
+      }, {});
+
+      return {
+        byStatus: Object.values(byStatus),
+        byDevice: Object.values(byDevice),
+        totalServices: data.length,
+        totalRevenue: data.reduce((sum, s) => sum + Number(s.total_cost || 0), 0),
+      };
+    },
+    enabled: !!currentCompany?.id,
+  });
+
   const StatCard = ({ title, value, icon: Icon, trend, trendValue }: any) => (
     <Card>
       <CardHeader className="flex flex-row items-center justify-between pb-2">
@@ -483,7 +577,7 @@ const Reports = () => {
         {/* Gráficos */}
         <Tabs defaultValue="sales" className="space-y-4">
           <div className="overflow-x-auto -mx-4 px-4">
-            <TabsList className="inline-flex w-auto min-w-full md:grid md:w-full md:grid-cols-7">
+            <TabsList className="inline-flex w-auto min-w-full md:grid md:w-full md:grid-cols-9">
               <TabsTrigger value="sales" className="text-xs md:text-sm">Ventas</TabsTrigger>
               <TabsTrigger value="customers" className="text-xs md:text-sm">Clientes</TabsTrigger>
               <TabsTrigger value="products" className="text-xs md:text-sm">Productos</TabsTrigger>
@@ -491,6 +585,8 @@ const Reports = () => {
               <TabsTrigger value="purchases" className="text-xs md:text-sm">Compras</TabsTrigger>
               <TabsTrigger value="payments" className="text-xs md:text-sm">Pagos</TabsTrigger>
               <TabsTrigger value="rotation" className="text-xs md:text-sm">Rotación</TabsTrigger>
+              <TabsTrigger value="returns" className="text-xs md:text-sm">Devoluciones</TabsTrigger>
+              <TabsTrigger value="services" className="text-xs md:text-sm">Servicios</TabsTrigger>
             </TabsList>
           </div>
 
@@ -756,6 +852,146 @@ const Reports = () => {
                     </tbody>
                   </table>
                 </div>
+              </CardContent>
+            </Card>
+          </TabsContent>
+
+          <TabsContent value="returns" className="space-y-4">
+            <div className="grid gap-4 md:grid-cols-2">
+              <Card>
+                <CardHeader>
+                  <CardTitle>Resumen de Devoluciones</CardTitle>
+                </CardHeader>
+                <CardContent>
+                  <div className="space-y-4">
+                    <div className="flex justify-between items-center">
+                      <span className="text-muted-foreground">Total devoluciones:</span>
+                      <span className="text-xl font-bold">{returnsData?.totalReturns || 0}</span>
+                    </div>
+                    <div className="flex justify-between items-center">
+                      <span className="text-muted-foreground">Monto total:</span>
+                      <span className="text-xl font-bold text-destructive">
+                        {formatCurrency(returnsData?.totalAmount || 0)}
+                      </span>
+                    </div>
+                  </div>
+                </CardContent>
+              </Card>
+              
+              <Card>
+                <CardHeader>
+                  <CardTitle>Devoluciones por Razón</CardTitle>
+                </CardHeader>
+                <CardContent>
+                  <ResponsiveContainer width="100%" height={200}>
+                    <PieChart>
+                      <Pie
+                        data={returnsData?.byReason || []}
+                        cx="50%"
+                        cy="50%"
+                        labelLine={false}
+                        label={(entry) => `${entry.name}: ${entry.count}`}
+                        outerRadius={60}
+                        fill="hsl(var(--chart-1))"
+                        dataKey="count"
+                      >
+                        {(returnsData?.byReason || []).map((_: any, index: number) => (
+                          <Cell key={`cell-${index}`} fill={COLORS[index % COLORS.length]} />
+                        ))}
+                      </Pie>
+                      <Tooltip />
+                    </PieChart>
+                  </ResponsiveContainer>
+                </CardContent>
+              </Card>
+            </div>
+
+            <Card>
+              <CardHeader>
+                <CardTitle>Devoluciones por Día</CardTitle>
+              </CardHeader>
+              <CardContent>
+                <ResponsiveContainer width="100%" height={300}>
+                  <BarChart data={returnsData?.byDay || []}>
+                    <CartesianGrid strokeDasharray="3 3" />
+                    <XAxis dataKey="day" />
+                    <YAxis />
+                    <Tooltip />
+                    <Legend />
+                    <Bar dataKey="total" fill="hsl(var(--destructive))" name="Monto ($)" />
+                    <Bar dataKey="count" fill="hsl(var(--chart-2))" name="Cantidad" />
+                  </BarChart>
+                </ResponsiveContainer>
+              </CardContent>
+            </Card>
+          </TabsContent>
+
+          <TabsContent value="services" className="space-y-4">
+            <div className="grid gap-4 md:grid-cols-2">
+              <Card>
+                <CardHeader>
+                  <CardTitle>Resumen de Servicios Técnicos</CardTitle>
+                </CardHeader>
+                <CardContent>
+                  <div className="space-y-4">
+                    <div className="flex justify-between items-center">
+                      <span className="text-muted-foreground">Total servicios:</span>
+                      <span className="text-xl font-bold">{servicesData?.totalServices || 0}</span>
+                    </div>
+                    <div className="flex justify-between items-center">
+                      <span className="text-muted-foreground">Facturación total:</span>
+                      <span className="text-xl font-bold text-green-600">
+                        {formatCurrency(servicesData?.totalRevenue || 0)}
+                      </span>
+                    </div>
+                  </div>
+                </CardContent>
+              </Card>
+              
+              <Card>
+                <CardHeader>
+                  <CardTitle>Servicios por Estado</CardTitle>
+                </CardHeader>
+                <CardContent>
+                  <ResponsiveContainer width="100%" height={200}>
+                    <PieChart>
+                      <Pie
+                        data={servicesData?.byStatus || []}
+                        cx="50%"
+                        cy="50%"
+                        labelLine={false}
+                        label={(entry) => `${entry.name}: ${entry.count}`}
+                        outerRadius={60}
+                        fill="hsl(var(--chart-1))"
+                        dataKey="count"
+                      >
+                        {(servicesData?.byStatus || []).map((_: any, index: number) => (
+                          <Cell key={`cell-${index}`} fill={COLORS[index % COLORS.length]} />
+                        ))}
+                      </Pie>
+                      <Tooltip />
+                    </PieChart>
+                  </ResponsiveContainer>
+                </CardContent>
+              </Card>
+            </div>
+
+            <Card>
+              <CardHeader>
+                <CardTitle>Servicios por Tipo de Dispositivo</CardTitle>
+              </CardHeader>
+              <CardContent>
+                <ResponsiveContainer width="100%" height={300}>
+                  <BarChart data={servicesData?.byDevice || []} layout="vertical">
+                    <CartesianGrid strokeDasharray="3 3" />
+                    <XAxis type="number" />
+                    <YAxis dataKey="name" type="category" width={100} />
+                    <Tooltip />
+                    <Legend />
+                    <Bar dataKey="value" fill="hsl(var(--chart-4))" name="Facturación ($)" />
+                    <Bar dataKey="count" fill="hsl(var(--chart-5))" name="Cantidad" />
+                  </BarChart>
+                </ResponsiveContainer>
               </CardContent>
             </Card>
           </TabsContent>
