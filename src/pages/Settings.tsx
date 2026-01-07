@@ -240,14 +240,17 @@ export default function Settings() {
   });
 
   const { data: ticketConfigData, isLoading: isLoadingTicketConfig } = useQuery({
-    queryKey: ["ticket-config"],
+    queryKey: ["ticket-config", currentCompany?.id],
     queryFn: async () => {
+      if (!currentCompany?.id) return null;
+      
       const { data, error } = await supabase
         .from("ticket_config" as any)
         .select("*")
-        .single();
+        .eq("company_id", currentCompany.id)
+        .maybeSingle();
       
-      if (error && error.code !== 'PGRST116') { // PGRST116 = no rows found
+      if (error) {
         throw error;
       }
       
@@ -272,15 +275,19 @@ export default function Settings() {
       
       return data;
     },
+    enabled: !!currentCompany?.id,
   });
 
   const saveTicketConfigMutation = useMutation({
     mutationFn: async (config: typeof ticketConfig) => {
+      if (!currentCompany?.id) throw new Error("No company selected");
+      
       // Intentar actualizar primero
       const { data: existingConfig } = await supabase
         .from("ticket_config" as any)
         .select("id")
-        .single();
+        .eq("company_id", currentCompany.id)
+        .maybeSingle();
 
       if (existingConfig) {
         // Actualizar configuración existente
@@ -305,10 +312,11 @@ export default function Settings() {
 
         if (error) throw error;
       } else {
-        // Crear nueva configuración
+        // Crear nueva configuración con company_id
         const { error } = await supabase
           .from("ticket_config" as any)
           .insert({
+            company_id: currentCompany.id,
             logo_url: config.logo_url || null,
             company_name: config.company_name,
             company_address: config.company_address || null,
@@ -331,10 +339,10 @@ export default function Settings() {
     },
     onSuccess: () => {
       toast.success("Configuración de diseño guardada exitosamente");
-      queryClient.invalidateQueries({ queryKey: ["ticket-config"] });
+      queryClient.invalidateQueries({ queryKey: ["ticket-config", currentCompany?.id] });
     },
     onError: (error: any) => {
-      toast.error("Error al guardar la configuración de diseño");
+      toast.error("Error al guardar la configuración de diseño: " + (error?.message || "Error desconocido"));
       console.error("Error saving ticket config:", error);
     },
   });

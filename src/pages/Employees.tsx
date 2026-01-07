@@ -14,11 +14,12 @@ import { Label } from "@/components/ui/label";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { toast } from "sonner";
-import { Users, Plus, Edit, Trash2, Shield, UserCog } from "lucide-react";
+import { Users, Plus, Edit, Trash2, Shield, UserCog, Clock } from "lucide-react";
 import { format } from "date-fns";
 import { es } from "date-fns/locale";
 import { EmployeePermissionsManager } from "@/components/employees/EmployeePermissionsManager";
 import { EmployeeRoleAssignment } from "@/components/employees/EmployeeRoleAssignment";
+import { EmployeeTimeTracking } from "@/components/employees/EmployeeTimeTracking";
 
 interface EmployeeFormData {
   first_name: string;
@@ -80,19 +81,43 @@ const Employees = () => {
     mutationFn: async (data: EmployeeFormData) => {
       if (!currentCompany?.id) throw new Error("No hay empresa seleccionada");
       
-      const { error } = await supabase
+      const { data: newEmployee, error } = await supabase
         .from("employees")
         .insert({
           ...data,
           company_id: currentCompany.id,
           active: true,
-        });
+        })
+        .select()
+        .single();
       
       if (error) throw error;
+      
+      // If the employee has an email, send invitation
+      if (data.email) {
+        try {
+          const { error: inviteError } = await supabase.functions.invoke("invite-employee", {
+            body: {
+              email: data.email,
+              full_name: `${data.first_name} ${data.last_name}`,
+              role: "employee",
+              companyId: currentCompany.id,
+            },
+          });
+          
+          if (inviteError) {
+            console.warn("Could not send invitation email:", inviteError);
+          }
+        } catch (err) {
+          console.warn("Error sending invitation:", err);
+        }
+      }
+      
+      return newEmployee;
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["employees"] });
-      toast.success("Empleado creado exitosamente");
+      toast.success("Empleado creado exitosamente. Si tiene email, recibirá una invitación.");
       setDialogOpen(false);
       setFormData(initialFormData);
     },
@@ -213,6 +238,10 @@ const Employees = () => {
             </TabsTrigger>
             {isAdmin && (
               <>
+                <TabsTrigger value="time" className="flex-1 min-w-[80px] text-xs sm:text-sm">
+                  <Clock className="mr-1 sm:mr-2 h-4 w-4" />
+                  <span className="hidden sm:inline">Horarios</span>
+                </TabsTrigger>
                 <TabsTrigger value="roles" className="flex-1 min-w-[80px] text-xs sm:text-sm">
                   <UserCog className="mr-1 sm:mr-2 h-4 w-4" />
                   <span className="hidden sm:inline">Roles</span>
@@ -480,6 +509,10 @@ const Employees = () => {
 
           {isAdmin && (
             <>
+              <TabsContent value="time">
+                <EmployeeTimeTracking />
+              </TabsContent>
+
               <TabsContent value="roles">
                 <EmployeeRoleAssignment />
               </TabsContent>
