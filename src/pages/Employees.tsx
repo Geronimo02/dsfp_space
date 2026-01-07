@@ -14,11 +14,13 @@ import { Label } from "@/components/ui/label";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { toast } from "sonner";
-import { Users, Plus, Edit, Trash2, Shield, UserCog, Mail, CheckCircle2 } from "lucide-react";
+import { Users, Plus, Edit, Trash2, Shield, UserCog, Mail, CheckCircle2, Clock } from "lucide-react";
 import { format } from "date-fns";
 import { es } from "date-fns/locale";
 import { EmployeePermissionsManager } from "@/components/employees/EmployeePermissionsManager";
 import { EmployeeRoleAssignment } from "@/components/employees/EmployeeRoleAssignment";
+import { EmployeeTimeTracking } from "@/components/employees/EmployeeTimeTracking";
+import { EmployeeSelfTimeTracking } from "@/components/employees/EmployeeSelfTimeTracking";
 
 interface EmployeeFormData {
   first_name: string;
@@ -27,11 +29,11 @@ interface EmployeeFormData {
   document_number: string;
   email: string;
   phone: string;
-  position: string;
   department: string;
   hire_date: string;
   base_salary: number;
   salary_type: string;
+  role: string;
 }
 
 const initialFormData: EmployeeFormData = {
@@ -41,11 +43,11 @@ const initialFormData: EmployeeFormData = {
   document_number: "",
   email: "",
   phone: "",
-  position: "",
   department: "",
   hire_date: new Date().toISOString().split("T")[0],
   base_salary: 0,
   salary_type: "monthly",
+  role: "employee",
 };
 
 const Employees = () => {
@@ -53,11 +55,8 @@ const Employees = () => {
   const { hasPermission, isAdmin, loading: permissionsLoading } = usePermissions();
   const queryClient = useQueryClient();
   const [dialogOpen, setDialogOpen] = useState(false);
-  const [inviteDialogOpen, setInviteDialogOpen] = useState(false);
   const [editingEmployee, setEditingEmployee] = useState<any>(null);
   const [formData, setFormData] = useState<EmployeeFormData>(initialFormData);
-  const [inviteEmail, setInviteEmail] = useState("");
-  const [inviteRole, setInviteRole] = useState<"employee" | "manager">("employee");
 
   const canCreate = hasPermission("employees", "create");
   const canEdit = hasPermission("employees", "edit");
@@ -77,9 +76,39 @@ const Employees = () => {
       
       if (employeesError) throw employeesError;
 
-      // No necesitamos verificar company_users en el cliente
-      // El badge se agregará desde el servidor cuando implementemos RPC
-      return employeesData || [];
+      // Obtener roles de cada empleado desde company_users
+      const supabaseClient = supabase as any;
+      const employeesWithRoles: any = await Promise.all(
+        (employeesData || []).map(async (employee: any) => {
+          if (employee.email) {
+            // Buscar el perfil por email
+            const profileResult = await supabaseClient
+              .from("profiles")
+              .select("id")
+              .eq("email", employee.email)
+              .maybeSingle();
+            
+            const profile = profileResult.data;
+            
+            if (profile) {
+              // Obtener el rol desde company_users
+              const companyUserResult = await supabaseClient
+                .from("company_users")
+                .select("role")
+                .eq("user_id", profile.id)
+                .eq("company_id", currentCompany.id)
+                .maybeSingle();
+              
+              const companyUser = companyUserResult.data;
+              
+              return { ...employee, role: companyUser?.role || "-" };
+            }
+          }
+          return { ...employee, role: "-" };
+        })
+      );
+
+      return employeesWithRoles;
     },
     enabled: !!currentCompany?.id,
   });
@@ -88,19 +117,51 @@ const Employees = () => {
     mutationFn: async (data: EmployeeFormData) => {
       if (!currentCompany?.id) throw new Error("No hay empresa seleccionada");
       
-      const { error } = await supabase
+      // Extraer el rol del formData
+      const { role, ...employeeData } = data;
+      
+      // Crear el empleado
+      const { data: newEmployee, error: employeeError } = await supabase
         .from("employees")
         .insert({
-          ...data,
+          ...employeeData,
           company_id: currentCompany.id,
           active: true,
-        });
+        })
+        .select()
+        .single();
       
-      if (error) throw error;
+      if (employeeError) throw employeeError;
+      
+      // Si tiene email, enviar invitación automáticamente
+      if (data.email) {
+        const { data: { session } } = await supabase.auth.getSession();
+        if (session) {
+          try {
+            const response = await supabase.functions.invoke('invite-employee', {
+              body: {
+                email: data.email,
+                role: role,
+                companyId: currentCompany.id,
+                full_name: `${data.first_name} ${data.last_name}`,
+              },
+            });
+            
+            if (response.error) {
+              console.error("Error al enviar invitación:", response.error);
+              // No fallar la creación si falla el email
+            }
+          } catch (inviteError) {
+            console.error("Error al enviar invitación:", inviteError);
+            // No fallar la creación si falla el email
+          }
+        }
+      }
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["employees"] });
-      toast.success("Empleado creado exitosamente");
+      queryClient.invalidateQueries({ queryKey: ["company-users"] });
+      toast.success("Empleado creado exitosamente. Se ha enviado una invitación por email.");
       setDialogOpen(false);
       setFormData(initialFormData);
     },
@@ -111,12 +172,61 @@ const Employees = () => {
 
   const updateMutation = useMutation({
     mutationFn: async ({ id, data }: { id: string; data: Partial<EmployeeFormData> }) => {
-      const { error } = await supabase
+      if (!currentCompany?.id) throw new Error("No hay empresa seleccionada");
+      
+      // Extraer el rol del data (si existe)
+      const { role, ...employeeData } = data;
+      
+      // Actualizar los datos del empleado (sin el rol)
+      const { error: employeeError } = await supabase
         .from("employees")
-        .update(data)
+        .update(employeeData)
         .eq("id", id);
       
-      if (error) throw error;
+      if (employeeError) throw employeeError;
+      
+      // Si se está actualizando el rol y hay email, actualizar en company_users
+      if (role && data.email) {
+        // Buscar si existe un usuario con ese email
+        const supabaseClient = supabase as any;
+        const profileResult = await supabaseClient
+          .from("profiles")
+          .select("id")
+          .eq("email", data.email)
+          .maybeSingle();
+        
+        const profiles = profileResult.data;
+        
+        if (profiles) {
+          // Verificar si ya existe relación
+          const relationResult = await supabaseClient
+            .from("company_users")
+            .select("id")
+            .eq("user_id", profiles.id)
+            .eq("company_id", currentCompany.id)
+            .maybeSingle();
+          
+          const existingRelation = relationResult.data;
+          
+          if (existingRelation) {
+            // Actualizar el rol
+            await supabase
+              .from("company_users")
+              .update({ role: role as any })
+              .eq("id", existingRelation.id);
+          } else {
+            // Crear la relación con el rol
+            await supabase
+              .from("company_users")
+              .insert({
+                user_id: profiles.id,
+                company_id: currentCompany.id,
+                role: role as any,
+                active: true,
+              });
+          }
+        }
+      }
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["employees"] });
@@ -131,58 +241,44 @@ const Employees = () => {
   });
 
   const deleteMutation = useMutation({
-    mutationFn: async (id: string) => {
-      const { error } = await supabase
-        .from("employees")
-        .delete()
-        .eq("id", id);
-      
-      if (error) throw error;
-    },
-    onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ["employees"] });
-      toast.success("Empleado eliminado exitosamente");
-    },
-    onError: () => {
-      toast.error("Error al eliminar el empleado");
-    },
-  });
-
-  // Nueva mutación para invitar empleado y crear acceso
-  const inviteEmployeeMutation = useMutation({
-    mutationFn: async ({ email, role }: { email: string, role: string }) => {
+    mutationFn: async (employee: any) => {
       if (!currentCompany?.id) throw new Error("No hay empresa seleccionada");
       
-      // Llamar a la edge function para invitar al empleado
-      const { data: { session } } = await supabase.auth.getSession();
-      if (!session) throw new Error("No hay sesión activa");
-
-      const response = await supabase.functions.invoke('invite-employee', {
-        body: {
-          email,
-          role,
-          companyId: currentCompany.id,
-          full_name: email.split("@")[0], // Nombre temporal
-        },
-      });
-
-      if (response.error) {
-        throw new Error(response.error.message || "Error al invitar empleado");
+      // Eliminar el empleado
+      const { error: deleteError } = await supabase
+        .from("employees")
+        .delete()
+        .eq("id", employee.id);
+      
+      if (deleteError) throw deleteError;
+      
+      // Si tiene email, desactivar acceso en company_users
+      if (employee.email) {
+        const supabaseClient = supabase as any;
+        const profileResult = await supabaseClient
+          .from("profiles")
+          .select("id")
+          .eq("email", employee.email)
+          .maybeSingle();
+        
+        const profiles = profileResult.data;
+        
+        if (profiles) {
+          await supabase
+            .from("company_users")
+            .update({ active: false })
+            .eq("user_id", profiles.id)
+            .eq("company_id", currentCompany.id);
+        }
       }
-
-      return response.data;
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["employees"] });
       queryClient.invalidateQueries({ queryKey: ["company-users"] });
-      toast.success("Invitación enviada exitosamente. El empleado recibirá un email para configurar su contraseña.");
-      setInviteDialogOpen(false);
-      setInviteEmail("");
-      setInviteRole("employee");
+      toast.success("Empleado eliminado y acceso desactivado exitosamente");
     },
     onError: (error: any) => {
-      console.error("Error al invitar empleado:", error);
-      toast.error("Error al invitar empleado: " + (error.message || "Error desconocido"));
+      toast.error("Error al eliminar el empleado: " + error.message);
     },
   });
 
@@ -212,11 +308,11 @@ const Employees = () => {
       document_number: employee.document_number || "",
       email: employee.email || "",
       phone: employee.phone || "",
-      position: employee.position || "",
       department: employee.department || "",
       hire_date: employee.hire_date || "",
       base_salary: employee.base_salary || 0,
       salary_type: employee.salary_type || "monthly",
+      role: employee.role || "employee",
     });
     setDialogOpen(true);
   };
@@ -255,19 +351,17 @@ const Employees = () => {
           <TabsList className="w-full flex flex-wrap h-auto gap-1 p-1">
             <TabsTrigger value="list" className="flex-1 min-w-[100px] text-xs sm:text-sm">
               <Users className="mr-1 sm:mr-2 h-4 w-4" />
-              <span className="hidden sm:inline">Lista</span>
+              <span className="hidden sm:inline">Empleados</span>
+            </TabsTrigger>
+            <TabsTrigger value="time-tracking" className="flex-1 min-w-[100px] text-xs sm:text-sm">
+              <Clock className="mr-1 sm:mr-2 h-4 w-4" />
+              <span className="hidden sm:inline">Mi Horario</span>
             </TabsTrigger>
             {isAdmin && (
-              <>
-                <TabsTrigger value="roles" className="flex-1 min-w-[80px] text-xs sm:text-sm">
-                  <UserCog className="mr-1 sm:mr-2 h-4 w-4" />
-                  <span className="hidden sm:inline">Roles</span>
-                </TabsTrigger>
-                <TabsTrigger value="permissions" className="flex-1 min-w-[80px] text-xs sm:text-sm">
-                  <Shield className="mr-1 sm:mr-2 h-4 w-4" />
-                  <span className="hidden sm:inline">Permisos</span>
-                </TabsTrigger>
-              </>
+              <TabsTrigger value="permissions" className="flex-1 min-w-[80px] text-xs sm:text-sm">
+                <Shield className="mr-1 sm:mr-2 h-4 w-4" />
+                <span className="hidden sm:inline">Permisos</span>
+              </TabsTrigger>
             )}
           </TabsList>
 
@@ -282,72 +376,7 @@ const Employees = () => {
                     </CardDescription>
                   </div>
                   {canCreate && (
-                    <div className="flex flex-col sm:flex-row gap-2">
-                      <Dialog open={inviteDialogOpen} onOpenChange={setInviteDialogOpen}>
-                        <DialogTrigger asChild>
-                          <Button variant="outline" size="sm" className="w-full sm:w-auto">
-                            <Mail className="mr-2 h-4 w-4" />
-                            <span className="sm:inline">Invitar por Email</span>
-                          </Button>
-                        </DialogTrigger>
-                        <DialogContent>
-                          <DialogHeader>
-                            <DialogTitle>Invitar Empleado</DialogTitle>
-                            <DialogDescription>
-                              El empleado recibirá un email para crear su cuenta y acceder al sistema.
-                            </DialogDescription>
-                          </DialogHeader>
-                          <div className="space-y-4 py-4">
-                            <div className="space-y-2">
-                              <Label htmlFor="invite-email">Email</Label>
-                              <Input
-                                id="invite-email"
-                                type="email"
-                                placeholder="empleado@empresa.com"
-                                value={inviteEmail}
-                                onChange={(e) => setInviteEmail(e.target.value)}
-                              />
-                            </div>
-                            <div className="space-y-2">
-                              <Label htmlFor="invite-role">Rol</Label>
-                              <Select value={inviteRole} onValueChange={(v: any) => setInviteRole(v)}>
-                                <SelectTrigger id="invite-role">
-                                  <SelectValue />
-                                </SelectTrigger>
-                                <SelectContent>
-                                  <SelectItem value="employee">Empleado</SelectItem>
-                                  <SelectItem value="manager">Manager</SelectItem>
-                                </SelectContent>
-                              </Select>
-                            </div>
-                            <div className="flex gap-2">
-                              <Button
-                                onClick={() => {
-                                  if (!inviteEmail) {
-                                    toast.error("Ingresa un email");
-                                    return;
-                                  }
-                                  inviteEmployeeMutation.mutate({ email: inviteEmail, role: inviteRole });
-                                }}
-                                disabled={inviteEmployeeMutation.isPending}
-                                className="flex-1"
-                              >
-                                {inviteEmployeeMutation.isPending ? "Enviando..." : "Enviar Invitación"}
-                              </Button>
-                              <Button
-                                variant="outline"
-                                onClick={() => {
-                                  setInviteDialogOpen(false);
-                                  setInviteEmail("");
-                                }}
-                              >
-                                Cancelar
-                              </Button>
-                            </div>
-                          </div>
-                        </DialogContent>
-                      </Dialog>
-                      <Dialog open={dialogOpen} onOpenChange={setDialogOpen}>
+                    <Dialog open={dialogOpen} onOpenChange={setDialogOpen}>
                         <DialogTrigger asChild>
                           <Button onClick={handleOpenDialog} size="sm" className="w-full sm:w-auto">
                             <Plus className="mr-2 h-4 w-4" />
@@ -431,15 +460,6 @@ const Employees = () => {
                             />
                           </div>
                           <div className="space-y-2">
-                            <Label htmlFor="position">Cargo</Label>
-                            <Input
-                              id="position"
-                              value={formData.position}
-                              onChange={(e) => setFormData({ ...formData, position: e.target.value })}
-                              placeholder="Vendedor"
-                            />
-                          </div>
-                          <div className="space-y-2">
                             <Label htmlFor="department">Departamento</Label>
                             <Input
                               id="department"
@@ -474,6 +494,28 @@ const Employees = () => {
                             </Select>
                           </div>
                           <div className="space-y-2 col-span-2">
+                            <Label htmlFor="role">Rol en el Sistema *</Label>
+                            <Select 
+                              value={formData.role} 
+                              onValueChange={(value) => setFormData({ ...formData, role: value })}
+                            >
+                              <SelectTrigger>
+                                <SelectValue />
+                              </SelectTrigger>
+                              <SelectContent>
+                                <SelectItem value="employee">Empleado - Solo ver horarios y datos básicos</SelectItem>
+                                <SelectItem value="cashier">Cajero - POS, ventas y cobros</SelectItem>
+                                <SelectItem value="warehouse">Depósito - Inventario y compras</SelectItem>
+                                <SelectItem value="technician">Técnico - Servicios técnicos</SelectItem>
+                                <SelectItem value="accountant">Contador - Reportes y finanzas (solo lectura)</SelectItem>
+                                <SelectItem value="viewer">Visualizador - Solo lectura general</SelectItem>
+                                <SelectItem value="auditor">Auditor - Ver todo y exportar</SelectItem>
+                                <SelectItem value="manager">Gerente - Gestión completa sin eliminar</SelectItem>
+                                {isAdmin && <SelectItem value="admin">Administrador - Acceso total</SelectItem>}
+                              </SelectContent>
+                            </Select>
+                          </div>
+                          <div className="space-y-2 col-span-2">
                             <Label htmlFor="base_salary">Salario Base</Label>
                             <Input
                               id="base_salary"
@@ -500,7 +542,6 @@ const Employees = () => {
                         </div>
                       </DialogContent>
                     </Dialog>
-                    </div>
                   )}
                 </div>
               </CardHeader>
@@ -511,7 +552,7 @@ const Employees = () => {
                       <TableRow>
                         <TableHead className="min-w-[120px]">Nombre</TableHead>
                         <TableHead className="hidden sm:table-cell">Documento</TableHead>
-                        <TableHead className="hidden md:table-cell">Posición</TableHead>
+                        <TableHead className="hidden md:table-cell">Rol</TableHead>
                         <TableHead className="hidden lg:table-cell">Departamento</TableHead>
                         <TableHead className="hidden lg:table-cell">Ingreso</TableHead>
                         <TableHead className="hidden md:table-cell">Salario</TableHead>
@@ -533,7 +574,17 @@ const Employees = () => {
                           <TableCell className="hidden sm:table-cell text-xs sm:text-sm">
                             {employee.document_type} {employee.document_number}
                           </TableCell>
-                          <TableCell className="hidden md:table-cell text-xs sm:text-sm">{employee.position || "-"}</TableCell>
+                          <TableCell className="hidden md:table-cell text-xs sm:text-sm">
+                            {employee.role === "admin" ? "Administrador" :
+                             employee.role === "manager" ? "Gerente" :
+                             employee.role === "cashier" ? "Cajero" :
+                             employee.role === "warehouse" ? "Depósito" :
+                             employee.role === "technician" ? "Técnico" :
+                             employee.role === "accountant" ? "Contador" :
+                             employee.role === "employee" ? "Empleado" :
+                             employee.role === "viewer" ? "Visualizador" :
+                             employee.role === "auditor" ? "Auditor" : "-"}
+                          </TableCell>
                           <TableCell className="hidden lg:table-cell text-xs sm:text-sm">{employee.department || "-"}</TableCell>
                           <TableCell className="hidden lg:table-cell text-xs sm:text-sm">
                             {employee.hire_date
@@ -562,8 +613,8 @@ const Employees = () => {
                                   variant="ghost"
                                   size="sm"
                                   onClick={() => {
-                                    if (confirm("¿Está seguro de eliminar este empleado?")) {
-                                      deleteMutation.mutate(employee.id);
+                                    if (confirm("¿Está seguro de eliminar este empleado? Se desactivará su acceso al sistema.")) {
+                                      deleteMutation.mutate(employee);
                                     }
                                   }}
                                 >
@@ -595,16 +646,18 @@ const Employees = () => {
             </Card>
           </TabsContent>
 
-          {isAdmin && (
-            <>
-              <TabsContent value="roles">
-                <EmployeeRoleAssignment />
-              </TabsContent>
+          <TabsContent value="time-tracking">
+            {isAdmin ? (
+              <EmployeeTimeTracking />
+            ) : (
+              <EmployeeSelfTimeTracking />
+            )}
+          </TabsContent>
 
-              <TabsContent value="permissions">
-                <EmployeePermissionsManager />
-              </TabsContent>
-            </>
+          {isAdmin && (
+            <TabsContent value="permissions">
+              <EmployeePermissionsManager />
+            </TabsContent>
           )}
         </Tabs>
       </div>

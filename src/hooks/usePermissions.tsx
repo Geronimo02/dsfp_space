@@ -4,6 +4,8 @@ import { useCompany } from "@/contexts/CompanyContext";
 
 export type Permission = "view" | "create" | "edit" | "delete" | "export";
 export type Module = 
+  | "dashboard"
+  | "pos"
   | "products" 
   | "sales" 
   | "customers" 
