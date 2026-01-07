@@ -9,7 +9,7 @@ import { Button } from "@/components/ui/button";
 import { Calendar } from "@/components/ui/calendar";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
 import { BarChart, Bar, LineChart, Line, PieChart, Pie, Cell, XAxis, YAxis, CartesianGrid, Tooltip, Legend, ResponsiveContainer } from "recharts";
-import { TrendingUp, DollarSign, Package, ShoppingCart, Wallet, ArrowUpRight, ArrowDownRight, RotateCw, AlertTriangle, Zap, CalendarIcon } from "lucide-react";
+import { TrendingUp, DollarSign, Package, ShoppingCart, Wallet, ArrowUpRight, ArrowDownRight, RotateCw, AlertTriangle, Zap, CalendarIcon, RefreshCw, Wrench } from "lucide-react";
 import { format, subDays, startOfDay, endOfDay } from "date-fns";
 import { es } from "date-fns/locale";
 import { cn } from "@/lib/utils";
@@ -296,6 +296,92 @@ const Reports = () => {
     },
   });
 
+  // Devoluciones
+  const { data: returnsData } = useQuery({
+    queryKey: ["reports-returns", dateRangeType, customDateRange, currentCompany?.id],
+    queryFn: async () => {
+      const { start, end } = getDateRange();
+      const { data, error } = await supabase
+        .from("returns")
+        .select(`
+          *,
+          sale:sales(sale_number, customer:customers(name))
+        `)
+        .eq("company_id", currentCompany?.id)
+        .gte("created_at", start.toISOString())
+        .lte("created_at", end.toISOString())
+        .order("created_at", { ascending: false });
+
+      if (error) throw error;
+
+      // Calcular estadísticas
+      const totalReturns = data?.length || 0;
+      const totalAmount = data?.reduce((sum, r) => sum + Number(r.total), 0) || 0;
+      const byStatus = data?.reduce((acc: any, r) => {
+        acc[r.status] = (acc[r.status] || 0) + 1;
+        return acc;
+      }, {});
+      const byRefundMethod = data?.reduce((acc: any, r) => {
+        acc[r.refund_method] = (acc[r.refund_method] || 0) + 1;
+        return acc;
+      }, {});
+
+      return { 
+        returns: data, 
+        totalReturns,
+        totalAmount,
+        byStatus,
+        byRefundMethod
+      };
+    },
+    enabled: !!currentCompany?.id,
+  });
+
+  // Servicios técnicos (arreglos)
+  const { data: repairsData } = useQuery({
+    queryKey: ["reports-repairs", dateRangeType, customDateRange, currentCompany?.id],
+    queryFn: async () => {
+      const { start, end } = getDateRange();
+      const { data, error } = await supabase
+        .from("technical_services")
+        .select(`
+          *,
+          customer:customers(name)
+        `)
+        .eq("company_id", currentCompany?.id)
+        .gte("created_at", start.toISOString())
+        .lte("created_at", end.toISOString())
+        .order("created_at", { ascending: false });
+
+      if (error) throw error;
+
+      // Calcular estadísticas
+      const totalRepairs = data?.length || 0;
+      const totalRevenue = data?.reduce((sum, r) => sum + Number(r.total_cost || 0), 0) || 0;
+      const byStatus = data?.reduce((acc: any, r) => {
+        acc[r.status] = (acc[r.status] || 0) + 1;
+        return acc;
+      }, {});
+      const avgRepairTime = data?.reduce((sum, r) => {
+        if (r.status === 'delivered' && r.completed_date) {
+          const start = new Date(r.created_at);
+          const end = new Date(r.completed_date);
+          return sum + Math.floor((end.getTime() - start.getTime()) / (1000 * 60 * 60 * 24));
+        }
+        return sum;
+      }, 0) / (data?.filter(r => r.status === 'delivered').length || 1);
+
+      return { 
+        repairs: data, 
+        totalRepairs,
+        totalRevenue,
+        byStatus,
+        avgRepairTime: Math.round(avgRepairTime)
+      };
+    },
+    enabled: !!currentCompany?.id,
+  });
+
   // Rotación de inventario
   const { data: rotationData } = useQuery({
     queryKey: ["reports-rotation", currentCompany?.id],
@@ -355,100 +441,6 @@ const Reports = () => {
 
       return productMetrics.sort((a, b) => a.rotationDays - b.rotationDays);
     },
-  });
-
-  // Devoluciones por día
-  const { data: returnsData } = useQuery({
-    queryKey: ["reports-returns", dateRangeType, customDateRange, currentCompany?.id],
-    queryFn: async () => {
-      const { start, end } = getDateRange();
-      const { data, error } = await supabase
-        .from("returns")
-        .select("created_at, total, status, reason")
-        .eq("company_id", currentCompany?.id)
-        .gte("created_at", start.toISOString())
-        .lte("created_at", end.toISOString())
-        .order("created_at");
-
-      if (error) throw error;
-
-      // Agrupar por día
-      const groupedByDay = data.reduce((acc: any, ret) => {
-        const day = format(new Date(ret.created_at), "dd/MMM", { locale: es });
-        if (!acc[day]) {
-          acc[day] = { day, total: 0, count: 0 };
-        }
-        acc[day].total += Number(ret.total);
-        acc[day].count += 1;
-        return acc;
-      }, {});
-
-      // Agrupar por razón
-      const byReason = data.reduce((acc: any, ret) => {
-        const reason = ret.reason || "Sin especificar";
-        if (!acc[reason]) {
-          acc[reason] = { name: reason, value: 0, count: 0 };
-        }
-        acc[reason].value += Number(ret.total);
-        acc[reason].count += 1;
-        return acc;
-      }, {});
-
-      return {
-        byDay: Object.values(groupedByDay),
-        byReason: Object.values(byReason),
-        totalReturns: data.length,
-        totalAmount: data.reduce((sum, r) => sum + Number(r.total), 0),
-      };
-    },
-    enabled: !!currentCompany?.id,
-  });
-
-  // Servicios técnicos
-  const { data: servicesData } = useQuery({
-    queryKey: ["reports-services", dateRangeType, customDateRange, currentCompany?.id],
-    queryFn: async () => {
-      const { start, end } = getDateRange();
-      const { data, error } = await supabase
-        .from("technical_services")
-        .select("created_at, total_cost, status, device_type")
-        .eq("company_id", currentCompany?.id)
-        .gte("created_at", start.toISOString())
-        .lte("created_at", end.toISOString())
-        .order("created_at");
-
-      if (error) throw error;
-
-      // Agrupar por estado
-      const byStatus = data.reduce((acc: any, svc) => {
-        const status = svc.status || "Sin estado";
-        if (!acc[status]) {
-          acc[status] = { name: status, value: 0, count: 0 };
-        }
-        acc[status].value += Number(svc.total_cost || 0);
-        acc[status].count += 1;
-        return acc;
-      }, {});
-
-      // Agrupar por tipo de dispositivo
-      const byDevice = data.reduce((acc: any, svc) => {
-        const device = svc.device_type || "Otro";
-        if (!acc[device]) {
-          acc[device] = { name: device, value: 0, count: 0 };
-        }
-        acc[device].value += Number(svc.total_cost || 0);
-        acc[device].count += 1;
-        return acc;
-      }, {});
-
-      return {
-        byStatus: Object.values(byStatus),
-        byDevice: Object.values(byDevice),
-        totalServices: data.length,
-        totalRevenue: data.reduce((sum, s) => sum + Number(s.total_cost || 0), 0),
-      };
-    },
-    enabled: !!currentCompany?.id,
   });
 
   const StatCard = ({ title, value, icon: Icon, trend, trendValue }: any) => (
@@ -586,7 +578,7 @@ const Reports = () => {
               <TabsTrigger value="payments" className="text-xs md:text-sm">Pagos</TabsTrigger>
               <TabsTrigger value="rotation" className="text-xs md:text-sm">Rotación</TabsTrigger>
               <TabsTrigger value="returns" className="text-xs md:text-sm">Devoluciones</TabsTrigger>
-              <TabsTrigger value="services" className="text-xs md:text-sm">Servicios</TabsTrigger>
+              <TabsTrigger value="repairs" className="text-xs md:text-sm">Arreglos</TabsTrigger>
             </TabsList>
           </div>
 
@@ -856,142 +848,264 @@ const Reports = () => {
             </Card>
           </TabsContent>
 
+          {/* Tab de Devoluciones */}
           <TabsContent value="returns" className="space-y-4">
-            <div className="grid gap-4 md:grid-cols-2">
+            <div className="grid gap-4 md:grid-cols-4">
               <Card>
-                <CardHeader>
-                  <CardTitle>Resumen de Devoluciones</CardTitle>
+                <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+                  <CardTitle className="text-sm font-medium">Total Devoluciones</CardTitle>
+                  <RefreshCw className="h-4 w-4 text-muted-foreground" />
                 </CardHeader>
                 <CardContent>
-                  <div className="space-y-4">
-                    <div className="flex justify-between items-center">
-                      <span className="text-muted-foreground">Total devoluciones:</span>
-                      <span className="text-xl font-bold">{returnsData?.totalReturns || 0}</span>
-                    </div>
-                    <div className="flex justify-between items-center">
-                      <span className="text-muted-foreground">Monto total:</span>
-                      <span className="text-xl font-bold text-destructive">
-                        {formatCurrency(returnsData?.totalAmount || 0)}
-                      </span>
-                    </div>
-                  </div>
+                  <div className="text-2xl font-bold">{returnsData?.totalReturns || 0}</div>
+                  <p className="text-xs text-muted-foreground">
+                    {formatCurrency(returnsData?.totalAmount || 0)}
+                  </p>
                 </CardContent>
               </Card>
-              
               <Card>
-                <CardHeader>
-                  <CardTitle>Devoluciones por Razón</CardTitle>
+                <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+                  <CardTitle className="text-sm font-medium">Pendientes</CardTitle>
+                  <AlertTriangle className="h-4 w-4 text-orange-500" />
                 </CardHeader>
                 <CardContent>
-                  <ResponsiveContainer width="100%" height={200}>
-                    <PieChart>
-                      <Pie
-                        data={returnsData?.byReason || []}
-                        cx="50%"
-                        cy="50%"
-                        labelLine={false}
-                        label={(entry) => `${entry.name}: ${entry.count}`}
-                        outerRadius={60}
-                        fill="hsl(var(--chart-1))"
-                        dataKey="count"
-                      >
-                        {(returnsData?.byReason || []).map((_: any, index: number) => (
-                          <Cell key={`cell-${index}`} fill={COLORS[index % COLORS.length]} />
-                        ))}
-                      </Pie>
-                      <Tooltip />
-                    </PieChart>
-                  </ResponsiveContainer>
+                  <div className="text-2xl font-bold">{returnsData?.byStatus?.['pending'] || 0}</div>
+                </CardContent>
+              </Card>
+              <Card>
+                <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+                  <CardTitle className="text-sm font-medium">Aprobadas</CardTitle>
+                  <RefreshCw className="h-4 w-4 text-green-500" />
+                </CardHeader>
+                <CardContent>
+                  <div className="text-2xl font-bold">{returnsData?.byStatus?.['approved'] || 0}</div>
+                </CardContent>
+              </Card>
+              <Card>
+                <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+                  <CardTitle className="text-sm font-medium">Completadas</CardTitle>
+                  <RefreshCw className="h-4 w-4 text-blue-500" />
+                </CardHeader>
+                <CardContent>
+                  <div className="text-2xl font-bold">{returnsData?.byStatus?.['completed'] || 0}</div>
                 </CardContent>
               </Card>
             </div>
 
             <Card>
               <CardHeader>
-                <CardTitle>Devoluciones por Día</CardTitle>
+                <CardTitle>Métodos de Reembolso</CardTitle>
               </CardHeader>
               <CardContent>
                 <ResponsiveContainer width="100%" height={300}>
-                  <BarChart data={returnsData?.byDay || []}>
-                    <CartesianGrid strokeDasharray="3 3" />
-                    <XAxis dataKey="day" />
-                    <YAxis />
+                  <PieChart>
+                    <Pie
+                      data={Object.entries(returnsData?.byRefundMethod || {}).map(([method, count]) => ({
+                        name: method === 'cash' ? 'Efectivo' : method === 'card' ? 'Tarjeta' : method === 'credit_note' ? 'Nota de Crédito' : 'Cambio',
+                        value: count
+                      }))}
+                      cx="50%"
+                      cy="50%"
+                      labelLine={false}
+                      label={({ name, percent }) => `${name}: ${(percent * 100).toFixed(0)}%`}
+                      outerRadius={80}
+                      fill="#8884d8"
+                      dataKey="value"
+                    >
+                      {Object.keys(returnsData?.byRefundMethod || {}).map((_, index) => (
+                        <Cell key={`cell-${index}`} fill={COLORS[index % COLORS.length]} />
+                      ))}
+                    </Pie>
                     <Tooltip />
-                    <Legend />
-                    <Bar dataKey="total" fill="hsl(var(--destructive))" name="Monto ($)" />
-                    <Bar dataKey="count" fill="hsl(var(--chart-2))" name="Cantidad" />
-                  </BarChart>
+                  </PieChart>
                 </ResponsiveContainer>
+              </CardContent>
+            </Card>
+
+            <Card>
+              <CardHeader>
+                <CardTitle>Detalle de Devoluciones</CardTitle>
+              </CardHeader>
+              <CardContent>
+                <div className="overflow-auto max-h-[500px]">
+                  <table className="w-full">
+                    <thead className="bg-muted sticky top-0">
+                      <tr>
+                        <th className="text-left p-2 font-semibold">Nº Devolución</th>
+                        <th className="text-left p-2 font-semibold">Venta</th>
+                        <th className="text-left p-2 font-semibold">Cliente</th>
+                        <th className="text-right p-2 font-semibold">Total</th>
+                        <th className="text-center p-2 font-semibold">Estado</th>
+                        <th className="text-center p-2 font-semibold">Método</th>
+                        <th className="text-right p-2 font-semibold">Fecha</th>
+                      </tr>
+                    </thead>
+                    <tbody>
+                      {returnsData?.returns?.map((ret: any) => (
+                        <tr key={ret.id} className="border-b hover:bg-muted/50">
+                          <td className="p-2">{ret.return_number}</td>
+                          <td className="p-2">{ret.sale?.sale_number}</td>
+                          <td className="p-2">{ret.sale?.customer?.name}</td>
+                          <td className="text-right p-2">{formatCurrency(ret.total)}</td>
+                          <td className="text-center p-2">
+                            <span className={`inline-flex items-center px-2 py-1 rounded-full text-xs font-medium
+                              ${ret.status === 'completed' ? 'bg-blue-100 text-blue-800 dark:bg-blue-900/30 dark:text-blue-400' :
+                                ret.status === 'approved' ? 'bg-green-100 text-green-800 dark:bg-green-900/30 dark:text-green-400' :
+                                ret.status === 'pending' ? 'bg-orange-100 text-orange-800 dark:bg-orange-900/30 dark:text-orange-400' :
+                                'bg-red-100 text-red-800 dark:bg-red-900/30 dark:text-red-400'}`}>
+                              {ret.status === 'pending' ? 'Pendiente' :
+                               ret.status === 'approved' ? 'Aprobada' :
+                               ret.status === 'completed' ? 'Completada' : 'Rechazada'}
+                            </span>
+                          </td>
+                          <td className="text-center p-2">
+                            {ret.refund_method === 'cash' ? 'Efectivo' :
+                             ret.refund_method === 'card' ? 'Tarjeta' :
+                             ret.refund_method === 'credit_note' ? 'N. Crédito' : 'Cambio'}
+                          </td>
+                          <td className="text-right p-2">
+                            {format(new Date(ret.created_at), "dd/MM/yyyy", { locale: es })}
+                          </td>
+                        </tr>
+                      ))}
+                    </tbody>
+                  </table>
+                </div>
               </CardContent>
             </Card>
           </TabsContent>
 
-          <TabsContent value="services" className="space-y-4">
-            <div className="grid gap-4 md:grid-cols-2">
+          {/* Tab de Arreglos/Servicios Técnicos */}
+          <TabsContent value="repairs" className="space-y-4">
+            <div className="grid gap-4 md:grid-cols-4">
               <Card>
-                <CardHeader>
-                  <CardTitle>Resumen de Servicios Técnicos</CardTitle>
+                <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+                  <CardTitle className="text-sm font-medium">Total Arreglos</CardTitle>
+                  <Wrench className="h-4 w-4 text-muted-foreground" />
                 </CardHeader>
                 <CardContent>
-                  <div className="space-y-4">
-                    <div className="flex justify-between items-center">
-                      <span className="text-muted-foreground">Total servicios:</span>
-                      <span className="text-xl font-bold">{servicesData?.totalServices || 0}</span>
-                    </div>
-                    <div className="flex justify-between items-center">
-                      <span className="text-muted-foreground">Facturación total:</span>
-                      <span className="text-xl font-bold text-green-600">
-                        {formatCurrency(servicesData?.totalRevenue || 0)}
-                      </span>
-                    </div>
-                  </div>
+                  <div className="text-2xl font-bold">{repairsData?.totalRepairs || 0}</div>
+                  <p className="text-xs text-muted-foreground">
+                    {formatCurrency(repairsData?.totalRevenue || 0)}
+                  </p>
                 </CardContent>
               </Card>
-              
               <Card>
-                <CardHeader>
-                  <CardTitle>Servicios por Estado</CardTitle>
+                <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+                  <CardTitle className="text-sm font-medium">En Reparación</CardTitle>
+                  <RotateCw className="h-4 w-4 text-orange-500" />
                 </CardHeader>
                 <CardContent>
-                  <ResponsiveContainer width="100%" height={200}>
-                    <PieChart>
-                      <Pie
-                        data={servicesData?.byStatus || []}
-                        cx="50%"
-                        cy="50%"
-                        labelLine={false}
-                        label={(entry) => `${entry.name}: ${entry.count}`}
-                        outerRadius={60}
-                        fill="hsl(var(--chart-1))"
-                        dataKey="count"
-                      >
-                        {(servicesData?.byStatus || []).map((_: any, index: number) => (
-                          <Cell key={`cell-${index}`} fill={COLORS[index % COLORS.length]} />
-                        ))}
-                      </Pie>
-                      <Tooltip />
-                    </PieChart>
-                  </ResponsiveContainer>
+                  <div className="text-2xl font-bold">{repairsData?.byStatus?.['in_repair'] || 0}</div>
+                </CardContent>
+              </Card>
+              <Card>
+                <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+                  <CardTitle className="text-sm font-medium">Listos</CardTitle>
+                  <Zap className="h-4 w-4 text-green-500" />
+                </CardHeader>
+                <CardContent>
+                  <div className="text-2xl font-bold">{repairsData?.byStatus?.['ready'] || 0}</div>
+                </CardContent>
+              </Card>
+              <Card>
+                <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+                  <CardTitle className="text-sm font-medium">Tiempo Promedio</CardTitle>
+                  <Wrench className="h-4 w-4 text-blue-500" />
+                </CardHeader>
+                <CardContent>
+                  <div className="text-2xl font-bold">{repairsData?.avgRepairTime || 0}d</div>
+                  <p className="text-xs text-muted-foreground">días</p>
                 </CardContent>
               </Card>
             </div>
 
             <Card>
               <CardHeader>
-                <CardTitle>Servicios por Tipo de Dispositivo</CardTitle>
+                <CardTitle>Estados de Arreglos</CardTitle>
               </CardHeader>
               <CardContent>
                 <ResponsiveContainer width="100%" height={300}>
-                  <BarChart data={servicesData?.byDevice || []} layout="vertical">
-                    <CartesianGrid strokeDasharray="3 3" />
-                    <XAxis type="number" />
-                    <YAxis dataKey="name" type="category" width={100} />
+                  <PieChart>
+                    <Pie
+                      data={Object.entries(repairsData?.byStatus || {}).map(([status, count]) => ({
+                        name: status === 'pending' ? 'Pendiente' :
+                              status === 'diagnosing' ? 'Diagnóstico' :
+                              status === 'awaiting_parts' ? 'Esperando Repuestos' :
+                              status === 'in_repair' ? 'En Reparación' :
+                              status === 'ready' ? 'Listo' :
+                              status === 'delivered' ? 'Entregado' : 'Cancelado',
+                        value: count
+                      }))}
+                      cx="50%"
+                      cy="50%"
+                      labelLine={false}
+                      label={({ name, percent }) => `${name}: ${(percent * 100).toFixed(0)}%`}
+                      outerRadius={80}
+                      fill="#8884d8"
+                      dataKey="value"
+                    >
+                      {Object.keys(repairsData?.byStatus || {}).map((_, index) => (
+                        <Cell key={`cell-${index}`} fill={COLORS[index % COLORS.length]} />
+                      ))}
+                    </Pie>
                     <Tooltip />
-                    <Legend />
-                    <Bar dataKey="value" fill="hsl(var(--chart-4))" name="Facturación ($)" />
-                    <Bar dataKey="count" fill="hsl(var(--chart-5))" name="Cantidad" />
-                  </BarChart>
+                  </PieChart>
                 </ResponsiveContainer>
+              </CardContent>
+            </Card>
+
+            <Card>
+              <CardHeader>
+                <CardTitle>Detalle de Arreglos</CardTitle>
+              </CardHeader>
+              <CardContent>
+                <div className="overflow-auto max-h-[500px]">
+                  <table className="w-full">
+                    <thead className="bg-muted sticky top-0">
+                      <tr>
+                        <th className="text-left p-2 font-semibold">Nº Servicio</th>
+                        <th className="text-left p-2 font-semibold">Cliente</th>
+                        <th className="text-left p-2 font-semibold">Dispositivo</th>
+                        <th className="text-left p-2 font-semibold">Problema</th>
+                        <th className="text-right p-2 font-semibold">Costo</th>
+                        <th className="text-center p-2 font-semibold">Estado</th>
+                        <th className="text-right p-2 font-semibold">Fecha</th>
+                      </tr>
+                    </thead>
+                    <tbody>
+                      {repairsData?.repairs?.map((repair: any) => (
+                        <tr key={repair.id} className="border-b hover:bg-muted/50">
+                          <td className="p-2">{repair.service_number}</td>
+                          <td className="p-2">{repair.customer?.name}</td>
+                          <td className="p-2">{repair.device_type}</td>
+                          <td className="p-2 max-w-xs truncate">{repair.reported_issue}</td>
+                          <td className="text-right p-2">{formatCurrency(repair.service_cost || 0)}</td>
+                          <td className="text-center p-2">
+                            <span className={`inline-flex items-center px-2 py-1 rounded-full text-xs font-medium
+                              ${repair.status === 'delivered' ? 'bg-blue-100 text-blue-800 dark:bg-blue-900/30 dark:text-blue-400' :
+                                repair.status === 'ready' ? 'bg-green-100 text-green-800 dark:bg-green-900/30 dark:text-green-400' :
+                                repair.status === 'in_repair' ? 'bg-orange-100 text-orange-800 dark:bg-orange-900/30 dark:text-orange-400' :
+                                repair.status === 'awaiting_parts' ? 'bg-yellow-100 text-yellow-800 dark:bg-yellow-900/30 dark:text-yellow-400' :
+                                repair.status === 'diagnosing' ? 'bg-purple-100 text-purple-800 dark:bg-purple-900/30 dark:text-purple-400' :
+                                repair.status === 'pending' ? 'bg-gray-100 text-gray-800 dark:bg-gray-900/30 dark:text-gray-400' :
+                                'bg-red-100 text-red-800 dark:bg-red-900/30 dark:text-red-400'}`}>
+                              {repair.status === 'pending' ? 'Pendiente' :
+                               repair.status === 'diagnosing' ? 'Diagnóstico' :
+                               repair.status === 'awaiting_parts' ? 'Esp. Repuestos' :
+                               repair.status === 'in_repair' ? 'Reparando' :
+                               repair.status === 'ready' ? 'Listo' :
+                               repair.status === 'delivered' ? 'Entregado' : 'Cancelado'}
+                            </span>
+                          </td>
+                          <td className="text-right p-2">
+                            {format(new Date(repair.created_at), "dd/MM/yyyy", { locale: es })}
+                          </td>
+                        </tr>
+                      ))}
+                    </tbody>
+                  </table>
+                </div>
               </CardContent>
             </Card>
           </TabsContent>

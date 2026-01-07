@@ -10,9 +10,22 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { toast } from "sonner";
-import { Clock, Plus, LogIn, LogOut, Calendar } from "lucide-react";
+import { Clock, Plus, LogIn, LogOut, Calendar, Trash2 } from "lucide-react";
 import { format, startOfMonth, endOfMonth } from "date-fns";
 import { es } from "date-fns/locale";
+import { Badge } from "@/components/ui/badge";
+
+interface TimeEntry {
+  id: string;
+  employee_id: string;
+  clock_in: string;
+  clock_out: string | null;
+  notes: string | null;
+  employees?: {
+    first_name: string;
+    last_name: string;
+  };
+}
 
 export function EmployeeTimeTracking() {
   const { currentCompany } = useCompany();
@@ -21,7 +34,7 @@ export function EmployeeTimeTracking() {
   const [selectedEmployee, setSelectedEmployee] = useState<string>("");
   const [selectedDate, setSelectedDate] = useState(new Date().toISOString().split("T")[0]);
   const [clockInTime, setClockInTime] = useState("09:00");
-  const [clockOutTime, setClockOutTime] = useState("18:00");
+  const [clockOutTime, setClockOutTime] = useState("");
   const [notes, setNotes] = useState("");
   const [filterMonth, setFilterMonth] = useState(new Date().toISOString().slice(0, 7));
 
@@ -62,7 +75,7 @@ export function EmployeeTimeTracking() {
         .order("clock_in", { ascending: false });
       
       if (error) throw error;
-      return data as any[];
+      return data as unknown as TimeEntry[];
     },
     enabled: !!currentCompany?.id,
   });
@@ -97,11 +110,29 @@ export function EmployeeTimeTracking() {
     },
   });
 
+  const deleteEntryMutation = useMutation({
+    mutationFn: async (entryId: string) => {
+      const { error } = await supabase
+        .from("employee_time_entries" as any)
+        .delete()
+        .eq("id", entryId);
+      
+      if (error) throw error;
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["time-entries"] });
+      toast.success("Registro eliminado");
+    },
+    onError: (error: any) => {
+      toast.error("Error al eliminar: " + error.message);
+    },
+  });
+
   const resetForm = () => {
     setSelectedEmployee("");
     setSelectedDate(new Date().toISOString().split("T")[0]);
     setClockInTime("09:00");
-    setClockOutTime("18:00");
+    setClockOutTime("");
     setNotes("");
   };
 
@@ -182,7 +213,7 @@ export function EmployeeTimeTracking() {
                   </div>
                   <div className="grid grid-cols-2 gap-4">
                     <div className="space-y-2">
-                      <Label htmlFor="clockIn">Hora Entrada</Label>
+                      <Label htmlFor="clockIn">Hora Entrada *</Label>
                       <Input
                         id="clockIn"
                         type="time"
@@ -191,7 +222,7 @@ export function EmployeeTimeTracking() {
                       />
                     </div>
                     <div className="space-y-2">
-                      <Label htmlFor="clockOut">Hora Salida</Label>
+                      <Label htmlFor="clockOut">Hora Salida (opcional)</Label>
                       <Input
                         id="clockOut"
                         type="time"
@@ -216,7 +247,7 @@ export function EmployeeTimeTracking() {
                   </Button>
                   <Button
                     onClick={() => createEntryMutation.mutate()}
-                    disabled={!selectedEmployee || createEntryMutation.isPending}
+                    disabled={!selectedEmployee || !clockInTime || createEntryMutation.isPending}
                   >
                     {createEntryMutation.isPending ? "Guardando..." : "Guardar"}
                   </Button>
@@ -226,63 +257,79 @@ export function EmployeeTimeTracking() {
           </div>
         </div>
         <CardDescription>
-          Registro de entrada y salida de empleados (solo visible para administradores)
+          Registro de entrada y salida de empleados
         </CardDescription>
       </CardHeader>
       <CardContent>
         {timeEntries && timeEntries.length > 0 ? (
-          <Table>
-            <TableHeader>
-              <TableRow>
-                <TableHead>Empleado</TableHead>
-                <TableHead>Fecha</TableHead>
-                <TableHead>
-                  <div className="flex items-center gap-1">
-                    <LogIn className="h-4 w-4" />
-                    Entrada
-                  </div>
-                </TableHead>
-                <TableHead>
-                  <div className="flex items-center gap-1">
-                    <LogOut className="h-4 w-4" />
-                    Salida
-                  </div>
-                </TableHead>
-                <TableHead>Horas</TableHead>
-                <TableHead>Notas</TableHead>
-              </TableRow>
-            </TableHeader>
-            <TableBody>
-              {timeEntries.map((entry: any) => (
-                <TableRow key={entry.id}>
-                  <TableCell className="font-medium">
-                    {entry.employees?.first_name} {entry.employees?.last_name}
-                  </TableCell>
-                  <TableCell>
+          <div className="border rounded-lg overflow-x-auto">
+            <Table>
+              <TableHeader>
+                <TableRow>
+                  <TableHead>Empleado</TableHead>
+                  <TableHead>Fecha</TableHead>
+                  <TableHead>
                     <div className="flex items-center gap-1">
-                      <Calendar className="h-4 w-4 text-muted-foreground" />
-                      {format(new Date(entry.clock_in), "dd/MM/yyyy", { locale: es })}
+                      <LogIn className="h-4 w-4" />
+                      Entrada
                     </div>
-                  </TableCell>
-                  <TableCell className="text-green-600 font-medium">
-                    {format(new Date(entry.clock_in), "HH:mm", { locale: es })}
-                  </TableCell>
-                  <TableCell className="text-red-600 font-medium">
-                    {entry.clock_out 
-                      ? format(new Date(entry.clock_out), "HH:mm", { locale: es })
-                      : "-"
-                    }
-                  </TableCell>
-                  <TableCell>
-                    {calculateHours(entry.clock_in, entry.clock_out)}
-                  </TableCell>
-                  <TableCell className="text-muted-foreground text-sm">
-                    {entry.notes || "-"}
-                  </TableCell>
+                  </TableHead>
+                  <TableHead>
+                    <div className="flex items-center gap-1">
+                      <LogOut className="h-4 w-4" />
+                      Salida
+                    </div>
+                  </TableHead>
+                  <TableHead>Horas</TableHead>
+                  <TableHead>Notas</TableHead>
+                  <TableHead>Acciones</TableHead>
                 </TableRow>
-              ))}
-            </TableBody>
-          </Table>
+              </TableHeader>
+              <TableBody>
+                {timeEntries.map((entry) => (
+                  <TableRow key={entry.id}>
+                    <TableCell className="font-medium">
+                      {entry.employees?.first_name} {entry.employees?.last_name}
+                    </TableCell>
+                    <TableCell>
+                      <div className="flex items-center gap-1">
+                        <Calendar className="h-4 w-4 text-muted-foreground" />
+                        {format(new Date(entry.clock_in), "dd/MM/yyyy", { locale: es })}
+                      </div>
+                    </TableCell>
+                    <TableCell className="text-green-600 font-medium">
+                      {format(new Date(entry.clock_in), "HH:mm", { locale: es })}
+                    </TableCell>
+                    <TableCell className="text-red-600 font-medium">
+                      {entry.clock_out 
+                        ? format(new Date(entry.clock_out), "HH:mm", { locale: es })
+                        : <Badge variant="secondary">En progreso</Badge>
+                      }
+                    </TableCell>
+                    <TableCell>
+                      {calculateHours(entry.clock_in, entry.clock_out)}
+                    </TableCell>
+                    <TableCell className="text-muted-foreground text-sm max-w-[200px] truncate">
+                      {entry.notes || "-"}
+                    </TableCell>
+                    <TableCell>
+                      <Button
+                        variant="ghost"
+                        size="sm"
+                        onClick={() => {
+                          if (confirm("¿Eliminar este registro?")) {
+                            deleteEntryMutation.mutate(entry.id);
+                          }
+                        }}
+                      >
+                        <Trash2 className="h-4 w-4" />
+                      </Button>
+                    </TableCell>
+                  </TableRow>
+                ))}
+              </TableBody>
+            </Table>
+          </div>
         ) : (
           <div className="text-center py-12">
             <Clock className="h-12 w-12 mx-auto text-muted-foreground mb-4" />

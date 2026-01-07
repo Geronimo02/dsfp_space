@@ -60,6 +60,7 @@ const Retentions = lazy(() => import("./pages/Retentions"));
 const Integrations = lazy(() => import("./pages/Integrations"));
 const Payroll = lazy(() => import("./pages/Payroll"));
 const AFIPBilling = lazy(() => import("./pages/AFIPBilling"));
+const MyTimeTracking = lazy(() => import("./pages/MyTimeTracking"));
 const PlatformAdmin = lazy(() => import("./pages/PlatformAdmin"));
 const CustomerSupport = lazy(() => import("./pages/CustomerSupport"));
 const CustomerSupportSettings = lazy(() => import("./pages/CustomerSupportSettings"));
@@ -371,6 +372,7 @@ const App = () => (
             
             {/* RRHH */}
             <Route path="/payroll" element={<ProtectedRoute><ModuleProtectedRoute moduleCode="payroll"><Payroll /></ModuleProtectedRoute></ProtectedRoute>} />
+            <Route path="/my-time-tracking" element={<ProtectedRoute><MyTimeTracking /></ProtectedRoute>} />
             
             {/* Integraciones */}
             <Route path="/integrations" element={<ProtectedRoute><ModuleProtectedRoute moduleCode="integrations"><Integrations /></ModuleProtectedRoute></ProtectedRoute>} />

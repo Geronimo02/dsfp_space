@@ -81,6 +81,17 @@ export default function Products() {
   }, [currentCompany, permissionsLoading, hasPermission, canCreate, canEdit, canDelete, canExport]);
 
   const [searchQuery, setSearchQuery] = useState("");
+  const [categoryFilter, setCategoryFilter] = useState<string>("");
+  
+  // Cargar parámetro de búsqueda desde URL
+  useEffect(() => {
+    const params = new URLSearchParams(window.location.search);
+    const searchParam = params.get('search');
+    if (searchParam) {
+      setSearchQuery(searchParam);
+    }
+  }, []);
+  
   const [isDialogOpen, setIsDialogOpen] = useState(false);
   const [editingProduct, setEditingProduct] = useState<any>(null);
   
@@ -147,7 +158,7 @@ export default function Products() {
   const queryClient = useQueryClient();
 
   const { data: products, isLoading } = useQuery({
-    queryKey: ["products", searchQuery, currentCompany?.id],
+    queryKey: ["products", searchQuery, categoryFilter, currentCompany?.id],
     queryFn: async () => {
       if (!currentCompany?.id) return [];
       
@@ -158,6 +169,10 @@ export default function Products() {
         if (sanitized) {
           query = query.or(`name.ilike.%${sanitized}%,barcode.ilike.%${sanitized}%,sku.ilike.%${sanitized}%`);
         }
+      }
+      
+      if (categoryFilter) {
+        query = query.eq("category", categoryFilter);
       }
       
       const { data, error } = await query;
@@ -404,13 +419,61 @@ export default function Products() {
         .eq("company_id", currentCompany.id);
       
       if (error) throw error;
+      
+      // Update warehouse stock if provided
+      if (warehouses && warehouseStockData[id] && Object.keys(warehouseStockData[id]).length > 0) {
+        for (const [warehouseId, stock] of Object.entries(warehouseStockData[id])) {
+          // Check if warehouse stock entry exists
+          const { data: existingStock } = await supabase
+            .from("warehouse_stock")
+            .select("id")
+            .eq("warehouse_id", warehouseId)
+            .eq("product_id", id)
+            .single();
+          
+          if (existingStock) {
+            // Update existing entry
+            await supabase
+              .from("warehouse_stock")
+              .update({ stock: stock || 0 })
+              .eq("id", existingStock.id);
+          } else if (stock > 0) {
+            // Create new entry only if stock > 0
+            await supabase
+              .from("warehouse_stock")
+              .insert({
+                warehouse_id: warehouseId,
+                product_id: id,
+                stock: stock || 0,
+                min_stock: data.min_stock || 0,
+                company_id: currentCompany.id,
+              });
+          }
+        }
+        
+        // Recalculate total stock
+        const { data: allStocks } = await supabase
+          .from("warehouse_stock")
+          .select("stock")
+          .eq("product_id", id);
+        
+        const totalStock = allStocks?.reduce((sum, s) => sum + s.stock, 0) || 0;
+        
+        await supabase
+          .from("products")
+          .update({ stock: totalStock })
+          .eq("id", id);
+      }
     },
     onSuccess: () => {
       toast.success("Producto actualizado exitosamente");
       queryClient.invalidateQueries({ queryKey: ["products"] });
+      queryClient.invalidateQueries({ queryKey: ["warehouse-stock"] });
+      queryClient.invalidateQueries({ queryKey: ["warehouse-stock-detail"] });
       setIsDialogOpen(false);
       setEditingProduct(null);
       resetForm();
+      setWarehouseStockData({});
     },
     onError: (error: any) => {
       const msg = error?.message || '';
@@ -565,7 +628,7 @@ export default function Products() {
     }
   };
 
-  const handleEdit = (product: any) => {
+  const handleEdit = async (product: any) => {
     setEditingProduct(product);
     setFormData({
       name: product.name,
@@ -584,6 +647,24 @@ export default function Products() {
     });
     setImagePreview(product.image_url || "");
     setImageFile(null);
+    
+    // Load warehouse stock data for this product
+    if (warehouses) {
+      const { data: warehouseStockData } = await supabase
+        .from("warehouse_stock")
+        .select("warehouse_id, stock")
+        .eq("product_id", product.id);
+      
+      const stockByWarehouse: Record<string, number> = {};
+      warehouseStockData?.forEach(ws => {
+        stockByWarehouse[ws.warehouse_id] = ws.stock;
+      });
+      
+      setWarehouseStockData({
+        [product.id]: stockByWarehouse
+      });
+    }
+    
     setIsDialogOpen(true);
   };
   
@@ -639,9 +720,27 @@ export default function Products() {
     setExpandedProducts(newExpanded);
   };
 
-  const handleStockAdjust = (product: any) => {
+  const handleStockAdjust = async (product: any) => {
     setAdjustingProduct(product);
-    setStockAdjustments({});
+    
+    // Load current warehouse stock values
+    if (warehouses) {
+      const { data: warehouseStockData } = await supabase
+        .from("warehouse_stock")
+        .select("warehouse_id, stock")
+        .eq("product_id", product.id);
+      
+      const initialStockValues: Record<string, string> = {};
+      warehouses.forEach(warehouse => {
+        const stockEntry = warehouseStockData?.find(ws => ws.warehouse_id === warehouse.id);
+        initialStockValues[warehouse.id] = stockEntry ? stockEntry.stock.toString() : '0';
+      });
+      
+      setStockAdjustments(initialStockValues);
+    } else {
+      setStockAdjustments({});
+    }
+    
     setIsStockAdjustDialogOpen(true);
   };
 
@@ -704,31 +803,42 @@ export default function Products() {
     if (!adjustingProduct) return;
 
     try {
-      for (const [warehouseId, adjustment] of Object.entries(stockAdjustments)) {
-        if (!adjustment || parseInt(adjustment) === 0) continue;
+      for (const [warehouseId, newStockValue] of Object.entries(stockAdjustments)) {
+        if (newStockValue === '' || newStockValue === undefined) continue;
 
-        const adjustmentValue = parseInt(adjustment);
+        const newStock = parseInt(newStockValue);
         
-        // Get current warehouse stock
-        const { data: currentStock } = await supabase
+        if (isNaN(newStock) || newStock < 0) {
+          toast.error(`Valor de stock inválido para depósito ${warehouseId}`);
+          continue;
+        }
+
+        // Check if warehouse stock entry exists
+        const { data: existingStock } = await supabase
           .from("warehouse_stock")
-          .select("stock")
+          .select("id")
           .eq("warehouse_id", warehouseId)
           .eq("product_id", adjustingProduct.id)
           .single();
 
-        if (currentStock) {
-          const newStock = currentStock.stock + adjustmentValue;
-          if (newStock < 0) {
-            toast.error(`Stock insuficiente en depósito ${warehouseId}`);
-            continue;
-          }
-
+        if (existingStock) {
+          // Update existing stock
           await supabase
             .from("warehouse_stock")
             .update({ stock: newStock })
             .eq("warehouse_id", warehouseId)
             .eq("product_id", adjustingProduct.id);
+        } else {
+          // Create new warehouse stock entry
+          await supabase
+            .from("warehouse_stock")
+            .insert({
+              warehouse_id: warehouseId,
+              product_id: adjustingProduct.id,
+              stock: newStock,
+              min_stock: adjustingProduct.min_stock || 0,
+              company_id: currentCompany?.id,
+            });
         }
       }
 
@@ -1445,51 +1555,72 @@ export default function Products() {
                   </div>
                 </div>
 
-                {/* Warehouse Distribution Section - Only for new products */}
-                {!editingProduct && warehouses && warehouses.length > 0 && (
+                {/* Warehouse Distribution Section */}
+                {warehouses && warehouses.length > 0 && (
                   <>
                     <Separator />
                     <div className="space-y-3">
-                      <Label className="text-base font-semibold">Distribución por Depósito (Opcional)</Label>
+                      <Label className="text-base font-semibold">
+                        {editingProduct ? "Gestionar Stock por Depósito" : "Distribución por Depósito (Opcional)"}
+                      </Label>
                       <p className="text-sm text-muted-foreground">
-                        Distribuye el stock total entre los depósitos. Si no distribuyes, el stock quedará sin asignar.
+                        {editingProduct 
+                          ? "Asigna o modifica el stock de este producto en cada depósito. El stock total se calculará automáticamente."
+                          : "Distribuye el stock total entre los depósitos. Si no distribuyes, el stock quedará sin asignar."}
                       </p>
                       <div className="grid grid-cols-2 gap-4">
-                        {warehouses.map((warehouse) => (
-                          <div key={warehouse.id} className="space-y-2">
-                            <Label htmlFor={`warehouse-${warehouse.id}`}>
-                              {warehouse.code} - {warehouse.name}
-                              {warehouse.is_main && <Badge variant="default" className="ml-2">Principal</Badge>}
-                            </Label>
-                            <Input
-                              id={`warehouse-${warehouse.id}`}
-                              type="number"
-                              min="0"
-                              placeholder="0"
-                              value={warehouseStockData["new"]?.[warehouse.id] || ""}
-                              onChange={(e) => {
-                                const value = parseInt(e.target.value) || 0;
-                                setWarehouseStockData({
-                                  ...warehouseStockData,
-                                  new: {
-                                    ...warehouseStockData["new"],
-                                    [warehouse.id]: value
-                                  }
-                                });
-                              }}
-                            />
-                          </div>
-                        ))}
+                        {warehouses.map((warehouse) => {
+                          const existingStock = editingProduct 
+                            ? warehouseStockData[editingProduct.id]?.[warehouse.id]
+                            : warehouseStockData["new"]?.[warehouse.id];
+                          
+                          return (
+                            <div key={warehouse.id} className="space-y-2">
+                              <Label htmlFor={`warehouse-${warehouse.id}`}>
+                                {warehouse.code} - {warehouse.name}
+                                {warehouse.is_main && <Badge variant="default" className="ml-2">Principal</Badge>}
+                              </Label>
+                              <Input
+                                id={`warehouse-${warehouse.id}`}
+                                type="number"
+                                min="0"
+                                placeholder="0"
+                                value={editingProduct 
+                                  ? (warehouseStockData[editingProduct.id]?.[warehouse.id] ?? existingStock ?? "")
+                                  : (warehouseStockData["new"]?.[warehouse.id] || "")}
+                                onChange={(e) => {
+                                  const value = parseInt(e.target.value) || 0;
+                                  const productKey = editingProduct ? editingProduct.id : "new";
+                                  setWarehouseStockData({
+                                    ...warehouseStockData,
+                                    [productKey]: {
+                                      ...warehouseStockData[productKey],
+                                      [warehouse.id]: value
+                                    }
+                                  });
+                                }}
+                              />
+                            </div>
+                          );
+                        })}
                       </div>
-                      {warehouseStockData["new"] && Object.values(warehouseStockData["new"]).some(v => v > 0) && (
-                        <div className="p-3 bg-muted rounded-lg">
-                          <div className="flex justify-between text-sm">
-                            <span>Total distribuido:</span>
-                            <span className="font-semibold">
-                              {Object.values(warehouseStockData["new"]).reduce((sum, val) => sum + (val || 0), 0)} / {formData.stock || 0}
-                            </span>
-                          </div>
+                      {editingProduct ? (
+                        <div className="p-3 bg-blue-50 dark:bg-blue-950 rounded-lg border border-blue-200 dark:border-blue-800">
+                          <p className="text-sm text-blue-700 dark:text-blue-300">
+                            💡 Al editar, puedes usar el botón de "Ajustar Stock" para modificaciones rápidas del stock actual.
+                          </p>
                         </div>
+                      ) : (
+                        warehouseStockData["new"] && Object.values(warehouseStockData["new"]).some(v => v > 0) && (
+                          <div className="p-3 bg-muted rounded-lg">
+                            <div className="flex justify-between text-sm">
+                              <span>Total distribuido:</span>
+                              <span className="font-semibold">
+                                {Object.values(warehouseStockData["new"]).reduce((sum, val) => sum + (val || 0), 0)} / {formData.stock || 0}
+                              </span>
+                            </div>
+                          </div>
+                        )
                       )}
                     </div>
                   </>
@@ -1653,14 +1784,29 @@ export default function Products() {
 
         <Card className="shadow-soft">
           <CardHeader>
-            <div className="relative">
-              <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
-              <Input
-                placeholder="Buscar productos..."
-                value={searchQuery}
-                onChange={(e) => setSearchQuery(e.target.value)}
-                className="pl-10"
-              />
+            <div className="flex flex-col sm:flex-row gap-3">
+              <div className="relative flex-1">
+                <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
+                <Input
+                  placeholder="Buscar productos..."
+                  value={searchQuery}
+                  onChange={(e) => setSearchQuery(e.target.value)}
+                  className="pl-10"
+                />
+              </div>
+              <Select value={categoryFilter || "ALL"} onValueChange={(value) => setCategoryFilter(value === "ALL" ? "" : value)}>
+                <SelectTrigger className="w-full sm:w-[200px]">
+                  <SelectValue placeholder="Todas las categorías" />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="ALL">Todas las categorías</SelectItem>
+                  {products && Array.from(new Set(products.filter(p => p.category).map(p => p.category))).sort().map(category => (
+                    <SelectItem key={category} value={category}>
+                      {category}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
             </div>
           </CardHeader>
           <CardContent className="p-2 sm:p-6 overflow-x-auto">
@@ -1928,7 +2074,7 @@ export default function Products() {
             </DialogHeader>
             <div className="space-y-4">
               <p className="text-sm text-muted-foreground">
-                Ingresa valores positivos para agregar o negativos para restar stock de cada depósito.
+                Modifica el stock de cada depósito. Ingresa el valor final deseado para cada ubicación.
               </p>
               {warehouses?.map((warehouse) => {
                 const warehouseStock = getWarehouseStockForProduct(adjustingProduct?.id || "")
