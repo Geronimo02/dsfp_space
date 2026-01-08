@@ -353,15 +353,21 @@ const Employees = () => {
               <Users className="mr-1 sm:mr-2 h-4 w-4" />
               <span className="hidden sm:inline">Empleados</span>
             </TabsTrigger>
-            <TabsTrigger value="time-tracking" className="flex-1 min-w-[100px] text-xs sm:text-sm">
+            <TabsTrigger value="my-time" className="flex-1 min-w-[100px] text-xs sm:text-sm">
               <Clock className="mr-1 sm:mr-2 h-4 w-4" />
               <span className="hidden sm:inline">Mi Horario</span>
             </TabsTrigger>
             {isAdmin && (
-              <TabsTrigger value="permissions" className="flex-1 min-w-[80px] text-xs sm:text-sm">
-                <Shield className="mr-1 sm:mr-2 h-4 w-4" />
-                <span className="hidden sm:inline">Permisos</span>
-              </TabsTrigger>
+              <>
+                <TabsTrigger value="all-times" className="flex-1 min-w-[100px] text-xs sm:text-sm">
+                  <Clock className="mr-1 sm:mr-2 h-4 w-4" />
+                  <span className="hidden sm:inline">Horarios</span>
+                </TabsTrigger>
+                <TabsTrigger value="permissions" className="flex-1 min-w-[80px] text-xs sm:text-sm">
+                  <Shield className="mr-1 sm:mr-2 h-4 w-4" />
+                  <span className="hidden sm:inline">Permisos</span>
+                </TabsTrigger>
+              </>
             )}
           </TabsList>
 
@@ -646,13 +652,15 @@ const Employees = () => {
             </Card>
           </TabsContent>
 
-          <TabsContent value="time-tracking">
-            {isAdmin ? (
-              <EmployeeTimeTracking />
-            ) : (
-              <EmployeeSelfTimeTracking />
-            )}
+          <TabsContent value="my-time">
+            <EmployeeSelfTimeTracking />
           </TabsContent>
+
+          {isAdmin && (
+            <TabsContent value="all-times">
+              <EmployeeTimeTracking />
+            </TabsContent>
+          )}
 
           {isAdmin && (
             <TabsContent value="permissions">

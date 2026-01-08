@@ -41,6 +41,7 @@ const MODULES = [
   { code: "cash_register", name: "Caja", category: "Finanzas" },
   { code: "reports", name: "Reportes", category: "Reportes" },
   { code: "employees", name: "Empleados", category: "RRHH" },
+  { code: "time_tracking", name: "Control de Horarios", category: "RRHH" },
   { code: "settings", name: "Configuración", category: "Administración" },
   { code: "technical_services", name: "Servicios Técnicos", category: "Operaciones" },
   { code: "promotions", name: "Promociones", category: "Operaciones" },
