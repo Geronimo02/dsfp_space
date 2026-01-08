@@ -8,6 +8,17 @@ import { toast } from "sonner";
 import { loadStripe } from "@stripe/stripe-js";
 import { Elements, PaymentElement, useElements, useStripe } from "@stripe/react-stripe-js";
 
+function getSubscriptionStatusLabel(status?: string) {
+  const map: Record<string, string> = {
+    active: "Activo",
+    trialing: "En prueba",
+    incomplete: "Pendiente de activación",
+    past_due: "Pago pendiente",
+    canceled: "Cancelado",
+  };
+  return status ? map[status] ?? status : "";
+}
+
 function StripePaymentSetup({ clientSecret, onSaved, companyId, onInvalidate }: { clientSecret: string; onSaved: () => void; companyId: string; onInvalidate: () => void }) {
   const stripe = useStripe();
   const elements = useElements();
@@ -57,31 +68,16 @@ export default function Subscription() {
 
   const { data: subscription, isLoading: subscriptionLoading } = useQuery({
     queryKey: ["subscription", currentCompany?.id],
-    enabled: !!currentCompany?.id,
-    staleTime: 30000, // 30 segundos
+    enabled: !companyLoading && !!currentCompany?.id,
+    staleTime: 30000,
     refetchOnWindowFocus: false,
+    placeholderData: (prev) => prev,
     queryFn: async () => {
       const { data, error } = await supabase
         .from("subscriptions")
-        .select("*")
+        .select("*, subscription_plans (name, price)")
         .eq("company_id", currentCompany!.id)
         .maybeSingle();
-      if (error) throw error;
-      return data;
-    },
-  });
-
-  const { data: subscriptionPlan, isLoading: planLoading } = useQuery({
-    queryKey: ["subscription-plan", subscription?.plan_id],
-    enabled: !!subscription?.plan_id,
-    staleTime: 30000, // 30 segundos
-    refetchOnWindowFocus: false,
-    queryFn: async () => {
-      const { data, error } = await supabase
-        .from("subscription_plans")
-        .select("name, price")
-        .eq("id", subscription!.plan_id)
-        .single();
       if (error) throw error;
       return data;
     },
@@ -202,7 +198,7 @@ export default function Subscription() {
             <CardDescription>Plan y período de prueba</CardDescription>
           </CardHeader>
           <CardContent className="space-y-2">
-            {subscriptionLoading || planLoading ? (
+            {subscriptionLoading ? (
               <div className="space-y-2">
                 <div className="h-4 w-32 bg-muted animate-pulse rounded" />
                 <div className="h-4 w-40 bg-muted animate-pulse rounded" />
@@ -211,9 +207,9 @@ export default function Subscription() {
               </div>
             ) : (
               <>
-                <p>Plan: <strong>{subscriptionPlan?.name ?? "Sin plan"}</strong></p>
-                <p>Precio: ${subscriptionPlan?.price ?? "-"} USD/mes</p>
-                <p>Estado: <strong>{subscription?.status === "active" ? "Activo" : subscription?.status ?? "Inactivo"}</strong></p>
+                <p>Plan: <strong>{subscription?.subscription_plans?.name ?? (subscription?.plan_id ? "Plan sin nombre" : "Sin plan")}</strong></p>
+                <p>Precio: ${subscription?.subscription_plans?.price ?? "-"} USD/mes</p>
+                <p>Estado: <strong>{getSubscriptionStatusLabel(subscription?.status) || ""}</strong></p>
                 <p>Proveedor: {subscription?.provider ?? effectiveProvider ?? "-"}</p>
                 {trialDaysLeft !== null && trialDaysLeft > 0 && (
                   <p>Trial resta: {trialDaysLeft} días</p>

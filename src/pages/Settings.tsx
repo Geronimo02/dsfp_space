@@ -21,6 +21,17 @@ import { CompanySettings } from "@/components/settings/CompanySettings";
 import { PriceListsSettings } from "@/components/settings/PriceListsSettings";
 import { PaymentMethodsManager } from "@/components/settings/PaymentMethodsManager";
 
+function getSubscriptionStatusLabel(status?: string) {
+  const map: Record<string, string> = {
+    active: "Activo",
+    trialing: "En prueba",
+    incomplete: "Pendiente de activación",
+    past_due: "Pago pendiente",
+    canceled: "Cancelado",
+  };
+  return status ? map[status] ?? status : "";
+}
+
 const settingsSchema = z.object({
   company_name: z.string().trim().min(1, "El nombre de la empresa es requerido").max(200, "El nombre debe tener máximo 200 caracteres"),
   email: z.string().trim().toLowerCase().max(255, "El email debe tener máximo 255 caracteres")
@@ -94,31 +105,16 @@ export default function Settings() {
 
   const { data: subscription, isLoading: subscriptionLoading } = useQuery({
     queryKey: ["subscription", currentCompany?.id],
-    enabled: !!currentCompany?.id,
+    enabled: !companyLoading && !!currentCompany?.id,
     staleTime: 30000, // 30 segundos
     refetchOnWindowFocus: false,
+    placeholderData: (prev) => prev,
     queryFn: async () => {
       const { data, error } = await supabase
         .from("subscriptions")
-        .select("*")
+        .select("*, subscription_plans (name, price)")
         .eq("company_id", currentCompany!.id)
         .maybeSingle();
-      if (error) throw error;
-      return data;
-    },
-  });
-
-  const { data: subscriptionPlan, isLoading: planLoading } = useQuery({
-    queryKey: ["subscription-plan", subscription?.plan_id],
-    enabled: !!subscription?.plan_id,
-    staleTime: 30000, // 30 segundos
-    refetchOnWindowFocus: false,
-    queryFn: async () => {
-      const { data, error } = await supabase
-        .from("subscription_plans")
-        .select("name, price")
-        .eq("id", subscription!.plan_id)
-        .single();
       if (error) throw error;
       return data;
     },
@@ -1197,7 +1193,7 @@ export default function Settings() {
                   <CardDescription>Información de tu plan y período de prueba</CardDescription>
                 </CardHeader>
                 <CardContent className="space-y-3">
-                  {subscriptionLoading || planLoading ? (
+                  {subscriptionLoading ? (
                     <div className="grid grid-cols-2 gap-4">
                       <div className="space-y-2">
                         <div className="h-4 w-16 bg-muted animate-pulse rounded" />
@@ -1217,13 +1213,13 @@ export default function Settings() {
                       <div>
                         <p className="text-sm font-medium text-muted-foreground">Plan</p>
                         <p className="text-lg font-semibold">
-                          {subscriptionPlan?.name ?? "Sin plan"}
+                          {subscription?.subscription_plans?.name ?? "Sin plan"}
                         </p>
                       </div>
                       <div>
                         <p className="text-sm font-medium text-muted-foreground">Estado</p>
                         <p className="text-lg font-semibold capitalize">
-                          {subscription?.status === "active" ? "Activo" : subscription?.status ?? "Inactivo"}
+                          {getSubscriptionStatusLabel(subscription?.status) || "Inactivo"}
                         </p>
                       </div>
                       <div className="col-span-2">

@@ -141,21 +141,25 @@ Deno.serve(async (req: Request) => {
     let paymentId: string | null = null;
     let amountCharged = 0;
     let currencyCharged = "USD";
+    let providerSubscriptionId: string | null = null;
+    let providerCustomerId: string | null = null;
+    let subscriptionStatus: string | null = null;
+    let currentPeriodEnd: string | null = null;
 
     // === CRITICAL: CHARGE THE PAYMENT FIRST ===
     if (spm.provider === "stripe") {
-      console.log("[finalize-signup] Processing Stripe payment...");
-      
+      console.log("[finalize-signup] Processing Stripe subscription...");
+
       try {
         const stripe = new Stripe(Deno.env.get("STRIPE_SECRET_KEY") || "", {
           apiVersion: "2023-10-16",
         });
 
-        // Get plan amount
+        // Get plan amount and name
         console.log(`[finalize-signup] Fetching plan details for plan_id: ${spm.plan_id}`);
         const { data: plan, error: planError } = await supabaseAdmin
           .from("subscription_plans")
-          .select("price, currency")
+          .select("price, currency, name")
           .eq("id", spm.plan_id)
           .single();
 
@@ -168,53 +172,60 @@ Deno.serve(async (req: Request) => {
         amountCharged = plan.price;
         currencyCharged = plan.currency || "USD";
 
-        console.log(`[finalize-signup] Charging Stripe PaymentIntent: ${currencyCharged} ${plan.price} (${amountCents} cents)`);
-
-        // Get the payment method to check if it has a customer
+        // Ensure customer exists and has the payment method attached
         const paymentMethod = await stripe.paymentMethods.retrieve(spm.payment_method_ref);
-        const customerId = typeof paymentMethod.customer === 'string' ? paymentMethod.customer : paymentMethod.customer?.id;
-        
-        console.log(`[finalize-signup] PaymentMethod customer: ${customerId}`);
+        let customerId = typeof paymentMethod.customer === "string" ? paymentMethod.customer : paymentMethod.customer?.id || null;
 
-        const paymentIntentParams: any = {
-          amount: amountCents,
-          currency: currencyCharged.toLowerCase(),
-          payment_method: spm.payment_method_ref,
-          confirm: true,
-          off_session: true,
-          description: `Subscription payment for ${actualEmail}`,
-          metadata: {
-            signup_intent_id: intent_id,
-            plan_id: spm.plan_id,
+        if (!customerId) {
+          const customer = await stripe.customers.create({
             email: actualEmail,
-          },
-        };
-
-        // If payment method has a customer, include it
-        if (customerId) {
-          paymentIntentParams.customer = customerId;
+            name: fullName,
+          });
+          customerId = customer.id;
         }
 
-        const paymentIntent = await stripe.paymentIntents.create(paymentIntentParams);
-
-        if (paymentIntent.status !== "succeeded") {
-          const errorMsg = `No pudimos procesar tu pago. Estado: ${paymentIntent.status}`;
-          console.error("[finalize-signup] Stripe payment failed:", errorMsg);
-          
-          // Update payment method with error
-          await supabaseAdmin
-            .from("signup_payment_methods")
-            .update({ payment_verified: false, payment_error: errorMsg })
-            .eq("id", spm.id);
-
-          return json({ error: errorMsg }, 400);
+        // Attach payment method if needed and set default
+        if (!paymentMethod.customer) {
+          await stripe.paymentMethods.attach(spm.payment_method_ref, { customer: customerId });
         }
 
-        paymentId = paymentIntent.id;
-        console.log(`[finalize-signup] ✅ Stripe payment succeeded: ${paymentId}`);
+        await stripe.customers.update(customerId, {
+          invoice_settings: { default_payment_method: spm.payment_method_ref },
+        });
+
+        // Create subscription immediately (no trial if plan is de pago)
+        const subscription = await stripe.subscriptions.create({
+          customer: customerId,
+          items: [
+            {
+              price_data: {
+                currency: currencyCharged.toLowerCase(),
+                product_data: { name: plan.name || "Suscripción" },
+                unit_amount: amountCents,
+                recurring: { interval: "month" },
+              },
+            },
+          ],
+          default_payment_method: spm.payment_method_ref,
+          trial_end: trialEndsAt ? Math.floor(new Date(trialEndsAt).getTime() / 1000) : undefined,
+          expand: ["latest_invoice.payment_intent"],
+          collection_method: "charge_automatically",
+        });
+
+        const stripeStatus = subscription.status; // active | trialing | incomplete | past_due | canceled
+        const periodEndSec = subscription.current_period_end;
+        const latestPi = (subscription as any)?.latest_invoice?.payment_intent;
+
+        paymentId = typeof latestPi?.id === "string" ? latestPi.id : null;
+        providerSubscriptionId = subscription.id;
+        providerCustomerId = customerId;
+        subscriptionStatus = stripeStatus;
+        currentPeriodEnd = periodEndSec ? new Date(periodEndSec * 1000).toISOString() : null;
+
+        console.log(`[finalize-signup] ✅ Stripe subscription created: ${subscription.id} status=${stripeStatus}`);
 
       } catch (err: any) {
-        console.error("[finalize-signup] Stripe charge failed:", err);
+        console.error("[finalize-signup] Stripe subscription failed:", err);
         const errorMsg = err.message || "No pudimos procesar tu tarjeta. Verifica los datos y que tengas fondos disponibles";
         
         // Update signup_payment_methods with error
@@ -331,6 +342,10 @@ Deno.serve(async (req: Request) => {
           })
           .eq("id", spm.id);
 
+        // For MP, mark subscription as active and set period end (30 días)
+        subscriptionStatus = "active";
+        currentPeriodEnd = new Date(Date.now() + 30 * 24 * 60 * 60 * 1000).toISOString();
+
       } catch (err: any) {
         console.error("[finalize-signup] MP charge failed:", err);
         const errorMsg = err.message || "No pudimos procesar tu tarjeta. Verifica los datos y que tengas fondos disponibles";
@@ -445,13 +460,15 @@ Deno.serve(async (req: Request) => {
 
     if (cuErr) return json({ error: String(cuErr.message ?? cuErr) }, 500);
 
-    // 5️⃣ Crear suscripción (se guarda como plan final; si venía de Free, queda Basic trialing)
-    // For MercadoPago, we don't have subscription_id, just the payment_id
-    const providerSubscriptionId = spm.provider === "stripe" ? null : null; // Will be null for now
-    const providerCustomerId = spm.provider === "stripe" ? null : null;
+    // 5️⃣ Crear suscripción (usar status real del proveedor)
+    providerSubscriptionId = spm.provider === "stripe" ? (providerSubscriptionId ?? null) : null;
+    providerCustomerId = spm.provider === "stripe" ? (providerCustomerId ?? null) : null;
+    subscriptionStatus = spm.provider === "stripe" ? (subscriptionStatus ?? "incomplete") : "active";
 
-    // Calculate period end (30 days from now for paid subscriptions)
-    const periodEnd = trialEndsAt || new Date(Date.now() + 30 * 24 * 60 * 60 * 1000).toISOString();
+    // Calculate period end (30 days from now) sólo si no vino del proveedor
+    const periodEnd = currentPeriodEnd
+      || trialEndsAt
+      || new Date(Date.now() + 30 * 24 * 60 * 60 * 1000).toISOString();
     
     // Get plan price for amount fields
     let planPrice = 0;
@@ -468,7 +485,7 @@ Deno.serve(async (req: Request) => {
       provider: spm.provider,
       provider_customer_id: providerCustomerId,
       provider_subscription_id: providerSubscriptionId,
-      status: "active", // Changed from "trialing" since we already charged
+      status: subscriptionStatus,
       trial_ends_at: trialEndsAt,
       current_period_end: periodEnd,
       amount_usd: currencyCharged === "USD" ? amountCharged : planPrice,
