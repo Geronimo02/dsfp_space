@@ -338,10 +338,9 @@ export default function POS() {
   
   let potentialCardSurcharge = 0;
   if (currentPaymentMethod === 'card' && cardSurchargeRate > 0 && restante_base > 0) {
-    if (currentInstallments > 1) {
-      const tasa_recargo = cardSurchargeRate * currentInstallments / 100;
-      potentialCardSurcharge = restante_base * tasa_recargo;
-    }
+    // Aplicar recargo siempre que haya tasa configurada (no solo cuotas > 1)
+    const tasa_recargo = cardSurchargeRate * currentInstallments / 100;
+    potentialCardSurcharge = restante_base * tasa_recargo;
   }
   
   // 4. TOTAL A PAGAR (actual, sin potencial)
@@ -364,9 +363,9 @@ export default function POS() {
       return;
     }
     
-    // Calcular recargo solo si es tarjeta con cuotas > 1
+    // Calcular recargo siempre que sea tarjeta y haya tasa configurada
     let surcharge = 0;
-    if (currentPaymentMethod === 'card' && currentInstallments > 1) {
+    if (currentPaymentMethod === 'card' && cardSurchargeRate > 0) {
       const tasa_recargo = cardSurchargeRate * currentInstallments / 100;
       surcharge = baseAmountInARS * tasa_recargo;
     }

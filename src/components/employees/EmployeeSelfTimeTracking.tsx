@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
 import { useCompany } from "@/contexts/CompanyContext";
@@ -6,11 +6,12 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/com
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { toast } from "sonner";
-import { Clock, LogIn, LogOut, Calendar } from "lucide-react";
+import { Clock, LogIn, LogOut, Calendar, AlertCircle } from "lucide-react";
 import { format, startOfDay, endOfDay } from "date-fns";
 import { es } from "date-fns/locale";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
+import { Alert, AlertDescription } from "@/components/ui/alert";
 
 interface TimeEntry {
   id: string;
@@ -23,7 +24,15 @@ export function EmployeeSelfTimeTracking() {
   const { currentCompany } = useCompany();
   const queryClient = useQueryClient();
   const [notes, setNotes] = useState("");
+  const [currentTime, setCurrentTime] = useState(new Date());
 
+  // Update clock every second
+  useEffect(() => {
+    const interval = setInterval(() => {
+      setCurrentTime(new Date());
+    }, 1000);
+    return () => clearInterval(interval);
+  }, []);
   // Get current user
   const { data: user } = useQuery({
     queryKey: ["current-user"],
@@ -141,11 +150,13 @@ export function EmployeeSelfTimeTracking() {
     return (
       <Card>
         <CardContent className="py-8">
-          <div className="text-center text-muted-foreground">
-            <Clock className="h-12 w-12 mx-auto mb-4 opacity-50" />
-            <p>No se encontró tu perfil de empleado</p>
-            <p className="text-sm mt-2">Contacta a tu administrador</p>
-          </div>
+          <Alert>
+            <AlertCircle className="h-4 w-4" />
+            <AlertDescription>
+              No se encontró tu perfil de empleado vinculado a tu cuenta. 
+              Contacta a tu administrador para que te vincule correctamente.
+            </AlertDescription>
+          </Alert>
         </CardContent>
       </Card>
     );
@@ -179,12 +190,12 @@ export function EmployeeSelfTimeTracking() {
         {/* Clock In/Out Section */}
         <div className="bg-gradient-to-br from-primary/5 to-primary/10 rounded-lg p-6 space-y-4">
           <div className="text-center">
-            <div className="text-4xl font-bold mb-2">
-              {format(new Date(), "HH:mm:ss")}
+            <div className="text-4xl font-bold mb-2 tabular-nums">
+              {format(currentTime, "HH:mm:ss")}
             </div>
             <div className="text-muted-foreground flex items-center justify-center gap-2">
               <Calendar className="h-4 w-4" />
-              {format(new Date(), "EEEE, dd 'de' MMMM yyyy", { locale: es })}
+              {format(currentTime, "EEEE, dd 'de' MMMM yyyy", { locale: es })}
             </div>
           </div>
 
