@@ -109,12 +109,21 @@ serve(async (req: Request) => {
       }
 
       if (existingCompanyUser) {
+        // If already a member, update role (and reactivate) instead of failing.
+        const { error: updateRoleError } = await supabaseAdmin
+          .from("company_users")
+          .update({ role, active: true })
+          .eq("id", (existingCompanyUser as any).id);
+
+        if (updateRoleError) throw updateRoleError;
+
         return new Response(
           JSON.stringify({
             success: true,
             already_member: true,
             user_id: userId,
-            message: "El usuario ya pertenece a esta empresa",
+            email_sent: false,
+            message: "El usuario ya pertenece a la empresa: rol actualizado",
           }),
           {
             headers: { ...corsHeaders, "Content-Type": "application/json" },
