@@ -63,52 +63,55 @@ const Employees = () => {
   const canDelete = hasPermission("employees", "delete");
 
   const { data: employees, isLoading } = useQuery({
-    queryKey: ["employees", currentCompany?.id],
+    queryKey: ["employees", currentCompany?.id, isAdmin],
     queryFn: async () => {
       if (!currentCompany?.id) return [];
-      
+
       // Obtener empleados de la tabla employees
       const { data: employeesData, error: employeesError } = await supabase
         .from("employees")
         .select("*")
         .eq("company_id", currentCompany.id)
         .order("created_at", { ascending: false });
-      
+
       if (employeesError) throw employeesError;
 
-      // Obtener roles de cada empleado desde company_users
-      const supabaseClient = supabase as any;
-      const employeesWithRoles: any = await Promise.all(
-        (employeesData || []).map(async (employee: any) => {
-          if (employee.email) {
-            // Buscar el perfil por email
-            const profileResult = await supabaseClient
-              .from("profiles")
-              .select("id")
-              .eq("email", employee.email)
-              .maybeSingle();
-            
-            const profile = profileResult.data;
-            
-            if (profile) {
-              // Obtener el rol desde company_users
-              const companyUserResult = await supabaseClient
-                .from("company_users")
-                .select("role")
-                .eq("user_id", profile.id)
-                .eq("company_id", currentCompany.id)
-                .maybeSingle();
-              
-              const companyUser = companyUserResult.data;
-              
-              return { ...employee, role: companyUser?.role || "-" };
-            }
-          }
-          return { ...employee, role: "-" };
-        })
+      const base = (employeesData || []).map((e: any) => ({ ...e, role: null as string | null }));
+
+      // Solo admin/manager necesitan ver roles; evitamos lógica client-side contra profiles (no tiene email)
+      if (!isAdmin) return base;
+
+      const emails = base
+        .map((e: any) => (e.email || "").trim().toLowerCase())
+        .filter(Boolean);
+
+      if (emails.length === 0) return base;
+
+      const { data: rolesData, error: rolesError } = await supabase.functions.invoke(
+        "company-users-roles",
+        {
+          body: {
+            companyId: currentCompany.id,
+            emails,
+          },
+        }
       );
 
-      return employeesWithRoles;
+      if (rolesError) {
+        console.error("Error cargando roles:", rolesError);
+        return base;
+      }
+
+      const items = (rolesData as any)?.items || [];
+      const roleByEmail = new Map<string, string>();
+      items.forEach((it: any) => {
+        if (it?.email && it?.role) roleByEmail.set(String(it.email).toLowerCase(), it.role);
+      });
+
+      return base.map((e: any) => {
+        const key = (e.email || "").trim().toLowerCase();
+        return { ...e, role: key ? roleByEmail.get(key) ?? null : null };
+      });
     },
     enabled: !!currentCompany?.id,
   });
@@ -185,46 +188,24 @@ const Employees = () => {
       
       if (employeeError) throw employeeError;
       
-      // Si se está actualizando el rol y hay email, actualizar en company_users
+      // Si se está actualizando el rol y hay email, actualizar en company_users usando edge function
       if (role && data.email) {
-        // Buscar si existe un usuario con ese email
-        const supabaseClient = supabase as any;
-        const profileResult = await supabaseClient
-          .from("profiles")
-          .select("id")
-          .eq("email", data.email)
-          .maybeSingle();
-        
-        const profiles = profileResult.data;
-        
-        if (profiles) {
-          // Verificar si ya existe relación
-          const relationResult = await supabaseClient
-            .from("company_users")
-            .select("id")
-            .eq("user_id", profiles.id)
-            .eq("company_id", currentCompany.id)
-            .maybeSingle();
-          
-          const existingRelation = relationResult.data;
-          
-          if (existingRelation) {
-            // Actualizar el rol
-            await supabase
-              .from("company_users")
-              .update({ role: role as any })
-              .eq("id", existingRelation.id);
-          } else {
-            // Crear la relación con el rol
-            await supabase
-              .from("company_users")
-              .insert({
-                user_id: profiles.id,
-                company_id: currentCompany.id,
-                role: role as any,
-                active: true,
-              });
-          }
+        const { data: sessionData } = await supabase.auth.getSession();
+        if (!sessionData.session) throw new Error("Sesión no válida");
+
+        const fullName = `${(employeeData as any).first_name || ""} ${(employeeData as any).last_name || ""}`.trim();
+
+        const response = await supabase.functions.invoke("invite-employee", {
+          body: {
+            email: data.email,
+            role: role,
+            companyId: currentCompany.id,
+            full_name: fullName,
+          },
+        });
+
+        if (response.error) {
+          throw new Error(response.error.message || "No se pudo guardar el rol");
         }
       }
     },
@@ -301,6 +282,19 @@ const Employees = () => {
 
   const handleEdit = (employee: any) => {
     setEditingEmployee(employee);
+    const normalizedRole =
+      employee.role === "admin" ||
+      employee.role === "manager" ||
+      employee.role === "cashier" ||
+      employee.role === "warehouse" ||
+      employee.role === "technician" ||
+      employee.role === "accountant" ||
+      employee.role === "viewer" ||
+      employee.role === "auditor" ||
+      employee.role === "employee"
+        ? employee.role
+        : "employee";
+
     setFormData({
       first_name: employee.first_name,
       last_name: employee.last_name,
@@ -312,7 +306,7 @@ const Employees = () => {
       hire_date: employee.hire_date || "",
       base_salary: employee.base_salary || 0,
       salary_type: employee.salary_type || "monthly",
-      role: employee.role || "employee",
+      role: normalizedRole,
     });
     setDialogOpen(true);
   };
