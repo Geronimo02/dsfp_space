@@ -144,8 +144,40 @@ export function Step4Combined({ formData, updateFormData, onSuccess, prevStep }:
     setErrorMessage("");
 
     try {
-      // Create signup intent first if not exists
-      let intentId = formData.plan_id; // Use plan_id as intent_id for now, or create proper intent
+      // 1) Crear (o reutilizar) un signup_intent real para no depender del plan_id
+      let intentId = typeof window !== "undefined" ? localStorage.getItem("signup_intent_id") : null;
+
+      if (!intentId) {
+        console.log("[Step4Combined] No intent en cache, creando...", {
+          email: formData.email,
+          plan_id: formData.plan_id,
+          provider,
+          paymentRef,
+        });
+
+        const { data, error } = await supabase.functions.invoke("create-intent", {
+          body: {
+            email: formData.email,
+            full_name: formData.full_name,
+            company_name: formData.company_name,
+            plan_id: formData.plan_id,
+            modules: formData.modules,
+            provider,
+            payment_provider: provider,
+            payment_method_ref: paymentRef,
+            billing_country: billingCountry,
+          },
+        });
+
+        if (error || !data?.intent_id) {
+          console.error("[Step4Combined] Error creando intent:", error || data);
+          throw new Error("No se pudo crear el intento de registro");
+        }
+
+        intentId = data.intent_id;
+        localStorage.setItem("signup_intent_id", intentId);
+        console.log("[Step4Combined] Intent creado y guardado:", intentId);
+      }
 
       // Call finalize-signup to charge payment and create account
       const { data, error } = await supabase.functions.invoke("finalize-signup", {

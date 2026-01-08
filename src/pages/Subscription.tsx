@@ -58,6 +58,8 @@ export default function Subscription() {
   const { data: subscription, isLoading: subscriptionLoading } = useQuery({
     queryKey: ["subscription", currentCompany?.id],
     enabled: !!currentCompany?.id,
+    staleTime: 30000, // 30 segundos
+    refetchOnWindowFocus: false,
     queryFn: async () => {
       const { data, error } = await supabase
         .from("subscriptions")
@@ -72,6 +74,8 @@ export default function Subscription() {
   const { data: subscriptionPlan, isLoading: planLoading } = useQuery({
     queryKey: ["subscription-plan", subscription?.plan_id],
     enabled: !!subscription?.plan_id,
+    staleTime: 30000, // 30 segundos
+    refetchOnWindowFocus: false,
     queryFn: async () => {
       const { data, error } = await supabase
         .from("subscription_plans")
