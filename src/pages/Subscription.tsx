@@ -73,6 +73,7 @@ export default function Subscription() {
     refetchOnWindowFocus: false,
     placeholderData: (prev) => prev,
     queryFn: async () => {
+      console.log("Fetching subscription for", currentCompany?.id);
       const { data, error } = await supabase
         .from("subscriptions")
         .select("*, subscription_plans (name, price)")
@@ -88,6 +89,7 @@ export default function Subscription() {
     queryKey: ["company-country", currentCompany?.id],
     enabled: !!currentCompany?.id && !subscription?.provider,
     queryFn: async () => {
+      console.log("Fetching subscription for", currentCompany?.id);
       const { data, error } = await supabase
         .from("companies")
         .select("country")
@@ -132,6 +134,7 @@ export default function Subscription() {
     queryKey: ["default-payment-method", currentCompany?.id],
     enabled: !!currentCompany?.id,
     queryFn: async () => {
+      console.log("Fetching subscription for", currentCompany?.id);
       const { data, error } = await supabase
         .from("company_payment_methods")
         .select("id, type, brand, last4, exp_month, exp_year, holder_name, mp_preapproval_id, is_default, created_at")
