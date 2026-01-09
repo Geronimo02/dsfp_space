@@ -1,3 +1,4 @@
+// subscription.tsx
 import { useEffect, useMemo, useState } from "react";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
@@ -19,7 +20,17 @@ function getSubscriptionStatusLabel(status?: string) {
   return status ? map[status] ?? status : "";
 }
 
-function StripePaymentSetup({ clientSecret, onSaved, companyId, onInvalidate }: { clientSecret: string; onSaved: () => void; companyId: string; onInvalidate: () => void }) {
+function StripePaymentSetup({
+  clientSecret,
+  onSaved,
+  companyId,
+  onInvalidate,
+}: {
+  clientSecret: string;
+  onSaved: () => void;
+  companyId: string;
+  onInvalidate: () => void;
+}) {
   const stripe = useStripe();
   const elements = useElements();
   const [saving, setSaving] = useState(false);
@@ -36,9 +47,13 @@ function StripePaymentSetup({ clientSecret, onSaved, companyId, onInvalidate }: 
         redirect: "if_required",
       });
       if (error) throw error;
+
       const pmId = (setupIntent?.payment_method as string) || "";
-      const { error: saveErr } = await supabase.functions.invoke("save-stripe-payment-method", { body: { payment_method_id: pmId, company_id: companyId } });
+      const { error: saveErr } = await supabase.functions.invoke("save-stripe-payment-method", {
+        body: { payment_method_id: pmId, company_id: companyId },
+      });
       if (saveErr) throw saveErr;
+
       toast.success("Método guardado");
       onInvalidate();
       onSaved();
@@ -73,7 +88,6 @@ export default function Subscription() {
     refetchOnWindowFocus: false,
     placeholderData: (prev) => prev,
     queryFn: async () => {
-      console.log("Fetching subscription for", currentCompany?.id);
       const { data, error } = await supabase
         .from("subscriptions")
         .select("*, subscription_plans (name, price)")
@@ -83,29 +97,6 @@ export default function Subscription() {
       return data;
     },
   });
-
-  // Fallback to company country when provider is missing
-  const { data: companyCountry } = useQuery({
-    queryKey: ["company-country", currentCompany?.id],
-    enabled: !!currentCompany?.id && !subscription?.provider,
-    queryFn: async () => {
-      console.log("Fetching subscription for", currentCompany?.id);
-      const { data, error } = await supabase
-        .from("companies")
-        .select("country")
-        .eq("id", currentCompany!.id)
-        .maybeSingle();
-      if (error) throw error;
-      return (data as any)?.country as string | null;
-    },
-  });
-
-  const effectiveProvider = useMemo(() => {
-    const prov = subscription?.provider?.toLowerCase();
-    if (prov === "stripe" || prov === "mercadopago") return prov;
-    const country = (companyCountry || "").toUpperCase();
-    return country === "AR" ? "mercadopago" : "stripe";
-  }, [subscription?.provider, companyCountry]);
 
   const trialDaysLeft = useMemo(() => {
     if (!subscription?.trial_ends_at) return null;
@@ -125,16 +116,13 @@ export default function Subscription() {
 
   useEffect(() => {
     const key = import.meta.env.VITE_STRIPE_PUBLIC_KEY;
-    if (key) {
-      setStripePromise(loadStripe(key));
-    }
+    if (key) setStripePromise(loadStripe(key));
   }, []);
 
   const { data: defaultPaymentMethod } = useQuery({
     queryKey: ["default-payment-method", currentCompany?.id],
     enabled: !!currentCompany?.id,
     queryFn: async () => {
-      console.log("Fetching subscription for", currentCompany?.id);
       const { data, error } = await supabase
         .from("company_payment_methods")
         .select("id, type, brand, last4, exp_month, exp_year, holder_name, mp_preapproval_id, is_default, created_at")
@@ -162,38 +150,14 @@ export default function Subscription() {
     }
   };
 
-  const setupMercadoPago = async () => {
-    try {
-      const { data, error } = await supabase.functions.invoke("create-mp-preapproval", {
-        body: { company_id: currentCompany!.id },
-      });
-      if (error) throw error;
-      if (data?.redirect_url) {
-        window.location.href = data.redirect_url;
-      } else {
-        toast.error("No se obtuvo URL de autorización");
-      }
-    } catch (e: any) {
-      console.error(e);
-      toast.error("Error iniciando autorización en MP: " + (e?.message ?? e));
-    }
-  };
-
-  // Single entry point: decide provider and start corresponding flow
   const addPaymentMethod = async () => {
-    const provider = effectiveProvider;
-    if (provider === "stripe") {
-      await setupStripe();
-    } else if (provider === "mercadopago") {
-      await setupMercadoPago();
-    } else {
-      toast.error("Proveedor de pago inválido");
-    }
+    await setupStripe();
   };
 
   return (
     <div className="p-6 space-y-6">
       <h1 className="text-2xl font-semibold">Suscripción</h1>
+
       <div className="grid md:grid-cols-2 gap-6">
         <Card>
           <CardHeader>
@@ -210,19 +174,28 @@ export default function Subscription() {
               </div>
             ) : (
               <>
-                <p>Plan: <strong>{subscription?.subscription_plans?.name ?? (subscription?.plan_id ? "Plan sin nombre" : "Sin plan")}</strong></p>
+                <p>
+                  Plan:{" "}
+                  <strong>{subscription?.subscription_plans?.name ?? (subscription?.plan_id ? "Plan sin nombre" : "Sin plan")}</strong>
+                </p>
                 <p>Precio: ${subscription?.subscription_plans?.price ?? "-"} USD/mes</p>
-                <p>Estado: <strong>{getSubscriptionStatusLabel(subscription?.status) || ""}</strong></p>
-                <p>Proveedor: {subscription?.provider ?? effectiveProvider ?? "-"}</p>
-                {trialDaysLeft !== null && trialDaysLeft > 0 && (
-                  <p>Trial resta: {trialDaysLeft} días</p>
+                <p>
+                  Estado: <strong>{getSubscriptionStatusLabel(subscription?.status) || ""}</strong>
+                </p>
+                {trialDaysLeft !== null && trialDaysLeft > 0 && <p>Trial resta: {trialDaysLeft} días</p>}
+                {nextBillingDate && (
+                  <p>
+                    Próxima facturación: <strong>{nextBillingDate}</strong>
+                  </p>
                 )}
-                {nextBillingDate && <p>Próxima facturación: <strong>{nextBillingDate}</strong></p>}
-                <p>Método guardado: {defaultPaymentMethod
-                  ? defaultPaymentMethod.type === "card"
-                    ? `${defaultPaymentMethod.brand?.toUpperCase() ?? "Tarjeta"} •••• ${defaultPaymentMethod.last4}`
-                    : "Mercado Pago"
-                  : "No guardado"}</p>
+                <p>
+                  Método guardado:{" "}
+                  {defaultPaymentMethod
+                    ? defaultPaymentMethod.type === "card"
+                      ? `${defaultPaymentMethod.brand?.toUpperCase() ?? "Tarjeta"} •••• ${defaultPaymentMethod.last4}`
+                      : "Mercado Pago"
+                    : "No guardado"}
+                </p>
               </>
             )}
           </CardContent>
@@ -231,12 +204,15 @@ export default function Subscription() {
         <Card>
           <CardHeader>
             <CardTitle>Método de pago</CardTitle>
-            <CardDescription>Agregar una tarjeta para cobro automático según tu país</CardDescription>
+            <CardDescription>Agregar una tarjeta para cobro automático</CardDescription>
           </CardHeader>
           <CardContent className="space-y-4">
             <div className="space-y-2">
-              <Button variant="outline" onClick={addPaymentMethod}>Agregar tarjeta</Button>
+              <Button variant="outline" onClick={addPaymentMethod}>
+                Agregar tarjeta
+              </Button>
             </div>
+
             {stripePromise && clientSecret && (
               <Elements stripe={stripePromise} options={{ clientSecret }}>
                 <StripePaymentSetup
