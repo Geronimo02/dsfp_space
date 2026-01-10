@@ -136,26 +136,27 @@ export function PaymentMethodsManager({
     },
   });
 
-  const { data: companyCountry } = useQuery({
-    queryKey: ["company-country", companyId],
+  const { data: defaultPaymentMethod } = useQuery({
+    queryKey: ["default-payment-method", companyId],
     enabled: !!companyId && !subscription?.provider,
     queryFn: async () => {
       const { data, error } = await supabase
-        .from("companies")
-        .select("country")
-        .eq("id", companyId!)
+        .from("company_payment_methods")
+        .select("billing_country, type")
+        .eq("company_id", companyId!)
+        .eq("is_default", true)
         .maybeSingle();
       if (error) throw error;
-      return (data as any)?.country as string | null;
+      return data as { billing_country?: string | null; type?: string } | null;
     },
   });
 
   const effectiveProvider = useMemo(() => {
     const prov = subscription?.provider?.toLowerCase();
     if (prov === "stripe" || prov === "mercadopago") return prov;
-    const country = (companyCountry || "").toUpperCase();
+    const country = (defaultPaymentMethod?.billing_country || "").toUpperCase();
     return country === "AR" ? "mercadopago" : "stripe";
-  }, [subscription?.provider, companyCountry]);
+  }, [subscription?.provider, defaultPaymentMethod?.billing_country]);
 
   const handleAddCard = async () => {
     try {
