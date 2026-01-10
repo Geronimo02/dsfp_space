@@ -543,11 +543,33 @@ export function Sidebar() {
         },
       ],
     },
+
+    // Admin de Plataforma - Solo para Platform Admins
+    {
+      section: "Admin de Plataforma",
+      items: [
+        {
+          title: "Panel de Admin",
+          href: "/admin/platform",
+          icon: BarChart3,
+          permission: "platform_admin",
+        },
+        {
+          title: "Suscripciones y Facturación",
+          href: "/admin/subscriptions-billing",
+          icon: DollarSign,
+          permission: "platform_admin",
+        },
+      ],
+    },
   ];
 
   const isNavItemVisible = (item: NavItem) => {
     // Platform admin ve todo
     if (isPlatformAdmin) return true;
+    
+    // Si requiere permiso platform_admin y no lo tiene, ocultar
+    if (item.permission === 'platform_admin' && !isPlatformAdmin) return false;
     
     // Si tiene módulo, verificar que esté activo
     if (item.module && !hasModule(item.module)) return false;

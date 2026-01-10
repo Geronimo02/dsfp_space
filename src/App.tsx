@@ -59,6 +59,7 @@ const Integrations = lazy(() => import("./pages/Integrations"));
 const Payroll = lazy(() => import("./pages/Payroll"));
 const AFIPBilling = lazy(() => import("./pages/AFIPBilling"));
 const PlatformAdmin = lazy(() => import("./pages/PlatformAdmin"));
+const AdminSubscriptionsAndBilling = lazy(() => import("./pages/AdminSubscriptionsAndBilling"));
 const CustomerSupport = lazy(() => import("./pages/CustomerSupport"));
 const CustomerSupportSettings = lazy(() => import("./pages/CustomerSupportSettings"));
 const KnowledgeBase = lazy(() => import("./pages/KnowledgeBase"));
@@ -357,6 +358,7 @@ const App = () => (
             
             {/* Admin de Plataforma */}
             <Route path="/admin/platform" element={<PlatformAdminRoute><PlatformAdmin /></PlatformAdminRoute>} />
+            <Route path="/admin/subscriptions-billing" element={<PlatformAdminRoute><AdminSubscriptionsAndBilling /></PlatformAdminRoute>} />
             
             {/* ADD ALL CUSTOM ROUTES ABOVE THE CATCH-ALL "*" ROUTE */}
             <Route path="*" element={<NotFound />} />

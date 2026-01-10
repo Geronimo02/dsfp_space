@@ -19,6 +19,9 @@ import { useCompany } from "@/contexts/CompanyContext";
 import { CompanySettings } from "@/components/settings/CompanySettings";
 import { PriceListsSettings } from "@/components/settings/PriceListsSettings";
 import { PaymentMethodsManager } from "@/components/settings/PaymentMethodsManager";
+import { PlanChanger } from "@/components/settings/PlanChanger";
+import { SubscriptionActions } from "@/components/settings/SubscriptionActions";
+import { InvoiceViewer } from "@/components/settings/InvoiceViewer";
 
 function getSubscriptionStatusLabel(status?: string) {
   const map: Record<string, string> = {
@@ -646,6 +649,12 @@ export default function Settings() {
                   )}
                 </CardContent>
               </Card>
+
+              <PlanChanger companyId={currentCompany?.id} currentPlanId={subscription?.plan_id} />
+
+              <SubscriptionActions companyId={currentCompany?.id} subscriptionStatus={subscription?.status} />
+
+              <InvoiceViewer companyId={currentCompany?.id} />
 
               <PaymentMethodsManager companyId={currentCompany?.id} />
             </div>
