@@ -85,6 +85,9 @@ export function usePermissions() {
   const hasPermission = (module: Module, permission: Permission): boolean => {
     // Admin fallback: if user has admin role, grant all permissions
     if (hasRole("admin")) return true;
+    
+    // Manager tiene acceso a casi todo excepto settings de admin
+    if (hasRole("manager") && module !== "settings") return true;
 
     if (!permissions || permissions.length === 0) return false;
 
