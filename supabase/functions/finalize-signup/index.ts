@@ -145,6 +145,7 @@ Deno.serve(async (req: Request) => {
     let providerCustomerId: string | null = null;
     let subscriptionStatus: string | null = null;
     let currentPeriodEnd: string | null = null;
+    let billingCountry: string | null = null;
 
     // === CRITICAL: CHARGE THE PAYMENT FIRST ===
     if (spm.provider === "stripe") {
@@ -174,6 +175,7 @@ Deno.serve(async (req: Request) => {
 
         // Ensure customer exists and has the payment method attached
         const paymentMethod = await stripe.paymentMethods.retrieve(spm.payment_method_ref);
+        billingCountry = (paymentMethod.billing_details?.address as any)?.country ?? null;
         let customerId = typeof paymentMethod.customer === "string" ? paymentMethod.customer : paymentMethod.customer?.id || null;
 
         if (!customerId) {
@@ -345,6 +347,7 @@ Deno.serve(async (req: Request) => {
         // For MP, mark subscription as active and set period end (30 días)
         subscriptionStatus = "active";
         currentPeriodEnd = new Date(Date.now() + 30 * 24 * 60 * 60 * 1000).toISOString();
+        billingCountry = spm.billing_country ?? "AR";
 
       } catch (err: any) {
         console.error("[finalize-signup] MP charge failed:", err);
@@ -479,6 +482,15 @@ Deno.serve(async (req: Request) => {
       .single();
     if (planData) planPrice = planData.price;
 
+    // If plan is paid, enforce active status at signup as requested
+    if ((planPrice ?? 0) > 0) {
+      subscriptionStatus = "active";
+      // Ensure period end is set for paid plans
+      if (!currentPeriodEnd) {
+        currentPeriodEnd = new Date(Date.now() + 30 * 24 * 60 * 60 * 1000).toISOString();
+      }
+    }
+
     const { error: subErr } = await supabaseAdmin.from("subscriptions").insert({
       company_id: companyId,
       plan_id: finalPlanId,
@@ -522,6 +534,7 @@ Deno.serve(async (req: Request) => {
           last4: spmData.last4,
           exp_month: spmData.exp_month,
           exp_year: spmData.exp_year,
+          billing_country: billingCountry ?? spmData.billing_country ?? null,
           is_default: true,
         });
 
@@ -543,6 +556,7 @@ Deno.serve(async (req: Request) => {
           exp_month: spmData.exp_month,
           exp_year: spmData.exp_year,
           holder_name: spmData.name,
+          billing_country: billingCountry ?? spmData.billing_country ?? null,
           is_default: true,
         });
 

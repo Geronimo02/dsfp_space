@@ -64,10 +64,10 @@ Deno.serve(async (req: Request) => {
     if (!targetCompanyId) return json({ error: "No se encontró empresa activa" }, 404);
 
     // Check if this is the first payment method for the company
-    const { data: existingMethods } = await supabase
+    const { data: existingMethods } = await supabaseAdmin
       .from("company_payment_methods")
       .select("id")
-      .eq("company_id", companyUser.company_id);
+      .eq("company_id", targetCompanyId);
 
     const isFirstMethod = !existingMethods || existingMethods.length === 0;
 
@@ -83,6 +83,7 @@ Deno.serve(async (req: Request) => {
         exp_month: pm.card?.exp_month || null,
         exp_year: pm.card?.exp_year || null,
         holder_name: pm.billing_details?.name || null,
+        billing_country: pm.billing_details?.address?.country || (pm as any)?.card?.country || null,
         is_default: isFirstMethod,
       })
       .select()
