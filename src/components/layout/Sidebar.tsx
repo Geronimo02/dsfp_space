@@ -50,7 +50,7 @@ import {
   Plus,
 } from "lucide-react";
 import { useActiveModules } from "@/hooks/useActiveModules";
-import { usePermissions } from "@/hooks/usePermissions";
+import { usePermissions, Module } from "@/hooks/usePermissions";
 import { usePlatformAdmin } from "@/hooks/usePlatformAdmin";
 import { useState, useMemo } from "react";
 import { Collapsible, CollapsibleContent, CollapsibleTrigger } from "@/components/ui/collapsible";
@@ -77,7 +77,7 @@ export function Sidebar() {
   const location = useLocation();
   const navigate = useNavigate();
   const activeModules = useActiveModules();
-  const { hasPermission, isAdmin } = usePermissions();
+  const { hasPermission, isAdmin, loading: permissionsLoading } = usePermissions();
   const { isPlatformAdmin } = usePlatformAdmin();
   
   const [openSections, setOpenSections] = useState<string[]>([]);
@@ -549,6 +549,9 @@ export function Sidebar() {
     // Platform admin ve todo
     if (isPlatformAdmin) return true;
     
+    // Mientras cargan los permisos, no mostrar nada para evitar flash
+    if (permissionsLoading) return false;
+    
     // Si tiene módulo, verificar que esté activo
     if (item.module && !hasModule(item.module)) return false;
     
@@ -556,11 +559,34 @@ export function Sidebar() {
     if (item.permission === 'admin' && !isAdmin) return false;
     
     // Verificar permisos de módulo si está definido
-    if (item.module && !hasPermission(item.module as any, "view")) {
-      return false;
+    // Los módulos base requieren verificación de permisos también
+    if (item.module) {
+      // Mapear módulos del sidebar a módulos de permisos
+      const permissionModule = mapSidebarModuleToPermission(item.module);
+      if (permissionModule && !hasPermission(permissionModule, "view")) {
+        return false;
+      }
     }
     
     return true;
+  };
+
+  // Función para mapear módulos del sidebar a módulos de permisos
+  const mapSidebarModuleToPermission = (sidebarModule: string): Module | null => {
+    const moduleMap: Record<string, Module> = {
+      'dashboard': 'dashboard',
+      'pos': 'pos',
+      'products': 'products',
+      'sales': 'sales',
+      'customers': 'customers',
+      'suppliers': 'suppliers',
+      'purchases': 'purchases',
+      'reports': 'reports',
+      'employees': 'employees',
+      'settings': 'settings',
+      'cash_register': 'cash_register',
+    };
+    return moduleMap[sidebarModule] || null;
   };
 
   const renderNavItem = (item: NavItem, isChild = false, isFavoritesList = false) => {

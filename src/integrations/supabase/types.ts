@@ -1040,6 +1040,7 @@ export type Database = {
       }
       company_payment_methods: {
         Row: {
+          billing_country: string | null
           brand: string | null
           company_id: string
           created_at: string | null
@@ -1056,6 +1057,7 @@ export type Database = {
           updated_at: string | null
         }
         Insert: {
+          billing_country?: string | null
           brand?: string | null
           company_id: string
           created_at?: string | null
@@ -1072,6 +1074,7 @@ export type Database = {
           updated_at?: string | null
         }
         Update: {
+          billing_country?: string | null
           brand?: string | null
           company_id?: string
           created_at?: string | null
