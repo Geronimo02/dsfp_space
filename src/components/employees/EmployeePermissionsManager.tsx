@@ -10,7 +10,7 @@ import { Switch } from "@/components/ui/switch";
 import { Label } from "@/components/ui/label";
 
 import { toast } from "sonner";
-import { Shield, Save, User, Settings } from "lucide-react";
+import { Shield, Save, Settings } from "lucide-react";
 import { Accordion, AccordionContent, AccordionItem, AccordionTrigger } from "@/components/ui/accordion";
 
 type AppRole = "admin" | "manager" | "cashier" | "accountant" | "viewer" | "warehouse" | "technician" | "auditor" | "employee";
@@ -27,23 +27,72 @@ const AVAILABLE_ROLES: { value: AppRole; label: string; description: string }[] 
   { value: "employee", label: "Empleado", description: "Acceso básico limitado" },
 ];
 
-const MODULES = [
+interface PermissionModule {
+  code: string;
+  name: string;
+  category: string;
+}
+
+const CATEGORY_LABELS: Record<string, string> = {
+  dashboard: "Dashboard",
+  pos: "General",
+  ventas: "Ventas",
+  clientes: "Clientes",
+  inventario: "Inventario",
+  compras: "Compras",
+  finanzas: "Finanzas",
+  operaciones: "Operaciones",
+  rrhh: "RRHH",
+  reportes: "Reportes",
+  administracion: "AdministraciA3n",
+  integraciones: "Integraciones",
+  otros: "Otros",
+};
+
+const DEFAULT_MODULES: PermissionModule[] = [
+  { code: "dashboard", name: "Dashboard", category: "Dashboard" },
   { code: "pos", name: "Punto de Venta", category: "General" },
   { code: "sales", name: "Ventas", category: "Ventas" },
   { code: "quotations", name: "Presupuestos", category: "Ventas" },
   { code: "delivery_notes", name: "Remitos", category: "Ventas" },
   { code: "returns", name: "Devoluciones", category: "Ventas" },
+  { code: "reservations", name: "Reservas", category: "Ventas" },
   { code: "customers", name: "Clientes", category: "Clientes" },
+  { code: "accounts_receivable", name: "Cuentas Corrientes", category: "Clientes" },
+  { code: "customer_support", name: "AtenciA3n al Cliente", category: "Clientes" },
   { code: "products", name: "Productos", category: "Inventario" },
+  { code: "inventory_alerts", name: "Alertas de Inventario", category: "Inventario" },
+  { code: "warehouses", name: "DepA3sitos", category: "Inventario" },
+  { code: "warehouse_stock", name: "Stock por DepA3sito", category: "Inventario" },
+  { code: "warehouse_transfers", name: "Transferencias", category: "Inventario" },
+  { code: "stock_reservations", name: "Reservas de Stock", category: "Inventario" },
   { code: "purchases", name: "Compras", category: "Compras" },
+  { code: "purchase_orders", name: "A\"rdenes de Compra", category: "Compras" },
+  { code: "purchase_reception", name: "RecepciA3n de MercaderA-a", category: "Compras" },
+  { code: "purchase_returns", name: "Devoluciones a Proveedores", category: "Compras" },
   { code: "suppliers", name: "Proveedores", category: "Compras" },
   { code: "expenses", name: "Gastos", category: "Finanzas" },
   { code: "cash_register", name: "Caja", category: "Finanzas" },
+  { code: "bank_accounts", name: "Cuentas Bancarias", category: "Finanzas" },
+  { code: "bank_movements", name: "Movimientos Bancarios", category: "Finanzas" },
+  { code: "card_movements", name: "Movimientos de Tarjetas", category: "Finanzas" },
+  { code: "retentions", name: "Retenciones", category: "Finanzas" },
+  { code: "checks", name: "Cheques", category: "Finanzas" },
   { code: "reports", name: "Reportes", category: "Reportes" },
+  { code: "accountant_reports", name: "Reportes Contador", category: "Reportes" },
   { code: "employees", name: "Empleados", category: "RRHH" },
+  { code: "payroll", name: "Liquidaciones", category: "RRHH" },
+  { code: "commissions", name: "Comisiones", category: "RRHH" },
+  { code: "audit_logs", name: "AuditorA-a", category: "AdministraciA3n" },
+  { code: "access_logs", name: "Logs de Acceso", category: "AdministraciA3n" },
+  { code: "monthly_closing", name: "Cierre Mensual", category: "AdministraciA3n" },
+  { code: "notifications", name: "Notificaciones", category: "AdministraciA3n" },
   { code: "settings", name: "Configuración", category: "Administración" },
   { code: "technical_services", name: "Servicios Técnicos", category: "Operaciones" },
   { code: "promotions", name: "Promociones", category: "Operaciones" },
+  { code: "integrations", name: "Integraciones", category: "Integraciones" },
+  { code: "afip", name: "FacturaciA3n AFIP", category: "Integraciones" },
+  { code: "pos_afip", name: "Puntos de Venta AFIP", category: "Integraciones" },
   { code: "bulk_operations", name: "Operaciones Masivas", category: "Administración" },
 ];
 
@@ -69,9 +118,36 @@ export function EmployeePermissionsManager() {
   const [permissions, setPermissions] = useState<Record<string, Permission>>({});
   const [hasChanges, setHasChanges] = useState(false);
 
+  const normalizeCategory = (category?: string | null) => {
+    if (!category) return CATEGORY_LABELS.otros;
+    return CATEGORY_LABELS[category] || category;
+  };
+
+  const { data: modules = DEFAULT_MODULES, isLoading: modulesLoading } = useQuery({
+    queryKey: ["permission-modules"],
+    queryFn: async () => {
+      const { data, error } = await supabase
+        .from("platform_modules")
+        .select("code, name, category, is_active, display_order")
+        .eq("is_active", true)
+        .order("category")
+        .order("display_order");
+
+      if (error) throw error;
+
+      const normalizedModules = (data || []).map((module: any) => ({
+        code: module.code,
+        name: module.name,
+        category: normalizeCategory(module.category),
+      }));
+
+      return normalizedModules.length > 0 ? normalizedModules : DEFAULT_MODULES;
+    },
+  });
+
   // Fetch current permissions for the selected role
-  const { data: rolePermissions, isLoading } = useQuery({
-    queryKey: ["role-permissions-config", currentCompany?.id, selectedRole],
+  const { data: rolePermissions, isLoading: rolePermissionsLoading } = useQuery({
+    queryKey: ["role-permissions-config", currentCompany?.id, selectedRole, modules.map((m) => m.code).join("|")],
     queryFn: async () => {
       if (!currentCompany?.id) return [];
       const { data, error } = await supabase
@@ -95,7 +171,7 @@ export function EmployeePermissionsManager() {
       });
       
       // Initialize missing modules with defaults
-      MODULES.forEach(m => {
+      modules.forEach((m) => {
         if (!permsRecord[m.code]) {
           permsRecord[m.code] = {
             can_view: false,
@@ -111,7 +187,7 @@ export function EmployeePermissionsManager() {
       setHasChanges(false);
       return data;
     },
-    enabled: !!currentCompany?.id,
+    enabled: !!currentCompany?.id && !modulesLoading,
   });
 
   const saveMutation = useMutation({
@@ -182,11 +258,13 @@ export function EmployeePermissionsManager() {
     setHasChanges(true);
   };
 
-  const groupedModules = MODULES.reduce((acc, m) => {
+  const groupedModules = modules.reduce((acc, m) => {
     if (!acc[m.category]) acc[m.category] = [];
     acc[m.category].push(m);
     return acc;
-  }, {} as Record<string, typeof MODULES>);
+  }, {} as Record<string, PermissionModule[]>);
+
+  const isLoading = rolePermissionsLoading || modulesLoading;
 
   if (isLoading) {
     return (
