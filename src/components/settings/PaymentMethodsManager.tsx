@@ -122,7 +122,7 @@ export function PaymentMethodsManager({
   });
 
   // Fetch subscription to decide provider
-  const { data: subscription } = useQuery({
+  const { data: subscription, isLoading: subscriptionLoading } = useQuery({
     queryKey: ["subscription", companyId],
     enabled: !!companyId,
     queryFn: async () => {
@@ -138,7 +138,7 @@ export function PaymentMethodsManager({
 
   const { data: defaultPaymentMethod } = useQuery({
     queryKey: ["default-payment-method", companyId],
-    enabled: !!companyId && !subscription?.provider,
+    enabled: !!companyId && !subscriptionLoading && !subscription?.provider,
     queryFn: async () => {
       const { data, error } = await supabase
         .from("company_payment_methods")
