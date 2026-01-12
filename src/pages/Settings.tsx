@@ -118,6 +118,7 @@ export default function Settings() {
     gcTime: 1000 * 60 * 30, // 30 minutos - mantener en cache aunque no se use
     refetchOnWindowFocus: true, // Refrescar al volver a la pestaña
     refetchOnMount: true, // Refrescar al montar el componente
+    placeholderData: (previousData) => previousData, // Mantener datos previos durante refetch
     queryFn: async () => {
       const { data, error } = await supabase
         .from("subscriptions")
@@ -128,13 +129,6 @@ export default function Settings() {
       return data;
     },
   });
-
-  // ✅ Force refresh when entering subscription tab (optional)
-  useEffect(() => {
-    if (isSubscriptionTab && currentCompany?.id) {
-      queryClient.invalidateQueries({ queryKey: ["subscription", currentCompany.id] });
-    }
-  }, [isSubscriptionTab, currentCompany?.id, queryClient]);
 
   const trialDaysLeft = useMemo(() => {
     if (!subscription?.trial_ends_at) return null;

@@ -18,6 +18,10 @@ export function InvoiceViewer({ companyId: propCompanyId, showAllCompanies = fal
   const { data: invoices, isLoading } = useQuery({
     queryKey: ["invoices", companyId, showAllCompanies],
     enabled: showAllCompanies || !!companyId,
+    staleTime: 60000,
+    gcTime: 1000 * 60 * 30,
+    placeholderData: (previousData) => previousData,
+    retry: false, // No reintentar si falla (tabla puede no existir aún)
     queryFn: async () => {
       let query = supabase
         .from("invoices")
@@ -28,8 +32,14 @@ export function InvoiceViewer({ companyId: propCompanyId, showAllCompanies = fal
       }
       
       const { data, error } = await query.order("created_at", { ascending: false });
-      if (error) throw error;
-      return data;
+      if (error) {
+        // Si la tabla no existe o no hay datos, retornar array vacío en lugar de error
+        if (error.code === "PGRST116" || error.message.includes("does not exist")) {
+          return [];
+        }
+        throw error;
+      }
+      return data || [];
     },
   });
 
