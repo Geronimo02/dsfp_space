@@ -106,7 +106,7 @@ export default function PlatformAdmin() {
         .from("companies")
         .select(`
           *,
-          company_subscriptions (
+          subscriptions (
             *,
             subscription_plans (*)
           ),
@@ -167,7 +167,7 @@ export default function PlatformAdmin() {
         .select(`
           *,
           companies (name),
-          company_subscriptions (status)
+          subscriptions (status)
         `)
         .order("payment_date", { ascending: false });
 
@@ -707,23 +707,6 @@ export default function PlatformAdmin() {
 
   // Create ticket
 
-  // Show loading while checking admin status
-  if (adminLoading) {
-    return (
-      <div className="flex items-center justify-center h-screen">
-        <div className="text-center">
-          <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-primary mx-auto"></div>
-          <p className="mt-4 text-muted-foreground">Verificando permisos...</p>
-        </div>
-      </div>
-    );
-  }
-
-  // Redirect if not platform admin
-  if (!isPlatformAdmin) {
-    return <Navigate to="/app" replace />;
-  }
-
   const handleLogout = async () => {
     const { error } = await supabase.auth.signOut();
     if (error) {
@@ -837,6 +820,23 @@ export default function PlatformAdmin() {
     u.companies?.name?.toLowerCase().includes(userSearch.toLowerCase())
   ), { initialPageSize: 10 });
 
+  // Show loading while checking admin status
+  if (adminLoading) {
+    return (
+      <div className="flex items-center justify-center h-screen">
+        <div className="text-center">
+          <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-primary mx-auto"></div>
+          <p className="mt-4 text-muted-foreground">Verificando permisos...</p>
+        </div>
+      </div>
+    );
+  }
+
+  // Redirect if not platform admin
+  if (!isPlatformAdmin) {
+    return <Navigate to="/app" replace />;
+  }
+
   if (isLoading) {
     return (
       <div className="flex items-center justify-center h-screen">
@@ -861,7 +861,7 @@ export default function PlatformAdmin() {
 
   const totalUsers = companies?.reduce((acc, c) => acc + (c.company_users?.filter((u: any) => u.active).length || 0), 0) || 0;
   const overduePayments = companies?.filter(c => {
-    const sub = c.company_subscriptions?.[0];
+    const sub = c.subscriptions?.[0];
     return sub && sub.next_payment_date && new Date(sub.next_payment_date) < new Date();
   }).length || 0;
 
@@ -1627,7 +1627,7 @@ export default function PlatformAdmin() {
                   </TableHeader>
                   <TableBody>
                     {companiesPagination.paginatedData?.map((company) => {
-                      const subscription = company.company_subscriptions?.[0];
+                      const subscription = company.subscriptions?.[0];
                       return (
                         <TableRow key={company.id}>
                           <TableCell className="font-medium">{company.name}</TableCell>
@@ -1637,7 +1637,7 @@ export default function PlatformAdmin() {
                             {getStatusBadge(company.active)}
                           </TableCell>
                           <TableCell>
-                            {getSubscriptionStatus(company.company_subscriptions)}
+                            {getSubscriptionStatus(company.subscriptions)}
                           </TableCell>
                           <TableCell>
                             {subscription?.next_payment_date

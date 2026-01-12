@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
 import { useCompany } from "@/contexts/CompanyContext";
@@ -6,11 +6,12 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/com
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { toast } from "sonner";
-import { Clock, LogIn, LogOut, Calendar } from "lucide-react";
+import { Clock, LogIn, LogOut, Calendar, AlertCircle } from "lucide-react";
 import { format, startOfDay, endOfDay } from "date-fns";
 import { es } from "date-fns/locale";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
+import { Alert, AlertDescription } from "@/components/ui/alert";
 
 interface TimeEntry {
   id: string;
@@ -23,8 +24,15 @@ export function EmployeeSelfTimeTracking() {
   const { currentCompany } = useCompany();
   const queryClient = useQueryClient();
   const [notes, setNotes] = useState("");
+  const [currentTime, setCurrentTime] = useState(new Date());
 
-  // Get current user
+  useEffect(() => {
+    const interval = setInterval(() => {
+      setCurrentTime(new Date());
+    }, 1000);
+    return () => clearInterval(interval);
+  }, []);
+
   const { data: user } = useQuery({
     queryKey: ["current-user"],
     queryFn: async () => {
@@ -33,12 +41,11 @@ export function EmployeeSelfTimeTracking() {
     },
   });
 
-  // Get employee record for current user
   const { data: employee } = useQuery({
     queryKey: ["current-employee", user?.email, currentCompany?.id],
     queryFn: async () => {
       if (!user?.email || !currentCompany?.id) return null;
-      
+
       const { data, error } = await supabase
         .from("employees")
         .select("*")
@@ -46,23 +53,22 @@ export function EmployeeSelfTimeTracking() {
         .eq("email", user.email)
         .eq("active", true)
         .maybeSingle();
-      
+
       if (error) throw error;
       return data;
     },
     enabled: !!user?.email && !!currentCompany?.id,
   });
 
-  // Get today's time entries
   const { data: todayEntries, isLoading } = useQuery({
     queryKey: ["my-time-entries", employee?.id],
     queryFn: async () => {
       if (!employee?.id) return [];
-      
+
       const today = new Date();
       const start = startOfDay(today);
       const end = endOfDay(today);
-      
+
       const { data, error } = await supabase
         .from("employee_time_entries" as any)
         .select("*")
@@ -70,7 +76,7 @@ export function EmployeeSelfTimeTracking() {
         .gte("clock_in", start.toISOString())
         .lte("clock_in", end.toISOString())
         .order("clock_in", { ascending: false });
-      
+
       if (error) throw error;
       return data as unknown as TimeEntry[];
     },
@@ -79,8 +85,10 @@ export function EmployeeSelfTimeTracking() {
 
   const clockInMutation = useMutation({
     mutationFn: async () => {
-      if (!employee?.id || !currentCompany?.id) throw new Error("No se encontró información del empleado");
-      
+      if (!employee?.id || !currentCompany?.id) {
+        throw new Error("No se encontro informacion del empleado");
+      }
+
       const now = new Date();
       const { error } = await supabase
         .from("employee_time_entries" as any)
@@ -90,12 +98,12 @@ export function EmployeeSelfTimeTracking() {
           clock_in: now.toISOString(),
           notes: notes || null,
         });
-      
+
       if (error) throw error;
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["my-time-entries"] });
-      toast.success("✅ Entrada registrada correctamente");
+      toast.success("Entrada registrada correctamente");
       setNotes("");
     },
     onError: (error: any) => {
@@ -108,17 +116,17 @@ export function EmployeeSelfTimeTracking() {
       const now = new Date();
       const { error } = await supabase
         .from("employee_time_entries" as any)
-        .update({ 
+        .update({
           clock_out: now.toISOString(),
           notes: notes || null,
         })
         .eq("id", entryId);
-      
+
       if (error) throw error;
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["my-time-entries"] });
-      toast.success("✅ Salida registrada correctamente");
+      toast.success("Salida registrada correctamente");
       setNotes("");
     },
     onError: (error: any) => {
@@ -134,18 +142,19 @@ export function EmployeeSelfTimeTracking() {
     return `${hours}h ${minutes}m`;
   };
 
-  const activeEntry = todayEntries?.find(entry => !entry.clock_out);
-  const completedEntries = todayEntries?.filter(entry => entry.clock_out) || [];
+  const activeEntry = todayEntries?.find((entry) => !entry.clock_out);
+  const completedEntries = todayEntries?.filter((entry) => entry.clock_out) || [];
 
   if (!employee) {
     return (
       <Card>
         <CardContent className="py-8">
-          <div className="text-center text-muted-foreground">
-            <Clock className="h-12 w-12 mx-auto mb-4 opacity-50" />
-            <p>No se encontró tu perfil de empleado</p>
-            <p className="text-sm mt-2">Contacta a tu administrador</p>
-          </div>
+          <Alert>
+            <AlertCircle className="h-4 w-4" />
+            <AlertDescription>
+              No se encontro tu perfil de empleado vinculado a tu cuenta. Contacta a tu administrador para que te vincule correctamente.
+            </AlertDescription>
+          </Alert>
         </CardContent>
       </Card>
     );
@@ -171,20 +180,17 @@ export function EmployeeSelfTimeTracking() {
           <Clock className="h-5 w-5 text-primary" />
           <CardTitle>Mi Control de Horarios</CardTitle>
         </div>
-        <CardDescription>
-          Registra tu entrada y salida
-        </CardDescription>
+        <CardDescription>Registra tu entrada y salida</CardDescription>
       </CardHeader>
       <CardContent className="space-y-6">
-        {/* Clock In/Out Section */}
         <div className="bg-gradient-to-br from-primary/5 to-primary/10 rounded-lg p-6 space-y-4">
           <div className="text-center">
-            <div className="text-4xl font-bold mb-2">
-              {format(new Date(), "HH:mm:ss")}
+            <div className="text-4xl font-bold mb-2 tabular-nums">
+              {format(currentTime, "HH:mm:ss")}
             </div>
             <div className="text-muted-foreground flex items-center justify-center gap-2">
               <Calendar className="h-4 w-4" />
-              {format(new Date(), "EEEE, dd 'de' MMMM yyyy", { locale: es })}
+              {format(currentTime, "EEEE, dd 'de' MMMM yyyy", { locale: es })}
             </div>
           </div>
 
@@ -194,7 +200,7 @@ export function EmployeeSelfTimeTracking() {
               id="notes"
               value={notes}
               onChange={(e) => setNotes(e.target.value)}
-              placeholder="Ej: Llegué tarde por tráfico"
+              placeholder="Ej: Llegue tarde por trafico"
             />
           </div>
 
@@ -237,7 +243,6 @@ export function EmployeeSelfTimeTracking() {
           </div>
         </div>
 
-        {/* Today's History */}
         {completedEntries.length > 0 && (
           <div className="space-y-2">
             <h3 className="font-semibold">Historial de hoy</h3>
@@ -278,7 +283,7 @@ export function EmployeeSelfTimeTracking() {
         )}
 
         <div className="text-xs text-muted-foreground text-center pt-4 border-t">
-          💡 Tu supervisor puede ver estos registros para calcular tu asistencia y horas trabajadas
+          Tu supervisor puede ver estos registros para calcular tu asistencia y horas trabajadas
         </div>
       </CardContent>
     </Card>

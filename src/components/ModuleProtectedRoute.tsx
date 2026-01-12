@@ -1,13 +1,14 @@
 import { ReactNode } from "react";
 import { Navigate } from "react-router-dom";
 import { useActiveModules } from "@/hooks/useActiveModules";
-import { usePermissions } from "@/hooks/usePermissions";
+import { Permission, usePermissions } from "@/hooks/usePermissions";
 import { usePlatformAdmin } from "@/hooks/usePlatformAdmin";
 
 interface ModuleProtectedRouteProps {
   children: ReactNode;
   moduleCode: string;
   redirectTo?: string;
+  permission?: Permission;
 }
 
 // Módulos base que siempre están disponibles (sincronizado con platform_modules.is_base_module = true)
@@ -17,9 +18,10 @@ export function ModuleProtectedRoute({
   children,
   moduleCode,
   redirectTo = "/module-not-available",
+  permission = "view",
 }: ModuleProtectedRouteProps) {
   const { data: activeModules = [], isLoading: modulesLoading } = useActiveModules();
-  const { isAdmin, loading: permissionsLoading } = usePermissions();
+  const { isAdmin, hasPermission, loading: permissionsLoading } = usePermissions();
   const { isPlatformAdmin, isLoading: adminLoading } = usePlatformAdmin();
 
   // Mostrar loading mientras se cargan los datos
@@ -36,7 +38,13 @@ export function ModuleProtectedRoute({
     return <>{children}</>;
   }
 
-  // Módulos base siempre disponibles
+  // Verificar permiso de rol para el módulo
+  const hasRolePermission = hasPermission(moduleCode as any, permission);
+  if (!hasRolePermission) {
+    return <Navigate to={redirectTo} replace />;
+  }
+
+  // Módulos base siempre disponibles si el rol tiene permiso
   if (BASE_MODULES.includes(moduleCode)) {
     return <>{children}</>;
   }

@@ -315,13 +315,13 @@ const App = () => (
             <Route path="/" element={<Landing />} />
 
             {/* Dashboard privado en /app */}
-            <Route path="/app" element={<ProtectedRoute><Dashboard /></ProtectedRoute>} />
+            <Route path="/app" element={<ProtectedRoute><ModuleProtectedRoute moduleCode="dashboard"><Dashboard /></ModuleProtectedRoute></ProtectedRoute>} />
             <Route path="/pos" element={<ProtectedRoute><ModuleProtectedRoute moduleCode="pos"><POS /></ModuleProtectedRoute></ProtectedRoute>} />
             <Route path="/products" element={<ProtectedRoute><ModuleProtectedRoute moduleCode="products"><Products /></ModuleProtectedRoute></ProtectedRoute>} />
             <Route path="/customers" element={<ProtectedRoute><ModuleProtectedRoute moduleCode="customers"><Customers /></ModuleProtectedRoute></ProtectedRoute>} />
             <Route path="/sales" element={<ProtectedRoute><ModuleProtectedRoute moduleCode="sales"><Sales /></ModuleProtectedRoute></ProtectedRoute>} />
-            <Route path="/settings" element={<ProtectedRoute><Settings /></ProtectedRoute>} />
-            <Route path="/settings/email" element={<ProtectedRoute><EmailConfig /></ProtectedRoute>} />
+            <Route path="/settings" element={<ProtectedRoute><ModuleProtectedRoute moduleCode="settings"><Settings /></ModuleProtectedRoute></ProtectedRoute>} />
+            <Route path="/settings/email" element={<ProtectedRoute><ModuleProtectedRoute moduleCode="settings"><EmailConfig /></ModuleProtectedRoute></ProtectedRoute>} />
             
             {/* Módulos Adicionales - requieren contrato */}
             <Route path="/quotations" element={<ProtectedRoute><ModuleProtectedRoute moduleCode="quotations"><Quotations /></ModuleProtectedRoute></ProtectedRoute>} />
@@ -372,7 +372,7 @@ const App = () => (
             
             {/* RRHH */}
             <Route path="/payroll" element={<ProtectedRoute><ModuleProtectedRoute moduleCode="payroll"><Payroll /></ModuleProtectedRoute></ProtectedRoute>} />
-            <Route path="/my-time-tracking" element={<ProtectedRoute><MyTimeTracking /></ProtectedRoute>} />
+            <Route path="/my-time-tracking" element={<ProtectedRoute><ModuleProtectedRoute moduleCode="employees"><MyTimeTracking /></ModuleProtectedRoute></ProtectedRoute>} />
             
             {/* Integraciones */}
             <Route path="/integrations" element={<ProtectedRoute><ModuleProtectedRoute moduleCode="integrations"><Integrations /></ModuleProtectedRoute></ProtectedRoute>} />
@@ -389,7 +389,7 @@ const App = () => (
             <Route path="/platform-support" element={<ProtectedRoute><PlatformSupport /></ProtectedRoute>} />
             
             {/* Notificaciones - siempre disponible */}
-            <Route path="/notification-settings" element={<ProtectedRoute><NotificationSettings /></ProtectedRoute>} />
+            <Route path="/notification-settings" element={<ProtectedRoute><ModuleProtectedRoute moduleCode="notifications"><NotificationSettings /></ModuleProtectedRoute></ProtectedRoute>} />
             
             {/* Admin de Plataforma */}
             <Route path="/admin/platform" element={<PlatformAdminRoute><PlatformAdmin /></PlatformAdminRoute>} />

@@ -50,7 +50,7 @@ import {
   Plus,
 } from "lucide-react";
 import { useActiveModules } from "@/hooks/useActiveModules";
-import { usePermissions } from "@/hooks/usePermissions";
+import { usePermissions, Module } from "@/hooks/usePermissions";
 import { usePlatformAdmin } from "@/hooks/usePlatformAdmin";
 import { useState, useMemo } from "react";
 import { Collapsible, CollapsibleContent, CollapsibleTrigger } from "@/components/ui/collapsible";
@@ -77,7 +77,7 @@ export function Sidebar() {
   const location = useLocation();
   const navigate = useNavigate();
   const activeModules = useActiveModules();
-  const { hasPermission, isAdmin } = usePermissions();
+  const { hasPermission, isAdmin, loading: permissionsLoading } = usePermissions();
   const { isPlatformAdmin } = usePlatformAdmin();
   
   const [openSections, setOpenSections] = useState<string[]>([]);
@@ -159,7 +159,6 @@ export function Sidebar() {
           title: "Ventas",
           href: "/sales",
           icon: FileText,
-          module: "sales",
           children: [
             {
               title: "Todas las Ventas",
@@ -171,25 +170,25 @@ export function Sidebar() {
               title: "Presupuestos",
               href: "/quotations",
               icon: FileCheck,
-              module: "sales",
+              module: "quotations",
             },
             {
               title: "Remitos",
               href: "/delivery-notes",
               icon: Truck,
-              module: "sales",
+              module: "delivery_notes",
             },
             {
               title: "Devoluciones",
               href: "/returns",
               icon: TrendingDown,
-              module: "sales",
+              module: "returns",
             },
             {
               title: "Reservas",
               href: "/reservations",
               icon: Calendar,
-              module: "sales",
+              module: "reservations",
             },
           ],
         },
@@ -204,7 +203,6 @@ export function Sidebar() {
           title: "Clientes",
           href: "/customers",
           icon: Users,
-          module: "customers",
           children: [
             {
               title: "Lista de Clientes",
@@ -216,19 +214,19 @@ export function Sidebar() {
               title: "Cuentas Corrientes",
               href: "/accounts-receivable",
               icon: Receipt,
-              module: "customers",
+              module: "accounts_receivable",
             },
             {
               title: "Atención al Cliente",
               href: "/customer-support",
               icon: MessageCircle,
-              module: "customers",
+              module: "customer_support",
             },
             {
               title: "Base de Conocimiento",
               href: "/customer-support/knowledge-base",
               icon: BookOpen,
-              module: "customers",
+              module: "customer_support",
             },
           ],
         },
@@ -242,8 +240,7 @@ export function Sidebar() {
         {
           title: "Inventario",
           href: "/products",
-          icon: Package,
-          module: "products",
+          icon: Package,
           children: [
             {
               title: "Productos",
@@ -255,32 +252,32 @@ export function Sidebar() {
               title: "Alertas de Inventario",
               href: "/inventory-alerts",
               icon: AlertCircle,
-              module: "products",
+              module: "inventory_alerts",
               badge: 5,
             },
             {
               title: "Depósitos",
               href: "/warehouses",
               icon: Warehouse,
-              module: "products",
+              module: "warehouses",
             },
             {
               title: "Stock por Depósito",
               href: "/warehouse-stock",
               icon: PackageSearch,
-              module: "products",
+              module: "warehouse_stock",
             },
             {
               title: "Transferencias",
               href: "/warehouse-transfers",
               icon: ArrowLeftRight,
-              module: "products",
+              module: "warehouse_transfers",
             },
             {
               title: "Reservas de Stock",
               href: "/stock-reservations",
               icon: PackageOpen,
-              module: "products",
+              module: "stock_reservations",
             },
           ],
         },
@@ -294,14 +291,13 @@ export function Sidebar() {
         {
           title: "Compras",
           href: "/purchases",
-          icon: ShoppingBag,
-          module: "purchases",
+          icon: ShoppingBag,
           children: [
             {
               title: "Órdenes de Compra",
               href: "/purchase-orders",
               icon: FileCheck,
-              module: "purchases",
+              module: "purchase_orders",
             },
             {
               title: "Historial de Compras",
@@ -313,19 +309,19 @@ export function Sidebar() {
               title: "Recepción de Mercadería",
               href: "/purchase-reception",
               icon: PackageCheck,
-              module: "purchases",
+              module: "purchase_reception",
             },
             {
               title: "Devoluciones a Proveedores",
               href: "/purchase-returns",
               icon: TrendingDown,
-              module: "purchases",
+              module: "purchase_returns",
             },
             {
               title: "Proveedores",
               href: "/suppliers",
               icon: Truck,
-              module: "purchases",
+              module: "suppliers",
             },
           ],
         },
@@ -339,32 +335,31 @@ export function Sidebar() {
         {
           title: "Finanzas",
           href: "/bank-accounts",
-          icon: Building2,
-          module: "cash_register",
+          icon: Building2,
           children: [
             {
               title: "Cuentas Bancarias",
               href: "/bank-accounts",
               icon: Building2,
-              module: "cash_register",
+              module: "bank_accounts",
             },
             {
               title: "Movimientos Bancarios",
               href: "/bank-movements",
               icon: TrendingUp,
-              module: "cash_register",
+              module: "bank_movements",
             },
             {
               title: "Movimientos de Tarjetas",
               href: "/card-movements",
               icon: CreditCard,
-              module: "cash_register",
+              module: "card_movements",
             },
             {
               title: "Retenciones",
               href: "/retentions",
               icon: Calculator,
-              module: "cash_register",
+              module: "retentions",
             },
           ],
         },
@@ -379,7 +374,7 @@ export function Sidebar() {
           title: "Servicios Técnicos",
           href: "/technical-services",
           icon: Wrench,
-          module: "sales",
+          module: "technical_services",
         },
         {
           title: "Gestión de Caja",
@@ -391,19 +386,19 @@ export function Sidebar() {
           title: "Gastos",
           href: "/expenses",
           icon: Receipt,
-          module: "cash_register",
+          module: "expenses",
         },
         {
           title: "Cheques",
           href: "/checks",
           icon: Banknote,
-          module: "cash_register",
+          module: "checks",
         },
         {
           title: "Promociones",
           href: "/promotions",
           icon: Tag,
-          module: "sales",
+          module: "promotions",
         },
       ],
     },
@@ -416,13 +411,13 @@ export function Sidebar() {
           title: "Liquidaciones",
           href: "/payroll",
           icon: Calculator,
-          module: "employees",
+          module: "payroll",
         },
         {
           title: "Comisiones",
           href: "/commissions",
           icon: BadgePercent,
-          module: "employees",
+          module: "commissions",
         },
         {
           title: "Empleados",
@@ -440,8 +435,7 @@ export function Sidebar() {
         {
           title: "Reportes",
           href: "/reports",
-          icon: BarChart3,
-          module: "reports",
+          icon: BarChart3,
           children: [
             {
               title: "Reportes",
@@ -453,7 +447,7 @@ export function Sidebar() {
               title: "Reportes Contador",
               href: "/accountant-reports",
               icon: BookOpen,
-              module: "reports",
+              module: "accountant_reports",
             },
           ],
         },
@@ -480,42 +474,42 @@ export function Sidebar() {
               title: "Puntos de Venta AFIP",
               href: "/pos-points",
               icon: Store,
-              module: "sales",
+              module: "pos_afip",
               permission: "admin",
             },
             {
               title: "Auditoría",
               href: "/audit-logs",
               icon: Shield,
-              module: "settings",
+              module: "audit_logs",
               permission: "admin",
             },
             {
               title: "Logs de Acceso",
               href: "/access-logs",
               icon: Activity,
-              module: "settings",
+              module: "access_logs",
               permission: "admin",
             },
             {
               title: "Cierre Mensual",
               href: "/monthly-closing",
               icon: Lock,
-              module: "reports",
+              module: "monthly_closing",
               permission: "admin",
             },
             {
               title: "Operaciones Masivas",
               href: "/bulk-operations",
               icon: Zap,
-              module: "settings",
+              module: "bulk_operations",
               permission: "admin",
             },
             {
               title: "Notificaciones",
               href: "/notification-settings",
               icon: Bell,
-              module: "settings",
+              module: "notifications",
               permission: "admin",
             },
           ],
@@ -531,14 +525,14 @@ export function Sidebar() {
           title: "Integraciones",
           href: "/integrations",
           icon: Plug,
-          module: "settings",
+          module: "integrations",
           permission: "admin",
         },
         {
           title: "Facturación AFIP",
           href: "/afip",
           icon: Store,
-          module: "sales",
+          module: "afip",
           permission: "admin",
         },
       ],
@@ -549,6 +543,9 @@ export function Sidebar() {
     // Platform admin ve todo
     if (isPlatformAdmin) return true;
     
+    // Mientras cargan los permisos, no mostrar nada para evitar flash
+    if (permissionsLoading) return false;
+    
     // Si tiene módulo, verificar que esté activo
     if (item.module && !hasModule(item.module)) return false;
     
@@ -556,11 +553,65 @@ export function Sidebar() {
     if (item.permission === 'admin' && !isAdmin) return false;
     
     // Verificar permisos de módulo si está definido
-    if (item.module && !hasPermission(item.module as any, "view")) {
-      return false;
+    if (item.module) {
+      const permissionModule = mapSidebarModuleToPermission(item.module);
+      if (permissionModule && !hasPermission(permissionModule, "view")) {
+        return false;
+      }
     }
     
     return true;
+  };
+
+  // Función para mapear módulos del sidebar a módulos de permisos
+  const mapSidebarModuleToPermission = (sidebarModule: string): Module | null => {
+    const moduleMap: Record<string, Module> = {
+      'dashboard': 'dashboard',
+      'pos': 'pos',
+      'products': 'products',
+      'sales': 'sales',
+      'quotations': 'quotations',
+      'delivery_notes': 'delivery_notes',
+      'returns': 'returns',
+      'reservations': 'reservations',
+      'customers': 'customers',
+      'accounts_receivable': 'accounts_receivable',
+      'customer_support': 'customer_support',
+      'inventory_alerts': 'inventory_alerts',
+      'warehouses': 'warehouses',
+      'warehouse_stock': 'warehouse_stock',
+      'warehouse_transfers': 'warehouse_transfers',
+      'stock_reservations': 'stock_reservations',
+      'suppliers': 'suppliers',
+      'purchases': 'purchases',
+      'purchase_orders': 'purchase_orders',
+      'purchase_reception': 'purchase_reception',
+      'purchase_returns': 'purchase_returns',
+      'expenses': 'expenses',
+      'reports': 'reports',
+      'accountant_reports': 'accountant_reports',
+      'employees': 'employees',
+      'payroll': 'payroll',
+      'commissions': 'commissions',
+      'settings': 'settings',
+      'cash_register': 'cash_register',
+      'bank_accounts': 'bank_accounts',
+      'bank_movements': 'bank_movements',
+      'card_movements': 'card_movements',
+      'retentions': 'retentions',
+      'checks': 'checks',
+      'technical_services': 'technical_services',
+      'promotions': 'promotions',
+      'audit_logs': 'audit_logs',
+      'access_logs': 'access_logs',
+      'monthly_closing': 'monthly_closing',
+      'bulk_operations': 'bulk_operations',
+      'notifications': 'notifications',
+      'integrations': 'integrations',
+      'afip': 'afip',
+      'pos_afip': 'pos_afip',
+    };
+    return moduleMap[sidebarModule] || null;
   };
 
   const renderNavItem = (item: NavItem, isChild = false, isFavoritesList = false) => {
@@ -836,3 +887,8 @@ export function Sidebar() {
     </UISidebar>
   );
 }
+
+
+
+
+

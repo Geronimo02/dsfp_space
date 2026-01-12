@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useState, useEffect, useMemo } from "react";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
 import { useCompany } from "@/contexts/CompanyContext";
@@ -8,10 +8,12 @@ import { Badge } from "@/components/ui/badge";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Switch } from "@/components/ui/switch";
 import { Label } from "@/components/ui/label";
+import { DEFAULT_ROLE_PERMISSIONS, Module } from "@/hooks/usePermissions";
 
 import { toast } from "sonner";
-import { Shield, Save, Settings } from "lucide-react";
+import { Shield, Save, Settings, RotateCcw, Info } from "lucide-react";
 import { Accordion, AccordionContent, AccordionItem, AccordionTrigger } from "@/components/ui/accordion";
+import { Alert, AlertDescription } from "@/components/ui/alert";
 
 type AppRole = "admin" | "manager" | "cashier" | "accountant" | "viewer" | "warehouse" | "technician" | "auditor" | "employee";
 
@@ -111,12 +113,43 @@ interface RolePermission extends Permission {
   company_id: string;
 }
 
-export function EmployeePermissionsManager() {
+export function EmployeePermissionsManager(): JSX.Element {
   const { currentCompany } = useCompany();
   const queryClient = useQueryClient();
   const [selectedRole, setSelectedRole] = useState<AppRole>("employee");
   const [permissions, setPermissions] = useState<Record<string, Permission>>({});
   const [hasChanges, setHasChanges] = useState(false);
+  const [isCustomized, setIsCustomized] = useState(false);
+
+  const normalizeCode = (code?: string | null) => (typeof code === "string" ? code.trim() : "");
+
+  const getDefaultPermissions = (role: AppRole, modulesList: PermissionModule[]): Record<string, Permission> => {
+    const roleDefaults = DEFAULT_ROLE_PERMISSIONS[role];
+    if (!roleDefaults) return {};
+
+    const permsRecord: Record<string, Permission> = {};
+    modulesList.forEach((m) => {
+      const moduleCode = normalizeCode(m.code);
+      if (!moduleCode) return;
+      const moduleDefault = roleDefaults[moduleCode as Module];
+      permsRecord[moduleCode] = moduleDefault
+        ? {
+            can_view: moduleDefault.view,
+            can_create: moduleDefault.create,
+            can_edit: moduleDefault.edit,
+            can_delete: moduleDefault.delete,
+            can_export: moduleDefault.export,
+          }
+        : {
+            can_view: false,
+            can_create: false,
+            can_edit: false,
+            can_delete: false,
+            can_export: false,
+          };
+    });
+    return permsRecord;
+  };
 
   const normalizeCategory = (category?: string | null) => {
     if (!category) return CATEGORY_LABELS.otros;
@@ -136,18 +169,39 @@ export function EmployeePermissionsManager() {
       if (error) throw error;
 
       const normalizedModules = (data || []).map((module: any) => ({
-        code: module.code,
+        code: normalizeCode(module.code),
         name: module.name,
         category: normalizeCategory(module.category),
       }));
 
-      return normalizedModules.length > 0 ? normalizedModules : DEFAULT_MODULES;
+      const filteredModules = normalizedModules.filter((module) => module.code.length > 0);
+      const uniqueModules = filteredModules.filter(
+        (module, index, list) => list.findIndex((item) => item.code === module.code) === index
+      );
+
+      if (uniqueModules.length === 0 || uniqueModules.length !== normalizedModules.length) {
+        return DEFAULT_MODULES;
+      }
+
+      return uniqueModules;
     },
   });
 
+  const normalizedModules = useMemo(() => {
+    const modulesList = (modules || []).map((module) => ({
+      ...module,
+      code: normalizeCode(module.code),
+    }));
+    const filtered = modulesList.filter((module) => module.code.length > 0);
+    const unique = filtered.filter(
+      (module, index, list) => list.findIndex((item) => item.code === module.code) === index
+    );
+    return unique.length > 0 ? unique : DEFAULT_MODULES;
+  }, [modules]);
+
   // Fetch current permissions for the selected role
   const { data: rolePermissions, isLoading: rolePermissionsLoading } = useQuery({
-    queryKey: ["role-permissions-config", currentCompany?.id, selectedRole, modules.map((m) => m.code).join("|")],
+    queryKey: ["role-permissions-config", currentCompany?.id, selectedRole, normalizedModules.map((m) => m.code).join("|")],
     queryFn: async () => {
       if (!currentCompany?.id) return [];
       const { data, error } = await supabase
@@ -157,11 +211,21 @@ export function EmployeePermissionsManager() {
         .eq("role", selectedRole);
       
       if (error) throw error;
-      
-      // Convert to record format
+
+      return data as RolePermission[];
+    },
+    enabled: !!currentCompany?.id && !modulesLoading,
+  });
+
+  useEffect(() => {
+    if (!rolePermissions) return;
+
+    if (rolePermissions.length > 0) {
       const permsRecord: Record<string, Permission> = {};
-      (data || []).forEach((p: RolePermission) => {
-        permsRecord[p.module] = {
+      rolePermissions.forEach((p: RolePermission) => {
+        const moduleCode = normalizeCode(p.module);
+        if (!moduleCode) return;
+        permsRecord[moduleCode] = {
           can_view: p.can_view,
           can_create: p.can_create,
           can_edit: p.can_edit,
@@ -169,26 +233,38 @@ export function EmployeePermissionsManager() {
           can_export: p.can_export,
         };
       });
-      
-      // Initialize missing modules with defaults
-      modules.forEach((m) => {
-        if (!permsRecord[m.code]) {
-          permsRecord[m.code] = {
-            can_view: false,
-            can_create: false,
-            can_edit: false,
-            can_delete: false,
-            can_export: false,
-          };
-        }
+
+      normalizedModules.forEach((m) => {
+        const moduleCode = normalizeCode(m.code);
+        if (!moduleCode || permsRecord[moduleCode]) return;
+        const defaults = DEFAULT_ROLE_PERMISSIONS[selectedRole];
+        const moduleDefault = defaults?.[moduleCode as Module];
+        permsRecord[moduleCode] = moduleDefault
+          ? {
+              can_view: moduleDefault.view,
+              can_create: moduleDefault.create,
+              can_edit: moduleDefault.edit,
+              can_delete: moduleDefault.delete,
+              can_export: moduleDefault.export,
+            }
+          : {
+              can_view: false,
+              can_create: false,
+              can_edit: false,
+              can_delete: false,
+              can_export: false,
+            };
       });
-      
+
       setPermissions(permsRecord);
-      setHasChanges(false);
-      return data;
-    },
-    enabled: !!currentCompany?.id && !modulesLoading,
-  });
+      setIsCustomized(true);
+    } else {
+      setPermissions(getDefaultPermissions(selectedRole, normalizedModules));
+      setIsCustomized(false);
+    }
+
+    setHasChanges(false);
+  }, [rolePermissions, selectedRole, normalizedModules]);
 
   const saveMutation = useMutation({
     mutationFn: async () => {
@@ -226,11 +302,18 @@ export function EmployeePermissionsManager() {
     },
   });
 
+  const resetToDefaults = () => {
+    setPermissions(getDefaultPermissions(selectedRole, normalizedModules));
+    setHasChanges(true);
+  };
+
   const updatePermission = (module: string, field: keyof Permission, value: boolean) => {
+    const moduleCode = normalizeCode(module);
+    if (!moduleCode) return;
     setPermissions(prev => ({
       ...prev,
-      [module]: {
-        ...prev[module],
+      [moduleCode]: {
+        ...prev[moduleCode],
         [field]: value,
         // Si desactivan view, desactivar todo
         ...(field === "can_view" && !value ? {
@@ -245,9 +328,11 @@ export function EmployeePermissionsManager() {
   };
 
   const setAllPermissions = (module: string, enabled: boolean) => {
+    const moduleCode = normalizeCode(module);
+    if (!moduleCode) return;
     setPermissions(prev => ({
       ...prev,
-      [module]: {
+      [moduleCode]: {
         can_view: enabled,
         can_create: enabled,
         can_edit: enabled,
@@ -258,7 +343,7 @@ export function EmployeePermissionsManager() {
     setHasChanges(true);
   };
 
-  const groupedModules = modules.reduce((acc, m) => {
+  const groupedModules = normalizedModules.reduce((acc, m) => {
     if (!acc[m.category]) acc[m.category] = [];
     acc[m.category].push(m);
     return acc;
@@ -283,16 +368,22 @@ export function EmployeePermissionsManager() {
   return (
     <Card>
       <CardHeader>
-        <div className="flex items-center justify-between">
+        <div className="flex items-center justify-between flex-wrap gap-2">
           <div className="flex items-center gap-2">
             <Shield className="h-5 w-5 text-primary" />
             <CardTitle>Gestión de Permisos por Rol</CardTitle>
           </div>
           {hasChanges && (
-            <Button onClick={() => saveMutation.mutate()} disabled={saveMutation.isPending}>
-              <Save className="mr-2 h-4 w-4" />
-              {saveMutation.isPending ? "Guardando..." : "Guardar Cambios"}
-            </Button>
+            <>
+              <Button variant="outline" onClick={resetToDefaults}>
+                <RotateCcw className="mr-2 h-4 w-4" />
+                Restaurar
+              </Button>
+              <Button onClick={() => saveMutation.mutate()} disabled={saveMutation.isPending}>
+                <Save className="mr-2 h-4 w-4" />
+                {saveMutation.isPending ? "Guardando..." : "Guardar"}
+              </Button>
+            </>
           )}
         </div>
         <CardDescription>
@@ -318,6 +409,24 @@ export function EmployeePermissionsManager() {
             </SelectContent>
           </Select>
         </div>
+
+        {!isCustomized && selectedRole !== "admin" && (
+          <Alert>
+            <Info className="h-4 w-4" />
+            <AlertDescription>
+              Este rol usa los <strong>permisos predeterminados</strong>. Modifica cualquier permiso para personalizar el acceso de este rol.
+            </AlertDescription>
+          </Alert>
+        )}
+
+        {isCustomized && (
+          <Alert className="bg-primary/5 border-primary/20">
+            <Info className="h-4 w-4 text-primary" />
+            <AlertDescription>
+              Este rol tiene <strong>permisos personalizados</strong>. Puedes restaurar los valores predeterminados con el boton "Restaurar".
+            </AlertDescription>
+          </Alert>
+        )}
 
         {selectedRole === "admin" ? (
           <div className="p-4 bg-muted/50 rounded-lg border">
@@ -419,3 +528,5 @@ export function EmployeePermissionsManager() {
     </Card>
   );
 }
+
+
