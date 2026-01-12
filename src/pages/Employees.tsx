@@ -52,7 +52,7 @@ const initialFormData: EmployeeFormData = {
 
 const Employees = () => {
   const { currentCompany } = useCompany();
-  const { hasPermission, isAdmin, loading: permissionsLoading } = usePermissions();
+  const { hasPermission, isAdmin, isManager, canManageEmployees, canManageTimeTracking, loading: permissionsLoading } = usePermissions();
   const queryClient = useQueryClient();
   const [dialogOpen, setDialogOpen] = useState(false);
   const [editingEmployee, setEditingEmployee] = useState<any>(null);
@@ -61,6 +61,10 @@ const Employees = () => {
   const canCreate = hasPermission("employees", "create");
   const canEdit = hasPermission("employees", "edit");
   const canDelete = hasPermission("employees", "delete");
+  
+  // Managers y admins pueden ver horarios de todos y gestionar roles
+  const canViewAllTimeTracking = canManageTimeTracking;
+  const canManageRoles = canManageEmployees;
 
   const { data: employees, isLoading } = useQuery({
     queryKey: ["employees", currentCompany?.id, isAdmin],
@@ -351,17 +355,23 @@ const Employees = () => {
               <Clock className="mr-1 sm:mr-2 h-4 w-4" />
               <span className="hidden sm:inline">Mi Horario</span>
             </TabsTrigger>
+            {canViewAllTimeTracking && (
+              <TabsTrigger value="all-times" className="flex-1 min-w-[100px] text-xs sm:text-sm">
+                <Clock className="mr-1 sm:mr-2 h-4 w-4" />
+                <span className="hidden sm:inline">Horarios</span>
+              </TabsTrigger>
+            )}
+            {canManageRoles && (
+              <TabsTrigger value="roles" className="flex-1 min-w-[80px] text-xs sm:text-sm">
+                <UserCog className="mr-1 sm:mr-2 h-4 w-4" />
+                <span className="hidden sm:inline">Roles</span>
+              </TabsTrigger>
+            )}
             {isAdmin && (
-              <>
-                <TabsTrigger value="all-times" className="flex-1 min-w-[100px] text-xs sm:text-sm">
-                  <Clock className="mr-1 sm:mr-2 h-4 w-4" />
-                  <span className="hidden sm:inline">Horarios</span>
-                </TabsTrigger>
-                <TabsTrigger value="permissions" className="flex-1 min-w-[80px] text-xs sm:text-sm">
-                  <Shield className="mr-1 sm:mr-2 h-4 w-4" />
-                  <span className="hidden sm:inline">Permisos</span>
-                </TabsTrigger>
-              </>
+              <TabsTrigger value="permissions" className="flex-1 min-w-[80px] text-xs sm:text-sm">
+                <Shield className="mr-1 sm:mr-2 h-4 w-4" />
+                <span className="hidden sm:inline">Permisos</span>
+              </TabsTrigger>
             )}
           </TabsList>
 
@@ -650,9 +660,15 @@ const Employees = () => {
             <EmployeeSelfTimeTracking />
           </TabsContent>
 
-          {isAdmin && (
+          {canViewAllTimeTracking && (
             <TabsContent value="all-times">
               <EmployeeTimeTracking />
+            </TabsContent>
+          )}
+
+          {canManageRoles && (
+            <TabsContent value="roles">
+              <EmployeeRoleAssignment />
             </TabsContent>
           )}
 
