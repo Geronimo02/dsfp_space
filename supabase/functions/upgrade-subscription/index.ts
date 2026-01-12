@@ -48,14 +48,62 @@ Deno.serve(async (req: Request) => {
     if (!cu) return json({ error: "No tienes acceso a esta compañía" }, 403);
 
     // Obtener suscripción actual
-    const { data: currentSub, error: subError } = await supabaseAdmin
+    let currentSub: any;
+    const { data: sub, error: subError } = await supabaseAdmin
       .from("subscriptions")
       .select("*, subscription_plans(price, name, stripe_price_id)")
       .eq("company_id", company_id)
       .maybeSingle();
+    
+    currentSub = sub;
 
-    if (subError || !currentSub) {
-      return json({ error: "No se encontró suscripción activa" }, 404);
+    // Si no existe suscripción (empresa legacy o plan free sin registro), crear una
+    if (!currentSub) {
+      console.log("[upgrade-subscription] No subscription found, attempting to create one...");
+      // Obtener plan Free como fallback
+      const { data: freePlan, error: freePlanErr } = await supabaseAdmin
+        .from("subscription_plans")
+        .select("id, price, name")
+        .eq("price", 0)
+        .maybeSingle();
+
+      if (freePlanErr) {
+        console.error("[upgrade-subscription] Error fetching free plan:", freePlanErr);
+      }
+
+      if (freePlan) {
+        console.log(`[upgrade-subscription] Creating subscription with free plan: ${freePlan.id}`);
+        // Crear suscripción inicial en plan free
+        const { data: newSub, error: insertErr } = await supabaseAdmin
+          .from("subscriptions")
+          .insert({
+            company_id,
+            plan_id: freePlan.id,
+            status: "active",
+            provider: null,
+          })
+          .select("*, subscription_plans(price, name, stripe_price_id)")
+          .single();
+
+        if (insertErr) {
+          console.error("[upgrade-subscription] Error creating subscription:", insertErr);
+        } else {
+          console.log("[upgrade-subscription] Subscription created successfully");
+          currentSub = newSub;
+        }
+      } else {
+        console.error("[upgrade-subscription] No free plan found in database");
+      }
+    }
+
+    if (subError) {
+      console.error("[upgrade-subscription] Database error:", subError);
+      return json({ error: `Error de base de datos: ${subError.message}` }, 500);
+    }
+
+    if (!currentSub) {
+      console.error("[upgrade-subscription] Could not find or create subscription");
+      return json({ error: "No se encontró suscripción. Por favor contacta a soporte." }, 404);
     }
 
     // Obtener nuevo plan

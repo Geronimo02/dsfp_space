@@ -221,10 +221,11 @@ Deno.serve(async (req: Request) => {
         paymentId = typeof latestPi?.id === "string" ? latestPi.id : null;
         providerSubscriptionId = subscription.id;
         providerCustomerId = customerId;
-        subscriptionStatus = stripeStatus;
+        // Si no hay trial (trialEndsAt es null) y el plan es de pago, forzar status "active"
+        subscriptionStatus = (!trialEndsAt && plan.price > 0) ? "active" : stripeStatus;
         currentPeriodEnd = periodEndSec ? new Date(periodEndSec * 1000).toISOString() : null;
 
-        console.log(`[finalize-signup] ✅ Stripe subscription created: ${subscription.id} status=${stripeStatus}`);
+        console.log(`[finalize-signup] ✅ Stripe subscription created: ${subscription.id} status=${subscriptionStatus} (stripe=${stripeStatus})`);
 
       } catch (err: any) {
         console.error("[finalize-signup] Stripe subscription failed:", err);
@@ -393,7 +394,7 @@ Deno.serve(async (req: Request) => {
     const trialEndsAt = intent
       ? (intent.plan_id === FREE_PLAN_ID
         ? new Date(Date.now() + FREE_TRIAL_DAYS * 24 * 60 * 60 * 1000).toISOString()
-        : (intent.trial_ends_at ?? null))
+        : null) // Para planes de pago, NO hay trial por defecto (a menos que se configure explícitamente)
       : null; // No trial from spm path
 
     const fullName = intent?.full_name ?? spm.full_name ?? "Usuario";

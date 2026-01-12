@@ -110,12 +110,14 @@ export default function Settings() {
     font_size: "small",
   });
 
-  // ✅ subscription query - always enabled but with long stale time to avoid unnecessary refetches
+  // ✅ subscription query - always enabled with proper cache settings
   const { data: subscription, isLoading: subscriptionLoading } = useQuery({
     queryKey: ["subscription", currentCompany?.id],
     enabled: !companyLoading && !!currentCompany?.id,
-    staleTime: 60000, // 1 minuto
-    refetchOnWindowFocus: false,
+    staleTime: 60000, // 1 minuto - datos considerados frescos
+    gcTime: 1000 * 60 * 30, // 30 minutos - mantener en cache aunque no se use
+    refetchOnWindowFocus: true, // Refrescar al volver a la pestaña
+    refetchOnMount: true, // Refrescar al montar el componente
     queryFn: async () => {
       const { data, error } = await supabase
         .from("subscriptions")
