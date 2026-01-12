@@ -130,6 +130,48 @@ export default function Settings() {
     },
   });
 
+  // ✅ Auto-create subscription if company doesn't have one (legacy companies)
+  useEffect(() => {
+    const createSubscriptionIfNeeded = async () => {
+      if (!currentCompany?.id || subscription !== undefined) return; // Only run if subscription data loaded but is null
+
+      try {
+        // Check if subscription exists
+        const { data: existingSub } = await supabase
+          .from("subscriptions")
+          .select("id")
+          .eq("company_id", currentCompany.id)
+          .maybeSingle();
+
+        if (!existingSub) {
+          // Get free plan
+          const { data: freePlan } = await supabase
+            .from("subscription_plans")
+            .select("id")
+            .eq("price", 0)
+            .maybeSingle();
+
+          if (freePlan) {
+            // Create subscription for free plan
+            await supabase.from("subscriptions").insert({
+              company_id: currentCompany.id,
+              plan_id: freePlan.id,
+              status: "active",
+              provider: null,
+            });
+
+            // Refresh subscription data
+            queryClient.invalidateQueries({ queryKey: ["subscription", currentCompany.id] });
+          }
+        }
+      } catch (error) {
+        console.error("Error creating subscription:", error);
+      }
+    };
+
+    createSubscriptionIfNeeded();
+  }, [currentCompany?.id, subscription, queryClient]);
+
   const trialDaysLeft = useMemo(() => {
     if (!subscription?.trial_ends_at) return null;
     const end = new Date(subscription.trial_ends_at).getTime();
