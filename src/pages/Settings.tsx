@@ -130,53 +130,6 @@ export default function Settings() {
     },
   });
 
-  // ✅ Auto-create subscription if company doesn't have one (legacy companies)
-  useEffect(() => {
-    const createSubscriptionIfNeeded = async () => {
-      // Solo ejecutar cuando:
-      // 1. Tenemos company_id
-      // 2. La query terminó de cargar
-      // 3. No hay suscripción
-      if (!currentCompany?.id || subscriptionLoading) return;
-      if (subscription) return; // Ya existe suscripción
-
-      try {
-        console.log("[Settings] Creating default subscription for company:", currentCompany.id);
-        // Get free plan
-        const { data: freePlan } = await supabase
-          .from("subscription_plans")
-          .select("id")
-          .eq("price", 0)
-          .maybeSingle();
-
-        if (freePlan) {
-          console.log("[Settings] Found free plan:", freePlan.id);
-          // Create subscription for free plan
-          const { error } = await supabase.from("subscriptions").insert({
-            company_id: currentCompany.id,
-            plan_id: freePlan.id,
-            status: "active",
-            provider: null,
-          });
-
-          if (error) {
-            console.error("[Settings] Error creating subscription:", error);
-          } else {
-            console.log("[Settings] Subscription created successfully");
-            // Refresh subscription data
-            queryClient.invalidateQueries({ queryKey: ["subscription", currentCompany.id] });
-          }
-        } else {
-          console.error("[Settings] No free plan found");
-        }
-      } catch (error) {
-        console.error("[Settings] Error in createSubscriptionIfNeeded:", error);
-      }
-    };
-
-    createSubscriptionIfNeeded();
-  }, [currentCompany?.id, subscriptionLoading, subscription, queryClient]);
-
   const trialDaysLeft = useMemo(() => {
     if (!subscription?.trial_ends_at) return null;
     const end = new Date(subscription.trial_ends_at).getTime();

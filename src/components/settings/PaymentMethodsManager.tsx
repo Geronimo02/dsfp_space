@@ -128,11 +128,11 @@ export function PaymentMethodsManager({
     queryFn: async () => {
       const { data, error } = await supabase
         .from("subscriptions")
-        .select("provider")
+        .select("*, subscription_plans (id, name, price, description)")
         .eq("company_id", companyId!)
         .maybeSingle();
       if (error) throw error;
-      return data as { provider?: string } | null;
+      return data as { provider?: string; plan_id?: string; status?: string; subscription_plans?: { id: string; name: string; price: number; description: string } } | null;
     },
   });
 
