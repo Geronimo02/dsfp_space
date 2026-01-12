@@ -46,6 +46,7 @@ export function InvoiceViewer({ companyId: propCompanyId, showAllCompanies = fal
   // Si la tabla de invoices no existe, no mostrar nada
   if (error && (error as any).code === "PGRST205") {
     return null;
+  }
 
   const handleDownload = (invoice: any) => {
     if (invoice.pdf_url?.startsWith("data:")) {
