@@ -1,4 +1,4 @@
-import { useState, useEffect } from "react";
+import { useState, useEffect, useMemo } from "react";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
 import { useCompany } from "@/contexts/CompanyContext";
@@ -21,35 +21,81 @@ const AVAILABLE_ROLES: { value: AppRole; label: string; description: string }[] 
   { value: "admin", label: "Administrador", description: "Acceso completo a todos los módulos" },
   { value: "manager", label: "Gerente", description: "Gestión general con algunas restricciones" },
   { value: "cashier", label: "Cajero", description: "Acceso a POS y gestión de caja" },
-  { value: "accountant", label: "Contador", description: "Acceso a finanzas y reportes (solo lectura)" },
+  { value: "accountant", label: "Contador", description: "Acceso a finanzas y reportes" },
   { value: "warehouse", label: "Depósito", description: "Gestión de inventario y stock" },
-  { value: "technician", label: "Técnico", description: "Servicios técnicos y presupuestos" },
-  { value: "auditor", label: "Auditor", description: "Solo lectura para auditorías con exportación" },
+  { value: "technician", label: "Técnico", description: "Servicios técnicos" },
+  { value: "auditor", label: "Auditor", description: "Solo lectura para auditorías" },
   { value: "viewer", label: "Visualizador", description: "Solo lectura básica" },
-  { value: "employee", label: "Empleado", description: "Acceso básico limitado (solo horarios)" },
+  { value: "employee", label: "Empleado", description: "Acceso básico limitado" },
 ];
 
-const MODULES: { code: Module; name: string; category: string }[] = [
-  { code: "dashboard", name: "Dashboard", category: "General" },
+interface PermissionModule {
+  code: string;
+  name: string;
+  category: string;
+}
+
+const CATEGORY_LABELS: Record<string, string> = {
+  dashboard: "Dashboard",
+  pos: "General",
+  ventas: "Ventas",
+  clientes: "Clientes",
+  inventario: "Inventario",
+  compras: "Compras",
+  finanzas: "Finanzas",
+  operaciones: "Operaciones",
+  rrhh: "RRHH",
+  reportes: "Reportes",
+  administracion: "AdministraciA3n",
+  integraciones: "Integraciones",
+  otros: "Otros",
+};
+
+const DEFAULT_MODULES: PermissionModule[] = [
+  { code: "dashboard", name: "Dashboard", category: "Dashboard" },
   { code: "pos", name: "Punto de Venta", category: "General" },
   { code: "sales", name: "Ventas", category: "Ventas" },
   { code: "quotations", name: "Presupuestos", category: "Ventas" },
   { code: "delivery_notes", name: "Remitos", category: "Ventas" },
   { code: "returns", name: "Devoluciones", category: "Ventas" },
+  { code: "reservations", name: "Reservas", category: "Ventas" },
   { code: "customers", name: "Clientes", category: "Clientes" },
+  { code: "accounts_receivable", name: "Cuentas Corrientes", category: "Clientes" },
+  { code: "customer_support", name: "AtenciA3n al Cliente", category: "Clientes" },
   { code: "products", name: "Productos", category: "Inventario" },
+  { code: "inventory_alerts", name: "Alertas de Inventario", category: "Inventario" },
+  { code: "warehouses", name: "DepA3sitos", category: "Inventario" },
+  { code: "warehouse_stock", name: "Stock por DepA3sito", category: "Inventario" },
+  { code: "warehouse_transfers", name: "Transferencias", category: "Inventario" },
+  { code: "stock_reservations", name: "Reservas de Stock", category: "Inventario" },
   { code: "purchases", name: "Compras", category: "Compras" },
+  { code: "purchase_orders", name: "A\"rdenes de Compra", category: "Compras" },
+  { code: "purchase_reception", name: "RecepciA3n de MercaderA-a", category: "Compras" },
+  { code: "purchase_returns", name: "Devoluciones a Proveedores", category: "Compras" },
   { code: "suppliers", name: "Proveedores", category: "Compras" },
   { code: "expenses", name: "Gastos", category: "Finanzas" },
   { code: "cash_register", name: "Caja", category: "Finanzas" },
+  { code: "bank_accounts", name: "Cuentas Bancarias", category: "Finanzas" },
+  { code: "bank_movements", name: "Movimientos Bancarios", category: "Finanzas" },
+  { code: "card_movements", name: "Movimientos de Tarjetas", category: "Finanzas" },
+  { code: "retentions", name: "Retenciones", category: "Finanzas" },
+  { code: "checks", name: "Cheques", category: "Finanzas" },
   { code: "reports", name: "Reportes", category: "Reportes" },
+  { code: "accountant_reports", name: "Reportes Contador", category: "Reportes" },
   { code: "employees", name: "Empleados", category: "RRHH" },
-  { code: "time_tracking", name: "Control de Horarios", category: "RRHH" },
+  { code: "payroll", name: "Liquidaciones", category: "RRHH" },
+  { code: "commissions", name: "Comisiones", category: "RRHH" },
+  { code: "audit_logs", name: "AuditorA-a", category: "AdministraciA3n" },
+  { code: "access_logs", name: "Logs de Acceso", category: "AdministraciA3n" },
+  { code: "monthly_closing", name: "Cierre Mensual", category: "AdministraciA3n" },
+  { code: "notifications", name: "Notificaciones", category: "AdministraciA3n" },
   { code: "settings", name: "Configuración", category: "Administración" },
   { code: "technical_services", name: "Servicios Técnicos", category: "Operaciones" },
   { code: "promotions", name: "Promociones", category: "Operaciones" },
+  { code: "integrations", name: "Integraciones", category: "Integraciones" },
+  { code: "afip", name: "FacturaciA3n AFIP", category: "Integraciones" },
+  { code: "pos_afip", name: "Puntos de Venta AFIP", category: "Integraciones" },
   { code: "bulk_operations", name: "Operaciones Masivas", category: "Administración" },
-  { code: "pos_afip", name: "Facturación AFIP", category: "Administración" },
 ];
 
 interface Permission {
@@ -67,46 +113,95 @@ interface RolePermission extends Permission {
   company_id: string;
 }
 
-export function EmployeePermissionsManager() {
+export function EmployeePermissionsManager(): JSX.Element {
   const { currentCompany } = useCompany();
   const queryClient = useQueryClient();
-  const [selectedRole, setSelectedRole] = useState<AppRole>("cashier");
+  const [selectedRole, setSelectedRole] = useState<AppRole>("employee");
   const [permissions, setPermissions] = useState<Record<string, Permission>>({});
   const [hasChanges, setHasChanges] = useState(false);
   const [isCustomized, setIsCustomized] = useState(false);
 
-  // Get default permissions for a role
-  const getDefaultPermissions = (role: AppRole): Record<string, Permission> => {
+  const normalizeCode = (code?: string | null) => (typeof code === "string" ? code.trim() : "");
+
+  const getDefaultPermissions = (role: AppRole, modulesList: PermissionModule[]): Record<string, Permission> => {
     const roleDefaults = DEFAULT_ROLE_PERMISSIONS[role];
     if (!roleDefaults) return {};
-    
+
     const permsRecord: Record<string, Permission> = {};
-    MODULES.forEach(m => {
-      const moduleDefault = roleDefaults[m.code as Module];
-      if (moduleDefault) {
-        permsRecord[m.code] = {
-          can_view: moduleDefault.view,
-          can_create: moduleDefault.create,
-          can_edit: moduleDefault.edit,
-          can_delete: moduleDefault.delete,
-          can_export: moduleDefault.export,
-        };
-      } else {
-        permsRecord[m.code] = {
-          can_view: false,
-          can_create: false,
-          can_edit: false,
-          can_delete: false,
-          can_export: false,
-        };
-      }
+    modulesList.forEach((m) => {
+      const moduleCode = normalizeCode(m.code);
+      if (!moduleCode) return;
+      const moduleDefault = roleDefaults[moduleCode as Module];
+      permsRecord[moduleCode] = moduleDefault
+        ? {
+            can_view: moduleDefault.view,
+            can_create: moduleDefault.create,
+            can_edit: moduleDefault.edit,
+            can_delete: moduleDefault.delete,
+            can_export: moduleDefault.export,
+          }
+        : {
+            can_view: false,
+            can_create: false,
+            can_edit: false,
+            can_delete: false,
+            can_export: false,
+          };
     });
     return permsRecord;
   };
 
+  const normalizeCategory = (category?: string | null) => {
+    if (!category) return CATEGORY_LABELS.otros;
+    return CATEGORY_LABELS[category] || category;
+  };
+
+  const { data: modules = DEFAULT_MODULES, isLoading: modulesLoading } = useQuery({
+    queryKey: ["permission-modules"],
+    queryFn: async () => {
+      const { data, error } = await supabase
+        .from("platform_modules")
+        .select("code, name, category, is_active, display_order")
+        .eq("is_active", true)
+        .order("category")
+        .order("display_order");
+
+      if (error) throw error;
+
+      const normalizedModules = (data || []).map((module: any) => ({
+        code: normalizeCode(module.code),
+        name: module.name,
+        category: normalizeCategory(module.category),
+      }));
+
+      const filteredModules = normalizedModules.filter((module) => module.code.length > 0);
+      const uniqueModules = filteredModules.filter(
+        (module, index, list) => list.findIndex((item) => item.code === module.code) === index
+      );
+
+      if (uniqueModules.length === 0 || uniqueModules.length !== normalizedModules.length) {
+        return DEFAULT_MODULES;
+      }
+
+      return uniqueModules;
+    },
+  });
+
+  const normalizedModules = useMemo(() => {
+    const modulesList = (modules || []).map((module) => ({
+      ...module,
+      code: normalizeCode(module.code),
+    }));
+    const filtered = modulesList.filter((module) => module.code.length > 0);
+    const unique = filtered.filter(
+      (module, index, list) => list.findIndex((item) => item.code === module.code) === index
+    );
+    return unique.length > 0 ? unique : DEFAULT_MODULES;
+  }, [modules]);
+
   // Fetch current permissions for the selected role
-  const { data: rolePermissions, isLoading } = useQuery({
-    queryKey: ["role-permissions-config", currentCompany?.id, selectedRole],
+  const { data: rolePermissions, isLoading: rolePermissionsLoading } = useQuery({
+    queryKey: ["role-permissions-config", currentCompany?.id, selectedRole, normalizedModules.map((m) => m.code).join("|")],
     queryFn: async () => {
       if (!currentCompany?.id) return [];
       const { data, error } = await supabase
@@ -116,20 +211,21 @@ export function EmployeePermissionsManager() {
         .eq("role", selectedRole);
       
       if (error) throw error;
+
       return data as RolePermission[];
     },
-    enabled: !!currentCompany?.id,
+    enabled: !!currentCompany?.id && !modulesLoading,
   });
 
-  // Update permissions when role changes or data loads
   useEffect(() => {
     if (!rolePermissions) return;
-    
+
     if (rolePermissions.length > 0) {
-      // Company has custom permissions for this role
       const permsRecord: Record<string, Permission> = {};
       rolePermissions.forEach((p: RolePermission) => {
-        permsRecord[p.module] = {
+        const moduleCode = normalizeCode(p.module);
+        if (!moduleCode) return;
+        permsRecord[moduleCode] = {
           can_view: p.can_view,
           can_create: p.can_create,
           can_edit: p.can_edit,
@@ -137,37 +233,38 @@ export function EmployeePermissionsManager() {
           can_export: p.can_export,
         };
       });
-      
-      // Fill missing modules with defaults
-      MODULES.forEach(m => {
-        if (!permsRecord[m.code]) {
-          const roleDefaults = DEFAULT_ROLE_PERMISSIONS[selectedRole];
-          const moduleDefault = roleDefaults?.[m.code as Module];
-          permsRecord[m.code] = moduleDefault ? {
-            can_view: moduleDefault.view,
-            can_create: moduleDefault.create,
-            can_edit: moduleDefault.edit,
-            can_delete: moduleDefault.delete,
-            can_export: moduleDefault.export,
-          } : {
-            can_view: false,
-            can_create: false,
-            can_edit: false,
-            can_delete: false,
-            can_export: false,
-          };
-        }
+
+      normalizedModules.forEach((m) => {
+        const moduleCode = normalizeCode(m.code);
+        if (!moduleCode || permsRecord[moduleCode]) return;
+        const defaults = DEFAULT_ROLE_PERMISSIONS[selectedRole];
+        const moduleDefault = defaults?.[moduleCode as Module];
+        permsRecord[moduleCode] = moduleDefault
+          ? {
+              can_view: moduleDefault.view,
+              can_create: moduleDefault.create,
+              can_edit: moduleDefault.edit,
+              can_delete: moduleDefault.delete,
+              can_export: moduleDefault.export,
+            }
+          : {
+              can_view: false,
+              can_create: false,
+              can_edit: false,
+              can_delete: false,
+              can_export: false,
+            };
       });
-      
+
       setPermissions(permsRecord);
       setIsCustomized(true);
     } else {
-      // Use default permissions for the role
-      setPermissions(getDefaultPermissions(selectedRole));
+      setPermissions(getDefaultPermissions(selectedRole, normalizedModules));
       setIsCustomized(false);
     }
+
     setHasChanges(false);
-  }, [rolePermissions, selectedRole]);
+  }, [rolePermissions, selectedRole, normalizedModules]);
 
   const saveMutation = useMutation({
     mutationFn: async () => {
@@ -206,15 +303,17 @@ export function EmployeePermissionsManager() {
   });
 
   const resetToDefaults = () => {
-    setPermissions(getDefaultPermissions(selectedRole));
+    setPermissions(getDefaultPermissions(selectedRole, normalizedModules));
     setHasChanges(true);
   };
 
   const updatePermission = (module: string, field: keyof Permission, value: boolean) => {
+    const moduleCode = normalizeCode(module);
+    if (!moduleCode) return;
     setPermissions(prev => ({
       ...prev,
-      [module]: {
-        ...prev[module],
+      [moduleCode]: {
+        ...prev[moduleCode],
         [field]: value,
         // Si desactivan view, desactivar todo
         ...(field === "can_view" && !value ? {
@@ -229,9 +328,11 @@ export function EmployeePermissionsManager() {
   };
 
   const setAllPermissions = (module: string, enabled: boolean) => {
+    const moduleCode = normalizeCode(module);
+    if (!moduleCode) return;
     setPermissions(prev => ({
       ...prev,
-      [module]: {
+      [moduleCode]: {
         can_view: enabled,
         can_create: enabled,
         can_edit: enabled,
@@ -242,11 +343,13 @@ export function EmployeePermissionsManager() {
     setHasChanges(true);
   };
 
-  const groupedModules = MODULES.reduce((acc, m) => {
+  const groupedModules = normalizedModules.reduce((acc, m) => {
     if (!acc[m.category]) acc[m.category] = [];
     acc[m.category].push(m);
     return acc;
-  }, {} as Record<string, typeof MODULES>);
+  }, {} as Record<string, PermissionModule[]>);
+
+  const isLoading = rolePermissionsLoading || modulesLoading;
 
   if (isLoading) {
     return (
@@ -270,23 +373,21 @@ export function EmployeePermissionsManager() {
             <Shield className="h-5 w-5 text-primary" />
             <CardTitle>Gestión de Permisos por Rol</CardTitle>
           </div>
-          <div className="flex gap-2">
-            {hasChanges && (
-              <>
-                <Button variant="outline" onClick={resetToDefaults}>
-                  <RotateCcw className="mr-2 h-4 w-4" />
-                  Restaurar
-                </Button>
-                <Button onClick={() => saveMutation.mutate()} disabled={saveMutation.isPending}>
-                  <Save className="mr-2 h-4 w-4" />
-                  {saveMutation.isPending ? "Guardando..." : "Guardar"}
-                </Button>
-              </>
-            )}
-          </div>
+          {hasChanges && (
+            <>
+              <Button variant="outline" onClick={resetToDefaults}>
+                <RotateCcw className="mr-2 h-4 w-4" />
+                Restaurar
+              </Button>
+              <Button onClick={() => saveMutation.mutate()} disabled={saveMutation.isPending}>
+                <Save className="mr-2 h-4 w-4" />
+                {saveMutation.isPending ? "Guardando..." : "Guardar"}
+              </Button>
+            </>
+          )}
         </div>
         <CardDescription>
-          Configura los permisos de cada rol. Los cambios se aplicarán a todos los usuarios con ese rol.
+          Configura los permisos de cada rol para controlar el acceso a los módulos
         </CardDescription>
       </CardHeader>
       <CardContent className="space-y-6">
@@ -322,7 +423,7 @@ export function EmployeePermissionsManager() {
           <Alert className="bg-primary/5 border-primary/20">
             <Info className="h-4 w-4 text-primary" />
             <AlertDescription>
-              Este rol tiene <strong>permisos personalizados</strong>. Puedes restaurar los valores predeterminados con el botón "Restaurar".
+              Este rol tiene <strong>permisos personalizados</strong>. Puedes restaurar los valores predeterminados con el boton "Restaurar".
             </AlertDescription>
           </Alert>
         )}
@@ -427,3 +528,5 @@ export function EmployeePermissionsManager() {
     </Card>
   );
 }
+
+

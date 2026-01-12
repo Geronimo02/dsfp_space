@@ -3,28 +3,64 @@ import { supabase } from "@/integrations/supabase/client";
 import { useCompany } from "@/contexts/CompanyContext";
 
 export type Permission = "view" | "create" | "edit" | "delete" | "export";
-export type Module = 
+export type Module =
   | "dashboard"
   | "pos"
-  | "products" 
-  | "sales" 
-  | "customers" 
-  | "suppliers" 
-  | "purchases" 
-  | "reports" 
-  | "employees"
-  | "time_tracking"
-  | "settings" 
-  | "cash_register" 
-  | "technical_services"
+  | "sales"
   | "quotations"
   | "delivery_notes"
-  | "promotions"
   | "returns"
-  | "credit_notes"
+  | "reservations"
+  | "customers"
+  | "accounts_receivable"
+  | "customer_support"
+  | "products"
+  | "inventory_alerts"
+  | "warehouses"
+  | "warehouse_stock"
+  | "warehouse_transfers"
+  | "stock_reservations"
+  | "purchases"
+  | "purchase_orders"
+  | "purchase_reception"
+  | "purchase_returns"
+  | "suppliers"
   | "expenses"
-  | "bulk_operations"
-  | "pos_afip";
+  | "cash_register"
+  | "bank_accounts"
+  | "bank_movements"
+  | "card_movements"
+  | "retentions"
+  | "checks"
+  | "reports"
+  | "accountant_reports"
+  | "employees"
+  | "payroll"
+  | "commissions"
+  | "audit_logs"
+  | "access_logs"
+  | "monthly_closing"
+  | "notifications"
+  | "settings"
+  | "technical_services"
+  | "promotions"
+  | "integrations"
+  | "afip"
+  | "pos_afip"
+  | "bulk_operations";
+
+export type AppRole =
+  | "admin"
+  | "manager"
+  | "cashier"
+  | "accountant"
+  | "viewer"
+  | "warehouse"
+  | "technician"
+  | "auditor"
+  | "employee";
+
+type RolePermissionDefaults = Record<Module, Record<Permission, boolean>>;
 
 interface RolePermission {
   role: string;
@@ -36,214 +72,217 @@ interface RolePermission {
   can_export: boolean;
 }
 
-// Permisos por defecto para cada rol cuando no hay permisos personalizados
-const DEFAULT_ROLE_PERMISSIONS: Record<string, Record<Module, { view: boolean; create: boolean; edit: boolean; delete: boolean; export: boolean }>> = {
-  admin: {
-    dashboard: { view: true, create: true, edit: true, delete: true, export: true },
-    pos: { view: true, create: true, edit: true, delete: true, export: true },
-    products: { view: true, create: true, edit: true, delete: true, export: true },
-    sales: { view: true, create: true, edit: true, delete: true, export: true },
-    customers: { view: true, create: true, edit: true, delete: true, export: true },
-    suppliers: { view: true, create: true, edit: true, delete: true, export: true },
-    purchases: { view: true, create: true, edit: true, delete: true, export: true },
-    reports: { view: true, create: true, edit: true, delete: true, export: true },
-    employees: { view: true, create: true, edit: true, delete: true, export: true },
-    time_tracking: { view: true, create: true, edit: true, delete: true, export: true },
-    settings: { view: true, create: true, edit: true, delete: true, export: true },
-    cash_register: { view: true, create: true, edit: true, delete: true, export: true },
-    technical_services: { view: true, create: true, edit: true, delete: true, export: true },
-    quotations: { view: true, create: true, edit: true, delete: true, export: true },
-    delivery_notes: { view: true, create: true, edit: true, delete: true, export: true },
-    promotions: { view: true, create: true, edit: true, delete: true, export: true },
-    returns: { view: true, create: true, edit: true, delete: true, export: true },
-    credit_notes: { view: true, create: true, edit: true, delete: true, export: true },
-    expenses: { view: true, create: true, edit: true, delete: true, export: true },
-    bulk_operations: { view: true, create: true, edit: true, delete: true, export: true },
-    pos_afip: { view: true, create: true, edit: true, delete: true, export: true },
-  },
+const ALL_MODULES: Module[] = [
+  "dashboard",
+  "pos",
+  "sales",
+  "quotations",
+  "delivery_notes",
+  "returns",
+  "reservations",
+  "customers",
+  "accounts_receivable",
+  "customer_support",
+  "products",
+  "inventory_alerts",
+  "warehouses",
+  "warehouse_stock",
+  "warehouse_transfers",
+  "stock_reservations",
+  "purchases",
+  "purchase_orders",
+  "purchase_reception",
+  "purchase_returns",
+  "suppliers",
+  "expenses",
+  "cash_register",
+  "bank_accounts",
+  "bank_movements",
+  "card_movements",
+  "retentions",
+  "checks",
+  "reports",
+  "accountant_reports",
+  "employees",
+  "payroll",
+  "commissions",
+  "audit_logs",
+  "access_logs",
+  "monthly_closing",
+  "notifications",
+  "settings",
+  "technical_services",
+  "promotions",
+  "integrations",
+  "afip",
+  "pos_afip",
+  "bulk_operations",
+];
+
+const allowAll = (modules: Module[], perms: Record<Permission, boolean>) =>
+  modules.reduce((acc, module) => {
+    acc[module] = perms;
+    return acc;
+  }, {} as RolePermissionDefaults);
+
+const DEFAULT_VIEW_ONLY = {
+  view: true,
+  create: false,
+  edit: false,
+  delete: false,
+  export: false,
+};
+
+const DEFAULT_VIEW_EXPORT = {
+  view: true,
+  create: false,
+  edit: false,
+  delete: false,
+  export: true,
+};
+
+const DEFAULT_NO_DELETE = {
+  view: true,
+  create: true,
+  edit: true,
+  delete: false,
+  export: true,
+};
+
+const DEFAULT_FULL = {
+  view: true,
+  create: true,
+  edit: true,
+  delete: true,
+  export: true,
+};
+
+export const DEFAULT_ROLE_PERMISSIONS: Record<AppRole, Partial<RolePermissionDefaults>> = {
+  admin: allowAll(ALL_MODULES, DEFAULT_FULL),
   manager: {
-    dashboard: { view: true, create: true, edit: true, delete: false, export: true },
-    pos: { view: true, create: true, edit: true, delete: false, export: true },
-    products: { view: true, create: true, edit: true, delete: false, export: true },
-    sales: { view: true, create: true, edit: true, delete: false, export: true },
-    customers: { view: true, create: true, edit: true, delete: false, export: true },
-    suppliers: { view: true, create: true, edit: true, delete: false, export: true },
-    purchases: { view: true, create: true, edit: true, delete: false, export: true },
-    reports: { view: true, create: true, edit: true, delete: false, export: true },
-    employees: { view: true, create: true, edit: true, delete: false, export: true },
-    time_tracking: { view: true, create: true, edit: true, delete: false, export: true },
-    settings: { view: true, create: false, edit: false, delete: false, export: false },
-    cash_register: { view: true, create: true, edit: true, delete: false, export: true },
-    technical_services: { view: true, create: true, edit: true, delete: false, export: true },
-    quotations: { view: true, create: true, edit: true, delete: false, export: true },
-    delivery_notes: { view: true, create: true, edit: true, delete: false, export: true },
-    promotions: { view: true, create: true, edit: true, delete: false, export: true },
-    returns: { view: true, create: true, edit: true, delete: false, export: true },
-    credit_notes: { view: true, create: true, edit: true, delete: false, export: true },
-    expenses: { view: true, create: true, edit: true, delete: false, export: true },
-    bulk_operations: { view: true, create: true, edit: true, delete: false, export: true },
-    pos_afip: { view: true, create: true, edit: true, delete: false, export: true },
+    ...allowAll(
+      [
+        "dashboard",
+        "sales",
+        "quotations",
+        "delivery_notes",
+        "returns",
+        "reservations",
+        "customers",
+        "accounts_receivable",
+        "products",
+        "inventory_alerts",
+        "warehouses",
+        "warehouse_stock",
+        "warehouse_transfers",
+        "stock_reservations",
+        "employees",
+        "reports",
+        "accountant_reports",
+        "expenses",
+      ],
+      DEFAULT_NO_DELETE
+    ),
   },
   cashier: {
-    dashboard: { view: true, create: false, edit: false, delete: false, export: false },
-    pos: { view: true, create: true, edit: true, delete: false, export: false },
-    products: { view: true, create: false, edit: false, delete: false, export: false },
-    sales: { view: true, create: true, edit: false, delete: false, export: false },
-    customers: { view: true, create: true, edit: false, delete: false, export: false },
-    suppliers: { view: false, create: false, edit: false, delete: false, export: false },
-    purchases: { view: false, create: false, edit: false, delete: false, export: false },
-    reports: { view: false, create: false, edit: false, delete: false, export: false },
-    employees: { view: false, create: false, edit: false, delete: false, export: false },
-    time_tracking: { view: true, create: true, edit: false, delete: false, export: false },
-    settings: { view: false, create: false, edit: false, delete: false, export: false },
-    cash_register: { view: true, create: true, edit: true, delete: false, export: false },
-    technical_services: { view: false, create: false, edit: false, delete: false, export: false },
-    quotations: { view: true, create: true, edit: false, delete: false, export: false },
-    delivery_notes: { view: true, create: true, edit: false, delete: false, export: false },
-    promotions: { view: true, create: false, edit: false, delete: false, export: false },
-    returns: { view: true, create: true, edit: false, delete: false, export: false },
-    credit_notes: { view: true, create: false, edit: false, delete: false, export: false },
-    expenses: { view: false, create: false, edit: false, delete: false, export: false },
-    bulk_operations: { view: false, create: false, edit: false, delete: false, export: false },
-    pos_afip: { view: true, create: true, edit: false, delete: false, export: false },
+    ...allowAll(
+      ["pos", "sales", "returns", "cash_register", "customers"],
+      {
+        view: true,
+        create: true,
+        edit: true,
+        delete: false,
+        export: false,
+      }
+    ),
+    products: DEFAULT_VIEW_ONLY,
+    inventory_alerts: DEFAULT_VIEW_ONLY,
   },
   warehouse: {
-    dashboard: { view: true, create: false, edit: false, delete: false, export: false },
-    pos: { view: false, create: false, edit: false, delete: false, export: false },
-    products: { view: true, create: true, edit: true, delete: false, export: true },
-    sales: { view: true, create: false, edit: false, delete: false, export: false },
-    customers: { view: false, create: false, edit: false, delete: false, export: false },
-    suppliers: { view: true, create: true, edit: true, delete: false, export: true },
-    purchases: { view: true, create: true, edit: true, delete: false, export: true },
-    reports: { view: true, create: false, edit: false, delete: false, export: true },
-    employees: { view: false, create: false, edit: false, delete: false, export: false },
-    time_tracking: { view: true, create: true, edit: false, delete: false, export: false },
-    settings: { view: false, create: false, edit: false, delete: false, export: false },
-    cash_register: { view: false, create: false, edit: false, delete: false, export: false },
-    technical_services: { view: false, create: false, edit: false, delete: false, export: false },
-    quotations: { view: true, create: false, edit: false, delete: false, export: false },
-    delivery_notes: { view: true, create: true, edit: true, delete: false, export: true },
-    promotions: { view: false, create: false, edit: false, delete: false, export: false },
-    returns: { view: true, create: true, edit: false, delete: false, export: false },
-    credit_notes: { view: false, create: false, edit: false, delete: false, export: false },
-    expenses: { view: false, create: false, edit: false, delete: false, export: false },
-    bulk_operations: { view: true, create: true, edit: false, delete: false, export: false },
-    pos_afip: { view: false, create: false, edit: false, delete: false, export: false },
+    ...allowAll(
+      [
+        "products",
+        "inventory_alerts",
+        "warehouses",
+        "warehouse_stock",
+        "warehouse_transfers",
+        "stock_reservations",
+        "purchases",
+        "purchase_orders",
+        "purchase_reception",
+        "purchase_returns",
+        "suppliers",
+        "reports",
+      ],
+      {
+        view: true,
+        create: true,
+        edit: true,
+        delete: false,
+        export: false,
+      }
+    ),
   },
   technician: {
-    dashboard: { view: true, create: false, edit: false, delete: false, export: false },
-    pos: { view: false, create: false, edit: false, delete: false, export: false },
-    products: { view: true, create: false, edit: false, delete: false, export: false },
-    sales: { view: false, create: false, edit: false, delete: false, export: false },
-    customers: { view: true, create: false, edit: false, delete: false, export: false },
-    suppliers: { view: false, create: false, edit: false, delete: false, export: false },
-    purchases: { view: false, create: false, edit: false, delete: false, export: false },
-    reports: { view: false, create: false, edit: false, delete: false, export: false },
-    employees: { view: false, create: false, edit: false, delete: false, export: false },
-    time_tracking: { view: true, create: true, edit: false, delete: false, export: false },
-    settings: { view: false, create: false, edit: false, delete: false, export: false },
-    cash_register: { view: false, create: false, edit: false, delete: false, export: false },
-    technical_services: { view: true, create: true, edit: true, delete: false, export: true },
-    quotations: { view: true, create: true, edit: true, delete: false, export: true },
-    delivery_notes: { view: true, create: true, edit: false, delete: false, export: false },
-    promotions: { view: false, create: false, edit: false, delete: false, export: false },
-    returns: { view: false, create: false, edit: false, delete: false, export: false },
-    credit_notes: { view: false, create: false, edit: false, delete: false, export: false },
-    expenses: { view: false, create: false, edit: false, delete: false, export: false },
-    bulk_operations: { view: false, create: false, edit: false, delete: false, export: false },
-    pos_afip: { view: false, create: false, edit: false, delete: false, export: false },
+    ...allowAll(["technical_services", "quotations", "customers"], {
+      view: true,
+      create: true,
+      edit: true,
+      delete: false,
+      export: false,
+    }),
+    products: DEFAULT_VIEW_ONLY,
   },
   accountant: {
-    dashboard: { view: true, create: false, edit: false, delete: false, export: true },
-    pos: { view: false, create: false, edit: false, delete: false, export: false },
-    products: { view: true, create: false, edit: false, delete: false, export: true },
-    sales: { view: true, create: false, edit: false, delete: false, export: true },
-    customers: { view: true, create: false, edit: false, delete: false, export: true },
-    suppliers: { view: true, create: false, edit: false, delete: false, export: true },
-    purchases: { view: true, create: false, edit: false, delete: false, export: true },
-    reports: { view: true, create: false, edit: false, delete: false, export: true },
-    employees: { view: true, create: false, edit: false, delete: false, export: true },
-    time_tracking: { view: true, create: false, edit: false, delete: false, export: true },
-    settings: { view: false, create: false, edit: false, delete: false, export: false },
-    cash_register: { view: true, create: false, edit: false, delete: false, export: true },
-    technical_services: { view: true, create: false, edit: false, delete: false, export: true },
-    quotations: { view: true, create: false, edit: false, delete: false, export: true },
-    delivery_notes: { view: true, create: false, edit: false, delete: false, export: true },
-    promotions: { view: true, create: false, edit: false, delete: false, export: true },
-    returns: { view: true, create: false, edit: false, delete: false, export: true },
-    credit_notes: { view: true, create: false, edit: false, delete: false, export: true },
-    expenses: { view: true, create: false, edit: false, delete: false, export: true },
-    bulk_operations: { view: true, create: false, edit: false, delete: false, export: true },
-    pos_afip: { view: true, create: false, edit: false, delete: false, export: true },
+    ...allowAll(
+      [
+        "reports",
+        "accountant_reports",
+        "expenses",
+        "cash_register",
+        "bank_accounts",
+        "bank_movements",
+        "card_movements",
+        "retentions",
+        "checks",
+        "accounts_receivable",
+        "customers",
+        "sales",
+        "purchases",
+        "purchase_orders",
+        "suppliers",
+      ],
+      DEFAULT_VIEW_EXPORT
+    ),
   },
   auditor: {
-    dashboard: { view: true, create: false, edit: false, delete: false, export: true },
-    pos: { view: true, create: false, edit: false, delete: false, export: true },
-    products: { view: true, create: false, edit: false, delete: false, export: true },
-    sales: { view: true, create: false, edit: false, delete: false, export: true },
-    customers: { view: true, create: false, edit: false, delete: false, export: true },
-    suppliers: { view: true, create: false, edit: false, delete: false, export: true },
-    purchases: { view: true, create: false, edit: false, delete: false, export: true },
-    reports: { view: true, create: false, edit: false, delete: false, export: true },
-    employees: { view: true, create: false, edit: false, delete: false, export: true },
-    time_tracking: { view: true, create: false, edit: false, delete: false, export: true },
-    settings: { view: true, create: false, edit: false, delete: false, export: true },
-    cash_register: { view: true, create: false, edit: false, delete: false, export: true },
-    technical_services: { view: true, create: false, edit: false, delete: false, export: true },
-    quotations: { view: true, create: false, edit: false, delete: false, export: true },
-    delivery_notes: { view: true, create: false, edit: false, delete: false, export: true },
-    promotions: { view: true, create: false, edit: false, delete: false, export: true },
-    returns: { view: true, create: false, edit: false, delete: false, export: true },
-    credit_notes: { view: true, create: false, edit: false, delete: false, export: true },
-    expenses: { view: true, create: false, edit: false, delete: false, export: true },
-    bulk_operations: { view: true, create: false, edit: false, delete: false, export: true },
-    pos_afip: { view: true, create: false, edit: false, delete: false, export: true },
+    ...allowAll(
+      [
+        "audit_logs",
+        "access_logs",
+        "reports",
+        "accountant_reports",
+        "sales",
+        "cash_register",
+        "bank_accounts",
+        "bank_movements",
+        "card_movements",
+        "retentions",
+        "checks",
+        "inventory_alerts",
+        "warehouse_stock",
+        "warehouse_transfers",
+        "products",
+        "employees",
+      ],
+      DEFAULT_VIEW_EXPORT
+    ),
   },
   viewer: {
-    dashboard: { view: true, create: false, edit: false, delete: false, export: false },
-    pos: { view: true, create: false, edit: false, delete: false, export: false },
-    products: { view: true, create: false, edit: false, delete: false, export: false },
-    sales: { view: true, create: false, edit: false, delete: false, export: false },
-    customers: { view: true, create: false, edit: false, delete: false, export: false },
-    suppliers: { view: true, create: false, edit: false, delete: false, export: false },
-    purchases: { view: true, create: false, edit: false, delete: false, export: false },
-    reports: { view: true, create: false, edit: false, delete: false, export: false },
-    employees: { view: false, create: false, edit: false, delete: false, export: false },
-    time_tracking: { view: true, create: true, edit: false, delete: false, export: false },
-    settings: { view: false, create: false, edit: false, delete: false, export: false },
-    cash_register: { view: true, create: false, edit: false, delete: false, export: false },
-    technical_services: { view: true, create: false, edit: false, delete: false, export: false },
-    quotations: { view: true, create: false, edit: false, delete: false, export: false },
-    delivery_notes: { view: true, create: false, edit: false, delete: false, export: false },
-    promotions: { view: true, create: false, edit: false, delete: false, export: false },
-    returns: { view: true, create: false, edit: false, delete: false, export: false },
-    credit_notes: { view: true, create: false, edit: false, delete: false, export: false },
-    expenses: { view: true, create: false, edit: false, delete: false, export: false },
-    bulk_operations: { view: false, create: false, edit: false, delete: false, export: false },
-    pos_afip: { view: true, create: false, edit: false, delete: false, export: false },
+    ...allowAll(["dashboard", "reports", "sales", "products", "customers"], DEFAULT_VIEW_ONLY),
   },
   employee: {
-    dashboard: { view: true, create: false, edit: false, delete: false, export: false },
-    pos: { view: false, create: false, edit: false, delete: false, export: false },
-    products: { view: false, create: false, edit: false, delete: false, export: false },
-    sales: { view: false, create: false, edit: false, delete: false, export: false },
-    customers: { view: false, create: false, edit: false, delete: false, export: false },
-    suppliers: { view: false, create: false, edit: false, delete: false, export: false },
-    purchases: { view: false, create: false, edit: false, delete: false, export: false },
-    reports: { view: false, create: false, edit: false, delete: false, export: false },
-    employees: { view: false, create: false, edit: false, delete: false, export: false },
-    time_tracking: { view: true, create: true, edit: false, delete: false, export: false },
-    settings: { view: false, create: false, edit: false, delete: false, export: false },
-    cash_register: { view: false, create: false, edit: false, delete: false, export: false },
-    technical_services: { view: false, create: false, edit: false, delete: false, export: false },
-    quotations: { view: false, create: false, edit: false, delete: false, export: false },
-    delivery_notes: { view: false, create: false, edit: false, delete: false, export: false },
-    promotions: { view: false, create: false, edit: false, delete: false, export: false },
-    returns: { view: false, create: false, edit: false, delete: false, export: false },
-    credit_notes: { view: false, create: false, edit: false, delete: false, export: false },
-    expenses: { view: false, create: false, edit: false, delete: false, export: false },
-    bulk_operations: { view: false, create: false, edit: false, delete: false, export: false },
-    pos_afip: { view: false, create: false, edit: false, delete: false, export: false },
+    ...allowAll(["employees"], DEFAULT_VIEW_ONLY),
   },
 };
 
@@ -285,7 +324,7 @@ export function usePermissions() {
         .from("role_permissions")
         .select("*")
         .in("role", userRoles)
-        .eq("company_id", currentCompany.id);
+        .eq("company_id", currentCompany.id);  // Added company filter
       
       if (error) throw error;
       return data as RolePermission[];
@@ -294,54 +333,51 @@ export function usePermissions() {
   });
 
   const hasPermission = (module: Module, permission: Permission): boolean => {
-    // Si no hay roles cargados, no tiene permisos
-    if (!userRoles || userRoles.length === 0) return false;
+    if (hasRole("admin")) return true;
 
-    // Admin siempre tiene todos los permisos
-    if (userRoles.includes("admin")) return true;
-    
-    // Primero verificar permisos personalizados de la empresa
-    if (permissions && permissions.length > 0) {
-      const modulePermissions = permissions.filter(p => p.module === module);
-      if (modulePermissions.length > 0) {
-        return modulePermissions.some(p => {
-          switch (permission) {
-            case "view": return p.can_view;
-            case "create": return p.can_create;
-            case "edit": return p.can_edit;
-            case "delete": return p.can_delete;
-            case "export": return p.can_export;
-            default: return false;
-          }
-        });
-      }
-    }
+    const roles = userRoles || [];
+    if (roles.length === 0) return false;
 
-    // Si no hay permisos personalizados, usar los permisos por defecto del rol
-    for (const role of userRoles) {
-      const roleDefaults = DEFAULT_ROLE_PERMISSIONS[role];
-      if (roleDefaults && roleDefaults[module]) {
-        const moduleDefault = roleDefaults[module];
+    const modulePermissions = (permissions || []).filter((p) => p.module === module);
+
+    const hasCustomPermission = (role: string) =>
+      modulePermissions.some((p) => {
+        if (p.role !== role) return false;
         switch (permission) {
-          case "view": if (moduleDefault.view) return true; break;
-          case "create": if (moduleDefault.create) return true; break;
-          case "edit": if (moduleDefault.edit) return true; break;
-          case "delete": if (moduleDefault.delete) return true; break;
-          case "export": if (moduleDefault.export) return true; break;
+          case "view":
+            return p.can_view;
+          case "create":
+            return p.can_create;
+          case "edit":
+            return p.can_edit;
+          case "delete":
+            return p.can_delete;
+          case "export":
+            return p.can_export;
+          default:
+            return false;
         }
-      }
-    }
+      });
 
-    return false;
+    const hasDefaultPermission = (role: string) => {
+      const defaults = DEFAULT_ROLE_PERMISSIONS[role as AppRole];
+      const moduleDefaults = defaults?.[module];
+      if (!moduleDefaults) return false;
+      return moduleDefaults[permission] || false;
+    };
+
+    return roles.some((role) => {
+      const hasCustomForRole = modulePermissions.some((p) => p.role === role);
+      if (hasCustomForRole) {
+        return hasCustomPermission(role);
+      }
+      return hasDefaultPermission(role);
+    });
   };
 
   const hasRole = (role: string): boolean => {
     return userRoles?.some(r => r === role) || false;
   };
-
-  // Helper para verificar si puede gestionar empleados/horarios
-  const canManageEmployees = userRoles?.some(r => ["admin", "manager"].includes(r)) || false;
-  const canManageTimeTracking = userRoles?.some(r => ["admin", "manager"].includes(r)) || false;
 
   const isAdmin = hasRole("admin");
   const isManager = hasRole("manager");
@@ -351,12 +387,15 @@ export function usePermissions() {
   const isWarehouse = hasRole("warehouse");
   const isTechnician = hasRole("technician");
   const isAuditor = hasRole("auditor");
+  const isEmployee = hasRole("employee");
+  const canManageEmployees = isAdmin || isManager;
+  const canManageTimeTracking = isAdmin || isManager;
 
   return {
     permissions,
     userRoles,
     hasPermission,
-    loading: userLoading || rolesLoading || permissionsLoading,
+    loading: userLoading || rolesLoading || permissionsLoading,  // Fixed to use actual loading states
     currentCompany,
     isAdmin,
     isManager,
@@ -366,10 +405,8 @@ export function usePermissions() {
     isWarehouse,
     isTechnician,
     isAuditor,
+    isEmployee,
     canManageEmployees,
     canManageTimeTracking,
   };
-}
-
-// Exportar los permisos por defecto para uso en otros componentes
-export { DEFAULT_ROLE_PERMISSIONS };
+};

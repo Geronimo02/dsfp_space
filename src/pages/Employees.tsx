@@ -14,7 +14,7 @@ import { Label } from "@/components/ui/label";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { toast } from "sonner";
-import { Users, Plus, Edit, Trash2, Shield, UserCog, Mail, CheckCircle2, Clock } from "lucide-react";
+import { Users, Plus, Edit, Trash2, Shield, UserCog, Clock } from "lucide-react";
 import { format } from "date-fns";
 import { es } from "date-fns/locale";
 import { EmployeePermissionsManager } from "@/components/employees/EmployeePermissionsManager";
@@ -52,7 +52,7 @@ const initialFormData: EmployeeFormData = {
 
 const Employees = () => {
   const { currentCompany } = useCompany();
-  const { hasPermission, isAdmin, isManager, canManageEmployees, canManageTimeTracking, loading: permissionsLoading } = usePermissions();
+  const { hasPermission, isAdmin, canManageEmployees, canManageTimeTracking } = usePermissions();
   const queryClient = useQueryClient();
   const [dialogOpen, setDialogOpen] = useState(false);
   const [editingEmployee, setEditingEmployee] = useState<any>(null);
@@ -61,17 +61,15 @@ const Employees = () => {
   const canCreate = hasPermission("employees", "create");
   const canEdit = hasPermission("employees", "edit");
   const canDelete = hasPermission("employees", "delete");
-  
-  // Managers y admins pueden ver horarios de todos y gestionar roles
+
   const canViewAllTimeTracking = canManageTimeTracking;
   const canManageRoles = canManageEmployees;
 
   const { data: employees, isLoading } = useQuery({
-    queryKey: ["employees", currentCompany?.id, isAdmin],
+    queryKey: ["employees", currentCompany?.id, canManageRoles],
     queryFn: async () => {
       if (!currentCompany?.id) return [];
 
-      // Obtener empleados de la tabla employees
       const { data: employeesData, error: employeesError } = await supabase
         .from("employees")
         .select("*")
@@ -80,42 +78,40 @@ const Employees = () => {
 
       if (employeesError) throw employeesError;
 
-      const base = (employeesData || []).map((e: any) => ({ ...e, role: null as string | null }));
+      const base = (employeesData || []).map((employee: any) => ({ ...employee, role: "-" }));
 
-      // Solo admin/manager necesitan ver roles; evitamos lógica client-side contra profiles (no tiene email)
-      if (!isAdmin) return base;
+      if (!canManageRoles) return base;
 
-      const emails = base
-        .map((e: any) => (e.email || "").trim().toLowerCase())
-        .filter(Boolean);
+      const supabaseClient = supabase as any;
+      const employeesWithRoles: any = await Promise.all(
+        base.map(async (employee: any) => {
+          if (employee.email) {
+            const profileResult = await supabaseClient
+              .from("profiles")
+              .select("id")
+              .eq("email", employee.email)
+              .maybeSingle();
 
-      if (emails.length === 0) return base;
+            const profile = profileResult.data;
 
-      const { data: rolesData, error: rolesError } = await supabase.functions.invoke(
-        "company-users-roles",
-        {
-          body: {
-            companyId: currentCompany.id,
-            emails,
-          },
-        }
+            if (profile) {
+              const companyUserResult = await supabaseClient
+                .from("company_users")
+                .select("role")
+                .eq("user_id", profile.id)
+                .eq("company_id", currentCompany.id)
+                .maybeSingle();
+
+              const companyUser = companyUserResult.data;
+
+              return { ...employee, role: companyUser?.role || "-" };
+            }
+          }
+          return { ...employee, role: "-" };
+        })
       );
 
-      if (rolesError) {
-        console.error("Error cargando roles:", rolesError);
-        return base;
-      }
-
-      const items = (rolesData as any)?.items || [];
-      const roleByEmail = new Map<string, string>();
-      items.forEach((it: any) => {
-        if (it?.email && it?.role) roleByEmail.set(String(it.email).toLowerCase(), it.role);
-      });
-
-      return base.map((e: any) => {
-        const key = (e.email || "").trim().toLowerCase();
-        return { ...e, role: key ? roleByEmail.get(key) ?? null : null };
-      });
+      return employeesWithRoles;
     },
     enabled: !!currentCompany?.id,
   });
@@ -123,12 +119,10 @@ const Employees = () => {
   const createMutation = useMutation({
     mutationFn: async (data: EmployeeFormData) => {
       if (!currentCompany?.id) throw new Error("No hay empresa seleccionada");
-      
-      // Extraer el rol del formData
+
       const { role, ...employeeData } = data;
-      
-      // Crear el empleado
-      const { data: newEmployee, error: employeeError } = await supabase
+
+      const { error: employeeError } = await supabase
         .from("employees")
         .insert({
           ...employeeData,
@@ -137,15 +131,14 @@ const Employees = () => {
         })
         .select()
         .single();
-      
+
       if (employeeError) throw employeeError;
-      
-      // Si tiene email, enviar invitación automáticamente
+
       if (data.email) {
         const { data: { session } } = await supabase.auth.getSession();
         if (session) {
           try {
-            const response = await supabase.functions.invoke('invite-employee', {
+            const response = await supabase.functions.invoke("invite-employee", {
               body: {
                 email: data.email,
                 role: role,
@@ -153,14 +146,12 @@ const Employees = () => {
                 full_name: `${data.first_name} ${data.last_name}`,
               },
             });
-            
+
             if (response.error) {
-              console.error("Error al enviar invitación:", response.error);
-              // No fallar la creación si falla el email
+              console.error("Error al enviar invitacion:", response.error);
             }
           } catch (inviteError) {
-            console.error("Error al enviar invitación:", inviteError);
-            // No fallar la creación si falla el email
+            console.error("Error al enviar invitacion:", inviteError);
           }
         }
       }
@@ -168,7 +159,7 @@ const Employees = () => {
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["employees"] });
       queryClient.invalidateQueries({ queryKey: ["company-users"] });
-      toast.success("Empleado creado exitosamente. Se ha enviado una invitación por email.");
+      toast.success("Empleado creado exitosamente. Se ha enviado una invitacion por email.");
       setDialogOpen(false);
       setFormData(initialFormData);
     },
@@ -180,22 +171,19 @@ const Employees = () => {
   const updateMutation = useMutation({
     mutationFn: async ({ id, data }: { id: string; data: Partial<EmployeeFormData> }) => {
       if (!currentCompany?.id) throw new Error("No hay empresa seleccionada");
-      
-      // Extraer el rol del data (si existe)
+
       const { role, ...employeeData } = data;
-      
-      // Actualizar los datos del empleado (sin el rol)
+
       const { error: employeeError } = await supabase
         .from("employees")
         .update(employeeData)
         .eq("id", id);
-      
+
       if (employeeError) throw employeeError;
-      
-      // Si se está actualizando el rol y hay email, actualizar en company_users usando edge function
+
       if (role && data.email) {
         const { data: sessionData } = await supabase.auth.getSession();
-        if (!sessionData.session) throw new Error("Sesión no válida");
+        if (!sessionData.session) throw new Error("Sesion no valida");
 
         const fullName = `${(employeeData as any).first_name || ""} ${(employeeData as any).last_name || ""}`.trim();
 
@@ -228,16 +216,14 @@ const Employees = () => {
   const deleteMutation = useMutation({
     mutationFn: async (employee: any) => {
       if (!currentCompany?.id) throw new Error("No hay empresa seleccionada");
-      
-      // Eliminar el empleado
+
       const { error: deleteError } = await supabase
         .from("employees")
         .delete()
         .eq("id", employee.id);
-      
+
       if (deleteError) throw deleteError;
-      
-      // Si tiene email, desactivar acceso en company_users
+
       if (employee.email) {
         const supabaseClient = supabase as any;
         const profileResult = await supabaseClient
@@ -245,9 +231,9 @@ const Employees = () => {
           .select("id")
           .eq("email", employee.email)
           .maybeSingle();
-        
+
         const profiles = profileResult.data;
-        
+
         if (profiles) {
           await supabase
             .from("company_users")
@@ -380,18 +366,18 @@ const Employees = () => {
               <CardHeader className="p-3 sm:p-6">
                 <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
                   <div>
-                    <CardTitle className="text-base sm:text-lg">Gestión de Empleados</CardTitle>
+                    <CardTitle className="text-base sm:text-lg">Gestion de Empleados</CardTitle>
                     <CardDescription className="text-xs sm:text-sm">
-                      Administra la información de tus empleados
+                      Administra la informacion de tus empleados
                     </CardDescription>
                   </div>
                   {canCreate && (
                     <Dialog open={dialogOpen} onOpenChange={setDialogOpen}>
-                        <DialogTrigger asChild>
-                          <Button onClick={handleOpenDialog} size="sm" className="w-full sm:w-auto">
-                            <Plus className="mr-2 h-4 w-4" />
-                            <span className="sm:inline">Nuevo Empleado</span>
-                          </Button>
+                      <DialogTrigger asChild>
+                        <Button onClick={handleOpenDialog} size="sm" className="w-full sm:w-auto">
+                          <Plus className="mr-2 h-4 w-4" />
+                          <span className="sm:inline">Nuevo Empleado</span>
+                        </Button>
                       </DialogTrigger>
                       <DialogContent className="max-w-2xl max-h-[90vh] overflow-y-auto">
                         <DialogHeader>
@@ -399,10 +385,9 @@ const Employees = () => {
                             {editingEmployee ? "Editar Empleado" : "Nuevo Empleado"}
                           </DialogTitle>
                           <DialogDescription>
-                            {editingEmployee 
+                            {editingEmployee
                               ? "Modifica los datos del empleado"
-                              : "Completa los datos del nuevo empleado"
-                            }
+                              : "Completa los datos del nuevo empleado"}
                           </DialogDescription>
                         </DialogHeader>
                         <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 py-4">
@@ -421,13 +406,13 @@ const Employees = () => {
                               id="last_name"
                               value={formData.last_name}
                               onChange={(e) => setFormData({ ...formData, last_name: e.target.value })}
-                              placeholder="Pérez"
+                              placeholder="Perez"
                             />
                           </div>
                           <div className="space-y-2">
                             <Label htmlFor="document_type">Tipo Documento</Label>
-                            <Select 
-                              value={formData.document_type} 
+                            <Select
+                              value={formData.document_type}
                               onValueChange={(value) => setFormData({ ...formData, document_type: value })}
                             >
                               <SelectTrigger>
@@ -442,7 +427,7 @@ const Employees = () => {
                             </Select>
                           </div>
                           <div className="space-y-2">
-                            <Label htmlFor="document_number">Número Documento</Label>
+                            <Label htmlFor="document_number">Numero Documento</Label>
                             <Input
                               id="document_number"
                               value={formData.document_number}
@@ -461,7 +446,7 @@ const Employees = () => {
                             />
                           </div>
                           <div className="space-y-2">
-                            <Label htmlFor="phone">Teléfono</Label>
+                            <Label htmlFor="phone">Telefono</Label>
                             <Input
                               id="phone"
                               value={formData.phone}
@@ -489,8 +474,8 @@ const Employees = () => {
                           </div>
                           <div className="space-y-2">
                             <Label htmlFor="salary_type">Tipo de Salario</Label>
-                            <Select 
-                              value={formData.salary_type} 
+                            <Select
+                              value={formData.salary_type}
                               onValueChange={(value) => setFormData({ ...formData, salary_type: value })}
                             >
                               <SelectTrigger>
@@ -505,22 +490,22 @@ const Employees = () => {
                           </div>
                           <div className="space-y-2 col-span-2">
                             <Label htmlFor="role">Rol en el Sistema *</Label>
-                            <Select 
-                              value={formData.role} 
+                            <Select
+                              value={formData.role}
                               onValueChange={(value) => setFormData({ ...formData, role: value })}
                             >
                               <SelectTrigger>
                                 <SelectValue />
                               </SelectTrigger>
                               <SelectContent>
-                                <SelectItem value="employee">Empleado - Solo ver horarios y datos básicos</SelectItem>
+                                <SelectItem value="employee">Empleado - Solo ver horarios y datos basicos</SelectItem>
                                 <SelectItem value="cashier">Cajero - POS, ventas y cobros</SelectItem>
-                                <SelectItem value="warehouse">Depósito - Inventario y compras</SelectItem>
-                                <SelectItem value="technician">Técnico - Servicios técnicos</SelectItem>
+                                <SelectItem value="warehouse">Deposito - Inventario y compras</SelectItem>
+                                <SelectItem value="technician">Tecnico - Servicios tecnicos</SelectItem>
                                 <SelectItem value="accountant">Contador - Reportes y finanzas (solo lectura)</SelectItem>
                                 <SelectItem value="viewer">Visualizador - Solo lectura general</SelectItem>
                                 <SelectItem value="auditor">Auditor - Ver todo y exportar</SelectItem>
-                                <SelectItem value="manager">Gerente - Gestión completa sin eliminar</SelectItem>
+                                <SelectItem value="manager">Gerente - Gestion completa sin eliminar</SelectItem>
                                 {isAdmin && <SelectItem value="admin">Administrador - Acceso total</SelectItem>}
                               </SelectContent>
                             </Select>
@@ -540,14 +525,15 @@ const Employees = () => {
                           <Button variant="outline" onClick={() => setDialogOpen(false)}>
                             Cancelar
                           </Button>
-                          <Button 
-                            onClick={handleSubmit} 
+                          <Button
+                            onClick={handleSubmit}
                             disabled={createMutation.isPending || updateMutation.isPending}
                           >
-                            {createMutation.isPending || updateMutation.isPending 
-                              ? "Guardando..." 
-                              : editingEmployee ? "Actualizar" : "Crear Empleado"
-                            }
+                            {createMutation.isPending || updateMutation.isPending
+                              ? "Guardando..."
+                              : editingEmployee
+                                ? "Actualizar"
+                                : "Crear Empleado"}
                           </Button>
                         </div>
                       </DialogContent>
@@ -588,8 +574,8 @@ const Employees = () => {
                             {employee.role === "admin" ? "Administrador" :
                              employee.role === "manager" ? "Gerente" :
                              employee.role === "cashier" ? "Cajero" :
-                             employee.role === "warehouse" ? "Depósito" :
-                             employee.role === "technician" ? "Técnico" :
+                             employee.role === "warehouse" ? "Deposito" :
+                             employee.role === "technician" ? "Tecnico" :
                              employee.role === "accountant" ? "Contador" :
                              employee.role === "employee" ? "Empleado" :
                              employee.role === "viewer" ? "Visualizador" :
@@ -610,8 +596,8 @@ const Employees = () => {
                           <TableCell>
                             <div className="flex gap-2">
                               {canEdit && (
-                                <Button 
-                                  variant="ghost" 
+                                <Button
+                                  variant="ghost"
                                   size="sm"
                                   onClick={() => handleEdit(employee)}
                                 >
@@ -623,7 +609,7 @@ const Employees = () => {
                                   variant="ghost"
                                   size="sm"
                                   onClick={() => {
-                                    if (confirm("¿Está seguro de eliminar este empleado? Se desactivará su acceso al sistema.")) {
+                                    if (confirm("Esta seguro de eliminar este empleado? Se desactivara su acceso al sistema.")) {
                                       deleteMutation.mutate(employee);
                                     }
                                   }}
