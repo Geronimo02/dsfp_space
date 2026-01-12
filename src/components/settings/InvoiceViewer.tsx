@@ -15,7 +15,7 @@ export function InvoiceViewer({ companyId: propCompanyId, showAllCompanies = fal
   const [selectedInvoice, setSelectedInvoice] = useState<any>(null);
   const [showPreview, setShowPreview] = useState(false);
 
-  const { data: invoices, isLoading } = useQuery({
+  const { data: invoices, isLoading, error } = useQuery({
     queryKey: ["invoices", companyId, showAllCompanies],
     enabled: showAllCompanies || !!companyId,
     staleTime: 60000,
@@ -34,7 +34,7 @@ export function InvoiceViewer({ companyId: propCompanyId, showAllCompanies = fal
       const { data, error } = await query.order("created_at", { ascending: false });
       if (error) {
         // Si la tabla no existe o no hay datos, retornar array vacío en lugar de error
-        if (error.code === "PGRST116" || error.message.includes("does not exist")) {
+        if (error.code === "PGRST116" || error.code === "PGRST205" || error.message.includes("does not exist")) {
           return [];
         }
         throw error;
@@ -42,6 +42,10 @@ export function InvoiceViewer({ companyId: propCompanyId, showAllCompanies = fal
       return data || [];
     },
   });
+
+  // Si la tabla de invoices no existe, no mostrar nada
+  if (error && (error as any).code === "PGRST205") {
+    return null;
 
   const handleDownload = (invoice: any) => {
     if (invoice.pdf_url?.startsWith("data:")) {
