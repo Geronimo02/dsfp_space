@@ -110,13 +110,12 @@ export default function Settings() {
     font_size: "small",
   });
 
-  // ✅ subscription query now triggers ONLY when the subscription tab is active
+  // ✅ subscription query - always enabled but with long stale time to avoid unnecessary refetches
   const { data: subscription, isLoading: subscriptionLoading } = useQuery({
     queryKey: ["subscription", currentCompany?.id],
-    enabled: isSubscriptionTab && !companyLoading && !!currentCompany?.id,
-    staleTime: 30000,
+    enabled: !companyLoading && !!currentCompany?.id,
+    staleTime: 60000, // 1 minuto
     refetchOnWindowFocus: false,
-    placeholderData: (prev) => prev,
     queryFn: async () => {
       const { data, error } = await supabase
         .from("subscriptions")
@@ -128,7 +127,7 @@ export default function Settings() {
     },
   });
 
-  // ✅ OPTIONAL: force refresh every time you enter the subscription tab
+  // ✅ Force refresh when entering subscription tab (optional)
   useEffect(() => {
     if (isSubscriptionTab && currentCompany?.id) {
       queryClient.invalidateQueries({ queryKey: ["subscription", currentCompany.id] });

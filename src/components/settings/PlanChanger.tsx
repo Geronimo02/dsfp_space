@@ -29,7 +29,8 @@ export function PlanChanger({ companyId, currentPlanId }: { companyId?: string; 
         .select("*")
         .order("price", { ascending: true });
       if (error) throw error;
-      return data as Plan[];
+      // Filtrar planes gratuitos - solo mostrar planes de pago
+      return (data as Plan[]).filter(plan => plan.price > 0);
     },
   });
 
