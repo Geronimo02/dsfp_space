@@ -910,6 +910,41 @@ export type Database = {
           },
         ]
       }
+      company_integration_oauth_apps: {
+        Row: {
+          client_id: string
+          client_secret_id: string
+          company_id: string
+          created_at: string
+          integration_type: string
+          updated_at: string
+        }
+        Insert: {
+          client_id: string
+          client_secret_id: string
+          company_id: string
+          created_at?: string
+          integration_type: string
+          updated_at?: string
+        }
+        Update: {
+          client_id?: string
+          client_secret_id?: string
+          company_id?: string
+          created_at?: string
+          integration_type?: string
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "company_integration_oauth_apps_company_id_fkey"
+            columns: ["company_id"]
+            isOneToOne: false
+            referencedRelation: "companies"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       company_modules: {
         Row: {
           activated_at: string | null
@@ -2552,17 +2587,23 @@ export type Database = {
         Row: {
           company_id: string
           credentials: Json | null
+          encrypted_credentials: string | null
           integration_id: string
+          updated_at: string
         }
         Insert: {
           company_id: string
           credentials?: Json | null
+          encrypted_credentials?: string | null
           integration_id: string
+          updated_at?: string
         }
         Update: {
           company_id?: string
           credentials?: Json | null
+          encrypted_credentials?: string | null
           integration_id?: string
+          updated_at?: string
         }
         Relationships: [
           {
@@ -2575,7 +2616,7 @@ export type Database = {
           {
             foreignKeyName: "integration_credentials_integration_id_fkey"
             columns: ["integration_id"]
-            isOneToOne: true
+            isOneToOne: false
             referencedRelation: "integrations"
             referencedColumns: ["id"]
           },
@@ -2931,6 +2972,90 @@ export type Database = {
             columns: ["sale_id"]
             isOneToOne: false
             referencedRelation: "sales"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      invoices: {
+        Row: {
+          amount: number
+          company_id: string
+          created_at: string
+          created_by: string | null
+          currency: string | null
+          due_date: string | null
+          id: string
+          invoice_date: string
+          invoice_number: string
+          metadata: Json | null
+          notes: string | null
+          payment_method: string | null
+          pdf_url: string | null
+          status: string | null
+          subscription_id: string | null
+          subtotal: number
+          tax_amount: number | null
+          tax_country: string | null
+          tax_rate: number | null
+          updated_at: string
+        }
+        Insert: {
+          amount: number
+          company_id: string
+          created_at?: string
+          created_by?: string | null
+          currency?: string | null
+          due_date?: string | null
+          id?: string
+          invoice_date?: string
+          invoice_number: string
+          metadata?: Json | null
+          notes?: string | null
+          payment_method?: string | null
+          pdf_url?: string | null
+          status?: string | null
+          subscription_id?: string | null
+          subtotal: number
+          tax_amount?: number | null
+          tax_country?: string | null
+          tax_rate?: number | null
+          updated_at?: string
+        }
+        Update: {
+          amount?: number
+          company_id?: string
+          created_at?: string
+          created_by?: string | null
+          currency?: string | null
+          due_date?: string | null
+          id?: string
+          invoice_date?: string
+          invoice_number?: string
+          metadata?: Json | null
+          notes?: string | null
+          payment_method?: string | null
+          pdf_url?: string | null
+          status?: string | null
+          subscription_id?: string | null
+          subtotal?: number
+          tax_amount?: number | null
+          tax_country?: string | null
+          tax_rate?: number | null
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "invoices_company_id_fkey"
+            columns: ["company_id"]
+            isOneToOne: false
+            referencedRelation: "companies"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "invoices_subscription_id_fkey"
+            columns: ["subscription_id"]
+            isOneToOne: false
+            referencedRelation: "subscriptions"
             referencedColumns: ["id"]
           },
         ]
@@ -3919,7 +4044,7 @@ export type Database = {
             foreignKeyName: "platform_payments_subscription_id_fkey"
             columns: ["subscription_id"]
             isOneToOne: false
-            referencedRelation: "subscriptions"
+            referencedRelation: "company_subscriptions"
             referencedColumns: ["id"]
           },
         ]
@@ -6098,14 +6223,19 @@ export type Database = {
         Row: {
           amount_ars: number | null
           amount_usd: number
+          canceled_at: string | null
+          cancellation_reason: string | null
           company_id: string
           created_at: string
           current_period_end: string | null
           fx_rate_at: string | null
           fx_rate_usd_ars: number | null
           id: string
+          invoice_count: number | null
+          last_invoice_id: string | null
           modules: Json
           mp_preapproval_id: string | null
+          next_invoice_date: string | null
           plan_id: string
           provider: string
           provider_customer_id: string | null
@@ -6119,14 +6249,19 @@ export type Database = {
         Insert: {
           amount_ars?: number | null
           amount_usd: number
+          canceled_at?: string | null
+          cancellation_reason?: string | null
           company_id: string
           created_at?: string
           current_period_end?: string | null
           fx_rate_at?: string | null
           fx_rate_usd_ars?: number | null
           id?: string
+          invoice_count?: number | null
+          last_invoice_id?: string | null
           modules?: Json
           mp_preapproval_id?: string | null
+          next_invoice_date?: string | null
           plan_id: string
           provider: string
           provider_customer_id?: string | null
@@ -6140,14 +6275,19 @@ export type Database = {
         Update: {
           amount_ars?: number | null
           amount_usd?: number
+          canceled_at?: string | null
+          cancellation_reason?: string | null
           company_id?: string
           created_at?: string
           current_period_end?: string | null
           fx_rate_at?: string | null
           fx_rate_usd_ars?: number | null
           id?: string
+          invoice_count?: number | null
+          last_invoice_id?: string | null
           modules?: Json
           mp_preapproval_id?: string | null
+          next_invoice_date?: string | null
           plan_id?: string
           provider?: string
           provider_customer_id?: string | null
@@ -6164,6 +6304,13 @@ export type Database = {
             columns: ["company_id"]
             isOneToOne: true
             referencedRelation: "companies"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "subscriptions_last_invoice_id_fkey"
+            columns: ["last_invoice_id"]
+            isOneToOne: false
+            referencedRelation: "invoices"
             referencedColumns: ["id"]
           },
           {
@@ -6388,6 +6535,45 @@ export type Database = {
             referencedColumns: ["id"]
           },
         ]
+      }
+      tax_rates: {
+        Row: {
+          active: boolean | null
+          country_code: string
+          country_name: string | null
+          created_at: string
+          effective_date: string | null
+          id: string
+          notes: string | null
+          tax_name: string | null
+          tax_rate: number
+          updated_at: string
+        }
+        Insert: {
+          active?: boolean | null
+          country_code: string
+          country_name?: string | null
+          created_at?: string
+          effective_date?: string | null
+          id?: string
+          notes?: string | null
+          tax_name?: string | null
+          tax_rate: number
+          updated_at?: string
+        }
+        Update: {
+          active?: boolean | null
+          country_code?: string
+          country_name?: string | null
+          created_at?: string
+          effective_date?: string | null
+          id?: string
+          notes?: string | null
+          tax_name?: string | null
+          tax_rate?: number
+          updated_at?: string
+        }
+        Relationships: []
       }
       technical_services: {
         Row: {
@@ -7041,6 +7227,13 @@ export type Database = {
           id: string
         }[]
       }
+      get_company_oauth_app: {
+        Args: { p_company_id: string; p_integration_type: string }
+        Returns: {
+          client_id: string
+          client_secret: string
+        }[]
+      }
       get_customer_movements: {
         Args: { p_customer_id: string }
         Returns: {
@@ -7137,6 +7330,15 @@ export type Database = {
       is_company_admin: { Args: { company_uuid: string }; Returns: boolean }
       is_platform_admin: { Args: { _user_id: string }; Returns: boolean }
       is_platform_admin_secure: { Args: never; Returns: boolean }
+      save_company_oauth_app: {
+        Args: {
+          p_client_id: string
+          p_client_secret: string
+          p_company_id: string
+          p_integration_type: string
+        }
+        Returns: string
+      }
       setup_accountant_permissions: {
         Args: { company_uuid: string }
         Returns: undefined
@@ -7341,4 +7543,3 @@ export const Constants = {
     },
   },
 } as const
-

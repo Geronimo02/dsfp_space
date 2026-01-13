@@ -282,7 +282,8 @@ export const DEFAULT_ROLE_PERMISSIONS: Record<AppRole, Partial<RolePermissionDef
     ...allowAll(["dashboard", "reports", "sales", "products", "customers"], DEFAULT_VIEW_ONLY),
   },
   employee: {
-    ...allowAll(["employees"], DEFAULT_VIEW_ONLY),
+    dashboard: { view: true, create: false, edit: false, delete: false, export: false },
+    employees: { view: true, create: false, edit: false, delete: false, export: false },
   },
 };
 
@@ -390,12 +391,14 @@ export function usePermissions() {
   const isEmployee = hasRole("employee");
   const canManageEmployees = isAdmin || isManager;
   const canManageTimeTracking = isAdmin || isManager;
+  const canViewOwnTimeTracking = true; // All employees can view their own time
 
   return {
     permissions,
     userRoles,
     hasPermission,
-    loading: userLoading || rolesLoading || permissionsLoading,  // Fixed to use actual loading states
+    hasRole,
+    loading: userLoading || rolesLoading || permissionsLoading,
     currentCompany,
     isAdmin,
     isManager,
@@ -408,5 +411,6 @@ export function usePermissions() {
     isEmployee,
     canManageEmployees,
     canManageTimeTracking,
+    canViewOwnTimeTracking,
   };
-};
+}
