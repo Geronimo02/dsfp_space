@@ -29,7 +29,6 @@ interface EmployeeFormData {
   document_number: string;
   email: string;
   phone: string;
-  department: string;
   hire_date: string;
   base_salary: number;
   salary_type: string;
@@ -43,11 +42,22 @@ const initialFormData: EmployeeFormData = {
   document_number: "",
   email: "",
   phone: "",
-  department: "",
   hire_date: new Date().toISOString().split("T")[0],
   base_salary: 0,
   salary_type: "monthly",
   role: "employee",
+};
+
+const ROLE_LABELS: Record<string, string> = {
+  admin: "Administrador",
+  manager: "Gerente",
+  cashier: "Cajero",
+  warehouse: "Depósito",
+  technician: "Técnico",
+  accountant: "Contador",
+  auditor: "Auditor",
+  viewer: "Visualizador",
+  employee: "Empleado",
 };
 
 const Employees = () => {
@@ -292,7 +302,6 @@ const Employees = () => {
       document_number: employee.document_number || "",
       email: employee.email || "",
       phone: employee.phone || "",
-      department: employee.department || "",
       hire_date: employee.hire_date || "",
       base_salary: employee.base_salary || 0,
       salary_type: employee.salary_type || "monthly",
@@ -455,15 +464,6 @@ const Employees = () => {
                             />
                           </div>
                           <div className="space-y-2">
-                            <Label htmlFor="department">Departamento</Label>
-                            <Input
-                              id="department"
-                              value={formData.department}
-                              onChange={(e) => setFormData({ ...formData, department: e.target.value })}
-                              placeholder="Ventas"
-                            />
-                          </div>
-                          <div className="space-y-2">
                             <Label htmlFor="hire_date">Fecha de Ingreso *</Label>
                             <Input
                               id="hire_date"
@@ -549,7 +549,6 @@ const Employees = () => {
                         <TableHead className="min-w-[120px]">Nombre</TableHead>
                         <TableHead className="hidden sm:table-cell">Documento</TableHead>
                         <TableHead className="hidden md:table-cell">Rol</TableHead>
-                        <TableHead className="hidden lg:table-cell">Departamento</TableHead>
                         <TableHead className="hidden lg:table-cell">Ingreso</TableHead>
                         <TableHead className="hidden md:table-cell">Salario</TableHead>
                         <TableHead>Estado</TableHead>
@@ -570,18 +569,11 @@ const Employees = () => {
                           <TableCell className="hidden sm:table-cell text-xs sm:text-sm">
                             {employee.document_type} {employee.document_number}
                           </TableCell>
-                          <TableCell className="hidden md:table-cell text-xs sm:text-sm">
-                            {employee.role === "admin" ? "Administrador" :
-                             employee.role === "manager" ? "Gerente" :
-                             employee.role === "cashier" ? "Cajero" :
-                             employee.role === "warehouse" ? "Deposito" :
-                             employee.role === "technician" ? "Tecnico" :
-                             employee.role === "accountant" ? "Contador" :
-                             employee.role === "employee" ? "Empleado" :
-                             employee.role === "viewer" ? "Visualizador" :
-                             employee.role === "auditor" ? "Auditor" : "-"}
+                          <TableCell className="hidden md:table-cell">
+                            <Badge variant="outline">
+                              {ROLE_LABELS[employee.role] || "-"}
+                            </Badge>
                           </TableCell>
-                          <TableCell className="hidden lg:table-cell text-xs sm:text-sm">{employee.department || "-"}</TableCell>
                           <TableCell className="hidden lg:table-cell text-xs sm:text-sm">
                             {employee.hire_date
                               ? format(new Date(employee.hire_date), "dd/MM/yyyy", { locale: es })
