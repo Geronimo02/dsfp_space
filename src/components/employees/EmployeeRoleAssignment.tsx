@@ -82,6 +82,28 @@ export function EmployeeRoleAssignment() {
     enabled: !!currentCompany?.id,
   });
 
+  const companyUserIds = companyUsers?.map((user) => user.user_id).filter(Boolean) || [];
+
+  const { data: profilesById } = useQuery({
+    queryKey: ["company-user-profiles", currentCompany?.id, companyUserIds],
+    queryFn: async () => {
+      if (!currentCompany?.id || companyUserIds.length === 0) return {};
+
+      const { data, error } = await supabase
+        .from("profiles")
+        .select("id, email")
+        .in("id", companyUserIds);
+
+      if (error) throw error;
+
+      return (data || []).reduce((acc: Record<string, { id: string; email: string | null }>, profile) => {
+        acc[profile.id] = profile;
+        return acc;
+      }, {});
+    },
+    enabled: !!currentCompany?.id && companyUserIds.length > 0,
+  });
+
   const updateRoleMutation = useMutation({
     mutationFn: async ({ userId, newRole }: { userId: string; newRole: AppRole }) => {
       // Prevent changing own role from the client side
@@ -284,8 +306,10 @@ export function EmployeeRoleAssignment() {
             </TableHeader>
             <TableBody>
               {companyUsers.map((user) => {
-                // Try to find matching employee
-                const employee = employees?.find(e => e.email === user.user_id);
+                const profile = profilesById?.[user.user_id];
+                const employee = profile?.email
+                  ? employees?.find((e) => e.email?.toLowerCase() === profile.email?.toLowerCase())
+                  : undefined;
                 
                 return (
                   <TableRow key={user.id}>

@@ -14,7 +14,7 @@ import { Label } from "@/components/ui/label";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { toast } from "sonner";
-import { Users, Plus, Edit, Trash2, Shield, UserCog, Clock } from "lucide-react";
+import { Users, Plus, Edit, Trash2, Shield, Clock } from "lucide-react";
 import { format } from "date-fns";
 import { es } from "date-fns/locale";
 import { EmployeePermissionsManager } from "@/components/employees/EmployeePermissionsManager";
@@ -52,7 +52,7 @@ const initialFormData: EmployeeFormData = {
 
 const Employees = () => {
   const { currentCompany } = useCompany();
-  const { hasPermission, isAdmin, canManageEmployees, canManageTimeTracking } = usePermissions();
+  const { hasPermission, isAdmin, isEmployee, canManageEmployees, canManageTimeTracking } = usePermissions();
   const queryClient = useQueryClient();
   const [dialogOpen, setDialogOpen] = useState(false);
   const [editingEmployee, setEditingEmployee] = useState<any>(null);
@@ -78,7 +78,14 @@ const Employees = () => {
 
       if (employeesError) throw employeesError;
 
-      const base = (employeesData || []).map((employee: any) => ({ ...employee, role: "-" }));
+      const { data: authData } = await supabase.auth.getUser();
+      const currentEmail = authData?.user?.email?.toLowerCase();
+
+      const filteredEmployees = !canManageEmployees && currentEmail
+        ? (employeesData || []).filter((employee: any) => employee.email?.toLowerCase() === currentEmail)
+        : (employeesData || []);
+
+      const base = filteredEmployees.map((employee: any) => ({ ...employee, role: "-" }));
 
       if (!canManageRoles) return base;
 
@@ -347,12 +354,6 @@ const Employees = () => {
                 <span className="hidden sm:inline">Horarios</span>
               </TabsTrigger>
             )}
-            {canManageRoles && (
-              <TabsTrigger value="roles" className="flex-1 min-w-[80px] text-xs sm:text-sm">
-                <UserCog className="mr-1 sm:mr-2 h-4 w-4" />
-                <span className="hidden sm:inline">Roles</span>
-              </TabsTrigger>
-            )}
             {isAdmin && (
               <TabsTrigger value="permissions" className="flex-1 min-w-[80px] text-xs sm:text-sm">
                 <Shield className="mr-1 sm:mr-2 h-4 w-4" />
@@ -472,22 +473,24 @@ const Employees = () => {
                               onChange={(e) => setFormData({ ...formData, hire_date: e.target.value })}
                             />
                           </div>
-                          <div className="space-y-2">
-                            <Label htmlFor="salary_type">Tipo de Salario</Label>
-                            <Select
-                              value={formData.salary_type}
-                              onValueChange={(value) => setFormData({ ...formData, salary_type: value })}
-                            >
-                              <SelectTrigger>
-                                <SelectValue />
-                              </SelectTrigger>
-                              <SelectContent>
-                                <SelectItem value="monthly">Mensual</SelectItem>
-                                <SelectItem value="hourly">Por hora</SelectItem>
-                                <SelectItem value="daily">Diario</SelectItem>
-                              </SelectContent>
-                            </Select>
-                          </div>
+                          {canManageEmployees && (
+                            <div className="space-y-2">
+                              <Label htmlFor="salary_type">Tipo de Salario</Label>
+                              <Select
+                                value={formData.salary_type}
+                                onValueChange={(value) => setFormData({ ...formData, salary_type: value })}
+                              >
+                                <SelectTrigger>
+                                  <SelectValue />
+                                </SelectTrigger>
+                                <SelectContent>
+                                  <SelectItem value="monthly">Mensual</SelectItem>
+                                  <SelectItem value="hourly">Por hora</SelectItem>
+                                  <SelectItem value="daily">Diario</SelectItem>
+                                </SelectContent>
+                              </Select>
+                            </div>
+                          )}
                           <div className="space-y-2 col-span-2">
                             <Label htmlFor="role">Rol en el Sistema *</Label>
                             <Select
@@ -510,16 +513,18 @@ const Employees = () => {
                               </SelectContent>
                             </Select>
                           </div>
-                          <div className="space-y-2 col-span-2">
-                            <Label htmlFor="base_salary">Salario Base</Label>
-                            <Input
-                              id="base_salary"
-                              type="number"
-                              value={formData.base_salary || ""}
-                              onChange={(e) => setFormData({ ...formData, base_salary: parseFloat(e.target.value) || 0 })}
-                              placeholder="100000"
-                            />
-                          </div>
+                          {canManageEmployees && (
+                            <div className="space-y-2 col-span-2">
+                              <Label htmlFor="base_salary">Salario Base</Label>
+                              <Input
+                                id="base_salary"
+                                type="number"
+                                value={formData.base_salary || ""}
+                                onChange={(e) => setFormData({ ...formData, base_salary: parseFloat(e.target.value) || 0 })}
+                                placeholder="100000"
+                              />
+                            </div>
+                          )}
                         </div>
                         <div className="flex justify-end gap-2">
                           <Button variant="outline" onClick={() => setDialogOpen(false)}>
@@ -551,9 +556,9 @@ const Employees = () => {
                         <TableHead className="hidden md:table-cell">Rol</TableHead>
                         <TableHead className="hidden lg:table-cell">Departamento</TableHead>
                         <TableHead className="hidden lg:table-cell">Ingreso</TableHead>
-                        <TableHead className="hidden md:table-cell">Salario</TableHead>
+                        {!isEmployee && <TableHead className="hidden md:table-cell">Salario</TableHead>}
                         <TableHead>Estado</TableHead>
-                        <TableHead>Acciones</TableHead>
+                        {(canEdit || canDelete) && <TableHead>Acciones</TableHead>}
                       </TableRow>
                     </TableHeader>
                     <TableBody>
@@ -587,38 +592,44 @@ const Employees = () => {
                               ? format(new Date(employee.hire_date), "dd/MM/yyyy", { locale: es })
                               : "-"}
                           </TableCell>
-                          <TableCell className="hidden md:table-cell text-xs sm:text-sm">${employee.base_salary?.toLocaleString() || 0}</TableCell>
+                          {!isEmployee && (
+                            <TableCell className="hidden md:table-cell text-xs sm:text-sm">
+                              ${employee.base_salary?.toLocaleString() || 0}
+                            </TableCell>
+                          )}
                           <TableCell>
                             <Badge variant={employee.active ? "default" : "secondary"}>
                               {employee.active ? "Activo" : "Inactivo"}
                             </Badge>
                           </TableCell>
-                          <TableCell>
-                            <div className="flex gap-2">
-                              {canEdit && (
-                                <Button
-                                  variant="ghost"
-                                  size="sm"
-                                  onClick={() => handleEdit(employee)}
-                                >
-                                  <Edit className="h-4 w-4" />
-                                </Button>
-                              )}
-                              {canDelete && (
-                                <Button
-                                  variant="ghost"
-                                  size="sm"
-                                  onClick={() => {
-                                    if (confirm("Esta seguro de eliminar este empleado? Se desactivara su acceso al sistema.")) {
-                                      deleteMutation.mutate(employee);
-                                    }
-                                  }}
-                                >
-                                  <Trash2 className="h-4 w-4" />
-                                </Button>
-                              )}
-                            </div>
-                          </TableCell>
+                          {(canEdit || canDelete) && (
+                            <TableCell>
+                              <div className="flex gap-2">
+                                {canEdit && (
+                                  <Button
+                                    variant="ghost"
+                                    size="sm"
+                                    onClick={() => handleEdit(employee)}
+                                  >
+                                    <Edit className="h-4 w-4" />
+                                  </Button>
+                                )}
+                                {canDelete && (
+                                  <Button
+                                    variant="ghost"
+                                    size="sm"
+                                    onClick={() => {
+                                      if (confirm("Esta seguro de eliminar este empleado? Se desactivara su acceso al sistema.")) {
+                                        deleteMutation.mutate(employee);
+                                      }
+                                    }}
+                                  >
+                                    <Trash2 className="h-4 w-4" />
+                                  </Button>
+                                )}
+                              </div>
+                            </TableCell>
+                          )}
                         </TableRow>
                       ))}
                     </TableBody>
@@ -640,6 +651,11 @@ const Employees = () => {
                 )}
               </CardContent>
             </Card>
+            {canManageRoles && (
+              <div className="mt-4 md:mt-6">
+                <EmployeeRoleAssignment />
+              </div>
+            )}
           </TabsContent>
 
           <TabsContent value="my-time">
@@ -649,12 +665,6 @@ const Employees = () => {
           {canViewAllTimeTracking && (
             <TabsContent value="all-times">
               <EmployeeTimeTracking />
-            </TabsContent>
-          )}
-
-          {canManageRoles && (
-            <TabsContent value="roles">
-              <EmployeeRoleAssignment />
             </TabsContent>
           )}
 
