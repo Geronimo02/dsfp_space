@@ -240,7 +240,8 @@ export function Sidebar() {
         {
           title: "Inventario",
           href: "/products",
-          icon: Package,
+          icon: Package,
+
           children: [
             {
               title: "Productos",
@@ -291,7 +292,8 @@ export function Sidebar() {
         {
           title: "Compras",
           href: "/purchases",
-          icon: ShoppingBag,
+          icon: ShoppingBag,
+
           children: [
             {
               title: "Órdenes de Compra",
@@ -335,7 +337,8 @@ export function Sidebar() {
         {
           title: "Finanzas",
           href: "/bank-accounts",
-          icon: Building2,
+          icon: Building2,
+
           children: [
             {
               title: "Cuentas Bancarias",
@@ -435,7 +438,8 @@ export function Sidebar() {
         {
           title: "Reportes",
           href: "/reports",
-          icon: BarChart3,
+          icon: BarChart3,
+
           children: [
             {
               title: "Reportes",
