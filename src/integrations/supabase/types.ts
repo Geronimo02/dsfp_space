@@ -7234,6 +7234,7 @@ export type Database = {
           client_secret: string
         }[]
       }
+      get_current_user_email: { Args: never; Returns: string }
       get_customer_movements: {
         Args: { p_customer_id: string }
         Returns: {
