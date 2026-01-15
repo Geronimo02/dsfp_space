@@ -79,6 +79,7 @@ export function Sidebar() {
   const activeModules = useActiveModules();
   const { hasPermission, isAdmin, loading: permissionsLoading } = usePermissions();
   const { isPlatformAdmin } = usePlatformAdmin();
+  const { currentCompany } = useCompany();
   
   const [openSections, setOpenSections] = useState<string[]>([]);
   const [searchQuery, setSearchQuery] = useState("");
@@ -765,14 +766,14 @@ export function Sidebar() {
     <UISidebar collapsible="offcanvas" className="border-r border-sidebar-border w-64">
       <div className="flex flex-col h-full bg-gradient-to-b from-sidebar to-sidebar/95">
         {/* Header - Más compacto */}
-        <div className="px-4 py-3 border-b bg-gradient-to-r from-primary/10 to-primary/5">
+        <div className="px-4 py-3 border-b bg-gradient-to-r from-slate-950 via-purple-950 to-slate-950">
           <div className="flex items-center gap-3">
-            <div className="p-2 rounded-lg bg-primary/10">
-              <ShoppingCart className="w-5 h-5 text-primary" />
+            <div className="p-2 rounded-lg bg-gradient-to-br from-slate-900 to-purple-900 border border-cyan-500/30 shadow-lg shadow-cyan-500/10">
+              <img src="/landing/images/ChatGPT Image 5 dic 2025, 12_17_26.png" alt="Ventify Space" className="w-5 h-5" />
             </div>
             <div>
-              <span className="text-lg font-bold text-foreground">RetailSnap</span>
-              <p className="text-[10px] text-muted-foreground">Sistema POS</p>
+              <span className="text-lg font-bold text-foreground">{currentCompany?.name || 'Tienda.Space'}</span>
+              <p className="text-[10px] text-muted-foreground">Ventify Space</p>
             </div>
           </div>
         </div>
