@@ -767,20 +767,20 @@ export function Sidebar() {
     <UISidebar collapsible="offcanvas" className="border-r border-sidebar-border w-64">
       <div className="flex flex-col h-full bg-gradient-to-b from-sidebar to-sidebar/95">
         {/* Header - Ultra moderno */}
-        <div className="px-4 py-3 border-b border-cyan-500/20 bg-gradient-to-r from-slate-900 via-indigo-900 to-slate-900 relative overflow-hidden">
-          {/* Efecto de fondo decorativo */}
-          <div className="absolute inset-0 opacity-30 pointer-events-none">
-            <div className="absolute top-0 right-0 w-32 h-32 bg-cyan-500/20 rounded-full blur-3xl"></div>
-            <div className="absolute bottom-0 left-0 w-24 h-24 bg-indigo-500/20 rounded-full blur-3xl"></div>
+        <div className="px-4 py-3 border-b border-sidebar-accent bg-sidebar/50 backdrop-blur-sm relative overflow-hidden">
+          {/* Efecto de fondo decorativo sutil */}
+          <div className="absolute inset-0 opacity-20 pointer-events-none">
+            <div className="absolute top-0 right-0 w-32 h-32 bg-primary/10 rounded-full blur-3xl"></div>
+            <div className="absolute bottom-0 left-0 w-24 h-24 bg-primary/5 rounded-full blur-3xl"></div>
           </div>
           
           <div className="flex items-center gap-3 relative z-10">
-            <div className="p-2 rounded-xl bg-gradient-to-br from-slate-800 to-indigo-900 border border-cyan-400/40 shadow-2xl shadow-cyan-500/20 backdrop-blur-sm">
-              <img src="/landing/images/ChatGPT Image 5 dic 2025, 12_17_26.png" alt="Ventify Space" className="w-8 h-8" />
+            <div className="p-2 rounded-lg bg-primary/10 border border-primary/20 shadow-lg shadow-primary/10">
+              <img src="/landing/images/ChatGPT Image 5 dic 2025, 12_17_26.png" alt="Ventify Space" className="w-7 h-7" />
             </div>
             <div className="flex-1 min-w-0">
-              <span className="text-sm font-bold text-white block truncate">{currentCompany?.name || 'Tienda.Space'}</span>
-              <p className="text-[10px] text-cyan-300">Ventify Space</p>
+              <span className="text-xs font-bold text-foreground block truncate">{currentCompany?.name || 'Tienda.Space'}</span>
+              <p className="text-[9px] text-muted-foreground">Ventify Space</p>
             </div>
           </div>
         </div>
