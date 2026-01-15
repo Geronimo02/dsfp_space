@@ -106,7 +106,7 @@ export default function Auth() {
 
   return (
     <>
-      <div className="flex min-h-screen items-center justify-center bg-gradient-to-br from-slate-900 via-slate-800 to-slate-900 p-4">
+      <div className="flex min-h-screen items-center justify-center bg-gradient-to-br from-slate-900 via-slate-800 to-slate-900 p-4 md:p-6">
         {/* Advanced animated background effects */}
         <div className="fixed inset-0 overflow-hidden pointer-events-none">
           {/* Main breathing orbs */}
@@ -129,7 +129,7 @@ export default function Auth() {
         </div>
 
         <Card
-          className="w-full max-w-4xl shadow-[0_28px_80px_rgba(0,0,0,0.55)] border-primary/40 relative z-10 bg-gradient-to-br from-slate-800/90 via-slate-700/90 to-slate-800/90 backdrop-blur-2xl p-6 md:p-10"
+          className="w-full max-w-3xl shadow-[0_28px_80px_rgba(0,0,0,0.55)] border-primary/40 relative z-10 bg-gradient-to-br from-slate-800/90 via-slate-700/90 to-slate-800/90 backdrop-blur-2xl p-6 md:p-8"
           style={{animation: 'fadeInUp 0.6s ease-out'}}
         >
         <style>{`
@@ -138,7 +138,7 @@ export default function Auth() {
             to { opacity: 1; transform: translateY(0); }
           }
         `}</style>
-        <CardHeader className="pb-6 md:pb-8 flex flex-col md:flex-row md:items-center md:justify-between gap-6 text-left">
+        <CardHeader className="pb-6 md:pb-8 flex flex-col items-center justify-center gap-6 text-center">
           {/* Logo with elegant animation */}
           <div className="relative flex items-center justify-center">
             <div className="w-24 h-24 rounded-full bg-gradient-to-br from-primary/10 via-transparent to-cyan-500/10 border border-primary/30 flex items-center justify-center overflow-visible" style={{animation: 'softGlow 4s infinite ease-in-out'}}>
