@@ -145,10 +145,6 @@ export default function Auth() {
             </div>
           </div>
           
-          <div>
-            <CardTitle className="text-2xl font-bold bg-gradient-to-r from-foreground to-foreground/70 bg-clip-text">Ventify.Space</CardTitle>
-            <CardDescription className="text-base mt-2">Sistema de Punto de Venta</CardDescription>
-          </div>
 
           {/* Custom animations */}
           <style>{`
