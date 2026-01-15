@@ -63,6 +63,8 @@ const Employees = () => {
   const canDelete = hasPermission("employees", "delete");
 
   const canViewAllTimeTracking = canManageTimeTracking;
+  const showMyTime = !canViewAllTimeTracking;
+  const defaultTab = canViewAllTimeTracking ? "all-times" : "list";
   const canManageRoles = canManageEmployees;
 
   const { data: employees, isLoading } = useQuery({
@@ -89,36 +91,32 @@ const Employees = () => {
 
       if (!canManageRoles) return base;
 
-      const supabaseClient = supabase as any;
-      const employeesWithRoles: any = await Promise.all(
-        base.map(async (employee: any) => {
-          if (employee.email) {
-            const profileResult = await supabaseClient
-              .from("profiles")
-              .select("id")
-              .eq("email", employee.email)
-              .maybeSingle();
+      const normalizeEmail = (email?: string | null) => (email || "").trim().toLowerCase();
+      const emails = base.map((employee: any) => normalizeEmail(employee.email)).filter(Boolean);
+      if (emails.length === 0) return base;
 
-            const profile = profileResult.data;
+      const { data, error } = await supabase.functions.invoke("company-users-roles", {
+        body: {
+          companyId: currentCompany.id,
+          emails,
+        },
+      });
 
-            if (profile) {
-              const companyUserResult = await supabaseClient
-                .from("company_users")
-                .select("role")
-                .eq("user_id", profile.id)
-                .eq("company_id", currentCompany.id)
-                .maybeSingle();
+      if (error) throw error;
 
-              const companyUser = companyUserResult.data;
+      const roleByEmail = new Map<string, string>();
+      (data as any)?.items?.forEach((item: any) => {
+        const email = normalizeEmail(item?.email);
+        if (email && item?.role) {
+          roleByEmail.set(email, item.role);
+        }
+      });
 
-              return { ...employee, role: companyUser?.role || "-" };
-            }
-          }
-          return { ...employee, role: "-" };
-        })
-      );
-
-      return employeesWithRoles;
+      return base.map((employee: any) => {
+        const email = normalizeEmail(employee.email);
+        const role = email ? roleByEmail.get(email) : undefined;
+        return { ...employee, role: role || "-" };
+      });
     },
     enabled: !!currentCompany?.id,
   });
@@ -338,16 +336,18 @@ const Employees = () => {
           <h1 className="text-2xl md:text-3xl font-bold">Empleados</h1>
         </div>
 
-        <Tabs defaultValue="list" className="space-y-4 md:space-y-6">
+        <Tabs defaultValue={defaultTab} className="space-y-4 md:space-y-6">
           <TabsList className="w-full flex flex-wrap h-auto gap-1 p-1">
             <TabsTrigger value="list" className="flex-1 min-w-[100px] text-xs sm:text-sm">
               <Users className="mr-1 sm:mr-2 h-4 w-4" />
               <span className="hidden sm:inline">Empleados</span>
             </TabsTrigger>
-            <TabsTrigger value="my-time" className="flex-1 min-w-[100px] text-xs sm:text-sm">
-              <Clock className="mr-1 sm:mr-2 h-4 w-4" />
-              <span className="hidden sm:inline">Mi Horario</span>
-            </TabsTrigger>
+            {showMyTime && (
+              <TabsTrigger value="my-time" className="flex-1 min-w-[100px] text-xs sm:text-sm">
+                <Clock className="mr-1 sm:mr-2 h-4 w-4" />
+                <span className="hidden sm:inline">Mi Horario</span>
+              </TabsTrigger>
+            )}
             {canViewAllTimeTracking && (
               <TabsTrigger value="all-times" className="flex-1 min-w-[100px] text-xs sm:text-sm">
                 <Clock className="mr-1 sm:mr-2 h-4 w-4" />
@@ -658,9 +658,11 @@ const Employees = () => {
             )}
           </TabsContent>
 
-          <TabsContent value="my-time">
-            <EmployeeSelfTimeTracking />
-          </TabsContent>
+          {showMyTime && (
+            <TabsContent value="my-time">
+              <EmployeeSelfTimeTracking />
+            </TabsContent>
+          )}
 
           {canViewAllTimeTracking && (
             <TabsContent value="all-times">

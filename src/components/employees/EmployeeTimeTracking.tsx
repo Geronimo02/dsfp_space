@@ -36,7 +36,7 @@ export function EmployeeTimeTracking() {
   const [clockInTime, setClockInTime] = useState("09:00");
   const [clockOutTime, setClockOutTime] = useState("");
   const [notes, setNotes] = useState("");
-  const [filterMonth, setFilterMonth] = useState(new Date().toISOString().slice(0, 7));
+  const [filterMonth, setFilterMonth] = useState(format(new Date(), "yyyy-MM"));
 
   // Fetch employees
   const { data: employees } = useQuery({
@@ -62,7 +62,8 @@ export function EmployeeTimeTracking() {
     queryFn: async () => {
       if (!currentCompany?.id) return [];
       
-      const monthDate = new Date(filterMonth + "-01");
+      const [yearStr, monthStr] = filterMonth.split("-");
+      const monthDate = new Date(Number(yearStr), Number(monthStr) - 1, 1);
       const start = startOfMonth(monthDate);
       const end = endOfMonth(monthDate);
       

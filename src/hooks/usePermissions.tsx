@@ -304,38 +304,43 @@ export function usePermissions() {
       
       const { data, error } = await supabase
         .from("company_users")
-        .select("role")
+        .select("role, platform_admin")
         .eq("user_id", user.id)
         .eq("company_id", currentCompany.id)
-        .eq("active", true);
+        .or("active.eq.true,active.is.null");
       
       if (error) throw error;
-      return data.map(r => r.role);
+      return data.map(r => ({
+        role: r.role,
+        platform_admin: r.platform_admin || false,
+      }));
     },
     enabled: !!user?.id && !!currentCompany?.id,
   });
 
+  const roleNames = userRoles?.map(r => r.role) || [];
+
   const { data: permissions, isLoading: permissionsLoading } = useQuery({
-    queryKey: ["role-permissions", userRoles, currentCompany?.id],
+    queryKey: ["role-permissions", roleNames, currentCompany?.id],
     queryFn: async () => {
-      if (!userRoles || userRoles.length === 0 || !currentCompany?.id) return [];
+      if (roleNames.length === 0 || !currentCompany?.id) return [];
       
       const { data, error } = await supabase
         .from("role_permissions")
         .select("*")
-        .in("role", userRoles)
+        .in("role", roleNames)
         .eq("company_id", currentCompany.id);  // Added company filter
       
       if (error) throw error;
       return data as RolePermission[];
     },
-    enabled: !!userRoles && userRoles.length > 0 && !!currentCompany?.id,
+    enabled: roleNames.length > 0 && !!currentCompany?.id,
   });
 
   const hasPermission = (module: Module, permission: Permission): boolean => {
     if (hasRole("admin")) return true;
 
-    const roles = userRoles || [];
+    const roles = roleNames;
     if (roles.length === 0) return false;
 
     const modulePermissions = (permissions || []).filter((p) => p.module === module);
@@ -376,10 +381,11 @@ export function usePermissions() {
   };
 
   const hasRole = (role: string): boolean => {
-    return userRoles?.some(r => r === role) || false;
+    return userRoles?.some(r => r.role === role) || false;
   };
 
-  const isAdmin = hasRole("admin");
+  const isPlatformAdmin = userRoles?.some(r => r.platform_admin) || false;
+  const isAdmin = hasRole("admin") || isPlatformAdmin;
   const isManager = hasRole("manager");
   const isCashier = hasRole("cashier");
   const isAccountant = hasRole("accountant");
@@ -393,7 +399,7 @@ export function usePermissions() {
 
   return {
     permissions,
-    userRoles,
+    userRoles: userRoles?.map(r => r.role) || [],
     hasPermission,
     loading: userLoading || rolesLoading || permissionsLoading,  // Fixed to use actual loading states
     currentCompany,
