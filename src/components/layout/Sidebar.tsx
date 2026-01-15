@@ -767,22 +767,33 @@ export function Sidebar() {
     <UISidebar collapsible="offcanvas" className="border-r border-sidebar-border w-64">
       <div className="flex flex-col h-full bg-gradient-to-b from-sidebar to-sidebar/95">
         {/* Header - Premium */}
-        <div className="px-4 py-4 border-b border-primary/20 bg-gradient-to-r from-slate-900 via-slate-800 to-slate-900 relative overflow-hidden group">
-          {/* Efecto de fondo Premium */}
+        <div className="px-5 py-5 border-b border-primary/20 bg-gradient-to-r from-slate-900 via-slate-800 to-slate-900 relative overflow-hidden group">
+          {/* Efecto de fondo Premium con animación minimalista */}
           <div className="absolute inset-0 opacity-50 pointer-events-none">
-            <div className="absolute -top-12 -right-12 w-48 h-48 bg-primary/20 rounded-full blur-3xl group-hover:blur-2xl transition-all duration-500"></div>
-            <div className="absolute -bottom-12 -left-12 w-40 h-40 bg-primary/15 rounded-full blur-3xl group-hover:blur-2xl transition-all duration-500"></div>
+            <div className="absolute -top-12 -right-12 w-56 h-56 bg-primary/15 rounded-full blur-3xl opacity-0 group-hover:opacity-100 transition-opacity duration-700"></div>
+            <div className="absolute -bottom-12 -left-12 w-48 h-48 bg-primary/10 rounded-full blur-3xl" style={{animation: 'breathing 6s infinite'}}></div>
           </div>
           
-          <div className="flex items-center gap-3.5 relative z-10">
-            <div className="p-2 rounded-lg bg-gradient-to-br from-slate-800 to-slate-900 border border-primary/30 shadow-xl shadow-primary/20 backdrop-blur-sm">
-              <img src="/landing/images/logo_transparente_hd.png" alt="Ventify Space" className="w-8 h-8 drop-shadow-lg" />
+          <div className="flex items-center gap-4 relative z-10">
+            <div className="p-3 rounded-lg bg-gradient-to-br from-slate-800 to-slate-900 border border-primary/40 shadow-lg shadow-primary/20 backdrop-blur-sm transition-all duration-1000" style={{animation: 'softGlow 4s infinite ease-in-out'}}>
+              <img src="/landing/images/logo_transparente_hd.png" alt="Ventify Space" className="w-10 h-10 drop-shadow-lg" />
             </div>
             <div className="flex-1 min-w-0">
-              <span className="text-sm font-bold text-white block truncate">{currentCompany?.name || 'Tienda.Space'}</span>
-              <p className="text-[10px] text-primary/70 font-medium">Ventify Space</p>
+              <span className="text-base font-bold text-white block truncate">{currentCompany?.name || 'Tienda.Space'}</span>
+              <p className="text-xs text-primary/80 font-medium">Ventify Space</p>
             </div>
           </div>
+          
+          <style>{`
+            @keyframes breathing {
+              0%, 100% { opacity: 0.4; }
+              50% { opacity: 0.6; }
+            }
+            @keyframes softGlow {
+              0%, 100% { box-shadow: 0 0 12px rgba(var(--primary-rgb), 0.15); }
+              50% { box-shadow: 0 0 24px rgba(var(--primary-rgb), 0.25); }
+            }
+          `}</style>
         </div>
 
         {/* Search Bar - Más compacto */}
