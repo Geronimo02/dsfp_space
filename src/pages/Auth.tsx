@@ -128,23 +128,30 @@ export default function Auth() {
           <div className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-[800px] h-[800px] border border-cyan-500/5 rounded-full" style={{animation: 'pulse 12s infinite ease-in-out 2s'}}></div>
         </div>
 
-        <Card className="w-full max-w-md shadow-2xl border-primary/40 relative z-10 bg-gradient-to-br from-slate-800/95 via-slate-700/95 to-slate-800/95 backdrop-blur-xl" style={{animation: 'fadeInUp 0.6s ease-out'}}>
+        <Card
+          className="w-full max-w-4xl shadow-[0_28px_80px_rgba(0,0,0,0.55)] border-primary/40 relative z-10 bg-gradient-to-br from-slate-800/90 via-slate-700/90 to-slate-800/90 backdrop-blur-2xl p-6 md:p-10"
+          style={{animation: 'fadeInUp 0.6s ease-out'}}
+        >
         <style>{`
           @keyframes fadeInUp {
             from { opacity: 0; transform: translateY(20px); }
             to { opacity: 1; transform: translateY(0); }
           }
         `}</style>
-        <CardHeader className="space-y-6 text-center pb-8 border-b border-primary/30">
+        <CardHeader className="pb-6 md:pb-8 flex flex-col md:flex-row md:items-center md:justify-between gap-6 text-left">
           {/* Logo with elegant animation */}
-          <div className="mx-auto relative">
+          <div className="relative">
             <div className="w-20 h-20 rounded-2xl bg-gradient-to-br from-primary/20 to-primary/5 border border-primary/30 flex items-center justify-center relative overflow-hidden group" style={{animation: 'softGlow 4s infinite ease-in-out'}}>
               {/* Animated background shine */}
               <div className="absolute inset-0 bg-gradient-to-tr from-transparent via-primary/10 to-transparent opacity-0 group-hover:opacity-100 transition-opacity duration-500" style={{animation: 'shine 3s infinite'}}></div>
               <img src="/landing/images/logo_transparente_hd.png" alt="Ventify Space" className="w-12 h-12 relative z-10 drop-shadow-lg" />
             </div>
           </div>
-          
+
+          <div className="flex-1">
+            <CardTitle className="text-3xl font-bold bg-gradient-to-r from-cyan-100 via-white to-blue-200 text-transparent bg-clip-text drop-shadow-[0_2px_12px_rgba(59,130,246,0.35)]">Bienvenido a Ventify.Space</CardTitle>
+            <CardDescription className="text-base mt-2 text-slate-200/90">Sistema de Punto de Venta — accede con tus credenciales</CardDescription>
+          </div>
 
           {/* Custom animations */}
           <style>{`
@@ -176,8 +183,8 @@ export default function Auth() {
             }
           `}</style>
         </CardHeader>
-        <CardContent className="pt-8">
-          <form onSubmit={handleLogin} className="space-y-5">
+        <CardContent className="pt-2 md:pt-4">
+          <form onSubmit={handleLogin} className="space-y-5 md:space-y-6">
             <div className="space-y-2">
               <Label htmlFor="login-email" className="text-white font-medium">Email</Label>
               <Input

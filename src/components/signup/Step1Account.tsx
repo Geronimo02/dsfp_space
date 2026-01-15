@@ -42,64 +42,68 @@ export function Step1Account({ formData, updateFormData, nextStep }: Step1Accoun
   };
 
   return (
-    <div className="space-y-6">
+    <div className="space-y-6 text-white">
       <div>
-        <h2 className="text-2xl font-bold mb-2">Crear tu cuenta</h2>
-        <p className="text-muted-foreground">Completa tus datos para comenzar</p>
+        <h2 className="text-2xl font-bold mb-2 text-white">Crear tu cuenta</h2>
+        <p className="text-slate-200/85">Completa tus datos para comenzar</p>
       </div>
 
       <div className="space-y-4">
         <div>
-          <Label htmlFor="email">Email *</Label>
+          <Label htmlFor="email" className="text-slate-100 font-medium">Email *</Label>
           <Input
             id="email"
             type="email"
             value={formData.email}
             onChange={(e) => updateFormData({ email: e.target.value })}
             placeholder="tu@empresa.com"
+            className="bg-slate-900/70 border-white/15 text-white placeholder:text-slate-300 focus:border-primary focus:ring-primary/30 h-11"
           />
           {errors.email && <p className="text-sm text-destructive mt-1">{errors.email}</p>}
         </div>
 
         <div>
-          <Label htmlFor="full_name">Nombre completo *</Label>
+          <Label htmlFor="full_name" className="text-slate-100 font-medium">Nombre completo *</Label>
           <Input
             id="full_name"
             value={formData.full_name}
             onChange={(e) => updateFormData({ full_name: e.target.value })}
             placeholder="Juan Pérez"
+            className="bg-slate-900/70 border-white/15 text-white placeholder:text-slate-300 focus:border-primary focus:ring-primary/30 h-11"
           />
           {errors.full_name && <p className="text-sm text-destructive mt-1">{errors.full_name}</p>}
         </div>
 
         <div>
-          <Label htmlFor="company_name">Nombre de la empresa *</Label>
+          <Label htmlFor="company_name" className="text-slate-100 font-medium">Nombre de la empresa *</Label>
           <Input
             id="company_name"
             value={formData.company_name}
             onChange={(e) => updateFormData({ company_name: e.target.value })}
             placeholder="Mi Empresa SRL"
+            className="bg-slate-900/70 border-white/15 text-white placeholder:text-slate-300 focus:border-primary focus:ring-primary/30 h-11"
           />
           {errors.company_name && <p className="text-sm text-destructive mt-1">{errors.company_name}</p>}
         </div>
 
         <div>
-          <Label htmlFor="password">Contraseña *</Label>
+          <Label htmlFor="password" className="text-slate-100 font-medium">Contraseña *</Label>
           <Input
             id="password"
             type="password"
             value={formData.password}
             onChange={(e) => updateFormData({ password: e.target.value })}
             placeholder="Mínimo 8 caracteres"
+            className="bg-slate-900/70 border-white/15 text-white placeholder:text-slate-300 focus:border-primary focus:ring-primary/30 h-11"
           />
           {errors.password && <p className="text-sm text-destructive mt-1">{errors.password}</p>}
         </div>
 
         <div>
-          <Label htmlFor="country">País *</Label>
+          <Label htmlFor="country" className="text-slate-100 font-medium">País *</Label>
           <Select value={formData.country || ""} onValueChange={(v) => updateFormData({ country: v })}>
-            <SelectTrigger id="country" className="w-full">
-              <SelectValue placeholder="Selecciona tu país" />
+            <SelectTrigger id="country" className="w-full bg-slate-900/70 border-white/15 text-white h-11">
+              <SelectValue placeholder="Selecciona tu país" className="placeholder:text-slate-300" />
             </SelectTrigger>
             <SelectContent>
               <SelectItem value="AR">Argentina</SelectItem>
@@ -116,7 +120,7 @@ export function Step1Account({ formData, updateFormData, nextStep }: Step1Accoun
       </div>
 
       <div className="flex justify-end">
-        <Button onClick={handleNext} size="lg">
+        <Button onClick={handleNext} size="lg" className="h-11 px-8 font-semibold shadow-lg">
           Continuar
         </Button>
       </div>
