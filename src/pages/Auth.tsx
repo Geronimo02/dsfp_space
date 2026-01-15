@@ -108,14 +108,43 @@ export default function Auth() {
     <>
       <div className="flex min-h-screen items-center justify-center bg-background p-4">
         <Card className="w-full max-w-md shadow-medium">
-        <CardHeader className="space-y-4 text-center">
-          <div className="mx-auto w-12 h-12 rounded-xl bg-primary flex items-center justify-center shadow-soft">
-            <ShoppingCart className="w-7 h-7 text-primary-foreground" />
+        <CardHeader className="space-y-4 text-center relative overflow-hidden group" style={{animation: 'gradientShift 8s infinite ease-in-out'}}>
+          {/* Background with gradient animation */}
+          <div className="absolute inset-0 bg-gradient-to-br from-slate-900 via-slate-800 to-slate-900 -z-10"></div>
+          
+          {/* Blur effects with breathing animation */}
+          <div className="absolute inset-0 opacity-50 pointer-events-none">
+            <div className="absolute top-0 right-0 w-32 h-32 bg-primary/15 rounded-full blur-3xl opacity-0 group-hover:opacity-100 transition-opacity duration-700"></div>
+            <div className="absolute bottom-0 left-0 w-28 h-28 bg-primary/10 rounded-full blur-3xl" style={{animation: 'breathing 6s infinite'}}></div>
           </div>
-          <div>
-            <CardTitle className="text-2xl font-bold">Ventify.Space</CardTitle>
-            <CardDescription>Sistema de Punto de Venta</CardDescription>
+
+          {/* Logo container with soft glow and animation */}
+          <div className="mx-auto relative z-10">
+            <div className="w-16 h-16 rounded-2xl bg-gradient-to-br from-slate-800 to-slate-900 border border-primary/40 shadow-xl shadow-primary/20 backdrop-blur-sm flex items-center justify-center" style={{animation: 'softGlow 4s infinite ease-in-out'}}>
+              <img src="/landing/images/logo_transparente_hd.png" alt="Ventify Space" className="w-10 h-10 drop-shadow-lg" />
+            </div>
           </div>
+          
+          <div className="relative z-10">
+            <CardTitle className="text-2xl font-bold text-white">Ventify.Space</CardTitle>
+            <CardDescription className="text-primary/80 font-medium">Sistema de Punto de Venta</CardDescription>
+          </div>
+
+          {/* Custom animations */}
+          <style>{`
+            @keyframes breathing {
+              0%, 100% { opacity: 0.4; transform: scale(1); }
+              50% { opacity: 0.6; transform: scale(1.05); }
+            }
+            @keyframes softGlow {
+              0%, 100% { box-shadow: 0 0 20px rgba(var(--primary-rgb, 59, 130, 246), 0.15); }
+              50% { box-shadow: 0 0 32px rgba(var(--primary-rgb, 59, 130, 246), 0.25); }
+            }
+            @keyframes gradientShift {
+              0%, 100% { background: linear-gradient(135deg, rgb(15, 23, 42), rgb(30, 41, 59), rgb(15, 23, 42)); }
+              50% { background: linear-gradient(135deg, rgb(20, 28, 47), rgb(35, 46, 64), rgb(20, 28, 47)); }
+            }
+          `}</style>
         </CardHeader>
         <CardContent>
           <form onSubmit={handleLogin} className="space-y-4">
