@@ -766,21 +766,21 @@ export function Sidebar() {
   return (
     <UISidebar collapsible="offcanvas" className="border-r border-sidebar-border w-64">
       <div className="flex flex-col h-full bg-gradient-to-b from-sidebar to-sidebar/95">
-        {/* Header - Ultra moderno */}
-        <div className="px-4 py-3 border-b border-sidebar-accent bg-sidebar/50 backdrop-blur-sm relative overflow-hidden">
-          {/* Efecto de fondo decorativo sutil */}
-          <div className="absolute inset-0 opacity-20 pointer-events-none">
-            <div className="absolute top-0 right-0 w-32 h-32 bg-primary/10 rounded-full blur-3xl"></div>
-            <div className="absolute bottom-0 left-0 w-24 h-24 bg-primary/5 rounded-full blur-3xl"></div>
+        {/* Header - Premium */}
+        <div className="px-4 py-4 border-b border-primary/20 bg-gradient-to-r from-slate-900 via-slate-800 to-slate-900 relative overflow-hidden group">
+          {/* Efecto de fondo Premium */}
+          <div className="absolute inset-0 opacity-50 pointer-events-none">
+            <div className="absolute -top-12 -right-12 w-48 h-48 bg-primary/20 rounded-full blur-3xl group-hover:blur-2xl transition-all duration-500"></div>
+            <div className="absolute -bottom-12 -left-12 w-40 h-40 bg-primary/15 rounded-full blur-3xl group-hover:blur-2xl transition-all duration-500"></div>
           </div>
           
-          <div className="flex items-center gap-3 relative z-10">
-            <div className="p-2 rounded-lg bg-primary/10 border border-primary/20 shadow-lg shadow-primary/10">
-              <img src="/landing/images/ChatGPT Image 5 dic 2025, 12_17_26.png" alt="Ventify Space" className="w-7 h-7" />
+          <div className="flex items-center gap-3.5 relative z-10">
+            <div className="p-2 rounded-lg bg-gradient-to-br from-slate-800 to-slate-900 border border-primary/30 shadow-xl shadow-primary/20 backdrop-blur-sm">
+              <img src="/landing/images/logo_transparente_hd.png" alt="Ventify Space" className="w-8 h-8 drop-shadow-lg" />
             </div>
             <div className="flex-1 min-w-0">
-              <span className="text-xs font-bold text-foreground block truncate">{currentCompany?.name || 'Tienda.Space'}</span>
-              <p className="text-[9px] text-muted-foreground">Ventify Space</p>
+              <span className="text-sm font-bold text-white block truncate">{currentCompany?.name || 'Tienda.Space'}</span>
+              <p className="text-[10px] text-primary/70 font-medium">Ventify Space</p>
             </div>
           </div>
         </div>
