@@ -418,6 +418,5 @@ export function usePermissions() {
     isEmployee,
     canManageEmployees,
     canManageTimeTracking,
-    canViewOwnTimeTracking,
   };
 };
