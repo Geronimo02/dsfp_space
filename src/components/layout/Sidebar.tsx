@@ -767,7 +767,9 @@ export function Sidebar() {
     <UISidebar collapsible="offcanvas" className="border-r border-sidebar-border w-64">
       <div className="flex flex-col h-full bg-gradient-to-b from-sidebar to-sidebar/95">
         {/* Header - Premium */}
-        <div className="px-5 py-5 border-b border-primary/20 bg-gradient-to-r from-slate-900 via-slate-800 to-slate-900 relative overflow-hidden group">
+        <div className="px-5 py-5 border-b border-primary/20 relative overflow-hidden group" style={{animation: 'gradientShift 8s infinite ease-in-out'}}>
+          <div className="absolute inset-0 bg-gradient-to-r from-slate-900 via-slate-800 to-slate-900 -z-10"></div>
+          
           {/* Efecto de fondo Premium con animación minimalista */}
           <div className="absolute inset-0 opacity-50 pointer-events-none">
             <div className="absolute -top-12 -right-12 w-56 h-56 bg-primary/15 rounded-full blur-3xl opacity-0 group-hover:opacity-100 transition-opacity duration-700"></div>
@@ -792,6 +794,10 @@ export function Sidebar() {
             @keyframes softGlow {
               0%, 100% { box-shadow: 0 0 12px rgba(var(--primary-rgb), 0.15); }
               50% { box-shadow: 0 0 24px rgba(var(--primary-rgb), 0.25); }
+            }
+            @keyframes gradientShift {
+              0%, 100% { background: linear-gradient(to right, rgb(15, 23, 42), rgb(30, 41, 59), rgb(15, 23, 42)); }
+              50% { background: linear-gradient(to right, rgb(20, 28, 47), rgb(35, 46, 64), rgb(20, 28, 47)); }
             }
           `}</style>
         </div>
