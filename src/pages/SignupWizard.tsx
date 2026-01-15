@@ -125,10 +125,25 @@ export default function SignupWizard() {
 
   return (
     <div className="min-h-screen bg-gradient-to-br from-slate-900 via-slate-800 to-slate-900 p-4 md:p-8 relative overflow-hidden">
-      {/* Subtle background effects */}
+      {/* Advanced animated background effects */}
       <div className="fixed inset-0 overflow-hidden pointer-events-none">
+        {/* Main breathing orbs */}
         <div className="absolute top-1/4 right-0 w-96 h-96 bg-primary/10 rounded-full blur-3xl" style={{animation: 'breathing 8s infinite'}}></div>
         <div className="absolute bottom-0 left-0 w-96 h-96 bg-primary/5 rounded-full blur-3xl" style={{animation: 'breathing 10s infinite 2s'}}></div>
+        
+        {/* Floating particles */}
+        <div className="absolute top-1/4 left-1/3 w-32 h-32 bg-cyan-500/5 rounded-full blur-2xl" style={{animation: 'float 12s infinite ease-in-out'}}></div>
+        <div className="absolute bottom-1/4 right-1/3 w-40 h-40 bg-blue-500/5 rounded-full blur-2xl" style={{animation: 'float 15s infinite ease-in-out 3s'}}></div>
+        <div className="absolute top-1/2 right-1/4 w-24 h-24 bg-indigo-500/5 rounded-full blur-2xl" style={{animation: 'float 10s infinite ease-in-out 5s'}}></div>
+        
+        {/* Diagonal moving lights */}
+        <div className="absolute top-0 left-0 w-full h-1 bg-gradient-to-r from-transparent via-primary/20 to-transparent" style={{animation: 'slideDown 8s infinite linear'}}></div>
+        <div className="absolute top-0 right-0 w-1 h-full bg-gradient-to-b from-transparent via-cyan-500/20 to-transparent" style={{animation: 'slideLeft 10s infinite linear 2s'}}></div>
+        
+        {/* Rotating gradient overlay */}
+        <div className="absolute inset-0 opacity-20" style={{animation: 'rotateGradient 25s infinite linear'}}>
+          <div className="absolute inset-0 bg-gradient-to-tr from-primary/5 via-transparent to-cyan-500/5"></div>
+        </div>
       </div>
 
       <div className="max-w-5xl mx-auto relative z-10">
@@ -160,13 +175,37 @@ export default function SignupWizard() {
             0% { transform: translateX(-100%) translateY(-100%) rotate(45deg); }
             100% { transform: translateX(100%) translateY(100%) rotate(45deg); }
           }
+          @keyframes float {
+            0%, 100% { transform: translate(0, 0) rotate(0deg); }
+            25% { transform: translate(20px, -30px) rotate(5deg); }
+            50% { transform: translate(-15px, -50px) rotate(-5deg); }
+            75% { transform: translate(-25px, -25px) rotate(3deg); }
+          }
+          @keyframes rotateGradient {
+            0% { transform: rotate(0deg); }
+            100% { transform: rotate(360deg); }
+          }
+          @keyframes slideDown {
+            0% { transform: translateY(-100%); }
+            100% { transform: translateY(100vh); }
+          }
+          @keyframes slideLeft {
+            0% { transform: translateX(100%); }
+            100% { transform: translateX(-100vw); }
+          }
         `}</style>
 
         {/* Stepper */}
         <SignupStepper currentStep={currentStep} />
 
         {/* Content */}
-        <Card className="p-6 md:p-8 mt-8 bg-card/95 backdrop-blur-sm border-primary/20 shadow-2xl">
+        <Card className="p-6 md:p-8 mt-8 bg-gradient-to-br from-slate-800/95 via-slate-700/95 to-slate-800/95 backdrop-blur-xl border-primary/40 shadow-2xl" style={{animation: 'fadeInUp 0.6s ease-out'}}>
+        <style>{`
+          @keyframes fadeInUp {
+            from { opacity: 0; transform: translateY(20px); }
+            to { opacity: 1; transform: translateY(0); }
+          }
+        `}</style>
           {currentStep === 0 && (
             <Step1Account formData={formData} updateFormData={updateFormData} nextStep={nextStep} />
           )}

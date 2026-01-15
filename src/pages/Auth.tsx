@@ -107,14 +107,35 @@ export default function Auth() {
   return (
     <>
       <div className="flex min-h-screen items-center justify-center bg-gradient-to-br from-slate-900 via-slate-800 to-slate-900 p-4">
-        {/* Subtle background effects */}
+        {/* Advanced animated background effects */}
         <div className="fixed inset-0 overflow-hidden pointer-events-none">
+          {/* Main breathing orbs */}
           <div className="absolute top-1/4 -right-48 w-96 h-96 bg-primary/10 rounded-full blur-3xl" style={{animation: 'breathing 8s infinite'}}></div>
           <div className="absolute -bottom-48 -left-48 w-96 h-96 bg-primary/5 rounded-full blur-3xl" style={{animation: 'breathing 10s infinite 2s'}}></div>
+          
+          {/* Floating particles */}
+          <div className="absolute top-1/3 left-1/4 w-32 h-32 bg-cyan-500/5 rounded-full blur-2xl" style={{animation: 'float 12s infinite ease-in-out'}}></div>
+          <div className="absolute bottom-1/3 right-1/4 w-40 h-40 bg-blue-500/5 rounded-full blur-2xl" style={{animation: 'float 15s infinite ease-in-out 3s'}}></div>
+          <div className="absolute top-2/3 left-1/3 w-24 h-24 bg-indigo-500/5 rounded-full blur-2xl" style={{animation: 'float 10s infinite ease-in-out 5s'}}></div>
+          
+          {/* Rotating gradient overlay */}
+          <div className="absolute inset-0 opacity-30" style={{animation: 'rotateGradient 20s infinite linear'}}>
+            <div className="absolute inset-0 bg-gradient-to-tr from-primary/5 via-transparent to-cyan-500/5"></div>
+          </div>
+          
+          {/* Pulsing rings */}
+          <div className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-[600px] h-[600px] border border-primary/5 rounded-full" style={{animation: 'pulse 8s infinite ease-in-out'}}></div>
+          <div className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-[800px] h-[800px] border border-cyan-500/5 rounded-full" style={{animation: 'pulse 12s infinite ease-in-out 2s'}}></div>
         </div>
 
-        <Card className="w-full max-w-md shadow-2xl border-primary/20 relative z-10 bg-card/95 backdrop-blur-sm">
-        <CardHeader className="space-y-6 text-center pb-8 border-b border-border/50">
+        <Card className="w-full max-w-md shadow-2xl border-primary/40 relative z-10 bg-gradient-to-br from-slate-800/95 via-slate-700/95 to-slate-800/95 backdrop-blur-xl" style={{animation: 'fadeInUp 0.6s ease-out'}}>
+        <style>{`
+          @keyframes fadeInUp {
+            from { opacity: 0; transform: translateY(20px); }
+            to { opacity: 1; transform: translateY(0); }
+          }
+        `}</style>
+        <CardHeader className="space-y-6 text-center pb-8 border-b border-primary/30">
           {/* Logo with elegant animation */}
           <div className="mx-auto relative">
             <div className="w-20 h-20 rounded-2xl bg-gradient-to-br from-primary/20 to-primary/5 border border-primary/30 flex items-center justify-center relative overflow-hidden group" style={{animation: 'softGlow 4s infinite ease-in-out'}}>
@@ -143,12 +164,26 @@ export default function Auth() {
               0% { transform: translateX(-100%) translateY(-100%) rotate(45deg); }
               100% { transform: translateX(100%) translateY(100%) rotate(45deg); }
             }
+            @keyframes float {
+              0%, 100% { transform: translate(0, 0) rotate(0deg); }
+              25% { transform: translate(20px, -30px) rotate(5deg); }
+              50% { transform: translate(-15px, -50px) rotate(-5deg); }
+              75% { transform: translate(-25px, -25px) rotate(3deg); }
+            }
+            @keyframes rotateGradient {
+              0% { transform: rotate(0deg); }
+              100% { transform: rotate(360deg); }
+            }
+            @keyframes pulse {
+              0%, 100% { transform: translate(-50%, -50%) scale(1); opacity: 0.3; }
+              50% { transform: translate(-50%, -50%) scale(1.05); opacity: 0.5; }
+            }
           `}</style>
         </CardHeader>
         <CardContent className="pt-8">
           <form onSubmit={handleLogin} className="space-y-5">
             <div className="space-y-2">
-              <Label htmlFor="login-email">Email</Label>
+              <Label htmlFor="login-email" className="text-white font-medium">Email</Label>
               <Input
                 id="login-email"
                 type="email"
@@ -156,10 +191,11 @@ export default function Auth() {
                 value={email}
                 onChange={(e) => setEmail(e.target.value)}
                 required
+                className="bg-slate-900/50 border-primary/30 text-white placeholder:text-slate-400 focus:border-primary focus:ring-primary/20"
               />
             </div>
             <div className="space-y-2">
-              <Label htmlFor="login-password">Contraseña</Label>
+              <Label htmlFor="login-password" className="text-white font-medium">Contraseña</Label>
               <Input
                 id="login-password"
                 type="password"
@@ -167,16 +203,17 @@ export default function Auth() {
                 value={password}
                 onChange={(e) => setPassword(e.target.value)}
                 required
+                className="bg-slate-900/50 border-primary/30 text-white placeholder:text-slate-400 focus:border-primary focus:ring-primary/20"
               />
             </div>
-            <Button type="submit" className="w-full mt-2 h-11" disabled={isLoading}>
+            <Button type="submit" className="w-full mt-2 h-11 bg-primary hover:bg-primary/90 text-white font-semibold shadow-lg" disabled={isLoading}>
               {isLoading ? "Iniciando sesión..." : "Iniciar Sesión"}
             </Button>
-            <div className="flex items-center justify-between mt-4 pt-2 border-t border-border/50">
+            <div className="flex items-center justify-between mt-4 pt-2 border-t border-primary/30">
               <Button
                 type="button"
                 variant="link"
-                className="text-sm text-muted-foreground"
+                className="text-sm text-slate-300 hover:text-white"
                 onClick={() => setShowForgotPassword(true)}
               >
                 ¿Olvidaste tu contraseña?
@@ -184,7 +221,7 @@ export default function Auth() {
               <Button
                 type="button"
                 variant="link"
-                className="text-sm"
+                className="text-sm text-primary hover:text-primary/80 font-medium"
                 onClick={() => navigate("/signup")}
               >
                 ¿No tienes cuenta? Regístrate
@@ -207,7 +244,7 @@ export default function Auth() {
         <form onSubmit={handleForgotPassword}>
           <div className="space-y-4 py-4">
             <div className="space-y-2">
-              <Label htmlFor="reset-email">Email</Label>
+              <Label htmlFor="reset-email" className="text-foreground font-medium">Email</Label>
               <Input
                 id="reset-email"
                 type="email"
@@ -215,6 +252,7 @@ export default function Auth() {
                 value={resetEmail}
                 onChange={(e) => setResetEmail(e.target.value)}
                 required
+                className="border-primary/30 focus:border-primary focus:ring-primary/20"
               />
             </div>
           </div>
