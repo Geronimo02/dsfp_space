@@ -20,6 +20,16 @@ export default function SignupWizard() {
     saveIntent,
   } = useSignupWizard();
 
+  const stepLabels = [
+    "Cuenta",
+    "Plan",
+    "Módulos",
+    "Pago",
+    "Confirmación",
+  ];
+  const currentStepLabel = stepLabels[currentStep] || "Paso";
+  const totalSteps = stepLabels.length;
+
   const handleCreateIntent = async () => {
     console.log("[SignupWizard] Creating intent with:", formData);
 
@@ -158,7 +168,7 @@ export default function SignupWizard() {
             </div>
             <h1 className="text-4xl font-bold text-white">Ventify</h1>
           </div>
-          <h2 className="text-xl text-primary/90 font-medium">Crea tu cuenta empresarial</h2>
+          <h2 className="text-xl text-slate-100 font-medium">Crea tu cuenta empresarial</h2>
         </div>
 
         {/* Custom animations */}
@@ -196,10 +206,19 @@ export default function SignupWizard() {
         `}</style>
 
         {/* Stepper */}
+        <div className="mb-4 flex items-center justify-between text-slate-100">
+          <div className="px-3 py-1 rounded-full bg-slate-800/80 border border-white/15 shadow-inner text-sm text-white">
+            Paso {currentStep + 1} de {totalSteps}
+          </div>
+          <span className="text-sm text-slate-100/90">{currentStepLabel}</span>
+        </div>
         <SignupStepper currentStep={currentStep} />
 
         {/* Content */}
-        <Card className="p-6 md:p-8 mt-8 bg-gradient-to-br from-slate-800/95 via-slate-700/95 to-slate-800/95 backdrop-blur-xl border-primary/40 shadow-2xl" style={{animation: 'fadeInUp 0.6s ease-out'}}>
+        <Card
+          className="p-6 md:p-8 mt-8 bg-gradient-to-br from-slate-900/90 via-slate-800/90 to-slate-900/90 backdrop-blur-2xl border-white/10 shadow-[0_24px_64px_rgba(0,0,0,0.55)] rounded-2xl text-white"
+          style={{animation: 'fadeInUp 0.6s ease-out'}}
+        >
         <style>{`
           @keyframes fadeInUp {
             from { opacity: 0; transform: translateY(20px); }
@@ -243,9 +262,9 @@ export default function SignupWizard() {
         </Card>
 
         {/* Footer */}
-        <p className="text-center text-sm text-slate-300/80 mt-6">
+        <p className="text-center text-sm text-slate-200 mt-6">
           ¿Ya tienes una cuenta?{" "}
-          <a href="/auth" className="text-primary hover:underline font-medium">
+          <a href="/auth" className="text-cyan-200 hover:text-cyan-100 underline-offset-4 hover:underline font-medium">
             Inicia sesión
           </a>
         </p>
