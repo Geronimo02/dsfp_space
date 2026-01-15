@@ -29,7 +29,6 @@ interface EmployeeFormData {
   document_number: string;
   email: string;
   phone: string;
-  department: string;
   hire_date: string;
   base_salary: number;
   salary_type: string;
@@ -43,16 +42,28 @@ const initialFormData: EmployeeFormData = {
   document_number: "",
   email: "",
   phone: "",
-  department: "",
   hire_date: new Date().toISOString().split("T")[0],
   base_salary: 0,
   salary_type: "monthly",
   role: "employee",
 };
 
+const ROLE_LABELS: Record<string, string> = {
+  admin: "Administrador",
+  manager: "Gerente",
+  cashier: "Cajero",
+  warehouse: "Depósito",
+  technician: "Técnico",
+  accountant: "Contador",
+  auditor: "Auditor",
+  viewer: "Visualizador",
+  employee: "Empleado",
+};
+
 const Employees = () => {
   const { currentCompany } = useCompany();
   const { hasPermission, isAdmin, isEmployee, canManageEmployees, canManageTimeTracking } = usePermissions();
+
   const queryClient = useQueryClient();
   const [dialogOpen, setDialogOpen] = useState(false);
   const [editingEmployee, setEditingEmployee] = useState<any>(null);
@@ -117,6 +128,7 @@ const Employees = () => {
         const role = email ? roleByEmail.get(email) : undefined;
         return { ...employee, role: role || "-" };
       });
+
     },
     enabled: !!currentCompany?.id,
   });
@@ -297,7 +309,6 @@ const Employees = () => {
       document_number: employee.document_number || "",
       email: employee.email || "",
       phone: employee.phone || "",
-      department: employee.department || "",
       hire_date: employee.hire_date || "",
       base_salary: employee.base_salary || 0,
       salary_type: employee.salary_type || "monthly",
@@ -456,15 +467,6 @@ const Employees = () => {
                             />
                           </div>
                           <div className="space-y-2">
-                            <Label htmlFor="department">Departamento</Label>
-                            <Input
-                              id="department"
-                              value={formData.department}
-                              onChange={(e) => setFormData({ ...formData, department: e.target.value })}
-                              placeholder="Ventas"
-                            />
-                          </div>
-                          <div className="space-y-2">
                             <Label htmlFor="hire_date">Fecha de Ingreso *</Label>
                             <Input
                               id="hire_date"
@@ -491,6 +493,7 @@ const Employees = () => {
                               </Select>
                             </div>
                           )}
+
                           <div className="space-y-2 col-span-2">
                             <Label htmlFor="role">Rol en el Sistema *</Label>
                             <Select
@@ -554,7 +557,6 @@ const Employees = () => {
                         <TableHead className="min-w-[120px]">Nombre</TableHead>
                         <TableHead className="hidden sm:table-cell">Documento</TableHead>
                         <TableHead className="hidden md:table-cell">Rol</TableHead>
-                        <TableHead className="hidden lg:table-cell">Departamento</TableHead>
                         <TableHead className="hidden lg:table-cell">Ingreso</TableHead>
                         {!isEmployee && <TableHead className="hidden md:table-cell">Salario</TableHead>}
                         <TableHead>Estado</TableHead>
@@ -585,8 +587,8 @@ const Employees = () => {
                              employee.role === "employee" ? "Empleado" :
                              employee.role === "viewer" ? "Visualizador" :
                              employee.role === "auditor" ? "Auditor" : "-"}
+
                           </TableCell>
-                          <TableCell className="hidden lg:table-cell text-xs sm:text-sm">{employee.department || "-"}</TableCell>
                           <TableCell className="hidden lg:table-cell text-xs sm:text-sm">
                             {employee.hire_date
                               ? format(new Date(employee.hire_date), "dd/MM/yyyy", { locale: es })

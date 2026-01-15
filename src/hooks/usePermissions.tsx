@@ -282,7 +282,9 @@ export const DEFAULT_ROLE_PERMISSIONS: Record<AppRole, Partial<RolePermissionDef
     ...allowAll(["dashboard", "reports", "sales", "products", "customers"], DEFAULT_VIEW_ONLY),
   },
   employee: {
+
     ...allowAll(["employees"], DEFAULT_VIEW_ONLY),
+
   },
 };
 
@@ -345,6 +347,7 @@ export function usePermissions() {
 
     const modulePermissions = (permissions || []).filter((p) => p.module === module);
 
+
     const hasCustomPermission = (role: string) =>
       modulePermissions.some((p) => {
         if (p.role !== role) return false;
@@ -386,6 +389,7 @@ export function usePermissions() {
 
   const isPlatformAdmin = userRoles?.some(r => r.platform_admin) || false;
   const isAdmin = hasRole("admin") || isPlatformAdmin;
+
   const isManager = hasRole("manager");
   const isCashier = hasRole("cashier");
   const isAccountant = hasRole("accountant");
@@ -414,5 +418,6 @@ export function usePermissions() {
     isEmployee,
     canManageEmployees,
     canManageTimeTracking,
+    canViewOwnTimeTracking,
   };
 };
