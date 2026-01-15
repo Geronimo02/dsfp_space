@@ -14,7 +14,7 @@ import { Label } from "@/components/ui/label";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { toast } from "sonner";
-import { Users, Plus, Edit, Trash2, Shield, UserCog, Clock } from "lucide-react";
+import { Users, Plus, Edit, Trash2, Shield, Clock } from "lucide-react";
 import { format } from "date-fns";
 import { es } from "date-fns/locale";
 import { EmployeePermissionsManager } from "@/components/employees/EmployeePermissionsManager";
@@ -62,7 +62,8 @@ const ROLE_LABELS: Record<string, string> = {
 
 const Employees = () => {
   const { currentCompany } = useCompany();
-  const { hasPermission, isAdmin, canManageEmployees, canManageTimeTracking } = usePermissions();
+  const { hasPermission, isAdmin, isEmployee, canManageEmployees, canManageTimeTracking } = usePermissions();
+
   const queryClient = useQueryClient();
   const [dialogOpen, setDialogOpen] = useState(false);
   const [editingEmployee, setEditingEmployee] = useState<any>(null);
@@ -73,6 +74,8 @@ const Employees = () => {
   const canDelete = hasPermission("employees", "delete");
 
   const canViewAllTimeTracking = canManageTimeTracking;
+  const showMyTime = !canViewAllTimeTracking;
+  const defaultTab = canViewAllTimeTracking ? "all-times" : "list";
   const canManageRoles = canManageEmployees;
 
   const { data: employees, isLoading } = useQuery({
@@ -88,40 +91,44 @@ const Employees = () => {
 
       if (employeesError) throw employeesError;
 
-      const base = (employeesData || []).map((employee: any) => ({ ...employee, role: "-" }));
+      const { data: authData } = await supabase.auth.getUser();
+      const currentEmail = authData?.user?.email?.toLowerCase();
+
+      const filteredEmployees = !canManageEmployees && currentEmail
+        ? (employeesData || []).filter((employee: any) => employee.email?.toLowerCase() === currentEmail)
+        : (employeesData || []);
+
+      const base = filteredEmployees.map((employee: any) => ({ ...employee, role: "-" }));
 
       if (!canManageRoles) return base;
 
-      const supabaseClient = supabase as any;
-      const employeesWithRoles: any = await Promise.all(
-        base.map(async (employee: any) => {
-          if (employee.email) {
-            const profileResult = await supabaseClient
-              .from("profiles")
-              .select("id")
-              .eq("email", employee.email)
-              .maybeSingle();
+      const normalizeEmail = (email?: string | null) => (email || "").trim().toLowerCase();
+      const emails = base.map((employee: any) => normalizeEmail(employee.email)).filter(Boolean);
+      if (emails.length === 0) return base;
 
-            const profile = profileResult.data;
+      const { data, error } = await supabase.functions.invoke("company-users-roles", {
+        body: {
+          companyId: currentCompany.id,
+          emails,
+        },
+      });
 
-            if (profile) {
-              const companyUserResult = await supabaseClient
-                .from("company_users")
-                .select("role")
-                .eq("user_id", profile.id)
-                .eq("company_id", currentCompany.id)
-                .maybeSingle();
+      if (error) throw error;
 
-              const companyUser = companyUserResult.data;
+      const roleByEmail = new Map<string, string>();
+      (data as any)?.items?.forEach((item: any) => {
+        const email = normalizeEmail(item?.email);
+        if (email && item?.role) {
+          roleByEmail.set(email, item.role);
+        }
+      });
 
-              return { ...employee, role: companyUser?.role || "-" };
-            }
-          }
-          return { ...employee, role: "-" };
-        })
-      );
+      return base.map((employee: any) => {
+        const email = normalizeEmail(employee.email);
+        const role = email ? roleByEmail.get(email) : undefined;
+        return { ...employee, role: role || "-" };
+      });
 
-      return employeesWithRoles;
     },
     enabled: !!currentCompany?.id,
   });
@@ -340,26 +347,22 @@ const Employees = () => {
           <h1 className="text-2xl md:text-3xl font-bold">Empleados</h1>
         </div>
 
-        <Tabs defaultValue="list" className="space-y-4 md:space-y-6">
+        <Tabs defaultValue={defaultTab} className="space-y-4 md:space-y-6">
           <TabsList className="w-full flex flex-wrap h-auto gap-1 p-1">
             <TabsTrigger value="list" className="flex-1 min-w-[100px] text-xs sm:text-sm">
               <Users className="mr-1 sm:mr-2 h-4 w-4" />
               <span className="hidden sm:inline">Empleados</span>
             </TabsTrigger>
-            <TabsTrigger value="my-time" className="flex-1 min-w-[100px] text-xs sm:text-sm">
-              <Clock className="mr-1 sm:mr-2 h-4 w-4" />
-              <span className="hidden sm:inline">Mi Horario</span>
-            </TabsTrigger>
+            {showMyTime && (
+              <TabsTrigger value="my-time" className="flex-1 min-w-[100px] text-xs sm:text-sm">
+                <Clock className="mr-1 sm:mr-2 h-4 w-4" />
+                <span className="hidden sm:inline">Mi Horario</span>
+              </TabsTrigger>
+            )}
             {canViewAllTimeTracking && (
               <TabsTrigger value="all-times" className="flex-1 min-w-[100px] text-xs sm:text-sm">
                 <Clock className="mr-1 sm:mr-2 h-4 w-4" />
                 <span className="hidden sm:inline">Horarios</span>
-              </TabsTrigger>
-            )}
-            {canManageRoles && (
-              <TabsTrigger value="roles" className="flex-1 min-w-[80px] text-xs sm:text-sm">
-                <UserCog className="mr-1 sm:mr-2 h-4 w-4" />
-                <span className="hidden sm:inline">Roles</span>
               </TabsTrigger>
             )}
             {isAdmin && (
@@ -472,22 +475,25 @@ const Employees = () => {
                               onChange={(e) => setFormData({ ...formData, hire_date: e.target.value })}
                             />
                           </div>
-                          <div className="space-y-2">
-                            <Label htmlFor="salary_type">Tipo de Salario</Label>
-                            <Select
-                              value={formData.salary_type}
-                              onValueChange={(value) => setFormData({ ...formData, salary_type: value })}
-                            >
-                              <SelectTrigger>
-                                <SelectValue />
-                              </SelectTrigger>
-                              <SelectContent>
-                                <SelectItem value="monthly">Mensual</SelectItem>
-                                <SelectItem value="hourly">Por hora</SelectItem>
-                                <SelectItem value="daily">Diario</SelectItem>
-                              </SelectContent>
-                            </Select>
-                          </div>
+                          {canManageEmployees && (
+                            <div className="space-y-2">
+                              <Label htmlFor="salary_type">Tipo de Salario</Label>
+                              <Select
+                                value={formData.salary_type}
+                                onValueChange={(value) => setFormData({ ...formData, salary_type: value })}
+                              >
+                                <SelectTrigger>
+                                  <SelectValue />
+                                </SelectTrigger>
+                                <SelectContent>
+                                  <SelectItem value="monthly">Mensual</SelectItem>
+                                  <SelectItem value="hourly">Por hora</SelectItem>
+                                  <SelectItem value="daily">Diario</SelectItem>
+                                </SelectContent>
+                              </Select>
+                            </div>
+                          )}
+
                           <div className="space-y-2 col-span-2">
                             <Label htmlFor="role">Rol en el Sistema *</Label>
                             <Select
@@ -510,16 +516,18 @@ const Employees = () => {
                               </SelectContent>
                             </Select>
                           </div>
-                          <div className="space-y-2 col-span-2">
-                            <Label htmlFor="base_salary">Salario Base</Label>
-                            <Input
-                              id="base_salary"
-                              type="number"
-                              value={formData.base_salary || ""}
-                              onChange={(e) => setFormData({ ...formData, base_salary: parseFloat(e.target.value) || 0 })}
-                              placeholder="100000"
-                            />
-                          </div>
+                          {canManageEmployees && (
+                            <div className="space-y-2 col-span-2">
+                              <Label htmlFor="base_salary">Salario Base</Label>
+                              <Input
+                                id="base_salary"
+                                type="number"
+                                value={formData.base_salary || ""}
+                                onChange={(e) => setFormData({ ...formData, base_salary: parseFloat(e.target.value) || 0 })}
+                                placeholder="100000"
+                              />
+                            </div>
+                          )}
                         </div>
                         <div className="flex justify-end gap-2">
                           <Button variant="outline" onClick={() => setDialogOpen(false)}>
@@ -550,9 +558,9 @@ const Employees = () => {
                         <TableHead className="hidden sm:table-cell">Documento</TableHead>
                         <TableHead className="hidden md:table-cell">Rol</TableHead>
                         <TableHead className="hidden lg:table-cell">Ingreso</TableHead>
-                        <TableHead className="hidden md:table-cell">Salario</TableHead>
+                        {!isEmployee && <TableHead className="hidden md:table-cell">Salario</TableHead>}
                         <TableHead>Estado</TableHead>
-                        <TableHead>Acciones</TableHead>
+                        {(canEdit || canDelete) && <TableHead>Acciones</TableHead>}
                       </TableRow>
                     </TableHeader>
                     <TableBody>
@@ -569,48 +577,61 @@ const Employees = () => {
                           <TableCell className="hidden sm:table-cell text-xs sm:text-sm">
                             {employee.document_type} {employee.document_number}
                           </TableCell>
-                          <TableCell className="hidden md:table-cell">
-                            <Badge variant="outline">
-                              {ROLE_LABELS[employee.role] || "-"}
-                            </Badge>
+                          <TableCell className="hidden md:table-cell text-xs sm:text-sm">
+                            {employee.role === "admin" ? "Administrador" :
+                             employee.role === "manager" ? "Gerente" :
+                             employee.role === "cashier" ? "Cajero" :
+                             employee.role === "warehouse" ? "Deposito" :
+                             employee.role === "technician" ? "Tecnico" :
+                             employee.role === "accountant" ? "Contador" :
+                             employee.role === "employee" ? "Empleado" :
+                             employee.role === "viewer" ? "Visualizador" :
+                             employee.role === "auditor" ? "Auditor" : "-"}
+
                           </TableCell>
                           <TableCell className="hidden lg:table-cell text-xs sm:text-sm">
                             {employee.hire_date
                               ? format(new Date(employee.hire_date), "dd/MM/yyyy", { locale: es })
                               : "-"}
                           </TableCell>
-                          <TableCell className="hidden md:table-cell text-xs sm:text-sm">${employee.base_salary?.toLocaleString() || 0}</TableCell>
+                          {!isEmployee && (
+                            <TableCell className="hidden md:table-cell text-xs sm:text-sm">
+                              ${employee.base_salary?.toLocaleString() || 0}
+                            </TableCell>
+                          )}
                           <TableCell>
                             <Badge variant={employee.active ? "default" : "secondary"}>
                               {employee.active ? "Activo" : "Inactivo"}
                             </Badge>
                           </TableCell>
-                          <TableCell>
-                            <div className="flex gap-2">
-                              {canEdit && (
-                                <Button
-                                  variant="ghost"
-                                  size="sm"
-                                  onClick={() => handleEdit(employee)}
-                                >
-                                  <Edit className="h-4 w-4" />
-                                </Button>
-                              )}
-                              {canDelete && (
-                                <Button
-                                  variant="ghost"
-                                  size="sm"
-                                  onClick={() => {
-                                    if (confirm("Esta seguro de eliminar este empleado? Se desactivara su acceso al sistema.")) {
-                                      deleteMutation.mutate(employee);
-                                    }
-                                  }}
-                                >
-                                  <Trash2 className="h-4 w-4" />
-                                </Button>
-                              )}
-                            </div>
-                          </TableCell>
+                          {(canEdit || canDelete) && (
+                            <TableCell>
+                              <div className="flex gap-2">
+                                {canEdit && (
+                                  <Button
+                                    variant="ghost"
+                                    size="sm"
+                                    onClick={() => handleEdit(employee)}
+                                  >
+                                    <Edit className="h-4 w-4" />
+                                  </Button>
+                                )}
+                                {canDelete && (
+                                  <Button
+                                    variant="ghost"
+                                    size="sm"
+                                    onClick={() => {
+                                      if (confirm("Esta seguro de eliminar este empleado? Se desactivara su acceso al sistema.")) {
+                                        deleteMutation.mutate(employee);
+                                      }
+                                    }}
+                                  >
+                                    <Trash2 className="h-4 w-4" />
+                                  </Button>
+                                )}
+                              </div>
+                            </TableCell>
+                          )}
                         </TableRow>
                       ))}
                     </TableBody>
@@ -632,21 +653,22 @@ const Employees = () => {
                 )}
               </CardContent>
             </Card>
+            {canManageRoles && (
+              <div className="mt-4 md:mt-6">
+                <EmployeeRoleAssignment />
+              </div>
+            )}
           </TabsContent>
 
-          <TabsContent value="my-time">
-            <EmployeeSelfTimeTracking />
-          </TabsContent>
+          {showMyTime && (
+            <TabsContent value="my-time">
+              <EmployeeSelfTimeTracking />
+            </TabsContent>
+          )}
 
           {canViewAllTimeTracking && (
             <TabsContent value="all-times">
               <EmployeeTimeTracking />
-            </TabsContent>
-          )}
-
-          {canManageRoles && (
-            <TabsContent value="roles">
-              <EmployeeRoleAssignment />
             </TabsContent>
           )}
 

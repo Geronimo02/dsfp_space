@@ -4044,7 +4044,7 @@ export type Database = {
             foreignKeyName: "platform_payments_subscription_id_fkey"
             columns: ["subscription_id"]
             isOneToOne: false
-            referencedRelation: "company_subscriptions"
+            referencedRelation: "subscriptions"
             referencedColumns: ["id"]
           },
         ]
@@ -7544,3 +7544,4 @@ export const Constants = {
     },
   },
 } as const
+
