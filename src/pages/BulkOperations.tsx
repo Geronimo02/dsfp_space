@@ -525,6 +525,17 @@ export default function BulkOperations() {
                 <CardDescription>Envía emails personalizados a múltiples clientes</CardDescription>
               </CardHeader>
               <CardContent className="space-y-4">
+                <div className="bg-yellow-50 border border-yellow-200 rounded-lg p-4">
+                  <div className="flex items-start gap-3">
+                    <AlertCircle className="h-5 w-5 text-yellow-600 mt-0.5 flex-shrink-0" />
+                    <div className="text-sm">
+                      <p className="font-medium text-yellow-900">Activación requerida</p>
+                      <p className="text-yellow-800 mt-1">
+                        Para utilizar el envío masivo de emails, dirígete a <span className="font-semibold">Funcionalidades Adicionales → Operaciones → Envío Masivo de Emails</span> y solicita la activación. Nos pondremos en contacto para completar el proceso.
+                      </p>
+                    </div>
+                  </div>
+                </div>
                 <div className="grid gap-4 md:grid-cols-2">
                   <div>
                     <Label>Filtrar Destinatarios</Label>

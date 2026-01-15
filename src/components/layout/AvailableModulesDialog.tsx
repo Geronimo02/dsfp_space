@@ -95,6 +95,7 @@ const MODULE_ICONS: Record<string, any> = {
   access_logs: Activity,
   monthly_closing: Lock,
   bulk_operations: Zap,
+  bulk_email: Mail,
   notifications: Bell,
   integrations: Plug,
   accounts_receivable: Receipt,

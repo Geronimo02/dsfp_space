@@ -95,7 +95,8 @@ INSERT INTO platform_modules (code, name, description, price_monthly, price_annu
     ('audit_logs', 'Auditoría', 'Registro de auditoría de acciones', 2500, 25500, FALSE, 74),
     ('access_logs', 'Logs de Acceso', 'Registro de accesos al sistema', 2000, 20400, FALSE, 75),
     ('bulk_operations', 'Operaciones Masivas', 'Operaciones en lote', 3000, 30600, FALSE, 76),
-    ('afip_pos_points', 'Puntos de Venta AFIP', 'Gestión de puntos de venta AFIP', 8000, 81600, FALSE, 77),
+    ('bulk_email', 'Envío de Correos Masivos', 'Envío masivo de emails a clientes', 10000, 102000, FALSE, 77),
+    ('afip_pos_points', 'Puntos de Venta AFIP', 'Gestión de puntos de venta AFIP', 8000, 81600, FALSE, 78),
     ('notifications', 'Notificaciones', 'Sistema de notificaciones personalizadas', 2000, 20400, FALSE, 78),
     ('settings', 'Configuración', 'Configuración avanzada del sistema', 0, 0, TRUE, 79)
 ON CONFLICT (code) DO NOTHING;
