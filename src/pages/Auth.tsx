@@ -113,8 +113,8 @@ export default function Auth() {
           <div className="absolute -bottom-48 -left-48 w-96 h-96 bg-primary/5 rounded-full blur-3xl" style={{animation: 'breathing 10s infinite 2s'}}></div>
         </div>
 
-        <Card className="w-full max-w-md shadow-2xl border-primary/20 relative z-10">
-        <CardHeader className="space-y-6 text-center pb-8">
+        <Card className="w-full max-w-md shadow-2xl border-primary/20 relative z-10 bg-card/95 backdrop-blur-sm">
+        <CardHeader className="space-y-6 text-center pb-8 border-b border-border/50">
           {/* Logo with elegant animation */}
           <div className="mx-auto relative">
             <div className="w-20 h-20 rounded-2xl bg-gradient-to-br from-primary/20 to-primary/5 border border-primary/30 flex items-center justify-center relative overflow-hidden group" style={{animation: 'softGlow 4s infinite ease-in-out'}}>
@@ -145,8 +145,8 @@ export default function Auth() {
             }
           `}</style>
         </CardHeader>
-        <CardContent>
-          <form onSubmit={handleLogin} className="space-y-4">
+        <CardContent className="pt-8">
+          <form onSubmit={handleLogin} className="space-y-5">
             <div className="space-y-2">
               <Label htmlFor="login-email">Email</Label>
               <Input
@@ -169,10 +169,10 @@ export default function Auth() {
                 required
               />
             </div>
-            <Button type="submit" className="w-full" disabled={isLoading}>
+            <Button type="submit" className="w-full mt-2 h-11" disabled={isLoading}>
               {isLoading ? "Iniciando sesión..." : "Iniciar Sesión"}
             </Button>
-            <div className="flex items-center justify-between mt-2">
+            <div className="flex items-center justify-between mt-4 pt-2 border-t border-border/50">
               <Button
                 type="button"
                 variant="link"

@@ -166,7 +166,7 @@ export default function SignupWizard() {
         <SignupStepper currentStep={currentStep} />
 
         {/* Content */}
-        <Card className="p-6 md:p-8 mt-8">
+        <Card className="p-6 md:p-8 mt-8 bg-card/95 backdrop-blur-sm border-primary/20 shadow-2xl">
           {currentStep === 0 && (
             <Step1Account formData={formData} updateFormData={updateFormData} nextStep={nextStep} />
           )}
@@ -204,7 +204,7 @@ export default function SignupWizard() {
         </Card>
 
         {/* Footer */}
-        <p className="text-center text-sm text-muted-foreground mt-6">
+        <p className="text-center text-sm text-slate-300/80 mt-6">
           ¿Ya tienes una cuenta?{" "}
           <a href="/auth" className="text-primary hover:underline font-medium">
             Inicia sesión
