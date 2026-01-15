@@ -124,46 +124,43 @@ export default function SignupWizard() {
   };
 
   return (
-    <div className="min-h-screen bg-gradient-to-br from-background via-background to-muted/20 p-4 md:p-8">
-      <div className="max-w-5xl mx-auto">
+    <div className="min-h-screen bg-gradient-to-br from-slate-900 via-slate-800 to-slate-900 p-4 md:p-8 relative overflow-hidden">
+      {/* Subtle background effects */}
+      <div className="fixed inset-0 overflow-hidden pointer-events-none">
+        <div className="absolute top-1/4 right-0 w-96 h-96 bg-primary/10 rounded-full blur-3xl" style={{animation: 'breathing 8s infinite'}}></div>
+        <div className="absolute bottom-0 left-0 w-96 h-96 bg-primary/5 rounded-full blur-3xl" style={{animation: 'breathing 10s infinite 2s'}}></div>
+      </div>
+
+      <div className="max-w-5xl mx-auto relative z-10">
         {/* Header */}
-        <div className="text-center mb-8 relative overflow-hidden group p-6 rounded-2xl" style={{animation: 'gradientShift 8s infinite ease-in-out'}}>
-          {/* Background with gradient animation */}
-          <div className="absolute inset-0 bg-gradient-to-br from-slate-900 via-slate-800 to-slate-900 -z-10"></div>
-          
-          {/* Blur effects with breathing animation */}
-          <div className="absolute inset-0 opacity-50 pointer-events-none">
-            <div className="absolute top-0 right-0 w-40 h-40 bg-primary/15 rounded-full blur-3xl opacity-0 group-hover:opacity-100 transition-opacity duration-700"></div>
-            <div className="absolute bottom-0 left-0 w-36 h-36 bg-primary/10 rounded-full blur-3xl" style={{animation: 'breathing 6s infinite'}}></div>
-          </div>
-
-          <div className="relative z-10">
-            <div className="flex items-center justify-center gap-3 mb-4">
-              {/* Logo container with soft glow */}
-              <div className="p-2 rounded-xl bg-gradient-to-br from-slate-800 to-slate-900 border border-primary/40 shadow-xl shadow-primary/20 backdrop-blur-sm" style={{animation: 'softGlow 4s infinite ease-in-out'}}>
-                <img src="/landing/images/logo_transparente_hd.png" alt="Ventify Space" className="w-8 h-8 drop-shadow-lg" />
-              </div>
-              <h1 className="text-3xl font-bold text-white">Ventify</h1>
+        <div className="text-center mb-8 p-6">
+          <div className="flex items-center justify-center gap-4 mb-4">
+            {/* Logo with elegant animation */}
+            <div className="w-16 h-16 rounded-2xl bg-gradient-to-br from-primary/20 to-primary/5 border border-primary/30 flex items-center justify-center relative overflow-hidden group" style={{animation: 'softGlow 4s infinite ease-in-out'}}>
+              {/* Animated background shine */}
+              <div className="absolute inset-0 bg-gradient-to-tr from-transparent via-primary/10 to-transparent opacity-0 group-hover:opacity-100 transition-opacity duration-500" style={{animation: 'shine 3s infinite'}}></div>
+              <img src="/landing/images/logo_transparente_hd.png" alt="Ventify Space" className="w-10 h-10 relative z-10 drop-shadow-lg" />
             </div>
-            <h2 className="text-xl text-primary/80 font-medium">Crea tu cuenta empresarial</h2>
+            <h1 className="text-4xl font-bold text-white">Ventify</h1>
           </div>
-
-          {/* Custom animations */}
-          <style>{`
-            @keyframes breathing {
-              0%, 100% { opacity: 0.4; transform: scale(1); }
-              50% { opacity: 0.6; transform: scale(1.05); }
-            }
-            @keyframes softGlow {
-              0%, 100% { box-shadow: 0 0 20px rgba(var(--primary-rgb, 59, 130, 246), 0.15); }
-              50% { box-shadow: 0 0 32px rgba(var(--primary-rgb, 59, 130, 246), 0.25); }
-            }
-            @keyframes gradientShift {
-              0%, 100% { background: linear-gradient(135deg, rgb(15, 23, 42), rgb(30, 41, 59), rgb(15, 23, 42)); }
-              50% { background: linear-gradient(135deg, rgb(20, 28, 47), rgb(35, 46, 64), rgb(20, 28, 47)); }
-            }
-          `}</style>
+          <h2 className="text-xl text-primary/90 font-medium">Crea tu cuenta empresarial</h2>
         </div>
+
+        {/* Custom animations */}
+        <style>{`
+          @keyframes breathing {
+            0%, 100% { opacity: 0.3; transform: scale(1); }
+            50% { opacity: 0.5; transform: scale(1.1); }
+          }
+          @keyframes softGlow {
+            0%, 100% { box-shadow: 0 0 20px rgba(59, 130, 246, 0.2), 0 0 40px rgba(59, 130, 246, 0.1); }
+            50% { box-shadow: 0 0 30px rgba(59, 130, 246, 0.3), 0 0 60px rgba(59, 130, 246, 0.15); }
+          }
+          @keyframes shine {
+            0% { transform: translateX(-100%) translateY(-100%) rotate(45deg); }
+            100% { transform: translateX(100%) translateY(100%) rotate(45deg); }
+          }
+        `}</style>
 
         {/* Stepper */}
         <SignupStepper currentStep={currentStep} />

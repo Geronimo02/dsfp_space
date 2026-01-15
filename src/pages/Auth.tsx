@@ -106,43 +106,42 @@ export default function Auth() {
 
   return (
     <>
-      <div className="flex min-h-screen items-center justify-center bg-background p-4">
-        <Card className="w-full max-w-md shadow-medium">
-        <CardHeader className="space-y-4 text-center relative overflow-hidden group" style={{animation: 'gradientShift 8s infinite ease-in-out'}}>
-          {/* Background with gradient animation */}
-          <div className="absolute inset-0 bg-gradient-to-br from-slate-900 via-slate-800 to-slate-900 -z-10"></div>
-          
-          {/* Blur effects with breathing animation */}
-          <div className="absolute inset-0 opacity-50 pointer-events-none">
-            <div className="absolute top-0 right-0 w-32 h-32 bg-primary/15 rounded-full blur-3xl opacity-0 group-hover:opacity-100 transition-opacity duration-700"></div>
-            <div className="absolute bottom-0 left-0 w-28 h-28 bg-primary/10 rounded-full blur-3xl" style={{animation: 'breathing 6s infinite'}}></div>
-          </div>
+      <div className="flex min-h-screen items-center justify-center bg-gradient-to-br from-slate-900 via-slate-800 to-slate-900 p-4">
+        {/* Subtle background effects */}
+        <div className="fixed inset-0 overflow-hidden pointer-events-none">
+          <div className="absolute top-1/4 -right-48 w-96 h-96 bg-primary/10 rounded-full blur-3xl" style={{animation: 'breathing 8s infinite'}}></div>
+          <div className="absolute -bottom-48 -left-48 w-96 h-96 bg-primary/5 rounded-full blur-3xl" style={{animation: 'breathing 10s infinite 2s'}}></div>
+        </div>
 
-          {/* Logo container with soft glow and animation */}
-          <div className="mx-auto relative z-10">
-            <div className="w-16 h-16 rounded-2xl bg-gradient-to-br from-slate-800 to-slate-900 border border-primary/40 shadow-xl shadow-primary/20 backdrop-blur-sm flex items-center justify-center" style={{animation: 'softGlow 4s infinite ease-in-out'}}>
-              <img src="/landing/images/logo_transparente_hd.png" alt="Ventify Space" className="w-10 h-10 drop-shadow-lg" />
+        <Card className="w-full max-w-md shadow-2xl border-primary/20 relative z-10">
+        <CardHeader className="space-y-6 text-center pb-8">
+          {/* Logo with elegant animation */}
+          <div className="mx-auto relative">
+            <div className="w-20 h-20 rounded-2xl bg-gradient-to-br from-primary/20 to-primary/5 border border-primary/30 flex items-center justify-center relative overflow-hidden group" style={{animation: 'softGlow 4s infinite ease-in-out'}}>
+              {/* Animated background shine */}
+              <div className="absolute inset-0 bg-gradient-to-tr from-transparent via-primary/10 to-transparent opacity-0 group-hover:opacity-100 transition-opacity duration-500" style={{animation: 'shine 3s infinite'}}></div>
+              <img src="/landing/images/logo_transparente_hd.png" alt="Ventify Space" className="w-12 h-12 relative z-10 drop-shadow-lg" />
             </div>
           </div>
           
-          <div className="relative z-10">
-            <CardTitle className="text-2xl font-bold text-white">Ventify.Space</CardTitle>
-            <CardDescription className="text-primary/80 font-medium">Sistema de Punto de Venta</CardDescription>
+          <div>
+            <CardTitle className="text-2xl font-bold bg-gradient-to-r from-foreground to-foreground/70 bg-clip-text">Ventify.Space</CardTitle>
+            <CardDescription className="text-base mt-2">Sistema de Punto de Venta</CardDescription>
           </div>
 
           {/* Custom animations */}
           <style>{`
             @keyframes breathing {
-              0%, 100% { opacity: 0.4; transform: scale(1); }
-              50% { opacity: 0.6; transform: scale(1.05); }
+              0%, 100% { opacity: 0.3; transform: scale(1); }
+              50% { opacity: 0.5; transform: scale(1.1); }
             }
             @keyframes softGlow {
-              0%, 100% { box-shadow: 0 0 20px rgba(var(--primary-rgb, 59, 130, 246), 0.15); }
-              50% { box-shadow: 0 0 32px rgba(var(--primary-rgb, 59, 130, 246), 0.25); }
+              0%, 100% { box-shadow: 0 0 20px rgba(59, 130, 246, 0.2), 0 0 40px rgba(59, 130, 246, 0.1); }
+              50% { box-shadow: 0 0 30px rgba(59, 130, 246, 0.3), 0 0 60px rgba(59, 130, 246, 0.15); }
             }
-            @keyframes gradientShift {
-              0%, 100% { background: linear-gradient(135deg, rgb(15, 23, 42), rgb(30, 41, 59), rgb(15, 23, 42)); }
-              50% { background: linear-gradient(135deg, rgb(20, 28, 47), rgb(35, 46, 64), rgb(20, 28, 47)); }
+            @keyframes shine {
+              0% { transform: translateX(-100%) translateY(-100%) rotate(45deg); }
+              100% { transform: translateX(100%) translateY(100%) rotate(45deg); }
             }
           `}</style>
         </CardHeader>
@@ -194,10 +193,10 @@ export default function Auth() {
           </form>
         </CardContent>
       </Card>
-    </div>
+      </div>
 
-    {/* Forgot Password Dialog */}
-    <AlertDialog open={showForgotPassword} onOpenChange={setShowForgotPassword}>
+      {/* Forgot Password Dialog */}
+      <AlertDialog open={showForgotPassword} onOpenChange={setShowForgotPassword}>
       <AlertDialogContent>
         <AlertDialogHeader>
           <AlertDialogTitle>Recuperar Contraseña</AlertDialogTitle>
