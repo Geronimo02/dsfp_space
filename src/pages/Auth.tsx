@@ -140,18 +140,15 @@ export default function Auth() {
         `}</style>
         <CardHeader className="pb-6 md:pb-8 flex flex-col md:flex-row md:items-center md:justify-between gap-6 text-left">
           {/* Logo with elegant animation */}
-          <div className="relative">
-            <div className="w-20 h-20 rounded-2xl bg-gradient-to-br from-primary/20 to-primary/5 border border-primary/30 flex items-center justify-center relative overflow-hidden group" style={{animation: 'softGlow 4s infinite ease-in-out'}}>
-              {/* Animated background shine */}
-              <div className="absolute inset-0 bg-gradient-to-tr from-transparent via-primary/10 to-transparent opacity-0 group-hover:opacity-100 transition-opacity duration-500" style={{animation: 'shine 3s infinite'}}></div>
-              <img src="/landing/images/logo_transparente_hd.png" alt="Ventify Space" className="w-12 h-12 relative z-10 drop-shadow-lg" />
+          <div className="relative flex items-center justify-center">
+            <div className="w-24 h-24 rounded-full bg-gradient-to-br from-primary/10 via-transparent to-cyan-500/10 border border-primary/30 flex items-center justify-center overflow-visible" style={{animation: 'softGlow 4s infinite ease-in-out'}}>
+              <div className="absolute inset-0 rounded-full ring-1 ring-cyan-300/30" style={{animation: 'pulse 10s infinite ease-in-out'}}></div>
+              <div className="absolute inset-2 rounded-full border border-white/10"></div>
+              <div className="absolute inset-0 bg-gradient-to-tr from-transparent via-primary/12 to-transparent opacity-80" style={{animation: 'shine 3s infinite'}}></div>
+              <img src="/landing/images/logo_transparente_hd.png" alt="Ventify Space" className="w-12 h-12 relative z-10 drop-shadow-[0_8px_18px_rgba(59,130,246,0.45)]" />
             </div>
           </div>
 
-          <div className="flex-1">
-            <CardTitle className="text-3xl font-bold bg-gradient-to-r from-cyan-100 via-white to-blue-200 text-transparent bg-clip-text drop-shadow-[0_2px_12px_rgba(59,130,246,0.35)]">Bienvenido a Ventify.Space</CardTitle>
-            <CardDescription className="text-base mt-2 text-slate-200/90">Sistema de Punto de Venta — accede con tus credenciales</CardDescription>
-          </div>
 
           {/* Custom animations */}
           <style>{`
