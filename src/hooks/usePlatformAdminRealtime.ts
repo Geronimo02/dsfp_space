@@ -32,7 +32,6 @@ export function usePlatformAdminRealtime({
           table: "platform_support_tickets",
         },
         (payload) => {
-          console.log("🎫 Admin - Ticket change:", payload);
 
           // Invalidate queries to refresh data
           queryClient.invalidateQueries({
@@ -67,7 +66,6 @@ export function usePlatformAdminRealtime({
           table: "platform_support_messages",
         },
         (payload) => {
-          console.log("💬 Admin - New message:", payload);
 
           const newMessage = payload.new as any;
 

@@ -21,7 +21,6 @@ export default function SignupWizard() {
   } = useSignupWizard();
 
   const handleCreateIntent = async () => {
-    console.log("[SignupWizard] Creating intent with:", formData);
 
     try {
       // Use the provider and payment method from formData
@@ -47,7 +46,6 @@ export default function SignupWizard() {
         throw error;
       }
 
-      console.log("[SignupWizard] Intent created:", data);
 
       if (!data?.intent_id) {
         throw new Error("No intent_id returned");
@@ -57,7 +55,6 @@ export default function SignupWizard() {
 
       // For test tokens (starting with "test_"), skip checkout and go directly to success
       if (paymentMethodRef?.startsWith("test_")) {
-        console.log("[SignupWizard] Test payment detected, skipping checkout");
         toast.success("¡Cuenta creada exitosamente!");
         setTimeout(() => {
           window.location.href = `/signup/success?intent_id=${data.intent_id}`;
@@ -85,25 +82,19 @@ export default function SignupWizard() {
         throw checkoutError;
       }
 
-      console.log("[SignupWizard] Checkout created:", checkoutData);
 
       // If payment was captured inline, navigate to success directly
       if (checkoutData?.is_paid_ready || (formData.payment_method_ref && formData.payment_provider)) {
-        console.log("[SignupWizard] Payment method ready, navigating to success");
         window.location.href = `/signup/success?intent_id=${data.intent_id}`;
         return;
       }
 
-      console.log("[SignupWizard] is_free_trial:", checkoutData?.is_free_trial);
-      console.log("[SignupWizard] checkout_url:", checkoutData?.checkout_url);
-      console.log("[SignupWizard] intent_id:", checkoutData?.intent_id);
 
       // Handle free trial (no external checkout needed)
       if (checkoutData?.is_free_trial || !checkoutData?.checkout_url) {
         // Save intent_id to localStorage if provided
         if (checkoutData?.intent_id) {
           localStorage.setItem("signup_intent_id", checkoutData.intent_id);
-          console.log("[SignupWizard] Saved intent_id to localStorage:", checkoutData.intent_id);
         }
         toast.success("¡Prueba gratuita activada!");
         setTimeout(() => {

@@ -17,7 +17,6 @@ export const useActiveModules = () => {
         return [...BASE_MODULES]; // Retornar base modules si no hay empresa
       }
 
-      console.log('[useActiveModules] Fetching active modules for company:', currentCompany.id);
 
       const { data, error } = await supabase
         .from('company_modules')
@@ -39,7 +38,6 @@ export const useActiveModules = () => {
       // Combinar con módulos base (siempre activos)
       const allActiveModules = [...new Set([...BASE_MODULES, ...companyModules])];
       
-      console.log('[useActiveModules] Active modules loaded:', allActiveModules);
       return allActiveModules;
     },
     enabled: !!currentCompany?.id,
@@ -52,7 +50,6 @@ export const useActiveModules = () => {
   useEffect(() => {
     if (!currentCompany?.id) return;
 
-    console.log('[useActiveModules] Setting up realtime subscription for company_modules:', currentCompany.id);
 
     const channel = supabase
       .channel(`company_modules_realtime_${currentCompany.id}`)
@@ -65,16 +62,13 @@ export const useActiveModules = () => {
           filter: `company_id=eq.${currentCompany.id}`,
         },
         (payload) => {
-          console.log('[useActiveModules] Realtime change detected:', payload);
           queryClient.invalidateQueries({ queryKey: ['activeModules', currentCompany.id] });
         }
       )
       .subscribe((status) => {
-        console.log('[useActiveModules] Realtime subscription status:', status);
       });
 
     return () => {
-      console.log('[useActiveModules] Cleaning up realtime subscription');
       supabase.removeChannel(channel);
     };
   }, [currentCompany?.id, queryClient]);

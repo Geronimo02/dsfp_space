@@ -39,7 +39,6 @@ export default function CompanySetup() {
       const { data: { user } } = await supabase.auth.getUser();
       if (!user) throw new Error("Usuario no autenticado");
 
-      console.log("Creating company with data:", { companyName, taxId, phone, address });
 
       // Use the security definer function to create company with admin
       // La función retorna UUID directamente
@@ -61,7 +60,6 @@ export default function CompanySetup() {
         throw new Error("No se recibió el ID de la empresa");
       }
 
-      console.log("Company created successfully with ID:", companyId);
       toast.success("Empresa creada exitosamente");
       
       // Esperar un momento para que se actualice la BD

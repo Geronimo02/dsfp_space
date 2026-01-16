@@ -23,11 +23,9 @@ export default function SignupSuccess() {
   useEffect(() => {
     // Try to get password from localStorage
     const savedData = localStorage.getItem("signup_wizard_data");
-    console.log("[SignupSuccess] Loading saved data:", savedData);
     if (savedData) {
       try {
         const data = JSON.parse(savedData);
-        console.log("[SignupSuccess] Parsed data:", { email: data.email, hasPassword: !!data.password });
         setPassword(data.password);
         setPasswordLoaded(true);
       } catch (e) {
@@ -48,7 +46,6 @@ export default function SignupSuccess() {
 
     // Don't start checking until password is loaded
     if (!passwordLoaded) {
-      console.log("[SignupSuccess] Waiting for password to load...");
       return;
     }
 
@@ -61,7 +58,6 @@ export default function SignupSuccess() {
 
         if (error) throw error;
 
-        console.log("[SignupSuccess] Intent status:", data.status);
 
         if (data.status === "paid_ready") {
           setStatus("paid_ready");
@@ -76,7 +72,6 @@ export default function SignupSuccess() {
               body: { intent_id: intentId, stripe_session_id: stripeSessionId },
             });
             if (readyErr) throw readyErr;
-            console.log("[SignupSuccess] Marked intent ready:", readyData);
             // Re-check status to proceed to finalize
             setStatus("checking");
             setAttempts((prev) => prev + 1);
@@ -116,7 +111,6 @@ export default function SignupSuccess() {
     }
 
     try {
-      console.log("[SignupSuccess] Finalizing signup with intent_id:", intentId);
 
       const { data, error } = await supabase.functions.invoke("finalize-signup", {
         body: {
@@ -127,7 +121,6 @@ export default function SignupSuccess() {
 
       if (error) throw error;
 
-      console.log("[SignupSuccess] Signup finalized:", data);
 
       // Clear localStorage
       localStorage.removeItem("signup_wizard_data");
@@ -150,7 +143,6 @@ export default function SignupSuccess() {
             .limit(1);
           
           if (companies && companies.length > 0) {
-            console.log("[SignupSuccess] Company verified, reloading...");
           } else {
             console.warn("[SignupSuccess] Company not found yet, but reloading anyway...");
           }

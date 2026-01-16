@@ -63,8 +63,6 @@ export function MercadoPagoCardFields({ onSuccess, isLoading }: MercadoPagoCardF
                   onSubmit: async (formData: any) => {
                     setSaving(true);
                     try {
-                      console.log("[MP] formData received:", formData);
-                      console.log("[MP] All form data keys:", Object.keys(formData));
                       
                       // Try to extract card data from formData
                       // MP Bricks may include: cardNumber, cardholderName, cardExpirationMonth, cardExpirationYear, securityCode
@@ -76,12 +74,6 @@ export function MercadoPagoCardFields({ onSuccess, isLoading }: MercadoPagoCardF
                         securityCode: formData.securityCode || formData.security_code || "",
                       };
                       
-                      console.log("[MP] Extracted card data:", {
-                        hasCardNumber: !!cardData.cardNumber,
-                        hasCardholderName: !!cardData.cardholderName,
-                        hasExpiration: !!cardData.cardExpirationMonth,
-                        hasSecurityCode: !!cardData.securityCode,
-                      });
                       
                       // If we have card data, tokenize it
                       if (cardData.cardNumber && cardData.cardholderName && cardData.cardExpirationMonth && cardData.securityCode) {
@@ -92,7 +84,6 @@ export function MercadoPagoCardFields({ onSuccess, isLoading }: MercadoPagoCardF
                         if (tokenResp.error) throw tokenResp.error;
                         
                         const token = tokenResp.data?.token_id || tokenResp.data?.id;
-                        console.log("[MP] Token created:", token);
                         
                         // Extract metadata from card data
                         const last4 = cardData.cardNumber.replace(/\s/g, '').slice(-4);
@@ -101,13 +92,11 @@ export function MercadoPagoCardFields({ onSuccess, isLoading }: MercadoPagoCardF
                         const exp_year = parseInt(cardData.cardExpirationYear, 10);
                         
                         const metadata = { brand, last4, exp_month, exp_year };
-                        console.log("[MP] Card metadata:", metadata);
                         
                         toast.success("Tarjeta procesada exitosamente");
                         onSuccess(token, metadata);
                       } else {
                         // Fallback: generate test token
-                        console.log("[MP] No card data in formData, using test token");
                         const testToken = `mp_token_${Date.now()}`;
                         const testMetadata = { brand: "test", last4: "0000", exp_month: 12, exp_year: 2030 };
                         toast.success("Tarjeta guardada exitosamente");
@@ -146,7 +135,6 @@ export function MercadoPagoCardFields({ onSuccess, isLoading }: MercadoPagoCardF
         try {
           cardPaymentRef.current.unmount();
         } catch (e) {
-          console.log("[MP] Unmount error (ok):", e);
         }
       }
     };

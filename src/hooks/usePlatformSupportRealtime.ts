@@ -33,7 +33,6 @@ export function usePlatformSupportRealtime({
           filter: `company_id=eq.${companyId}`,
         },
         (payload) => {
-          console.log("Ticket change:", payload);
           
           // Invalidate queries to refresh data
           queryClient.invalidateQueries({ 
@@ -73,7 +72,6 @@ export function usePlatformSupportRealtime({
             filter: `ticket_id=eq.${ticketId}`,
           },
           async (payload) => {
-            console.log("New message:", payload);
             
             // Invalidate messages query
             queryClient.invalidateQueries({ 

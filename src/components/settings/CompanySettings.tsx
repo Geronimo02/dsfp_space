@@ -144,8 +144,6 @@ export function CompanySettings() {
   useEffect(() => {
     if (currentCompany) {
       const company = currentCompany as any;
-      console.log('Cargando configuración de la empresa:', company);
-      console.log('card_surcharge_rate actual:', company.card_surcharge_rate);
       setFormData({
         name: company.name || "",
         tax_id: company.tax_id || "",
@@ -382,7 +380,6 @@ export function CompanySettings() {
     mutationFn: async (data: typeof formData & { logo_url?: string }) => {
       if (!currentCompany) throw new Error("No hay empresa seleccionada");
 
-      console.log('Guardando configuración:', data);
 
       const result = companySchema.safeParse(data);
       if (!result.success) {
@@ -434,7 +431,6 @@ export function CompanySettings() {
         afip_enabled: data.afip_enabled || false,
       } as any;
 
-      console.log('Datos a actualizar:', updateData);
 
       const { error } = await supabase
         .from('companies')
@@ -1136,7 +1132,6 @@ export function CompanySettings() {
                 value={formData.card_surcharge_rate ?? 0}
                 onChange={(e) => {
                   const value = e.target.value === '' ? 0 : parseFloat(e.target.value);
-                  console.log('Nuevo valor de recargo:', value);
                   setFormData({ ...formData, card_surcharge_rate: value });
                 }}
               />

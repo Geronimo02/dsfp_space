@@ -273,7 +273,6 @@ export const useToggleCompanyModule = () => {
         data = result.data;
         error = result.error;
         
-        console.log('Module update result:', { companyId, moduleId, active, data, error });
       } else {
         // Insert new record
         const result = await supabase
@@ -292,19 +291,12 @@ export const useToggleCompanyModule = () => {
         data = result.data;
         error = result.error;
         
-        console.log('Module insert result:', { companyId, moduleId, active, data, error });
       }
 
       if (error) throw error;
       return data;
     },
     onSuccess: (data, variables) => {
-      console.log('[useToggleCompanyModule] Success! Module toggled:', {
-        companyId: variables.companyId,
-        moduleId: variables.moduleId,
-        newActiveState: variables.active,
-        result: data
-      });
       // Invalidar todos los queries relacionados con refetchType immediate
       queryClient.invalidateQueries({ 
         queryKey: ['companyModules', variables.companyId],

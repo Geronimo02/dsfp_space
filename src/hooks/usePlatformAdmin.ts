@@ -7,7 +7,6 @@ export const usePlatformAdmin = () => {
     queryKey: ["platform-admin-status"],
     queryFn: async () => {
       const { data: { user } } = await supabase.auth.getUser();
-      console.log("[usePlatformAdmin] user:", user);
       if (!user) return false;
 
       const { data, error } = await supabase
@@ -21,13 +20,11 @@ export const usePlatformAdmin = () => {
         console.error("[usePlatformAdmin] Error checking platform admin:", error);
         return false;
       }
-      console.log("[usePlatformAdmin] platform_admins data:", data);
       return !!data;
     },
   });
 
   useEffect(() => {
-    console.log("[usePlatformAdmin] isPlatformAdmin:", isPlatformAdmin, "isLoading:", isLoading);
   }, [isPlatformAdmin, isLoading]);
 
   return {

@@ -65,14 +65,6 @@ export default function Products() {
 
   // Verificar que el usuario tenga acceso a la empresa actual
   useEffect(() => {
-    console.log('Permissions check:', { 
-      permissionsLoading, 
-      currentCompany: currentCompany?.id,
-      canCreate,
-      canEdit,
-      canDelete,
-      canExport 
-    });
     
     if (!permissionsLoading && currentCompany && !hasPermission('products', 'view')) {
       toast.error("No tienes acceso a los productos de esta empresa");
@@ -98,7 +90,6 @@ export default function Products() {
   // Reset form when dialog opens for new product
   useEffect(() => {
     if (isDialogOpen && !editingProduct) {
-      console.log('Dialog opened for new product, resetting form');
       resetForm();
     }
   }, [isDialogOpen, editingProduct]);
@@ -292,7 +283,6 @@ export default function Products() {
     
     const originalSize = formatFileSize(file.size);
     const compressedSize = formatFileSize(compressedBlob.size);
-    console.log(`Imagen comprimida: ${originalSize} → ${compressedSize}`);
     
     // Generate unique filename
     const fileExt = 'webp';
@@ -519,7 +509,6 @@ export default function Products() {
   });
 
   const resetForm = () => {
-    console.log('Resetting form');
     setFormData({
       name: "",
       barcode: "",
@@ -543,10 +532,6 @@ export default function Products() {
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
     
-    console.log('=== SUBMIT INICIADO ===');
-    console.log('formData:', formData);
-    console.log('currentCompany:', currentCompany);
-    console.log('imageFile:', imageFile);
     
     try {
       if (!currentCompany?.id) {
@@ -573,7 +558,6 @@ export default function Products() {
         }
       }
 
-      console.log('Validando con Zod...');
       const validatedData = productSchema.parse({
         name: formData.name,
         price: parseFloat(formData.price),
@@ -588,7 +572,6 @@ export default function Products() {
         expiration_date: formData.expiration_date || undefined,
       });
       
-      console.log('Validación exitosa:', validatedData);
 
       const productData = {
         name: validatedData.name,
@@ -610,7 +593,6 @@ export default function Products() {
         company_id: currentCompany.id,
       };
 
-      console.log('Ejecutando mutación con:', productData);
       if (editingProduct) {
         updateProductMutation.mutate({ id: editingProduct.id, data: productData });
       } else {
@@ -2240,12 +2222,10 @@ export default function Products() {
                       placeholder="Ej: 10 para subir 10%"
                       value={adjustmentPercentage}
                       onChange={(e) => {
-                        console.log('Porcentaje input change:', e.target.value);
                         setAdjustmentPercentage(e.target.value);
                       }}
                       onInput={(e) => {
                         const target = e.target as HTMLInputElement;
-                        console.log('Porcentaje input:', target.value);
                       }}
                       className="flex-1"
                       autoComplete="off"
