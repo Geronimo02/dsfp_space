@@ -778,7 +778,11 @@ export function Sidebar() {
           
           <div className="flex items-center gap-4 relative z-10">
             <div className="p-3 rounded-lg bg-gradient-to-br from-slate-800 to-slate-900 border border-primary/40 shadow-lg shadow-primary/20 backdrop-blur-sm transition-all duration-1000" style={{animation: 'softGlow 4s infinite ease-in-out'}}>
-              <img src="/landing/images/logo_transparente_hd.png" alt="Ventify Space" className="w-10 h-10 drop-shadow-lg" />
+              <img 
+                src={currentCompany?.logo_url || "/landing/images/logo_transparente_hd.png"} 
+                alt={currentCompany?.name || "Ventify Space"} 
+                className="w-10 h-10 drop-shadow-lg object-contain" 
+              />
             </div>
             <div className="flex-1 min-w-0">
               <span className="text-base font-bold text-white block truncate">{currentCompany?.name || 'Tienda.Space'}</span>

@@ -14,7 +14,7 @@ interface LayoutProps {
 }
 
 export function Layout({ children }: LayoutProps) {
-  const { currentCompanyRole } = useCompany();
+  const { currentCompanyRole, currentCompany } = useCompany();
   const isMobile = useIsMobile();
 
   const roleInfo = useMemo(() => {
