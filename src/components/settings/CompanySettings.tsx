@@ -122,6 +122,7 @@ export function CompanySettings() {
     loyalty_bronze_discount: 0,
     loyalty_silver_discount: 5,
     loyalty_gold_discount: 10,
+    logo_url: null as string | null,
     // Campos fiscales AFIP
     razon_social: "",
     nombre_fantasia: "",
@@ -170,6 +171,7 @@ export function CompanySettings() {
         loyalty_bronze_discount: Number(company.loyalty_bronze_discount) || 0,
         loyalty_silver_discount: Number(company.loyalty_silver_discount) || 5,
         loyalty_gold_discount: Number(company.loyalty_gold_discount) || 10,
+        logo_url: company.logo_url || null,
         // Campos fiscales AFIP
         razon_social: company.razon_social || "",
         nombre_fantasia: company.nombre_fantasia || "",
@@ -487,11 +489,10 @@ export function CompanySettings() {
     }
   };
 
-  const handleRemoveLogo = async () => {
+  const handleRemoveLogo = () => {
     setLogoPreview(null);
     setLogoFile(null);
-    setUploading(true);
-    updateCompanyMutation.mutate({ ...formData, logo_url: null });
+    setFormData({ ...formData, logo_url: null });
   };
 
   if (!currentCompany) {
