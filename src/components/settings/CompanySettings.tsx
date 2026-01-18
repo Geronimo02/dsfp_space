@@ -55,6 +55,7 @@ export function CompanySettings() {
   const [uploading, setUploading] = useState(false);
   const [logoFile, setLogoFile] = useState<File | null>(null);
   const [logoPreview, setLogoPreview] = useState<string | null>(null);
+  const [logoRemoved, setLogoRemoved] = useState(false);
   const [testingConnection, setTestingConnection] = useState(false);
   const [editingCurrency, setEditingCurrency] = useState<string | null>(null);
   const [editingRate, setEditingRate] = useState<string>("");
@@ -416,7 +417,7 @@ export function CompanySettings() {
         loyalty_bronze_discount: data.loyalty_bronze_discount,
         loyalty_silver_discount: data.loyalty_silver_discount,
         loyalty_gold_discount: data.loyalty_gold_discount,
-        logo_url: data.logo_url || currentCompany.logo_url,
+        logo_url: data.logo_url !== undefined ? data.logo_url : currentCompany.logo_url,
         // Campos fiscales
         razon_social: data.razon_social || null,
         nombre_fantasia: data.nombre_fantasia || null,
@@ -472,6 +473,7 @@ export function CompanySettings() {
       
       setLogoFile(null);
       setLogoPreview(null);
+      setLogoRemoved(false);
     },
     onError: (error: any) => {
       toast.error(error.message || "Error al actualizar");
@@ -486,12 +488,16 @@ export function CompanySettings() {
       uploadLogoMutation.mutate(logoFile);
     } else {
       updateCompanyMutation.mutate(formData);
+      if (logoRemoved) {
+        setLogoRemoved(false);
+      }
     }
   };
 
   const handleRemoveLogo = () => {
     setLogoPreview(null);
     setLogoFile(null);
+    setLogoRemoved(true);
     setFormData({ ...formData, logo_url: null });
   };
 
