@@ -487,6 +487,13 @@ export function CompanySettings() {
     }
   };
 
+  const handleRemoveLogo = async () => {
+    setLogoPreview(null);
+    setLogoFile(null);
+    setUploading(true);
+    updateCompanyMutation.mutate({ ...formData, logo_url: null });
+  };
+
   if (!currentCompany) {
     return (
       <Card>
@@ -528,10 +535,7 @@ export function CompanySettings() {
                     variant="ghost"
                     size="icon"
                     className="absolute -top-2 -right-2 h-6 w-6 rounded-full"
-                    onClick={() => {
-                      setLogoPreview(null);
-                      setLogoFile(null);
-                    }}
+                    onClick={handleRemoveLogo}
                   >
                     <X className="h-4 w-4" />
                   </Button>
