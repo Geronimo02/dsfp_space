@@ -7335,6 +7335,8 @@ export type Database = {
         }[]
       }
       is_company_admin: { Args: { company_uuid: string }; Returns: boolean }
+      is_company_admin_only: { Args: never; Returns: boolean }
+      is_company_admin_or_manager: { Args: never; Returns: boolean }
       is_platform_admin: { Args: { _user_id: string }; Returns: boolean }
       is_platform_admin_secure: { Args: never; Returns: boolean }
       save_company_oauth_app: {
