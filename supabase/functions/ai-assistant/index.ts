@@ -67,7 +67,7 @@ serve(async (req) => {
       throw new Error('LOVABLE_API_KEY no configurada');
     }
 
-    // Fetch comprehensive company data
+    // Fetch company data - SECURITY: Only aggregate metrics, no PII
     const [
       salesResult,
       productsResult,
@@ -87,14 +87,15 @@ serve(async (req) => {
         .from('products')
         .select('id, name, price, cost, stock, min_stock, category, active')
         .eq('company_id', companyId),
+      // SECURITY: Only fetch aggregate-friendly fields, no emails or personal identifiers
       supabaseClient
         .from('customers')
-        .select('id, name, total_purchases, current_balance, created_at, loyalty_tier')
+        .select('id, total_purchases, current_balance, created_at, loyalty_tier')
         .eq('company_id', companyId)
         .limit(100),
       supabaseClient
         .from('expenses')
-        .select('amount, category_id, expense_date, description')
+        .select('amount, category_id, expense_date')
         .eq('company_id', companyId)
         .gte('expense_date', new Date(Date.now() - 90 * 24 * 60 * 60 * 1000).toISOString().split('T')[0]),
       supabaseClient
@@ -107,9 +108,10 @@ serve(async (req) => {
         .select('total, purchase_date, supplier_id, status')
         .eq('company_id', companyId)
         .gte('purchase_date', new Date(Date.now() - 90 * 24 * 60 * 60 * 1000).toISOString().split('T')[0]),
+      // SECURITY: Only fetch aggregate-friendly fields, no names or contact info
       supabaseClient
         .from('suppliers')
-        .select('id, name, balance')
+        .select('id, balance')
         .eq('company_id', companyId)
         .eq('active', true)
     ]);
@@ -141,11 +143,17 @@ serve(async (req) => {
     });
 
     const enrichedProducts = products.map(p => ({
-      ...p,
+      id: p.id, // Keep ID for internal reference only
+      name: p.name, // Product names are not PII
+      category: p.category,
+      price: p.price,
+      stock: p.stock,
+      min_stock: p.min_stock,
       velocity_30d: productVelocity[p.id] || 0,
       days_of_stock: productVelocity[p.id] ? Math.round((p.stock || 0) / (productVelocity[p.id] / 30)) : 999,
       needs_reorder: (p.stock || 0) <= (p.min_stock || 5),
       revenue_30d: (productVelocity[p.id] || 0) * (p.price || 0),
+      active: p.active,
     }));
 
     const lowStockProducts = enrichedProducts.filter(p => p.needs_reorder && p.active);
@@ -155,7 +163,7 @@ serve(async (req) => {
       .sort((a, b) => b.revenue_30d - a.revenue_30d)
       .slice(0, 10);
 
-    // Customer analysis
+    // Customer analysis - SECURITY: Use anonymized identifiers, no names/emails
     const customerMetrics: Record<string, { purchases: number; total: number; lastPurchase: string }> = {};
     sales.forEach(s => {
       if (!s.customer_id) return;
@@ -169,17 +177,22 @@ serve(async (req) => {
       }
     });
 
-    const enrichedCustomers = customers.map(c => ({
-      ...c,
-      ...customerMetrics[c.id],
+    // SECURITY: Anonymize customer data - use index instead of real identifiers
+    const enrichedCustomers = customers.map((c, index) => ({
+      anonymizedId: `CLIENTE_${index + 1}`,
+      tier: c.loyalty_tier || 'standard',
+      totalPurchases: c.total_purchases || 0,
+      balance: c.current_balance || 0,
+      purchaseCount: customerMetrics[c.id]?.purchases || 0,
+      totalSpent: customerMetrics[c.id]?.total || 0,
       daysSinceLastPurchase: customerMetrics[c.id]?.lastPurchase 
         ? Math.floor((Date.now() - new Date(customerMetrics[c.id].lastPurchase).getTime()) / (1000 * 60 * 60 * 24))
         : 999,
-    })).sort((a, b) => (b.total || 0) - (a.total || 0));
+    })).sort((a, b) => b.totalSpent - a.totalSpent);
 
     const topCustomers = enrichedCustomers.slice(0, 10);
-    const inactiveCustomers = enrichedCustomers.filter(c => c.daysSinceLastPurchase > 30 && (c.total || 0) > 0);
-    const customersWithDebt = enrichedCustomers.filter(c => (c.current_balance || 0) > 0);
+    const inactiveCustomers = enrichedCustomers.filter(c => c.daysSinceLastPurchase > 30 && c.totalSpent > 0);
+    const customersWithDebt = enrichedCustomers.filter(c => c.balance > 0);
 
     // Financial analysis
     const totalExpenses30d = expenses.reduce((sum, e) => sum + (e.amount || 0), 0);
@@ -206,9 +219,9 @@ serve(async (req) => {
       avg: totals.length > 0 ? totals.reduce((a, b) => a + b, 0) / totals.length : 0,
     }));
 
-    // Build comprehensive context
+    // Build comprehensive context - SECURITY: No PII, only aggregates and anonymized data
     const businessContext = `
-=== DATOS DEL NEGOCIO EN TIEMPO REAL ===
+=== MÉTRICAS DEL NEGOCIO (DATOS AGREGADOS) ===
 
 📊 RESUMEN DE VENTAS (últimos 30 días):
 - Total ventas: $${totalSales30d.toLocaleString('es-AR', { minimumFractionDigits: 2 })}
@@ -226,13 +239,13 @@ ${avgByDayOfWeek.map(d => `- ${d.day}: $${d.avg.toLocaleString('es-AR', { minimu
 - Productos sin movimiento 30d (${deadStock.length}): ${deadStock.slice(0, 5).map(p => `${p.name} (${p.stock} unids)`).join(', ') || 'Ninguno'}
 - Top productos por ingresos: ${topProducts.slice(0, 5).map(p => `${p.name} ($${p.revenue_30d.toLocaleString('es-AR')})`).join(', ')}
 
-👥 CLIENTES:
+👥 MÉTRICAS DE CLIENTES (ANONIMIZADAS):
 - Total clientes registrados: ${customers.length}
-- Top clientes: ${topCustomers.slice(0, 5).map(c => `${c.name} ($${(c.total || 0).toLocaleString('es-AR')}, ${c.purchases || 0} compras)`).join(', ')}
+- Top clientes por valor: ${topCustomers.slice(0, 5).map(c => `${c.anonymizedId} ($${c.totalSpent.toLocaleString('es-AR')}, ${c.purchaseCount} compras, tier: ${c.tier})`).join(', ')}
 - Clientes inactivos (>30 días): ${inactiveCustomers.length}
-- Clientes con deuda: ${customersWithDebt.length} (Total: $${totalReceivables.toLocaleString('es-AR')})
+- Clientes con saldo pendiente: ${customersWithDebt.length} (Total: $${totalReceivables.toLocaleString('es-AR')})
 
-💰 FINANZAS:
+💰 RESUMEN FINANCIERO:
 - Ingresos (30d): $${totalSales30d.toLocaleString('es-AR')}
 - Compras (30d): $${totalPurchases30d.toLocaleString('es-AR')}
 - Gastos operativos (90d): $${totalExpenses30d.toLocaleString('es-AR')}
