@@ -4044,7 +4044,7 @@ export type Database = {
             foreignKeyName: "platform_payments_subscription_id_fkey"
             columns: ["subscription_id"]
             isOneToOne: false
-            referencedRelation: "subscriptions"
+            referencedRelation: "company_subscriptions"
             referencedColumns: ["id"]
           },
         ]
@@ -7143,7 +7143,13 @@ export type Database = {
           p_company_id: string
           p_invoice_volume?: number
         }
-        Returns: Json
+        Returns: {
+          base_price: number
+          breakdown: Json
+          modules_price: number
+          total_price: number
+          volume_price: number
+        }[]
       }
       check_expiring_checks: { Args: never; Returns: undefined }
       check_expiring_products: { Args: never; Returns: undefined }
@@ -7544,4 +7550,3 @@ export const Constants = {
     },
   },
 } as const
-
