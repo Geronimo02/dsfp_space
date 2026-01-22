@@ -129,23 +129,32 @@ Deno.serve(async (req: Request) => {
 
     const providerCustomerId = intent.provider === "stripe" ? intent.stripe_customer_id : null;
 
+    // Ensure required fields have valid values
+    const subscriptionProvider = intent.provider || "stripe";
+    const subscriptionAmountUsd = intent.amount_usd ?? 0; // Default to 0 for trial
+
+    console.log("[finalize-signup] Creating subscription with provider:", subscriptionProvider, "amount_usd:", subscriptionAmountUsd);
+
     const { error: subErr } = await supabaseAdmin.from("subscriptions").insert({
       company_id: companyId,
       plan_id: finalPlanId,
-      provider: intent.provider,
+      provider: subscriptionProvider,
       provider_customer_id: providerCustomerId,
       provider_subscription_id: providerSubscriptionId,
       status: "trialing",
       trial_ends_at: trialEndsAt,
       current_period_end: trialEndsAt,
-      amount_usd: intent.amount_usd,
+      amount_usd: subscriptionAmountUsd,
       amount_ars: intent.amount_ars ?? null,
       fx_rate_usd_ars: intent.fx_rate_usd_ars ?? null,
       fx_rate_at: intent.fx_rate_at ?? null,
       modules: intent.modules ?? [],
     });
 
-    if (subErr) return json({ error: String(subErr.message ?? subErr) }, 500);
+    if (subErr) {
+      console.error("[finalize-signup] Error creating subscription:", subErr);
+      return json({ error: String(subErr.message ?? subErr) }, 500);
+    }
 
     // 6️⃣ Guardar método de pago de signup (si existe) como método de la empresa
     console.log("[finalize-signup] Step 6: Looking for payment method for email:", intent.email);
