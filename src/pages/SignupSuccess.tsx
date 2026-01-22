@@ -1,4 +1,4 @@
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { useNavigate, useSearchParams } from "react-router-dom";
 import { supabase } from "@/integrations/supabase/client";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
@@ -19,6 +19,24 @@ export default function SignupSuccess() {
   const [attempts, setAttempts] = useState(0);
   const [password, setPassword] = useState("");
   const [passwordLoaded, setPasswordLoaded] = useState(false);
+  const finalizeInFlightRef = useRef(false);
+
+  const formatInvokeError = (err: unknown) => {
+    const e: any = err;
+    // Supabase Functions errors often include a JSON body in e.context
+    const body = e?.context?.body;
+    if (body) {
+      try {
+        const parsed = typeof body === "string" ? JSON.parse(body) : body;
+        if (parsed?.error) return String(parsed.error);
+        return typeof parsed === "string" ? parsed : JSON.stringify(parsed);
+      } catch {
+        return typeof body === "string" ? body : JSON.stringify(body);
+      }
+    }
+
+    return String(e?.message ?? err);
+  };
 
   useEffect(() => {
     // Try to get password from localStorage
@@ -63,10 +81,12 @@ export default function SignupSuccess() {
 
         console.log("[SignupSuccess] Intent status:", data.status);
 
-        if (data.status === "paid_ready") {
+         if (data.status === "paid_ready") {
           setStatus("paid_ready");
-          // Automatically finalize signup
-          await finalizeSignup();
+           // Automatically finalize signup (guard against double calls)
+           if (!finalizeInFlightRef.current) {
+             await finalizeSignup();
+           }
         } else if (data.status === "checkout_created") {
           setStatus("checkout_created");
           // Confirm intent ready (after returning from checkout)
@@ -115,6 +135,9 @@ export default function SignupSuccess() {
       return;
     }
 
+    if (finalizeInFlightRef.current) return;
+    finalizeInFlightRef.current = true;
+
     try {
       console.log("[SignupSuccess] Finalizing signup with intent_id:", intentId);
 
@@ -162,8 +185,9 @@ export default function SignupSuccess() {
       window.location.href = "/";
     } catch (error) {
       console.error("[SignupSuccess] Error finalizing:", error);
-      toast.error(`Error al finalizar registro: ${error}`);
+      toast.error(`Error al finalizar registro: ${formatInvokeError(error)}`);
       setStatus("error");
+      finalizeInFlightRef.current = false;
     }
   };
 
