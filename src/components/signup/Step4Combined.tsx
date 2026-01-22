@@ -1,17 +1,13 @@
 import { useState, useEffect } from "react";
 import { Button } from "@/components/ui/button";
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
-import { Label } from "@/components/ui/label";
+import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
-import { CreditCard, ArrowRight, ArrowLeft, AlertCircle, Loader2, CheckCircle2, XCircle } from "lucide-react";
+import { CreditCard, ArrowLeft, AlertCircle, Loader2, CheckCircle2, XCircle } from "lucide-react";
 import { SignupFormData } from "@/hooks/useSignupWizard";
-import { loadStripe } from "@stripe/stripe-js";
-import { Elements } from "@stripe/react-stripe-js";
 import { supabase } from "@/integrations/supabase/client";
 import { toast } from "sonner";
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
 import { Separator } from "@/components/ui/separator";
-import { StripeCardFields } from "./StripeCardFields";
 import { MercadoPagoCardFields } from "./MercadoPagoCardFields";
 
 interface Step4CombinedProps {
@@ -41,10 +37,6 @@ type ProcessingStage = "idle" | "payment_method" | "finalizing" | "success" | "e
 
 export function Step4Combined({ formData, updateFormData, onSuccess, prevStep }: Step4CombinedProps) {
   const [billingCountry, setBillingCountry] = useState<string>(formData.billing_country || "AR");
-  const [stripePromise] = useState(() => {
-    const key = import.meta.env.VITE_STRIPE_PUBLIC_KEY;
-    return key ? loadStripe(key) : null;
-  });
   const [planPrice, setPlanPrice] = useState<number | null>(null);
   const [loadingPlan, setLoadingPlan] = useState(true);
   const [processingStage, setProcessingStage] = useState<ProcessingStage>("idle");
@@ -81,9 +73,8 @@ export function Step4Combined({ formData, updateFormData, onSuccess, prevStep }:
     fetchPlan();
   }, [formData.plan_id]);
 
-  const isArgentina = billingCountry === "AR";
-  const provider = isArgentina ? "mercadopago" : "stripe";
-  const planAmountARS = planPrice ? Math.round(planPrice * 1000) : 0;
+  const provider = "mercadopago";
+  const planAmountMP = planPrice ? Math.round(planPrice * 1000) : 0;
   const totalModulesCost = formData.modules.length * MODULE_PRICE;
   const baseCost = planPrice || 0;
   const totalCost = baseCost + totalModulesCost;
@@ -388,28 +379,14 @@ export function Step4Combined({ formData, updateFormData, onSuccess, prevStep }:
                   <Loader2 className="w-5 h-5 animate-spin mx-auto mb-2" />
                   Cargando...
                 </div>
-              ) : isArgentina ? (
+              ) : (
                 <MercadoPagoCardFields
                   onSuccess={handlePaymentMethodSaved}
                   isLoading={processingStage !== "idle"}
                   email={formData.email}
                   planId={formData.plan_id || ""}
-                  planAmount={planAmountARS}
+                  planAmount={planAmountMP}
                 />
-              ) : !stripePromise ? (
-                <Alert variant="destructive">
-                  <AlertCircle className="h-4 w-4" />
-                  <AlertTitle>Stripe no configurado</AlertTitle>
-                </Alert>
-              ) : (
-                <Elements stripe={stripePromise}>
-                  <StripeCardFields
-                    onSuccess={handlePaymentMethodSaved}
-                    isLoading={processingStage !== "idle"}
-                    email={formData.email}
-                    planId={formData.plan_id || ""}
-                  />
-                </Elements>
               )}
             </CardContent>
           </Card>

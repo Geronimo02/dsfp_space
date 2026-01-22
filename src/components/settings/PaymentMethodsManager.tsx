@@ -1,11 +1,7 @@
-import { useMemo, useState } from "react";
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
+import { Card, CardContent } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
-import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog";
 import { Badge } from "@/components/ui/badge";
 import { CreditCard, Plus, Trash2, CheckCircle2, AlertCircle } from "lucide-react";
-import { loadStripe } from "@stripe/stripe-js";
-import { Elements, PaymentElement, useElements, useStripe } from "@stripe/react-stripe-js";
 import { supabase } from "@/integrations/supabase/client";
 import { toast } from "sonner";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
@@ -24,67 +20,6 @@ interface PaymentMethod {
   mp_preapproval_id?: string;
 }
 
-interface StripePaymentFormProps {
-  clientSecret: string;
-  onSuccess: () => void;
-  companyId: string;
-}
-
-function StripePaymentForm({ 
-  clientSecret, 
-  onSuccess,
-  companyId,
-}: StripePaymentFormProps) {
-  const stripe = useStripe();
-  const elements = useElements();
-  const [saving, setSaving] = useState(false);
-
-  const handleSubmit = async (e: React.FormEvent) => {
-    e.preventDefault();
-    if (!stripe || !elements) return;
-    
-    setSaving(true);
-    try {
-      const { setupIntent, error } = await stripe.confirmSetup({
-        elements,
-        confirmParams: {
-          return_url: window.location.href,
-        },
-        redirect: "if_required",
-      });
-
-      if (error) throw error;
-
-      const pmId = (setupIntent?.payment_method as string) || "";
-      
-      const { error: saveErr } = await supabase.functions.invoke("save-stripe-payment-method", { 
-        body: { payment_method_id: pmId, company_id: companyId } 
-      });
-      
-      if (saveErr) throw saveErr;
-
-      toast.success("Tarjeta guardada exitosamente");
-      onSuccess();
-    } catch (e: any) {
-      console.error(e);
-      toast.error(e?.message ?? "Error al guardar la tarjeta");
-    } finally {
-      setSaving(false);
-    }
-  };
-
-  return (
-    <form onSubmit={handleSubmit} className="space-y-4">
-      <PaymentElement />
-      <div className="flex gap-2 justify-end">
-        <Button type="submit" disabled={saving || !stripe || !elements}>
-          {saving ? "Guardando..." : "Guardar tarjeta"}
-        </Button>
-      </div>
-    </form>
-  );
-}
-
 export function PaymentMethodsManager({ 
   companyId,
   showTitle = true,
@@ -95,12 +30,6 @@ export function PaymentMethodsManager({
   compact?: boolean;
 }) {
   const queryClient = useQueryClient();
-  const [stripePromise] = useState(() => {
-    const key = import.meta.env.VITE_STRIPE_PUBLIC_KEY;
-    return key ? loadStripe(key) : null;
-  });
-  const [clientSecret, setClientSecret] = useState<string | null>(null);
-  const [addDialogOpen, setAddDialogOpen] = useState(false);
 
   // Fetch payment methods
   const { data: paymentMethods, isLoading } = useQuery({
@@ -121,64 +50,17 @@ export function PaymentMethodsManager({
     },
   });
 
-  // Fetch subscription to decide provider
-  const { data: subscription, isLoading: subscriptionLoading } = useQuery({
-    queryKey: ["subscription", companyId],
-    enabled: !!companyId,
-    queryFn: async () => {
-      const { data, error } = await supabase
-        .from("subscriptions")
-        .select("*, subscription_plans (id, name, price, description)")
-        .eq("company_id", companyId!)
-        .maybeSingle();
-      if (error) throw error;
-      return data as { provider?: string; plan_id?: string; status?: string; subscription_plans?: { id: string; name: string; price: number; description: string } } | null;
-    },
-  });
-
-  const { data: defaultPaymentMethod } = useQuery({
-    queryKey: ["default-payment-method", companyId],
-    enabled: !!companyId && !subscriptionLoading && !subscription?.provider,
-    queryFn: async () => {
-      const { data, error } = await supabase
-        .from("company_payment_methods")
-        .select("billing_country, type")
-        .eq("company_id", companyId!)
-        .eq("is_default", true)
-        .maybeSingle();
-      if (error) throw error;
-      return data as { billing_country?: string | null; type?: string } | null;
-    },
-  });
-
-  const effectiveProvider = useMemo(() => {
-    const prov = subscription?.provider?.toLowerCase();
-    if (prov === "stripe" || prov === "mercadopago") return prov;
-    const country = (defaultPaymentMethod?.billing_country || "").toUpperCase();
-    return country === "AR" ? "mercadopago" : "stripe";
-  }, [subscription?.provider, defaultPaymentMethod?.billing_country]);
-
   const handleAddCard = async () => {
     try {
-      if (effectiveProvider === "mercadopago") {
-        const { data, error } = await supabase.functions.invoke("create-mp-preapproval", {
-          body: { company_id: companyId },
-        });
-        if (error) throw error;
-        if (data?.redirect_url) {
-          window.location.href = data.redirect_url;
-          return;
-        }
-        throw new Error("No se obtuvo URL de autorización");
-      }
-
-      const { data, error } = await supabase.functions.invoke("create-stripe-setup-intent", {
+      const { data, error } = await supabase.functions.invoke("create-mp-preapproval", {
         body: { company_id: companyId },
       });
       if (error) throw error;
-      if (!data?.client_secret) throw new Error("No se pudo crear el setup intent");
-      setClientSecret(data.client_secret);
-      setAddDialogOpen(true);
+      if (data?.redirect_url) {
+        window.location.href = data.redirect_url;
+        return;
+      }
+      throw new Error("No se obtuvo URL de autorización");
     } catch (e: any) {
       console.error(e);
       toast.error(e?.message ?? "Error al iniciar configuración de pago");
@@ -252,35 +134,10 @@ export function PaymentMethodsManager({
       {showTitle && (
         <div className="flex items-center justify-between">
           <h3 className="text-lg font-semibold">Tus tarjetas de pago</h3>
-          <Dialog open={addDialogOpen} onOpenChange={setAddDialogOpen}>
-            <DialogTrigger asChild>
-              <Button size="sm" variant="outline" onClick={handleAddCard}>
-                <Plus className="h-4 w-4 mr-2" />
-                Añadir tarjeta
-              </Button>
-            </DialogTrigger>
-            <DialogContent className="max-w-md">
-              <DialogHeader>
-                <DialogTitle>Añadir tarjeta de crédito o débito</DialogTitle>
-                <DialogDescription>
-                  Ingresa los datos de tu tarjeta de forma segura
-                </DialogDescription>
-              </DialogHeader>
-              {effectiveProvider === "stripe" && stripePromise && clientSecret && (
-                <Elements stripe={stripePromise} options={{ clientSecret }}>
-                  <StripePaymentForm
-                    clientSecret={clientSecret}
-                    companyId={companyId!}
-                    onSuccess={() => {
-                      setAddDialogOpen(false);
-                      setClientSecret(null);
-                      queryClient.invalidateQueries({ queryKey: ["payment-methods", companyId] });
-                    }}
-                  />
-                </Elements>
-              )}
-            </DialogContent>
-          </Dialog>
+          <Button size="sm" variant="outline" onClick={handleAddCard}>
+            <Plus className="h-4 w-4 mr-2" />
+            Añadir tarjeta
+          </Button>
         </div>
       )}
 
@@ -311,7 +168,9 @@ export function PaymentMethodsManager({
                     <div className="flex-1">
                       <div className="flex items-center gap-2 mb-1">
                         <p className="font-semibold">
-                          {method.brand?.charAt(0).toUpperCase() + method.brand?.slice(1).toLowerCase() ?? "Tarjeta"} •••• {method.last4 ?? "****"}
+                          {(method.brand
+                            ? method.brand.charAt(0).toUpperCase() + method.brand.slice(1).toLowerCase()
+                            : "Tarjeta")} •••• {method.last4 ?? "****"}
                         </p>
                         {method.is_default && (
                           <Badge variant="default" className="text-xs">

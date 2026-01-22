@@ -3,14 +3,10 @@ import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Label } from "@/components/ui/label";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
-import { CreditCard, ArrowRight, ArrowLeft, AlertCircle, Loader2 } from "lucide-react";
+import { CreditCard, ArrowLeft, Loader2 } from "lucide-react";
 import { SignupFormData } from "@/hooks/useSignupWizard";
-import { loadStripe } from "@stripe/stripe-js";
-import { Elements } from "@stripe/react-stripe-js";
 import { supabase } from "@/integrations/supabase/client";
 import { toast } from "sonner";
-import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
-import { StripeCardFields } from "./StripeCardFields";
 import { MercadoPagoCardFields } from "./MercadoPagoCardFields";
 
 interface Step4PaymentProps {
@@ -36,10 +32,6 @@ const COUNTRIES = [
 
 export function Step4Payment({ formData, updateFormData, nextStep, prevStep }: Step4PaymentProps) {
   const [billingCountry, setBillingCountry] = useState<string>(formData.billing_country || "AR");
-  const [stripePromise] = useState(() => {
-    const key = import.meta.env.VITE_STRIPE_PUBLIC_KEY;
-    return key ? loadStripe(key) : null;
-  });
   const [loading, setLoading] = useState(false);
   const [planPrice, setPlanPrice] = useState<number | null>(null);
   const [loadingPlan, setLoadingPlan] = useState(true);
@@ -74,9 +66,8 @@ export function Step4Payment({ formData, updateFormData, nextStep, prevStep }: S
     fetchPlan();
   }, [formData.plan_id]);
 
-  const isArgentina = billingCountry === "AR";
-  const provider = isArgentina ? "mercadopago" : "stripe";
-  const planAmountARS = planPrice ? Math.round(planPrice * 1000) : 0; // Convert USD to ARS
+  const provider = "mercadopago";
+  const planAmountMP = planPrice ? Math.round(planPrice * 1000) : 0;
 
   const handlePaymentSuccess = async (paymentMethodRef: string, metadata: { brand: string; last4: string; exp_month: number; exp_year: number; payment_method_id?: string; issuer_id?: number }) => {
     setLoading(true);
@@ -175,35 +166,14 @@ export function Step4Payment({ formData, updateFormData, nextStep, prevStep }: S
               <Loader2 className="w-5 h-5 animate-spin mx-auto mb-2" />
               Cargando información del plan...
             </div>
-          ) : isArgentina ? (
-            // Mercado Pago form - same layout as Stripe
+          ) : (
             <MercadoPagoCardFields
               onSuccess={handlePaymentSuccess}
               isLoading={loading}
               email={formData.email}
               planId={formData.plan_id || ""}
-              planAmount={planAmountARS}
+              planAmount={planAmountMP}
             />
-          ) : !stripePromise ? (
-            // Stripe not configured
-            <Alert variant="destructive">
-              <AlertCircle className="h-4 w-4" />
-              <AlertTitle>Stripe no configurado</AlertTitle>
-              <AlertDescription>
-                La variable de entorno <code className="text-sm font-mono">VITE_STRIPE_PUBLIC_KEY</code> no está configurada.
-                Contacta al administrador.
-              </AlertDescription>
-            </Alert>
-          ) : (
-            // Stripe form - same layout as Mercado Pago (no intermediate button)
-            <Elements stripe={stripePromise}>
-              <StripeCardFields
-                onSuccess={handlePaymentSuccess}
-                isLoading={loading}
-                email={formData.email}
-                planId={formData.plan_id || ""}
-              />
-            </Elements>
           )}
         </CardContent>
       </Card>

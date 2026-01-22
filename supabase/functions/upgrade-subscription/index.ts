@@ -51,7 +51,7 @@ Deno.serve(async (req: Request) => {
     let currentSub: any;
     const { data: sub, error: subError } = await supabaseAdmin
       .from("subscriptions")
-      .select("*, subscription_plans(price, name, stripe_price_id)")
+      .select("*, subscription_plans(price, name, description)")
       .eq("company_id", company_id)
       .maybeSingle();
     
@@ -82,7 +82,7 @@ Deno.serve(async (req: Request) => {
             status: "active",
             provider: null,
           })
-          .select("*, subscription_plans(price, name, stripe_price_id)")
+          .select("*, subscription_plans(price, name, description)")
           .single();
 
         if (insertErr) {
@@ -128,12 +128,13 @@ Deno.serve(async (req: Request) => {
     }
 
     let result: any = {};
+    let stripeSub: any = null;
 
     // CASO 1: Stripe subscription
     if (currentSub.provider === "stripe" && currentSub.provider_subscription_id) {
       try {
         // Obtener suscripción actual en Stripe
-        const stripeSub = await stripe.subscriptions.retrieve(currentSub.provider_subscription_id);
+        stripeSub = await stripe.subscriptions.retrieve(currentSub.provider_subscription_id);
 
         if (isUpgrade) {
           // Upgrade: cambiar precio inmediatamente con proration
@@ -143,15 +144,12 @@ Deno.serve(async (req: Request) => {
               items: [
                 {
                   id: stripeSub.items.data[0].id,
-                  price: newPlan.stripe_price_id || undefined,
-                  price_data: newPlan.stripe_price_id
-                    ? undefined
-                    : {
-                        currency: "usd",
-                        product_data: { name: newPlan.name },
-                        unit_amount: Math.round(newPrice * 100),
-                        recurring: { interval: "month" },
-                      },
+                  price_data: {
+                    currency: "usd",
+                    product_data: { name: newPlan.name },
+                    unit_amount: Math.round(newPrice * 100),
+                    recurring: { interval: "month" },
+                  },
                 }
               ],
               proration_behavior: "create_prorations",
@@ -168,15 +166,12 @@ Deno.serve(async (req: Request) => {
               items: [
                 {
                   id: stripeSub.items.data[0].id,
-                  price: newPlan.stripe_price_id || undefined,
-                  price_data: newPlan.stripe_price_id
-                    ? undefined
-                    : {
-                        currency: "usd",
-                        product_data: { name: newPlan.name },
-                        unit_amount: Math.round(newPrice * 100),
-                        recurring: { interval: "month" },
-                      },
+                  price_data: {
+                    currency: "usd",
+                    product_data: { name: newPlan.name },
+                    unit_amount: Math.round(newPrice * 100),
+                    recurring: { interval: "month" },
+                  },
                 }
               ],
               proration_behavior: "always_invoice", // Crear invoice con crédito

@@ -1,13 +1,11 @@
 // subscription.tsx
-import { useEffect, useMemo, useState } from "react";
-import { useQuery, useQueryClient } from "@tanstack/react-query";
+import { useMemo, useState } from "react";
+import { useQuery } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
 import { useCompany } from "@/contexts/CompanyContext";
 import { Card, CardHeader, CardTitle, CardContent, CardDescription } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { toast } from "sonner";
-import { loadStripe } from "@stripe/stripe-js";
-import { Elements, PaymentElement, useElements, useStripe } from "@stripe/react-stripe-js";
 
 function getSubscriptionStatusLabel(status?: string) {
   const map: Record<string, string> = {
@@ -20,66 +18,9 @@ function getSubscriptionStatusLabel(status?: string) {
   return status ? map[status] ?? status : "";
 }
 
-function StripePaymentSetup({
-  clientSecret,
-  onSaved,
-  companyId,
-  onInvalidate,
-}: {
-  clientSecret: string;
-  onSaved: () => void;
-  companyId: string;
-  onInvalidate: () => void;
-}) {
-  const stripe = useStripe();
-  const elements = useElements();
-  const [saving, setSaving] = useState(false);
-
-  const handleSubmit = async () => {
-    if (!stripe || !elements) return;
-    setSaving(true);
-    try {
-      const { setupIntent, error } = await stripe.confirmSetup({
-        elements,
-        confirmParams: {
-          return_url: window.location.href,
-        },
-        redirect: "if_required",
-      });
-      if (error) throw error;
-
-      const pmId = (setupIntent?.payment_method as string) || "";
-      const { error: saveErr } = await supabase.functions.invoke("save-stripe-payment-method", {
-        body: { payment_method_id: pmId, company_id: companyId },
-      });
-      if (saveErr) throw saveErr;
-
-      toast.success("Método guardado");
-      onInvalidate();
-      onSaved();
-    } catch (e: any) {
-      console.error(e);
-      toast.error("Error al guardar tarjeta: " + (e?.message ?? e));
-    } finally {
-      setSaving(false);
-    }
-  };
-
-  return (
-    <div className="space-y-4">
-      <PaymentElement />
-      <Button onClick={handleSubmit} disabled={saving || !stripe || !elements}>
-        {saving ? "Guardando..." : "Guardar tarjeta"}
-      </Button>
-    </div>
-  );
-}
-
 export default function Subscription() {
   const { currentCompany, loading: companyLoading } = useCompany();
-  const queryClient = useQueryClient();
-  const [stripePromise, setStripePromise] = useState<any>(null);
-  const [clientSecret, setClientSecret] = useState<string | null>(null);
+  const [addingPayment, setAddingPayment] = useState(false);
 
   const { data: subscription, isLoading: subscriptionLoading } = useQuery({
     queryKey: ["subscription", currentCompany?.id],
@@ -114,11 +55,6 @@ export default function Subscription() {
     });
   }, [subscription?.current_period_end]);
 
-  useEffect(() => {
-    const key = import.meta.env.VITE_STRIPE_PUBLIC_KEY;
-    if (key) setStripePromise(loadStripe(key));
-  }, []);
-
   const { data: defaultPaymentMethod } = useQuery({
     queryKey: ["default-payment-method", currentCompany?.id],
     enabled: !!currentCompany?.id,
@@ -136,22 +72,28 @@ export default function Subscription() {
     },
   });
 
-  const setupStripe = async () => {
+  const startMercadoPagoFlow = async () => {
+    setAddingPayment(true);
     try {
-      const { data, error } = await supabase.functions.invoke("create-stripe-setup-intent", {
+      const { data, error } = await supabase.functions.invoke("create-mp-preapproval", {
         body: { company_id: currentCompany!.id },
       });
       if (error) throw error;
-      if (!data?.client_secret) throw new Error("Sin client_secret");
-      setClientSecret(data.client_secret);
+      if (data?.redirect_url) {
+        window.location.href = data.redirect_url;
+        return;
+      }
+      throw new Error("No se obtuvo URL de autorización");
     } catch (e: any) {
       console.error(e);
-      toast.error("Error iniciando setup de Stripe: " + (e?.message ?? e));
+      toast.error(e?.message ?? "Error al iniciar configuración de pago");
+    } finally {
+      setAddingPayment(false);
     }
   };
 
   const addPaymentMethod = async () => {
-    await setupStripe();
+    await startMercadoPagoFlow();
   };
 
   return (
@@ -208,24 +150,10 @@ export default function Subscription() {
           </CardHeader>
           <CardContent className="space-y-4">
             <div className="space-y-2">
-              <Button variant="outline" onClick={addPaymentMethod}>
-                Agregar tarjeta
+              <Button variant="outline" onClick={addPaymentMethod} disabled={addingPayment}>
+                {addingPayment ? "Redirigiendo..." : "Agregar tarjeta"}
               </Button>
             </div>
-
-            {stripePromise && clientSecret && (
-              <Elements stripe={stripePromise} options={{ clientSecret }}>
-                <StripePaymentSetup
-                  clientSecret={clientSecret}
-                  companyId={currentCompany!.id}
-                  onInvalidate={() => {
-                    queryClient.invalidateQueries({ queryKey: ["default-payment-method", currentCompany?.id] });
-                    queryClient.invalidateQueries({ queryKey: ["subscription", currentCompany?.id] });
-                  }}
-                  onSaved={() => setClientSecret(null)}
-                />
-              </Elements>
-            )}
           </CardContent>
         </Card>
       </div>

@@ -8,8 +8,8 @@ export interface SignupFormData {
   plan_id: string;
   modules: string[];
   // Payment method (unified schema)
-  payment_provider?: "stripe" | "mercadopago";
-  payment_method_ref?: string; // PM ID for Stripe, token for MP
+  payment_provider?: "mercadopago";
+  payment_method_ref?: string; // Token o referencia de Mercado Pago
   billing_country?: string; // ISO code like 'AR'
   payment_method_last4?: string;
   payment_method_brand?: string;

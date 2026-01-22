@@ -71,11 +71,10 @@ export default function SignupSuccess() {
           await finalizeSignup();
         } else if (data.status === "checkout_created") {
           setStatus("checkout_created");
-          // Confirm intent ready (after returning from checkout)
-          const stripeSessionId = searchParams.get("session_id") || null;
+          // Confirm intent ready after regresar del proveedor de pago
           try {
             const { data: readyData, error: readyErr } = await supabase.functions.invoke("mark-intent-ready", {
-              body: { intent_id: intentId, stripe_session_id: stripeSessionId },
+              body: { intent_id: intentId },
             });
             if (readyErr) throw readyErr;
             console.log("[SignupSuccess] Marked intent ready:", readyData);
