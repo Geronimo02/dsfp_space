@@ -93,7 +93,7 @@ Deno.serve(async (req: Request) => {
     const email = intent?.email;
     console.log(`[finalize-signup] Step 1: Looking for payment method for email: ${email}, intent_id: ${intent_id}`);
     
-    // If intent exists, look up by email. If not, look by plan_id (which is the intent_id in Step4Combined flow)
+    // Look up payment method by email (prioritize intent email, or search latest unlinked)
     let queryBuilder = supabaseAdmin
       .from("signup_payment_methods")
       .select("*")
@@ -103,10 +103,8 @@ Deno.serve(async (req: Request) => {
 
     if (email) {
       queryBuilder = queryBuilder.eq("email", email);
-    } else {
-      // No email means this is Step4Combined flow - look by plan_id
-      queryBuilder = queryBuilder.eq("plan_id", intent_id);
     }
+    // If no email from intent, just get the latest unlinked payment method (Step4Combined flow)
 
     const { data: spm, error: spmErr } = await queryBuilder.maybeSingle();
 
@@ -134,9 +132,30 @@ Deno.serve(async (req: Request) => {
 
     // Verify plan_id exists
     if (!spm.plan_id) {
-      console.error("[finalize-signup] No plan_id in payment method:", spm);
+      console.error("[finalize-signup] No plan_id in payment method:", JSON.stringify(spm, null, 2));
       return json({ error: "No se encontró el plan seleccionado. Por favor, vuelve al paso anterior." }, 400);
     }
+
+    // Verify plan exists in database
+    const { data: planCheck, error: planCheckErr } = await supabaseAdmin
+      .from("subscription_plans")
+      .select("id, name, price")
+      .eq("id", spm.plan_id)
+      .maybeSingle();
+    
+    if (planCheckErr || !planCheck) {
+      console.error("[finalize-signup] Plan verification failed:", {
+        plan_id: spm.plan_id,
+        error: planCheckErr,
+        planFound: planCheck,
+      });
+      return json({ 
+        error: `Plan inválido (${spm.plan_id}). Por favor, vuelve al paso anterior.`,
+        debug: { plan_id: spm.plan_id, error: planCheckErr?.message }
+      }, 400);
+    }
+    
+    console.log("[finalize-signup] Plan verified:", planCheck.name, planCheck.price);
 
     let paymentId: string | null = null;
     let amountCharged = 0;
@@ -194,6 +213,12 @@ Deno.serve(async (req: Request) => {
         await stripe.customers.update(customerId, {
           invoice_settings: { default_payment_method: spm.payment_method_ref },
         });
+
+        // Declare trialEndsAt before using it
+        let trialEndsAt: string | null = null;
+        if (intent?.plan_id === FREE_PLAN_ID) {
+          trialEndsAt = new Date(Date.now() + FREE_TRIAL_DAYS * 24 * 60 * 60 * 1000).toISOString();
+        }
 
         // Create subscription immediately (no trial if plan is de pago)
         const subscription = await stripe.subscriptions.create({
@@ -381,9 +406,17 @@ Deno.serve(async (req: Request) => {
     // STEP 2: CREATE ACCOUNT (only after successful payment)
     // =================================================================
 
-    // Check payment status only if intent exists
+    // If intent exists but wasn't marked ready (MP flow), mark it now after successful charge
     if (intent && intent.status !== "paid_ready") {
-      return json({ error: "El pago/autorización aún no fue confirmado" }, 409);
+      const { error: updIntentStatus } = await supabaseAdmin
+        .from("signup_intents")
+        .update({ status: "paid_ready" })
+        .eq("id", intent_id);
+      if (updIntentStatus) {
+        console.error("[finalize-signup] Could not update intent to paid_ready:", updIntentStatus);
+      } else {
+        intent.status = "paid_ready";
+      }
     }
 
     // Use intent values if available, otherwise use spm values

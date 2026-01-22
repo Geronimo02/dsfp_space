@@ -85,6 +85,8 @@ export function Step4Combined({ formData, updateFormData, onSuccess, prevStep }:
     metadata: { brand: string; last4: string; exp_month: number; exp_year: number; payment_method_id?: string; issuer_id?: number }
   ) => {
     console.log("[Step4Combined] Payment method tokenized, saving...");
+    console.log("[Step4Combined] formData.plan_id:", formData.plan_id);
+    console.log("[Step4Combined] Full formData:", JSON.stringify(formData, null, 2));
     setProcessingStage("payment_method");
     setPaymentMethodRef(paymentRef);
 
@@ -108,6 +110,8 @@ export function Step4Combined({ formData, updateFormData, onSuccess, prevStep }:
         company_name: formData.company_name,
         modules: formData.modules,
       };
+      
+      console.log("[Step4Combined] Request body plan_id:", requestBody.plan_id);
 
       const { data, error } = await supabase.functions.invoke("signup-save-payment-method", {
         body: requestBody,
