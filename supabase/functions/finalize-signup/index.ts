@@ -14,28 +14,6 @@ const FREE_PLAN_ID = "460d1274-59bc-4c99-a815-c3c1d52d0803";
 const BASIC_PLAN_ID = "ea1d515e-5557-4b5c-a0b1-cd5ea9d13fc0";
 const FREE_TRIAL_DAYS = 7;
 
-async function findAuthUserIdByEmail(
-  supabaseAdmin: any,
-  email: string
-): Promise<string | null> {
-  const needle = String(email).trim().toLowerCase();
-  const perPage = 200;
-
-  // Search a few pages; projects usually have low user counts.
-  for (let page = 1; page <= 20; page++) {
-    const { data, error } = await supabaseAdmin.auth.admin.listUsers({ page, perPage });
-    if (error) throw error;
-
-    const found = (data?.users ?? []).find((u: any) => (u?.email ?? "").toLowerCase() === needle);
-    if (found?.id) return found.id;
-
-    // Stop when no more pages
-    if (!data?.nextPage || (data?.users?.length ?? 0) < perPage) break;
-  }
-
-  return null;
-}
-
 Deno.serve(async (req: Request) => {
   if (req.method === "OPTIONS") {
     return new Response("ok", { headers: corsHeaders });
@@ -52,8 +30,6 @@ Deno.serve(async (req: Request) => {
       Deno.env.get("SUPABASE_URL")!,
       Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!
     );
-
-    console.log("[finalize-signup] Start", { intent_id });
 
     const { data: intent, error: intentErr } = await supabaseAdmin
       .from("signup_intents")
@@ -84,7 +60,7 @@ Deno.serve(async (req: Request) => {
         : (intent.trial_ends_at ?? null);
 
     // 2️⃣ Crear usuario Auth (admin)
-    // Try to create user; if already exists, recover user id via pagination.
+    // Try to create user; if already exists, continue (idempotent)
     let userId: string | null = null;
     try {
       const { data: createdUser, error: userErr } = await supabaseAdmin.auth.admin.createUser({
@@ -98,21 +74,12 @@ Deno.serve(async (req: Request) => {
         // If user already exists, proceed without failing
         const msg = String(userErr.message ?? userErr);
         if (msg.toLowerCase().includes("already") || msg.toLowerCase().includes("registrado")) {
-          console.log("[finalize-signup] User already exists, searching by email...");
-          userId = await findAuthUserIdByEmail(supabaseAdmin, intent.email);
-
-          if (userId) {
-            // Ensure the password matches what the user just set in the wizard
-            const { error: updUserErr } = await supabaseAdmin.auth.admin.updateUserById(userId, {
-              password,
-              email_confirm: true,
-            });
-            if (updUserErr) {
-              console.warn("[finalize-signup] Could not update existing user password:", updUserErr);
-            }
-          }
+          // Try to find existing user via auth list (best-effort)
+          const { data: usersList } = await supabaseAdmin.auth.admin.listUsers();
+          const existing = usersList?.users?.find((u: any) => (u.email || "").toLowerCase() === String(intent.email).toLowerCase());
+          userId = existing?.id ?? null;
         } else {
-          return json({ error: msg, step: "create_user" }, 500);
+          return json({ error: msg }, 500);
         }
       } else {
         userId = createdUser?.user?.id ?? null;
@@ -120,79 +87,30 @@ Deno.serve(async (req: Request) => {
     } catch (e) {
       // Fallback: continue if intent has company already
       if (!userId) {
-        return json({ error: String(e), step: "create_user_exception" }, 500);
+        return json({ error: String(e) }, 500);
       }
     }
 
     if (!userId) {
-      return json(
-        {
-          error: "No se pudo obtener el usuario (ya existe pero no se pudo encontrar por email)",
-          step: "resolve_existing_user",
-        },
-        500
-      );
+      return json({ error: "No se pudo obtener el usuario creado" }, 500);
     }
 
-    // 3️⃣ Crear / recuperar empresa (idempotente)
-    let companyId: string | null = intent.company_id ?? null;
-    if (companyId) {
-      const { data: existingCompany, error: existingCompanyErr } = await supabaseAdmin
-        .from("companies")
-        .select("id")
-        .eq("id", companyId)
-        .maybeSingle();
+    // 3️⃣ Crear empresa
+    const { data: company, error: companyErr } = await supabaseAdmin
+      .from("companies")
+      .insert({
+        name: intent.company_name ?? intent.full_name ?? "Nueva empresa",
+        email: intent.email,
+        active: true,
+      })
+      .select("id")
+      .single();
 
-      if (existingCompanyErr || !existingCompany) {
-        console.warn("[finalize-signup] intent.company_id present but not found, will recreate", {
-          companyId,
-          existingCompanyErr,
-        });
-        companyId = null;
-      }
+    if (companyErr || !company) {
+      return json({ error: String(companyErr?.message ?? "No se pudo crear la empresa") }, 500);
     }
 
-    if (!companyId) {
-      const companyEmail = String(intent.email).trim().toLowerCase();
-      const { data: company, error: companyErr } = await supabaseAdmin
-        .from("companies")
-        .insert({
-          name: intent.company_name ?? intent.full_name ?? "Nueva empresa",
-          email: companyEmail,
-          active: true,
-        })
-        .select("id")
-        .single();
-
-      if (companyErr || !company) {
-        // If the insert fails (e.g. unique constraint), try to reuse existing company by email.
-        console.warn("[finalize-signup] Company insert failed, trying to reuse by email", companyErr);
-        const { data: byEmail, error: byEmailErr } = await supabaseAdmin
-          .from("companies")
-          .select("id")
-          .eq("email", companyEmail)
-          .order("created_at", { ascending: false })
-          .limit(1)
-          .maybeSingle();
-
-        if (byEmailErr || !byEmail) {
-          return json(
-            { error: String(companyErr?.message ?? "No se pudo crear la empresa"), step: "create_company" },
-            500
-          );
-        }
-        companyId = byEmail.id;
-      } else {
-        companyId = company.id;
-      }
-    }
-
-    // Persist company_id early for retries
-    try {
-      await supabaseAdmin.from("signup_intents").update({ company_id: companyId }).eq("id", intent_id);
-    } catch (e) {
-      console.warn("[finalize-signup] Could not persist company_id early:", e);
-    }
+    const companyId = company.id;
 
     // 4️⃣ Asociar usuario a empresa como ADMIN
     const { error: cuErr } = await supabaseAdmin.from("company_users").insert({
@@ -203,14 +121,7 @@ Deno.serve(async (req: Request) => {
       platform_admin: false,
     });
 
-    if (cuErr) {
-      const msg = String(cuErr.message ?? cuErr);
-      // Ignore duplicates on retries
-      if (!msg.toLowerCase().includes("duplicate")) {
-        return json({ error: msg, step: "link_company_user" }, 500);
-      }
-      console.log("[finalize-signup] company_users already exists, continuing...");
-    }
+    if (cuErr) return json({ error: String(cuErr.message ?? cuErr) }, 500);
 
     // 5️⃣ Crear suscripción (se guarda como plan final; si venía de Free, queda Basic trialing)
     const providerSubscriptionId =
@@ -222,25 +133,9 @@ Deno.serve(async (req: Request) => {
     const subscriptionProvider = intent.provider || "stripe";
     const subscriptionAmountUsd = intent.amount_usd ?? 0; // Default to 0 for trial
 
-    console.log("[finalize-signup] Upserting subscription", {
-      provider: subscriptionProvider,
-      amount_usd: subscriptionAmountUsd,
-      companyId,
-      finalPlanId,
-    });
+    console.log("[finalize-signup] Creating subscription with provider:", subscriptionProvider, "amount_usd:", subscriptionAmountUsd);
 
-    const { data: existingSub, error: existingSubErr } = await supabaseAdmin
-      .from("subscriptions")
-      .select("id")
-      .eq("company_id", companyId)
-      .maybeSingle();
-
-    if (existingSubErr) {
-      console.error("[finalize-signup] Error checking existing subscription:", existingSubErr);
-      return json({ error: String(existingSubErr.message ?? existingSubErr), step: "check_subscription" }, 500);
-    }
-
-    const subPayload = {
+    const { error: subErr } = await supabaseAdmin.from("subscriptions").insert({
       company_id: companyId,
       plan_id: finalPlanId,
       provider: subscriptionProvider,
@@ -254,23 +149,11 @@ Deno.serve(async (req: Request) => {
       fx_rate_usd_ars: intent.fx_rate_usd_ars ?? null,
       fx_rate_at: intent.fx_rate_at ?? null,
       modules: intent.modules ?? [],
-    };
+    });
 
-    if (existingSub?.id) {
-      const { error: updSubErr } = await supabaseAdmin
-        .from("subscriptions")
-        .update(subPayload)
-        .eq("id", existingSub.id);
-      if (updSubErr) {
-        console.error("[finalize-signup] Error updating subscription:", updSubErr);
-        return json({ error: String(updSubErr.message ?? updSubErr), step: "update_subscription" }, 500);
-      }
-    } else {
-      const { error: subErr } = await supabaseAdmin.from("subscriptions").insert(subPayload);
-      if (subErr) {
-        console.error("[finalize-signup] Error creating subscription:", subErr);
-        return json({ error: String(subErr.message ?? subErr), step: "create_subscription" }, 500);
-      }
+    if (subErr) {
+      console.error("[finalize-signup] Error creating subscription:", subErr);
+      return json({ error: String(subErr.message ?? subErr) }, 500);
     }
 
     // 6️⃣ Guardar método de pago de signup (si existe) como método de la empresa
@@ -422,11 +305,10 @@ Deno.serve(async (req: Request) => {
       })
       .eq("id", intent_id);
 
-    if (updErr) return json({ error: String(updErr.message ?? updErr), step: "finalize_intent" }, 500);
+    if (updErr) return json({ error: String(updErr.message ?? updErr) }, 500);
 
     return json({ ok: true, redirect_to: "/auth" }, 200);
   } catch (e) {
-    console.error("[finalize-signup] Unhandled error:", e);
-    return json({ error: String(e), step: "unhandled" }, 500);
+    return json({ error: String(e) }, 500);
   }
 });
