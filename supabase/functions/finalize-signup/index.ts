@@ -154,18 +154,10 @@ Deno.serve(async (req: Request) => {
 
     if (!companyId) {
       const companyEmail = String(intent.email).trim().toLowerCase();
-      const companyName = String(intent.company_name ?? intent.full_name ?? "Nueva empresa").trim();
-      
-      console.log("[finalize-signup] Creating company with:", { 
-        name: companyName, 
-        email: companyEmail 
-      });
-      
-      // Insert only minimal required fields to avoid JSON type issues
       const { data: company, error: companyErr } = await supabaseAdmin
         .from("companies")
         .insert({
-          name: companyName,
+          name: intent.company_name ?? intent.full_name ?? "Nueva empresa",
           email: companyEmail,
           active: true,
         })
@@ -173,13 +165,8 @@ Deno.serve(async (req: Request) => {
         .single();
 
       if (companyErr || !company) {
-        console.warn("[finalize-signup] Company insert failed:", {
-          code: companyErr?.code,
-          message: companyErr?.message,
-          details: companyErr?.details,
-        });
-        
-        // If the insert fails, try to reuse existing company by email
+        // If the insert fails (e.g. unique constraint), try to reuse existing company by email.
+        console.warn("[finalize-signup] Company insert failed, trying to reuse by email", companyErr);
         const { data: byEmail, error: byEmailErr } = await supabaseAdmin
           .from("companies")
           .select("id")
@@ -188,23 +175,15 @@ Deno.serve(async (req: Request) => {
           .limit(1)
           .maybeSingle();
 
-        console.log("[finalize-signup] Fallback search result:", { byEmail, byEmailErr });
-
         if (byEmailErr || !byEmail) {
           return json(
-            { 
-              error: String(companyErr?.message ?? "No se pudo crear la empresa"), 
-              step: "create_company",
-              details: companyErr?.details ?? null
-            },
+            { error: String(companyErr?.message ?? "No se pudo crear la empresa"), step: "create_company" },
             500
           );
         }
         companyId = byEmail.id;
-        console.log("[finalize-signup] Reusing existing company:", companyId);
       } else {
         companyId = company.id;
-        console.log("[finalize-signup] Created new company:", companyId);
       }
     }
 
