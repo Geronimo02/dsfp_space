@@ -52,7 +52,7 @@ verify_jwt = true
 verify_jwt = true
 
 [functions.reset-database]
-verify_jwt = true
+verify_jwt = false
 
 [functions.send-alert-email]
 verify_jwt = true

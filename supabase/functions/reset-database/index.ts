@@ -4,9 +4,9 @@ import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
 interface UserRole {
   role: string;
 }
-// Restrict CORS to production domains only - SECURITY: Do not add third-party origins
+// Restrict CORS to specific domains for security
 const ALLOWED_ORIGINS = [
-  "https://dsfp-space.lovable.app",
+  "https://5670e5fc-c3f6-4b61-9f11-214ae88eb9ef.lovableproject.com",
   "http://localhost:5173"
 ];
 
