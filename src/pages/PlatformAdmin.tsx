@@ -1654,17 +1654,7 @@ export default function PlatformAdmin() {
                             )}
                           </TableCell>
                           <TableCell>
-                            <div className="flex gap-2">
-                              <Button 
-                                variant="outline" 
-                                size="sm"
-                                onClick={() => {
-                                  window.open(`/app/guest/${company.id}`, '_blank');
-                                }}
-                              >
-                                <Users className="h-4 w-4 mr-1" />
-                                Ver como visitante
-                              </Button>
+                            <div className="flex gap-2 flex-wrap">
                               <Button 
                                 variant="outline" 
                                 size="sm"
