@@ -66,7 +66,7 @@ export default function PlatformAdmin() {
   
   // State for filters and dialogs
   const [companySearch, setCompanySearch] = useState("");
-  const [companyStatusFilter, setCompanyStatusFilter] = useState<string>("all");
+  const [companyStatusFilter, setCompanyStatusFilter] = useState<string>("active");
   const [notificationFilter, setNotificationFilter] = useState<string>("all");
   const [feedbackStatusFilter, setFeedbackStatusFilter] = useState<string>("all");
   const [paymentStatusFilter, setPaymentStatusFilter] = useState<string>("all");
