@@ -1659,6 +1659,16 @@ export default function PlatformAdmin() {
                                 variant="outline" 
                                 size="sm"
                                 onClick={() => {
+                                  window.open(`/app/guest/${company.id}`, '_blank');
+                                }}
+                              >
+                                <Users className="h-4 w-4 mr-1" />
+                                Ver como visitante
+                              </Button>
+                              <Button 
+                                variant="outline" 
+                                size="sm"
+                                onClick={() => {
                                   setSelectedCompanyForModules(company);
                                   setModulesDialogOpen(true);
                                 }}

@@ -20,8 +20,30 @@ export function MercadoPagoCardFields({ onSuccess, isLoading }: MercadoPagoCardF
   const [saving, setSaving] = useState(false);
   const [mpLoaded, setMpLoaded] = useState(false);
   const [mpError, setMpError] = useState<string | null>(null);
+  const [cardError, setCardError] = useState<string | null>(null);
   const cardPaymentRef = useRef<any>(null);
   const publicKeyRef = useRef(import.meta.env.VITE_MERCADOPAGO_PUBLIC_KEY);
+
+  // Function to translate error messages from Mercado Pago
+  const translateMercadoPagoError = (errorMsg: string): string => {
+    if (!errorMsg) return "No pudimos verificar los métodos de pago de esta tarjeta. Intentá nuevamente o usá otra tarjeta.";
+    
+    const errorMap: { [key: string]: string } = {
+      "get_card_bin_payment_methods_failed": "No pudimos verificar los métodos de pago de esta tarjeta. Intentá nuevamente o usá otra tarjeta.",
+      "invalid_card_number": "El número de tarjeta no es válido. Verificá e intentá nuevamente.",
+      "invalid_expiration_date": "La fecha de vencimiento no es válida.",
+      "invalid_security_code": "El código de seguridad no es válido.",
+      "card_not_supported": "Esta tarjeta no está soportada. Intentá con otra.",
+    };
+
+    for (const [key, value] of Object.entries(errorMap)) {
+      if (errorMsg.toLowerCase().includes(key.toLowerCase())) {
+        return value;
+      }
+    }
+
+    return "No pudimos verificar los métodos de pago de esta tarjeta. Intentá nuevamente o usá otra tarjeta.";
+  };
 
   useEffect(() => {
     if (!publicKeyRef.current) {
@@ -58,7 +80,8 @@ export function MercadoPagoCardFields({ onSuccess, isLoading }: MercadoPagoCardF
                   },
                   onError: (error: any) => {
                     console.error("[MP] Brick error:", error);
-                    setMpError(error?.message || "Error en Mercado Pago");
+                    const friendlyMessage = translateMercadoPagoError(error?.message);
+                    setCardError(friendlyMessage);
                   },
                   onSubmit: async (formData: any) => {
                     setSaving(true);
@@ -115,7 +138,8 @@ export function MercadoPagoCardFields({ onSuccess, isLoading }: MercadoPagoCardF
                       }
                     } catch (error: any) {
                       console.error("[MP] Token error:", error);
-                      toast.error(error?.message || "Error al procesar la tarjeta");
+                      const friendlyMessage = translateMercadoPagoError(error?.message);
+                      setCardError(friendlyMessage);
                       setSaving(false);
                     }
                   },
@@ -154,6 +178,7 @@ export function MercadoPagoCardFields({ onSuccess, isLoading }: MercadoPagoCardF
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
+    setCardError(null); // Limpiar errores previos
     if (!cardPaymentRef.current) return;
 
     try {
@@ -161,7 +186,8 @@ export function MercadoPagoCardFields({ onSuccess, isLoading }: MercadoPagoCardF
       await cardPaymentRef.current.submit();
     } catch (error: any) {
       console.error("[MP] Submit error:", error);
-      toast.error(error?.message || "Error al guardar la tarjeta");
+      const friendlyMessage = translateMercadoPagoError(error?.message);
+      setCardError(friendlyMessage);
       setSaving(false);
     }
   };
@@ -189,6 +215,14 @@ export function MercadoPagoCardFields({ onSuccess, isLoading }: MercadoPagoCardF
           </div>
         )}
       </div>
+
+      {/* Card Error Alert */}
+      {cardError && (
+        <Alert variant="destructive">
+          <AlertCircle className="h-4 w-4" />
+          <AlertDescription>{cardError}</AlertDescription>
+        </Alert>
+      )}
 
       <div className="flex gap-3 justify-end">
         <Button type="submit" disabled={saving || isLoading || !mpLoaded}>
