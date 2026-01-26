@@ -174,8 +174,8 @@ export default function PlatformAdmin() {
         .from("platform_payments")
         .select(`
           *,
-          companies (name),
-          subscriptions (status)
+          companies:company_id (name),
+          subscriptions:subscription_id (status)
         `)
         .order("payment_date", { ascending: false });
 
