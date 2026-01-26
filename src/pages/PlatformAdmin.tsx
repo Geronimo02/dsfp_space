@@ -435,16 +435,10 @@ export default function PlatformAdmin() {
       if (status === "resolved") updates.resolved_at = new Date().toISOString();
       if (status === "closed") updates.closed_at = new Date().toISOString();
 
-      const { error } = await (supabase as any)
+      const { data, error } = await (supabase as any)
         .from("platform_support_tickets")
         .update(updates)
-        .eq("id", ticketId);
-
-      if (error) throw error;
-      
-      // Fetch the updated ticket from DB to ensure we have all current data
-      const { data, error: fetchError } = await (supabase as any)
-        .from("platform_support_tickets")
+        .eq("id", ticketId)
         .select(`
           *,
           companies!platform_support_tickets_company_id_fkey (
@@ -454,10 +448,10 @@ export default function PlatformAdmin() {
             whatsapp_number
           )
         `)
-        .eq("id", ticketId)
         .single();
 
-      if (fetchError) throw fetchError;
+      if (error) throw error;
+      if (!data) throw new Error("No se pudo actualizar el ticket");
       return data;
     },
     onSuccess: (updatedTicket) => {

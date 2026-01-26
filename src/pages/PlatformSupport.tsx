@@ -132,21 +132,15 @@ export default function PlatformSupport() {
     mutationFn: async (newStatus: string) => {
       if (!selectedTicket?.id) throw new Error("No hay ticket seleccionado");
 
-      const { error } = await (supabase as any)
+      const { data, error } = await (supabase as any)
         .from("platform_support_tickets")
         .update({ status: newStatus, updated_at: new Date().toISOString() })
-        .eq("id", selectedTicket.id);
-
-      if (error) throw error;
-      
-      // Fetch the updated ticket from DB to ensure we have all current data
-      const { data, error: fetchError } = await (supabase as any)
-        .from("platform_support_tickets")
-        .select("*")
         .eq("id", selectedTicket.id)
+        .select("*")
         .single();
 
-      if (fetchError) throw fetchError;
+      if (error) throw error;
+      if (!data) throw new Error("No se pudo actualizar el ticket");
       return data;
     },
     onSuccess: (updatedTicket) => {
