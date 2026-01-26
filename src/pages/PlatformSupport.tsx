@@ -47,6 +47,12 @@ export default function PlatformSupport() {
   usePlatformSupportRealtime({
     companyId: currentCompany?.id,
     ticketId: selectedTicket?.id,
+    onTicketUpdate: (updatedTicket: any) => {
+      // Update the selected ticket if it's the one being viewed
+      if (updatedTicket.id === selectedTicket?.id) {
+        setSelectedTicket(updatedTicket);
+      }
+    },
   });
 
   // Fetch tickets
@@ -118,6 +124,34 @@ export default function PlatformSupport() {
     },
     onError: (error: any) => {
       toast.error(error.message || "Error al crear ticket");
+    },
+  });
+
+  // Update ticket status mutation
+  const updateTicketStatusMutation = useMutation({
+    mutationFn: async (newStatus: string) => {
+      if (!selectedTicket?.id) return;
+
+      const { error } = await (supabase as any)
+        .from("platform_support_tickets")
+        .update({ status: newStatus, updated_at: new Date().toISOString() })
+        .eq("id", selectedTicket.id);
+
+      if (error) throw error;
+      
+      return newStatus;
+    },
+    onSuccess: (newStatus) => {
+      // Update the selected ticket locally
+      setSelectedTicket({ ...selectedTicket, status: newStatus });
+      // Invalidate queries to refresh the list
+      queryClient.invalidateQueries({ 
+        queryKey: ["platform-support-tickets", currentCompany?.id] 
+      });
+      toast.success("Estado actualizado correctamente");
+    },
+    onError: (error: any) => {
+      toast.error(error.message || "Error al actualizar estado");
     },
   });
 
@@ -425,6 +459,23 @@ export default function PlatformSupport() {
                           </div>
                         </div>
                         <CardDescription>{selectedTicket.subject}</CardDescription>
+                        <div className="flex items-center gap-2 mt-3">
+                          <Label className="text-xs">Estado:</Label>
+                          <Select
+                            value={selectedTicket.status}
+                            onValueChange={(newStatus) => updateTicketStatusMutation.mutate(newStatus)}
+                          >
+                            <SelectTrigger className="w-auto h-8">
+                              <SelectValue />
+                            </SelectTrigger>
+                            <SelectContent>
+                              <SelectItem value="open">Abierto</SelectItem>
+                              <SelectItem value="in_progress">En Progreso</SelectItem>
+                              <SelectItem value="resolved">Resuelto</SelectItem>
+                              <SelectItem value="closed">Cerrado</SelectItem>
+                            </SelectContent>
+                          </Select>
+                        </div>
                         {selectedTicket.sla_response_hours && (
                           <div className="text-xs text-muted-foreground mt-2">
                             SLA: Respuesta en {selectedTicket.sla_response_hours}h | Resolución en {selectedTicket.sla_resolution_hours}h

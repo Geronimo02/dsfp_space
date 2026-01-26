@@ -62,7 +62,15 @@ export default function PlatformAdmin() {
   const queryClient = useQueryClient();
   
   // Enable realtime for platform admin to receive new tickets and messages
-  usePlatformAdminRealtime({ enabled: isPlatformAdmin });
+  usePlatformAdminRealtime({
+    enabled: isPlatformAdmin,
+    onTicketUpdate: (updatedTicket: any) => {
+      // Update the selected ticket if it's the one being viewed
+      if (updatedTicket.id === selectedPlatformTicket?.id) {
+        setSelectedPlatformTicket(updatedTicket);
+      }
+    },
+  });
   
   // State for filters and dialogs
   const [companySearch, setCompanySearch] = useState("");
@@ -423,7 +431,7 @@ export default function PlatformAdmin() {
   // Mutation para cambiar estado del ticket
   const updatePlatformTicketStatusMutation = useMutation({
     mutationFn: async ({ ticketId, status }: { ticketId: string, status: string }) => {
-      const updates: any = { status };
+      const updates: any = { status, updated_at: new Date().toISOString() };
       if (status === "resolved") updates.resolved_at = new Date().toISOString();
       if (status === "closed") updates.closed_at = new Date().toISOString();
 
@@ -443,6 +451,7 @@ export default function PlatformAdmin() {
         setSelectedPlatformTicket({
           ...selectedPlatformTicket,
           status: data.status,
+          updated_at: data.updated_at,
           resolved_at: data.resolved_at,
           closed_at: data.closed_at
         });
@@ -1278,7 +1287,6 @@ export default function PlatformAdmin() {
                               <SelectContent>
                                 <SelectItem value="open">Abierto</SelectItem>
                                 <SelectItem value="in_progress">En Progreso</SelectItem>
-                                <SelectItem value="pending">Pendiente</SelectItem>
                                 <SelectItem value="resolved">Resuelto</SelectItem>
                                 <SelectItem value="closed">Cerrado</SelectItem>
                               </SelectContent>
