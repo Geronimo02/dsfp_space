@@ -131,17 +131,12 @@ Deno.serve(async (req: Request) => {
 
     if (cuErr) return json({ error: String(cuErr.message ?? cuErr) }, 500);
 
-    // 5️⃣ Crear suscripción (se guarda como plan final; si venía de Free, queda Basic trialing)
-    const providerSubscriptionId =
-      intent.provider === "stripe" ? intent.stripe_subscription_id : intent.mp_preapproval_id;
-
-    const providerCustomerId = intent.provider === "stripe" ? intent.stripe_customer_id : null;
-
+    // 5️⃣ Crear suscripción (solo MercadoPago)
+    const providerSubscriptionId = intent.mp_preapproval_id;
     const { error: subErr } = await supabaseAdmin.from("subscriptions").insert({
       company_id: companyId,
       plan_id: finalPlanId,
-      provider: intent.provider,
-      provider_customer_id: providerCustomerId,
+      provider: "mercadopago",
       provider_subscription_id: providerSubscriptionId,
       status: subscriptionStatus,
       trial_ends_at: trialEndsAt,
@@ -179,37 +174,7 @@ Deno.serve(async (req: Request) => {
 
         const isFirst = !existing || existing.length === 0;
 
-        if (spm.provider === "stripe") {
-          // Store card with metadata from signup
-          const { error: insertErr } = await supabaseAdmin
-            .from("company_payment_methods")
-            .insert({
-              company_id: companyId,
-              type: "card",
-              stripe_payment_method_id: spm.payment_method_ref,
-              brand: spm.brand ?? null,
-              last4: spm.last4 ?? null,
-              exp_month: spm.exp_month ?? null,
-              exp_year: spm.exp_year ?? null,
-              holder_name: spm.name ?? null,
-              is_default: isFirst,
-            });
-          
-          if (insertErr) {
-            console.error("[finalize-signup] Error inserting payment method:", insertErr);
-            throw insertErr;
-          }
-          
-          // Reflect in subscriptions for UI
-          const { error: subErr } = await supabaseAdmin
-            .from("subscriptions")
-            .update({ stripe_payment_method_id: spm.payment_method_ref })
-            .eq("company_id", companyId);
-            
-          if (subErr) {
-            console.error("[finalize-signup] Error updating subscription:", subErr);
-          }
-        } else if (spm.provider === "mercadopago") {
+        if (spm.provider === "mercadopago") {
           const { error: insertErr } = await supabaseAdmin
             .from("company_payment_methods")
             .insert({
@@ -262,20 +227,7 @@ Deno.serve(async (req: Request) => {
       const hasAnyMethod = !!existing && existing.length > 0;
 
       if (!hasAnyMethod) {
-        if (intent.provider === "stripe" && intent.stripe_payment_method_id) {
-          await supabaseAdmin
-            .from("company_payment_methods")
-            .insert({
-              company_id: companyId,
-              type: "card",
-              stripe_payment_method_id: intent.stripe_payment_method_id,
-              is_default: true,
-            });
-          await supabaseAdmin
-            .from("subscriptions")
-            .update({ stripe_payment_method_id: intent.stripe_payment_method_id })
-            .eq("company_id", companyId);
-        } else if (intent.provider === "mercadopago") {
+        if (intent.provider === "mercadopago") {
           await supabaseAdmin
             .from("company_payment_methods")
             .insert({
