@@ -31,19 +31,27 @@ Deno.serve(async (req: Request) => {
 
     const fx = Number(Deno.env.get("DEFAULT_USD_ARS_RATE") ?? "1000");
     const amount_ars = Math.round(Number(sub.subscription_plans?.price ?? 0) * fx);
-    const start_date = sub.trial_ends_at ?? new Date(Date.now() + 7 * 24 * 60 * 60 * 1000).toISOString();
+    
+    // Solo usar start_date si hay trial (plan Free) - sino cobro inmediato
+    const hasTrialPending = sub.trial_ends_at && new Date(sub.trial_ends_at) > new Date();
+
+    const autoRecurring: Record<string, unknown> = {
+      frequency: 1,
+      frequency_type: "months",
+      transaction_amount: amount_ars,
+      currency_id: "ARS",
+    };
+
+    // Solo agregar start_date si está en trial (plan Free)
+    if (hasTrialPending) {
+      autoRecurring.start_date = sub.trial_ends_at;
+    }
 
     const body = {
       reason: `Suscripción ${sub.subscription_plans?.name}`,
       payer_email: sub.signup_intents?.email,
       back_url: `${url}/functions/v1/mercadopago-webhook`,
-      auto_recurring: {
-        frequency: 1,
-        frequency_type: "months",
-        transaction_amount: amount_ars,
-        currency_id: "ARS",
-        start_date,
-      },
+      auto_recurring: autoRecurring,
     };
 
     const resp = await fetch("https://api.mercadopago.com/preapproval", {

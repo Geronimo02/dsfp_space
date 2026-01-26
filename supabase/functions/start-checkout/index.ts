@@ -153,28 +153,69 @@ Deno.serve(async (req: Request) => {
       const mpToken = Deno.env.get("MP_ACCESS_TOKEN");
       if (!mpToken) return json({ error: "MP_ACCESS_TOKEN no configurado" }, 500);
       
-      // For MercadoPago, create preapproval directly without redirecting
+      // For MercadoPago, create preapproval with immediate billing
       const usdArs = Number(Deno.env.get("DEFAULT_USD_ARS_RATE") ?? "1000");
       const amountArsRecurring = Math.round(Number(plan.price) * usdArs);
 
-      // Create a subscription plan without user redirection
-      // Using a simple approach: mark as ready and let finalize-signup handle subscription creation
+      // Create preapproval with immediate start date (cobro inmediato)
+      const preapprovalBody = {
+        reason: `Suscripción ${plan.name}`,
+        payer_email: intent.email,
+        external_reference: intent.id,
+        back_url: success_url,
+        auto_recurring: {
+          frequency: 1,
+          frequency_type: "months",
+          transaction_amount: amountArsRecurring,
+          currency_id: "ARS",
+          // NO start_date = cobro inmediato al autorizar
+        },
+      };
+
+      const mpResp = await fetch("https://api.mercadopago.com/preapproval", {
+        method: "POST",
+        headers: { 
+          Authorization: `Bearer ${mpToken}`, 
+          "Content-Type": "application/json" 
+        },
+        body: JSON.stringify(preapprovalBody),
+      });
+
+      const mpData = await mpResp.json();
+      
+      if (!mpResp.ok) {
+        console.error("MP preapproval error:", mpData);
+        return json({ error: mpData?.message ?? "Error al crear suscripción en MercadoPago" }, 502);
+      }
+
+      const checkoutUrl = mpData.init_point ?? mpData.sandbox_init_point;
+      
+      if (!checkoutUrl) {
+        return json({ error: "No se obtuvo URL de checkout de MercadoPago" }, 502);
+      }
+
+      // Update intent with preapproval info
       const { error: updErr } = await supabaseAdmin
         .from("signup_intents")
         .update({
-          status: "paid_ready",
+          status: "checkout_created",
+          provider: "mercadopago",
+          mp_preapproval_id: mpData.id,
           billing_plan_id: billingPlanId,
           trial_days: trialDays,
+          amount_ars: amountArsRecurring,
+          fx_rate_usd_ars: usdArs,
+          fx_rate_at: new Date().toISOString(),
         })
         .eq("id", intent_id);
 
       if (updErr) return json({ error: String(updErr.message ?? updErr) }, 500);
 
-      // Return success directly without checkout_url or redirection
+      // Redirect to MercadoPago checkout
       return json({ 
-        is_paid_ready: true, 
+        checkout_url: checkoutUrl, 
         provider: "mercadopago",
-        message: "Pago procesado correctamente"
+        preapproval_id: mpData.id
       }, 200);
     }
 
