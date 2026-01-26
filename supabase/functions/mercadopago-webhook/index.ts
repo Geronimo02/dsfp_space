@@ -6,6 +6,7 @@ type MpTopic =
   | "subscription_preapproval"
   | "subscription_preapproval_plan"
   | "subscription_authorized_payment"
+  | "payment"
   | string;
 
 function json(payload: unknown, status = 200) {
@@ -33,6 +34,8 @@ async function fetchMpResource(topic: MpTopic, id: string, token: string) {
     url = `https://api.mercadopago.com/preapproval_plan/${id}`;
   } else if (topic === "subscription_authorized_payment") {
     url = `https://api.mercadopago.com/authorized_payments/${id}`;
+  } else if (topic === "payment") {
+    url = `https://api.mercadopago.com/v1/payments/${id}`;
   } else {
     url = `https://api.mercadopago.com/preapproval/${id}`;
   }
@@ -47,6 +50,85 @@ async function fetchMpResource(topic: MpTopic, id: string, token: string) {
   }
 
   return await res.json();
+}
+
+// Obtener detalles del pago para extraer info de tarjeta
+async function fetchPaymentDetails(paymentId: string, token: string) {
+  try {
+    const res = await fetch(`https://api.mercadopago.com/v1/payments/${paymentId}`, {
+      headers: { Authorization: `Bearer ${token}` },
+    });
+    if (!res.ok) return null;
+    return await res.json();
+  } catch {
+    return null;
+  }
+}
+
+// Extraer y guardar datos de tarjeta del pago
+async function saveCardDetailsFromPayment(
+  supabase: ReturnType<typeof createClient>,
+  companyId: string,
+  paymentData: any,
+  preapprovalId: string
+) {
+  const card = paymentData?.card;
+  if (!card) return;
+
+  const last4 = card.last_four_digits;
+  const expMonth = card.expiration_month;
+  const expYear = card.expiration_year;
+  const holderName = card.cardholder?.name;
+  const brand = paymentData.payment_method_id; // visa, master, amex, etc.
+
+  if (!last4) return;
+
+  // Actualizar el método de pago existente o crear uno nuevo
+  const { data: existing } = await supabase
+    .from("company_payment_methods")
+    .select("id")
+    .eq("company_id", companyId)
+    .eq("mp_preapproval_id", preapprovalId)
+    .maybeSingle();
+
+  if (existing) {
+    // Actualizar con los datos de la tarjeta
+    await supabase
+      .from("company_payment_methods")
+      .update({
+        last4,
+        exp_month: expMonth,
+        exp_year: expYear,
+        holder_name: holderName,
+        brand,
+        updated_at: new Date().toISOString(),
+      })
+      .eq("id", existing.id);
+    
+    console.log("Card details updated for existing payment method");
+  } else {
+    // Verificar si es el primer método de pago
+    const { data: allMethods } = await supabase
+      .from("company_payment_methods")
+      .select("id")
+      .eq("company_id", companyId);
+
+    const isFirst = !allMethods || allMethods.length === 0;
+
+    await supabase.from("company_payment_methods").insert({
+      company_id: companyId,
+      type: "mercadopago",
+      mp_preapproval_id: preapprovalId,
+      last4,
+      exp_month: expMonth,
+      exp_year: expYear,
+      holder_name: holderName,
+      brand,
+      is_default: isFirst,
+    });
+    
+    console.log("New payment method created with card details");
+  }
 }
 
 Deno.serve(async (req: Request) => {
@@ -122,6 +204,39 @@ Deno.serve(async (req: Request) => {
     console.log("MP status:", mpStatus);
     console.log("External reference:", externalRef);
 
+    // --- Manejar eventos de pago para capturar datos de tarjeta ---
+    if (topic === "payment" || topic === "subscription_authorized_payment") {
+      let paymentData = mpObj;
+      
+      // Si es authorized_payment, necesitamos obtener el payment_id
+      if (topic === "subscription_authorized_payment" && mpObj?.payment?.id) {
+        paymentData = await fetchPaymentDetails(mpObj.payment.id, mpToken);
+      }
+
+      if (paymentData?.card) {
+        // Buscar la suscripción asociada
+        const preapprovalId = mpObj?.preapproval_id || paymentData?.metadata?.preapproval_id;
+        
+        if (preapprovalId) {
+          const { data: sub } = await supabaseAdmin
+            .from("subscriptions")
+            .select("id, company_id, mp_preapproval_id")
+            .or(`mp_preapproval_id.eq.${preapprovalId},provider_subscription_id.eq.${preapprovalId}`)
+            .maybeSingle();
+
+          if (sub?.company_id) {
+            await saveCardDetailsFromPayment(
+              supabaseAdmin,
+              sub.company_id,
+              paymentData,
+              preapprovalId
+            );
+            console.log("Card details saved for company:", sub.company_id);
+          }
+        }
+      }
+    }
+
     if (externalRef) {
       const { data: intent, error: intentErr } = await supabaseAdmin
         .from("signup_intents")
@@ -175,23 +290,33 @@ Deno.serve(async (req: Request) => {
         const { data: existing } = await supabaseAdmin
           .from("company_payment_methods")
           .select("id")
-          .eq("company_id", sub.company_id);
+          .eq("company_id", sub.company_id)
+          .eq("mp_preapproval_id", sub.mp_preapproval_id ?? providerSubId)
+          .maybeSingle();
 
-        const isFirst = !existing || existing.length === 0;
+        if (!existing) {
+          const { data: allMethods } = await supabaseAdmin
+            .from("company_payment_methods")
+            .select("id")
+            .eq("company_id", sub.company_id);
 
-        await supabaseAdmin
-          .from("company_payment_methods")
-          .insert({
-            company_id: sub.company_id,
-            type: "mercadopago",
-            mp_preapproval_id: sub.mp_preapproval_id ?? providerSubId,
-            is_default: isFirst,
-          });
+          const isFirst = !allMethods || allMethods.length === 0;
+
+          await supabaseAdmin
+            .from("company_payment_methods")
+            .insert({
+              company_id: sub.company_id,
+              type: "mercadopago",
+              mp_preapproval_id: sub.mp_preapproval_id ?? providerSubId,
+              is_default: isFirst,
+            });
+        }
       }
     }
 
     return json({ ok: true }, 200);
   } catch (e) {
+    console.error("Webhook error:", e);
     return json({ error: String(e) }, 500);
   }
 });

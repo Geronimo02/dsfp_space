@@ -53,11 +53,19 @@ Deno.serve(async (req: Request) => {
     // Determine final billed plan (basic if free was chosen)
     const finalPlanId = intent.plan_id === FREE_PLAN_ID ? BASIC_PLAN_ID : (intent.billing_plan_id ?? intent.plan_id);
 
-    // Trial settings
-    const trialEndsAt =
-      intent.plan_id === FREE_PLAN_ID
-        ? new Date(Date.now() + FREE_TRIAL_DAYS * 24 * 60 * 60 * 1000).toISOString()
-        : (intent.trial_ends_at ?? null);
+    // Trial settings - solo trial si eligió plan Free
+    const isFreePlanSignup = intent.plan_id === FREE_PLAN_ID;
+    const trialEndsAt = isFreePlanSignup
+      ? new Date(Date.now() + FREE_TRIAL_DAYS * 24 * 60 * 60 * 1000).toISOString()
+      : null;
+
+    // Status: trialing solo si hay trial, sino active
+    const subscriptionStatus = isFreePlanSignup ? "trialing" : "active";
+
+    // current_period_end: si hay trial es trial_ends_at, sino 1 mes desde ahora
+    const currentPeriodEnd = isFreePlanSignup
+      ? trialEndsAt
+      : new Date(Date.now() + 30 * 24 * 60 * 60 * 1000).toISOString();
 
     // 2️⃣ Crear usuario Auth (admin)
     // Try to create user; if already exists, continue (idempotent)
@@ -135,9 +143,9 @@ Deno.serve(async (req: Request) => {
       provider: intent.provider,
       provider_customer_id: providerCustomerId,
       provider_subscription_id: providerSubscriptionId,
-      status: "trialing",
+      status: subscriptionStatus,
       trial_ends_at: trialEndsAt,
-      current_period_end: trialEndsAt,
+      current_period_end: currentPeriodEnd,
       amount_usd: intent.amount_usd,
       amount_ars: intent.amount_ars ?? null,
       fx_rate_usd_ars: intent.fx_rate_usd_ars ?? null,
