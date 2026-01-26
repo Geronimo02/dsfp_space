@@ -234,7 +234,24 @@ export function Sidebar() {
         },
       ],
     },
-
+// CRM
+        {
+          section: "CRM",
+          items: [
+            {
+              title: "Oportunidades",
+              href: "/opportunities",
+              icon: Target,
+              module: "opportunities",
+            },
+            {
+              title: "Pipelines",
+              href: "/pipelines",
+              icon: TrendingUp,
+              module: "pipelines",
+            },
+          ],
+        },
     // Inventario
     {
       section: "Inventario",
