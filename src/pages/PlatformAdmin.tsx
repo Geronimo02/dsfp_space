@@ -441,20 +441,34 @@ export default function PlatformAdmin() {
         .eq("id", ticketId);
 
       if (error) throw error;
-      return { ticketId, status, ...updates };
+      
+      // Fetch the updated ticket from DB to ensure we have all current data
+      const { data, error: fetchError } = await (supabase as any)
+        .from("platform_support_tickets")
+        .select(`
+          *,
+          companies!platform_support_tickets_company_id_fkey (
+            name,
+            email,
+            phone,
+            whatsapp_number
+          )
+        `)
+        .eq("id", ticketId)
+        .single();
+
+      if (fetchError) throw fetchError;
+      return data;
     },
-    onSuccess: (data) => {
+    onSuccess: (updatedTicket) => {
       toast.success("Estado actualizado");
-      queryClient.invalidateQueries({ queryKey: ["platform-support-tickets"] });
-      // Actualizar el ticket seleccionado localmente
-      if (selectedPlatformTicket && selectedPlatformTicket.id === data.ticketId) {
-        setSelectedPlatformTicket({
-          ...selectedPlatformTicket,
-          status: data.status,
-          updated_at: data.updated_at,
-          resolved_at: data.resolved_at,
-          closed_at: data.closed_at
-        });
+      queryClient.invalidateQueries({ 
+        queryKey: ["platform-support-tickets"],
+        refetchType: 'all'
+      });
+      // Actualizar el ticket seleccionado con datos frescos de BD
+      if (selectedPlatformTicket && selectedPlatformTicket.id === updatedTicket.id) {
+        setSelectedPlatformTicket(updatedTicket);
         // Si se cierra, deselecciona después de 1 segundo
         if (data.status === "closed") {
           setTimeout(() => setSelectedPlatformTicket(null), 1000);
@@ -1280,6 +1294,7 @@ export default function PlatformAdmin() {
                                   status: val
                                 });
                               }}
+                              disabled={updatePlatformTicketStatusMutation.isPending}
                             >
                               <SelectTrigger className="w-[140px] h-8">
                                 <SelectValue />

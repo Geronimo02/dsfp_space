@@ -130,7 +130,7 @@ export default function PlatformSupport() {
   // Update ticket status mutation
   const updateTicketStatusMutation = useMutation({
     mutationFn: async (newStatus: string) => {
-      if (!selectedTicket?.id) return;
+      if (!selectedTicket?.id) throw new Error("No hay ticket seleccionado");
 
       const { error } = await (supabase as any)
         .from("platform_support_tickets")
@@ -139,14 +139,23 @@ export default function PlatformSupport() {
 
       if (error) throw error;
       
-      return newStatus;
+      // Fetch the updated ticket from DB to ensure we have all current data
+      const { data, error: fetchError } = await (supabase as any)
+        .from("platform_support_tickets")
+        .select("*")
+        .eq("id", selectedTicket.id)
+        .single();
+
+      if (fetchError) throw fetchError;
+      return data;
     },
-    onSuccess: (newStatus) => {
-      // Update the selected ticket locally
-      setSelectedTicket({ ...selectedTicket, status: newStatus });
-      // Invalidate queries to refresh the list
+    onSuccess: (updatedTicket) => {
+      // Update the selected ticket with fresh data from DB
+      setSelectedTicket(updatedTicket);
+      // Invalidate and refetch the tickets list
       queryClient.invalidateQueries({ 
-        queryKey: ["platform-support-tickets", currentCompany?.id] 
+        queryKey: ["platform-support-tickets", currentCompany?.id],
+        refetchType: 'all'
       });
       toast.success("Estado actualizado correctamente");
     },
@@ -464,6 +473,7 @@ export default function PlatformSupport() {
                           <Select
                             value={selectedTicket.status}
                             onValueChange={(newStatus) => updateTicketStatusMutation.mutate(newStatus)}
+                            disabled={updateTicketStatusMutation.isPending}
                           >
                             <SelectTrigger className="w-auto h-8">
                               <SelectValue />
