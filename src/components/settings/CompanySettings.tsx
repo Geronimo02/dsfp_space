@@ -55,7 +55,6 @@ export function CompanySettings() {
   const [uploading, setUploading] = useState(false);
   const [logoFile, setLogoFile] = useState<File | null>(null);
   const [logoPreview, setLogoPreview] = useState<string | null>(null);
-  const [logoRemoved, setLogoRemoved] = useState(false);
   const [testingConnection, setTestingConnection] = useState(false);
   const [editingCurrency, setEditingCurrency] = useState<string | null>(null);
   const [editingRate, setEditingRate] = useState<string>("");
@@ -123,7 +122,6 @@ export function CompanySettings() {
     loyalty_bronze_discount: 0,
     loyalty_silver_discount: 5,
     loyalty_gold_discount: 10,
-    logo_url: null as string | null,
     // Campos fiscales AFIP
     razon_social: "",
     nombre_fantasia: "",
@@ -146,8 +144,6 @@ export function CompanySettings() {
   useEffect(() => {
     if (currentCompany) {
       const company = currentCompany as any;
-      console.log('Cargando configuración de la empresa:', company);
-      console.log('card_surcharge_rate actual:', company.card_surcharge_rate);
       setFormData({
         name: company.name || "",
         tax_id: company.tax_id || "",
@@ -172,7 +168,6 @@ export function CompanySettings() {
         loyalty_bronze_discount: Number(company.loyalty_bronze_discount) || 0,
         loyalty_silver_discount: Number(company.loyalty_silver_discount) || 5,
         loyalty_gold_discount: Number(company.loyalty_gold_discount) || 10,
-        logo_url: company.logo_url || null,
         // Campos fiscales AFIP
         razon_social: company.razon_social || "",
         nombre_fantasia: company.nombre_fantasia || "",
@@ -373,8 +368,6 @@ export function CompanySettings() {
     onSuccess: (logoUrl) => {
       updateCompanyMutation.mutate({ ...formData, logo_url: logoUrl });
       setLogoFile(null);
-      setLogoPreview(null);
-      setUploading(false);
     },
     onError: (error: any) => {
       toast.error(error.message || "Error al subir el logo");
@@ -385,95 +378,64 @@ export function CompanySettings() {
     mutationFn: async (data: typeof formData & { logo_url?: string }) => {
       if (!currentCompany) throw new Error("No hay empresa seleccionada");
 
-      console.log('Guardando configuración:', data);
-
       const result = companySchema.safeParse(data);
       if (!result.success) {
-        console.error('Error de validación:', result.error.errors);
         throw new Error(result.error.errors[0].message);
       }
 
-      const updateData = {
-        name: data.name,
-        tax_id: data.tax_id || null,
-        phone: data.phone || null,
-        email: data.email || null,
-        address: data.address || null,
-        currency: data.currency,
-        default_tax_rate: data.default_tax_rate,
-        card_surcharge_rate: data.card_surcharge_rate,
-        whatsapp_number: data.whatsapp_number || null,
-        whatsapp_enabled: data.whatsapp_enabled,
-        low_stock_alert: data.low_stock_alert,
-        receipt_footer: data.receipt_footer || null,
-        receipt_format: data.receipt_format,
-        receipt_printer_name: data.receipt_printer_name || null,
-        loyalty_enabled: data.loyalty_enabled,
-        loyalty_points_per_currency: data.loyalty_points_per_currency,
-        loyalty_currency_per_point: data.loyalty_currency_per_point,
-        loyalty_bronze_threshold: data.loyalty_bronze_threshold,
-        loyalty_silver_threshold: data.loyalty_silver_threshold,
-        loyalty_gold_threshold: data.loyalty_gold_threshold,
-        loyalty_bronze_discount: data.loyalty_bronze_discount,
-        loyalty_silver_discount: data.loyalty_silver_discount,
-        loyalty_gold_discount: data.loyalty_gold_discount,
-        logo_url: data.logo_url !== undefined ? data.logo_url : currentCompany.logo_url,
-        // Campos fiscales
-        razon_social: data.razon_social || null,
-        nombre_fantasia: data.nombre_fantasia || null,
-        condicion_iva: data.condicion_iva || 'responsable_inscripto',
-        inicio_actividades: data.inicio_actividades || null,
-        certificado_afip_url: data.certificado_afip_url || null,
-        clave_fiscal: data.clave_fiscal || null,
-        max_discount_percentage: data.max_discount_percentage || 10,
-        max_installments: data.max_installments || 12,
-        require_customer_document: data.require_customer_document || false,
-        autoprint_receipt: data.autoprint_receipt || false,
-        // Campos integración AFIP
-        cuit: data.cuit || null,
-        afip_certificate: data.afip_certificate || null,
-        afip_private_key: data.afip_private_key || null,
-        afip_ambiente: data.afip_ambiente || 'testing',
-        afip_enabled: data.afip_enabled || false,
-      } as any;
-
-      console.log('Datos a actualizar:', updateData);
-
       const { error } = await supabase
         .from('companies')
-        .update(updateData)
+        .update({
+          name: data.name,
+          tax_id: data.tax_id || null,
+          phone: data.phone || null,
+          email: data.email || null,
+          address: data.address || null,
+          currency: data.currency,
+          default_tax_rate: data.default_tax_rate,
+          card_surcharge_rate: data.card_surcharge_rate,
+          whatsapp_number: data.whatsapp_number || null,
+          whatsapp_enabled: data.whatsapp_enabled,
+          low_stock_alert: data.low_stock_alert,
+          receipt_footer: data.receipt_footer || null,
+          receipt_format: data.receipt_format,
+          receipt_printer_name: data.receipt_printer_name || null,
+          loyalty_enabled: data.loyalty_enabled,
+          loyalty_points_per_currency: data.loyalty_points_per_currency,
+          loyalty_currency_per_point: data.loyalty_currency_per_point,
+          loyalty_bronze_threshold: data.loyalty_bronze_threshold,
+          loyalty_silver_threshold: data.loyalty_silver_threshold,
+          loyalty_gold_threshold: data.loyalty_gold_threshold,
+          loyalty_bronze_discount: data.loyalty_bronze_discount,
+          loyalty_silver_discount: data.loyalty_silver_discount,
+          loyalty_gold_discount: data.loyalty_gold_discount,
+          logo_url: data.logo_url || currentCompany.logo_url,
+          // Campos fiscales
+          razon_social: data.razon_social || null,
+          nombre_fantasia: data.nombre_fantasia || null,
+          condicion_iva: data.condicion_iva || 'responsable_inscripto',
+          inicio_actividades: data.inicio_actividades || null,
+          certificado_afip_url: data.certificado_afip_url || null,
+          clave_fiscal: data.clave_fiscal || null,
+          max_discount_percentage: data.max_discount_percentage || 10,
+          max_installments: data.max_installments || 12,
+          require_customer_document: data.require_customer_document || false,
+          autoprint_receipt: data.autoprint_receipt || false,
+          // Campos integración AFIP
+          cuit: data.cuit || null,
+          afip_certificate: data.afip_certificate || null,
+          afip_private_key: data.afip_private_key || null,
+          afip_ambiente: data.afip_ambiente || 'testing',
+          afip_enabled: data.afip_enabled || false,
+        } as any)
         .eq('id', currentCompany.id);
 
-      if (error) {
-        console.error('Error de Supabase:', error);
-        throw error;
-      }
-
-      // Recargar los datos actualizados
-      const { data: updatedCompany } = await supabase
-        .from('companies')
-        .select('*')
-        .eq('id', currentCompany.id)
-        .single();
-      
-      return updatedCompany;
+      if (error) throw error;
     },
-    onSuccess: async () => {
+    onSuccess: () => {
       toast.success("Configuración actualizada");
-      
-      // Invalidar todas las queries relacionadas con la compañía
-      await Promise.all([
-        queryClient.invalidateQueries({ queryKey: ['companies'] }),
-        queryClient.invalidateQueries({ queryKey: ['company', currentCompany?.id] }),
-        queryClient.invalidateQueries({ queryKey: ['company-settings', currentCompany?.id] }),
-      ]);
-      
-      // Refrescar el contexto de la compañía
-      await refreshCompanies();
-      
-      setLogoFile(null);
-      setLogoPreview(null);
-      setLogoRemoved(false);
+      refreshCompanies();
+      queryClient.invalidateQueries({ queryKey: ['company', currentCompany?.id] });
     },
     onError: (error: any) => {
       toast.error(error.message || "Error al actualizar");
@@ -485,20 +447,11 @@ export function CompanySettings() {
     
     if (logoFile) {
       setUploading(true);
-      uploadLogoMutation.mutate(logoFile);
+      await uploadLogoMutation.mutateAsync(logoFile);
+      setUploading(false);
     } else {
       updateCompanyMutation.mutate(formData);
-      if (logoRemoved) {
-        setLogoRemoved(false);
-      }
     }
-  };
-
-  const handleRemoveLogo = () => {
-    setLogoPreview(null);
-    setLogoFile(null);
-    setLogoRemoved(true);
-    setFormData({ ...formData, logo_url: null });
   };
 
   if (!currentCompany) {
@@ -542,7 +495,10 @@ export function CompanySettings() {
                     variant="ghost"
                     size="icon"
                     className="absolute -top-2 -right-2 h-6 w-6 rounded-full"
-                    onClick={handleRemoveLogo}
+                    onClick={() => {
+                      setLogoPreview(null);
+                      setLogoFile(null);
+                    }}
                   >
                     <X className="h-4 w-4" />
                   </Button>
@@ -1093,21 +1049,6 @@ export function CompanySettings() {
           </div>
 
           {/* Financial Settings */}
-          <div className="space-y-4">
-            <div className="flex items-center justify-between p-4 border rounded-lg bg-muted/50">
-              <div>
-                <p className="text-sm font-medium">Configuración Actual de Recargos</p>
-                <p className="text-xs text-muted-foreground">Recargo aplicado en pagos con tarjeta en cuotas</p>
-              </div>
-              <div className="text-right">
-                <p className="text-2xl font-bold text-primary">
-                  {Number((currentCompany as any)?.card_surcharge_rate) || 0}%
-                </p>
-                <p className="text-xs text-muted-foreground">por cuota</p>
-              </div>
-            </div>
-          </div>
-
           <div className="grid grid-cols-3 gap-4">
             <div className="space-y-2">
               <Label htmlFor="currency">Moneda</Label>
@@ -1136,29 +1077,14 @@ export function CompanySettings() {
               />
             </div>
             <div className="space-y-2">
-              <Label htmlFor="surcharge">Recargo tarjeta de crédito (%)</Label>
+              <Label htmlFor="surcharge">Recargo tarjeta (%)</Label>
               <Input
                 id="surcharge"
                 type="number"
                 step="0.01"
-                min="0"
-                max="100"
-                placeholder="Ej: 8 para 8% de recargo"
-                value={formData.card_surcharge_rate ?? 0}
-                onChange={(e) => {
-                  const value = e.target.value === '' ? 0 : parseFloat(e.target.value);
-                  console.log('Nuevo valor de recargo:', value);
-                  setFormData({ ...formData, card_surcharge_rate: value });
-                }}
+                value={formData.card_surcharge_rate}
+                onChange={(e) => setFormData({ ...formData, card_surcharge_rate: parseFloat(e.target.value) || 0 })}
               />
-              <p className="text-xs text-muted-foreground">
-                Se aplica por cuota en pagos con tarjeta. Ej: 8% en 3 cuotas = 24% de recargo total
-                {formData.card_surcharge_rate > 0 && (
-                  <span className="font-semibold text-primary ml-1">
-                    (Actual: {formData.card_surcharge_rate}%)
-                  </span>
-                )}
-              </p>
             </div>
           </div>
 
