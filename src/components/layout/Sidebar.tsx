@@ -239,8 +239,8 @@ export function Sidebar() {
           section: "CRM",
           items: [
             {
-            title: "Ventas",
-          href: "/sales",
+            title: "CRM",
+          href: "/crm",
           icon: FileText,
           children: [
             {
