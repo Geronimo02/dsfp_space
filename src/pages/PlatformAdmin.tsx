@@ -464,10 +464,13 @@ export default function PlatformAdmin() {
       if (selectedPlatformTicket && selectedPlatformTicket.id === updatedTicket.id) {
         setSelectedPlatformTicket(updatedTicket);
         // Si se cierra, deselecciona después de 1 segundo
-        if (data.status === "closed") {
+        if (updatedTicket.status === "closed") {
           setTimeout(() => setSelectedPlatformTicket(null), 1000);
         }
       }
+    },
+    onError: (error: any) => {
+      toast.error(error.message || "Error al actualizar el estado del ticket");
     },
   });
 
