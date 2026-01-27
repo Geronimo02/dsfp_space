@@ -97,7 +97,8 @@ export function usePlatformSupportTickets() {
       ticketId: string;
       message: string;
     }) => {
-      if (!ticketId || !message.trim()) return;
+      if (!ticketId || !message.trim()) 
+        throw new Error("Ticket ID y mensaje son requeridos");
 
       const { data: { user } } = await supabase.auth.getUser();
       if (!user) throw new Error("Usuario no autenticado");
@@ -114,7 +115,6 @@ export function usePlatformSupportTickets() {
         ]);
 
       if (error) throw error;
-
       return { ticketId };
     },
     onSuccess: () => {

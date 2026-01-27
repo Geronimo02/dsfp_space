@@ -340,9 +340,6 @@ export default function PlatformAdmin() {
     respondPlatformTicketMutation,
     updatePlatformTicketStatusMutation,
   } = usePlatformSupportTickets();
-      toast.error(error.message || "Error al actualizar el estado del ticket");
-    },
-  });
 
   // Fetch integrations data
   const { data: integrationsData } = useQuery({
@@ -1027,8 +1024,6 @@ export default function PlatformAdmin() {
                           filtered = filtered.filter((t: any) => t.status === 'open');
                         } else if (platformSupportStatusFilter === 'in_progress') {
                           filtered = filtered.filter((t: any) => t.status === 'in_progress');
-                        } else if (platformSupportStatusFilter !== 'all') {
-                          filtered = filtered.filter((t: any) => t.status === platformSupportStatusFilter);
                         }
                         
                         if (filtered.length === 0) {
@@ -1353,12 +1348,21 @@ export default function PlatformAdmin() {
                           <div className="space-y-2">
                             <div className="grid grid-cols-3 gap-2">
                               <Button
-                                onClick={() => respondPlatformTicketMutation.mutate()}
-                                disabled={!platformTicketMessage.trim()}
+                                onClick={() => {
+                                  if (!selectedPlatformTicket?.id || !platformTicketMessage.trim()) {
+                                    toast.error("Completa el mensaje antes de enviar");
+                                    return;
+                                  }
+                                  respondPlatformTicketMutation.mutate({
+                                    ticketId: selectedPlatformTicket.id,
+                                    message: platformTicketMessage
+                                  });
+                                }}
+                                disabled={!platformTicketMessage.trim() || respondPlatformTicketMutation.isPending}
                                 className="col-span-1"
                               >
                                 <MessageSquare className="h-4 w-4 mr-2" />
-                                Enviar
+                                {respondPlatformTicketMutation.isPending ? "Enviando..." : "Enviar"}
                               </Button>
                               <Button
                                 variant="outline"
