@@ -448,7 +448,7 @@ export default function PlatformAdmin() {
             whatsapp_number
           )
         `)
-        .single();
+        .maybeSingle();
 
       if (error) throw error;
       if (!data) throw new Error("No se pudo actualizar el ticket");
