@@ -239,6 +239,11 @@ export function Sidebar() {
           section: "CRM",
           items: [
             {
+            title: "Ventas",
+          href: "/sales",
+          icon: FileText,
+          children: [
+            {
               title: "Oportunidades",
               href: "/opportunities",
               icon: Target,
@@ -252,6 +257,8 @@ export function Sidebar() {
             },
           ],
         },
+      ],
+    },
     // Inventario
     {
       section: "Inventario",
