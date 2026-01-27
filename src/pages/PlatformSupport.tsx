@@ -100,16 +100,56 @@ export default function PlatformSupport() {
       const randomStr = Math.random().toString(36).substring(2, 5).toUpperCase();
       const ticketNumber = `TKT-${dateStr}-${randomStr}`;
 
-      const { error: ticketError } = await (supabase as any)
+      const { data: createdTickets, error: ticketError } = await (supabase as any)
         .from("platform_support_tickets")
         .insert([{
           ...ticketForm,
           ticket_number: ticketNumber,
           company_id: currentCompany.id,
           created_by: user.id,
-        }]);
+        }])
+        .select("id, ticket_number")
+        .returns<any[]>();
 
       if (ticketError) throw ticketError;
+
+      const createdTicket = createdTickets?.[0];
+
+      if (createdTicket) {
+        try {
+          const [adminNotification, companyNotification] = await Promise.all([
+            supabase.functions.invoke("notify-admins-platform-ticket", {
+              body: {
+                ticketId: createdTicket.id,
+                ticketNumber,
+                companyId: currentCompany.id,
+                companyName: currentCompany.name,
+                subject: ticketForm.subject,
+                description: ticketForm.description,
+                priority: ticketForm.priority,
+                category: ticketForm.category,
+              },
+            }),
+            supabase.functions.invoke("notify-platform-support-ticket", {
+              body: {
+                ticket_id: createdTicket.id,
+                type: "ticket_created",
+                send_email: true,
+                send_whatsapp: true,
+              },
+            }),
+          ]);
+
+          if (adminNotification.error) {
+            console.error("Error notificando a admins:", adminNotification.error);
+          }
+          if (companyNotification.error) {
+            console.error("Error notificando a la empresa:", companyNotification.error);
+          }
+        } catch (notificationError) {
+          console.error("Error llamando a edge functions de notificación:", notificationError);
+        }
+      }
     },
     onSuccess: () => {
       toast.success("Ticket creado. Los administradores lo revisarán pronto.");

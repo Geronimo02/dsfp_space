@@ -140,6 +140,26 @@ export function usePlatformSupportTickets(options?: UsePlatformSupportTicketsOpt
         ]);
 
       if (error) throw error;
+
+      try {
+        const { error: notifyError } = await supabase.functions.invoke(
+          "notify-platform-support-ticket",
+          {
+            body: {
+              ticket_id: ticketId,
+              type: "message_received",
+              send_email: true,
+              send_whatsapp: true,
+            },
+          }
+        );
+
+        if (notifyError) {
+          console.error("❌ [Ticket Update] Error notificando respuesta:", notifyError);
+        }
+      } catch (notifyException) {
+        console.error("❌ [Ticket Update] Error llamando edge function:", notifyException);
+      }
       return { ticketId };
     },
     onSuccess: () => {
@@ -226,6 +246,26 @@ export function usePlatformSupportTickets(options?: UsePlatformSupportTicketsOpt
       if (!data) {
         console.error("❌ [Ticket Update] No se recibió data del SELECT");
         throw new Error("No se pudo obtener el ticket actualizado");
+      }
+
+      try {
+        const { error: notifyError } = await supabase.functions.invoke(
+          "notify-platform-support-ticket",
+          {
+            body: {
+              ticket_id: ticketId,
+              type: "status_changed",
+              send_email: true,
+              send_whatsapp: true,
+            },
+          }
+        );
+
+        if (notifyError) {
+          console.error("❌ [Ticket Update] Error notificando cambio de estado:", notifyError);
+        }
+      } catch (notifyException) {
+        console.error("❌ [Ticket Update] Error llamando edge function:", notifyException);
       }
       
       console.log("✅ [Ticket Update] Ticket actualizado exitosamente:", data);

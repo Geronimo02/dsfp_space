@@ -62,25 +62,6 @@ export default function PlatformAdmin() {
   const navigate = useNavigate();
   const queryClient = useQueryClient();
   
-  // Enable realtime for platform admin to receive new tickets and messages
-  usePlatformAdminRealtime({
-    enabled: isPlatformAdmin,
-    isMutatingRef, // Pasar ref para bloquear realtime durante mutaciones
-    onTicketUpdate: (updatedTicket: any) => {
-      // Ignorar realtime updates durante mutaciones para prevenir race conditions
-      if (isMutatingRef?.current) {
-        console.warn("⏸️ [Realtime] Update ignorado durante mutación:", updatedTicket);
-        return;
-      }
-      
-      console.log("📡 [Realtime] Update recibido:", updatedTicket);
-      // Update the selected ticket if it's the one being viewed
-      if (updatedTicket.id === selectedPlatformTicket?.id) {
-        setSelectedPlatformTicket(updatedTicket);
-      }
-    },
-  });
-  
   // State for filters and dialogs
   const [companySearch, setCompanySearch] = useState("");
   const [companyStatusFilter, setCompanyStatusFilter] = useState<string>("all");
@@ -358,6 +339,25 @@ export default function PlatformAdmin() {
         setTimeout(() => setSelectedPlatformTicket(null), 1000);
       }
     }
+  });
+
+  // Enable realtime for platform admin to receive new tickets and messages
+  usePlatformAdminRealtime({
+    enabled: isPlatformAdmin,
+    isMutatingRef, // Bloquea realtime mientras hay mutaciones
+    onTicketUpdate: (updatedTicket: any) => {
+      // Ignorar realtime updates durante mutaciones para prevenir race conditions
+      if (isMutatingRef?.current) {
+        console.warn("⏸️ [Realtime] Update ignorado durante mutación:", updatedTicket);
+        return;
+      }
+      
+      console.log("📡 [Realtime] Update recibido:", updatedTicket);
+      // Update the selected ticket if it's the one being viewed
+      if (updatedTicket.id === selectedPlatformTicket?.id) {
+        setSelectedPlatformTicket(updatedTicket);
+      }
+    },
   });
 
   // Fetch integrations data

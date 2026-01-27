@@ -232,7 +232,7 @@ export function AvailableModulesDialog({
       // Create a platform support ticket for the request
       const ticketNumber = `MOD-${new Date().toISOString().split('T')[0].replace(/-/g, '')}-${Math.random().toString(36).substring(2, 5).toUpperCase()}`;
       
-      const { error } = await (supabase as any)
+      const { data: createdTickets, error } = await (supabase as any)
         .from("platform_support_tickets")
         .insert([{
           ticket_number: ticketNumber,
@@ -242,11 +242,51 @@ export function AvailableModulesDialog({
           description: `La empresa solicita activar los siguientes módulos:\n\n${selectedModuleNames.map(n => `• ${n}`).join('\n')}${message ? `\n\nMensaje adicional:\n${message}` : ''}`,
           category: "feature_request",
           priority: "medium",
-        }]);
+        }])
+        .select("id, ticket_number")
+        .returns<any[]>();
       
       if (error) {
         console.error("Error creating ticket:", error);
         // Still show success since the request was recorded
+      }
+
+      const createdTicket = createdTickets?.[0];
+
+      if (createdTicket) {
+        try {
+          const [adminNotification, companyNotification] = await Promise.all([
+            supabase.functions.invoke("notify-admins-platform-ticket", {
+              body: {
+                ticketId: createdTicket.id,
+                ticketNumber,
+                companyId: currentCompany?.id,
+                companyName: currentCompany?.name,
+                subject: `Solicitud de activación de módulos: ${selectedModuleNames.join(', ')}`,
+                description: `La empresa solicita activar los siguientes módulos:\n\n${selectedModuleNames.map(n => `• ${n}`).join('\n')}${message ? `\n\nMensaje adicional:\n${message}` : ''}`,
+                priority: "medium",
+                category: "feature_request",
+              },
+            }),
+            supabase.functions.invoke("notify-platform-support-ticket", {
+              body: {
+                ticket_id: createdTicket.id,
+                type: "ticket_created",
+                send_email: true,
+                send_whatsapp: true,
+              },
+            }),
+          ]);
+
+          if (adminNotification.error) {
+            console.error("Error notificando a admins:", adminNotification.error);
+          }
+          if (companyNotification.error) {
+            console.error("Error notificando a la empresa:", companyNotification.error);
+          }
+        } catch (notificationError) {
+          console.error("Error llamando edge functions de notificación:", notificationError);
+        }
       }
       
       setSent(true);
