@@ -74,6 +74,10 @@ const SignupWizard = lazy(() => import("./pages/SignupWizard"));
 const SignupSuccess = lazy(() => import("./pages/SignupSuccess"));
 const SignupCancel = lazy(() => import("./pages/SignupCancel"));
 
+
+const Opportunities = lazy(() => import("./pages/Opportunities"));
+const Pipelines = lazy(() => import("./pages/Pipelines"));
+
 const queryClient = new QueryClient();
 
 
@@ -332,6 +336,8 @@ const App = () => (
             <Route path="/accounts-receivable" element={<ProtectedRoute><ModuleProtectedRoute moduleCode="accounts_receivable"><AccountsReceivable /></ModuleProtectedRoute></ProtectedRoute>} />
             <Route path="/promotions" element={<ProtectedRoute><ModuleProtectedRoute moduleCode="promotions"><Promotions /></ModuleProtectedRoute></ProtectedRoute>} />
             
+            
+
             {/* Inventario & Compras */}
             <Route path="/suppliers" element={<ProtectedRoute><ModuleProtectedRoute moduleCode="suppliers"><Suppliers /></ModuleProtectedRoute></ProtectedRoute>} />
             <Route path="/purchases" element={<ProtectedRoute><ModuleProtectedRoute moduleCode="purchases"><Purchases /></ModuleProtectedRoute></ProtectedRoute>} />
