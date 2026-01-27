@@ -335,7 +335,7 @@ export default function PlatformAdmin() {
     queryKey: ["platform-support-tickets"],
     queryFn: async () => {
       try {
-        const { data, error } = await (supabase as any)
+        const { data, error } = await supabase
           .from("platform_support_tickets")
           .select(`
             *,
@@ -368,7 +368,7 @@ export default function PlatformAdmin() {
     queryKey: ["platform-ticket-messages", selectedPlatformTicket?.id],
     queryFn: async () => {
       if (!selectedPlatformTicket?.id) return [];
-      const { data, error } = await (supabase as any)
+      const { data, error } = await supabase
         .from("platform_support_messages")
         .select("*")
         .eq("ticket_id", selectedPlatformTicket.id)
@@ -386,7 +386,7 @@ export default function PlatformAdmin() {
       const { data: { user } } = await supabase.auth.getUser();
       if (!user) throw new Error("Usuario no autenticado");
 
-      const { error } = await (supabase as any)
+      const { error } = await supabase
         .from("platform_support_messages")
         .insert([{
           ticket_id: selectedPlatformTicket.id,
@@ -435,7 +435,7 @@ export default function PlatformAdmin() {
       if (status === "resolved") updates.resolved_at = new Date().toISOString();
       if (status === "closed") updates.closed_at = new Date().toISOString();
 
-      const { data, error } = await (supabase as any)
+      const { data, error } = await supabase
         .from("platform_support_tickets")
         .update(updates)
         .eq("id", ticketId)
