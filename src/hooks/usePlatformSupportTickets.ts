@@ -163,9 +163,12 @@ export function usePlatformSupportTickets(options?: UsePlatformSupportTicketsOpt
       ticketId: string;
       status: TicketStatus;
     }) => {
+      console.log("🎫 [Ticket Update] Iniciando actualización:", { ticketId, status });
+      
       // Validar status
       const validStatuses: TicketStatus[] = ["open", "in_progress", "pending", "resolved", "closed"];
       if (!validStatuses.includes(status)) {
+        console.error("❌ [Ticket Update] Estado inválido:", status);
         throw new Error(`Estado inválido: ${status}`);
       }
 
@@ -174,17 +177,30 @@ export function usePlatformSupportTickets(options?: UsePlatformSupportTicketsOpt
         updated_at: new Date().toISOString(),
       };
       
-      // FIX: Usar now() de Supabase para timestamp del servidor
       if (status === "resolved") 
         updates.resolved_at = new Date().toISOString();
       if (status === "closed") 
         updates.closed_at = new Date().toISOString();
 
-      // FIX: Una sola query con select + actualizar
-      const { data, error } = await supabase
+      console.log("📝 [Ticket Update] Updates a aplicar:", updates);
+
+      // FIX: Separar UPDATE y SELECT en 2 queries para evitar error 406
+      // 1. Primero hacer el UPDATE sin select
+      const { error: updateError } = await supabase
         .from("platform_support_tickets")
         .update(updates)
-        .eq("id", ticketId)
+        .eq("id", ticketId);
+
+      if (updateError) {
+        console.error("❌ [Ticket Update] Error en UPDATE:", updateError);
+        throw updateError;
+      }
+      
+      console.log("✅ [Ticket Update] UPDATE exitoso, obteniendo datos...");
+
+      // 2. Luego hacer el SELECT con join
+      const { data, error: selectError } = await supabase
+        .from("platform_support_tickets")
         .select(
           `
           *,
@@ -196,12 +212,24 @@ export function usePlatformSupportTickets(options?: UsePlatformSupportTicketsOpt
           )
         `
         )
+        .eq("id", ticketId)
         .single();
 
-      if (error) throw error;
+      if (selectError) {
+        console.error("❌ [Ticket Update] Error en SELECT:", selectError);
+        throw selectError;
+      }
+      if (!data) {
+        console.error("❌ [Ticket Update] No se recibió data del SELECT");
+        throw new Error("No se pudo obtener el ticket actualizado");
+      }
+      
+      console.log("✅ [Ticket Update] Ticket actualizado exitosamente:", data);
       return data as PlatformSupportTicket;
     },
     onMutate: async ({ ticketId, status }) => {
+      console.log("🔄 [Optimistic Update] Aplicando actualización optimista:", { ticketId, status });
+      
       // FIX: Optimistic update - actualizar UI inmediatamente
       const previousTickets = queryClient.getQueryData<PlatformSupportTicket[]>([
         "platform-support-tickets",
@@ -213,13 +241,20 @@ export function usePlatformSupportTickets(options?: UsePlatformSupportTicketsOpt
         );
         
         queryClient.setQueryData(["platform-support-tickets"], optimisticTickets);
+        console.log("✅ [Optimistic Update] Cache actualizado optimísticamente");
+      } else {
+        console.warn("⚠️ [Optimistic Update] No hay tickets previos en cache");
       }
 
       return { previousTickets };
     },
     onSuccess: (updatedTicket) => {
-      if (!isMountedRef.current) return;
+      if (!isMountedRef.current) {
+        console.warn("⚠️ [Ticket Update] Componente desmontado, cancelando callbacks");
+        return;
+      }
       
+      console.log("🎉 [Ticket Update] onSuccess ejecutado:", updatedTicket);
       toast.success("Estado actualizado");
       
       // FIX: Solo invalidar si es necesario (actualizar cache en lugar de refetch)
@@ -229,14 +264,23 @@ export function usePlatformSupportTickets(options?: UsePlatformSupportTicketsOpt
           old?.map((t) => (t.id === updatedTicket.id ? updatedTicket : t))
       );
 
+      console.log("✅ [Ticket Update] Cache actualizado con datos reales");
       options?.onTicketStatusUpdate?.(updatedTicket);
     },
     onError: (error: any, _variables, context: any) => {
       if (!isMountedRef.current) return;
       
+      console.error("❌ [Ticket Update] Error en mutación:", {
+        error: error.message,
+        details: error,
+        variables: _variables,
+        context
+      });
+      
       // Revertir optimistic update si falla
       if (context?.previousTickets) {
         queryClient.setQueryData(["platform-support-tickets"], context.previousTickets);
+        console.log("🔄 [Ticket Update] Rollback de optimistic update aplicado");
       }
       
       toast.error(error.message || "Error al actualizar el estado del ticket");
