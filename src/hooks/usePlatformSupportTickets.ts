@@ -45,6 +45,7 @@ interface UsePlatformSupportTicketsOptions {
 export function usePlatformSupportTickets(options?: UsePlatformSupportTicketsOptions) {
   const queryClient = useQueryClient();
   const isMountedRef = useRef(true);
+  const isMutatingRef = useRef(false);
 
   // Cleanup on unmount
   useEffect(() => {
@@ -87,6 +88,8 @@ export function usePlatformSupportTickets(options?: UsePlatformSupportTicketsOpt
     },
     staleTime: 30 * 1000, // 30 segundos
     gcTime: 5 * 60 * 1000, // 5 minutos
+    refetchOnWindowFocus: false, // Prevenir refetch que sobrescribe cambios
+    refetchOnMount: false, // Solo refetch manual
   });
 
   // Fetch messages para ticket específico - FIX: Incluir ticketId en queryKey
@@ -163,6 +166,7 @@ export function usePlatformSupportTickets(options?: UsePlatformSupportTicketsOpt
       ticketId: string;
       status: TicketStatus;
     }) => {
+      isMutatingRef.current = true;
       console.log("🎫 [Ticket Update] Iniciando actualización:", { ticketId, status });
       
       // Validar status
@@ -255,6 +259,13 @@ export function usePlatformSupportTickets(options?: UsePlatformSupportTicketsOpt
       }
       
       console.log("🎉 [Ticket Update] onSuccess ejecutado:", updatedTicket);
+      
+      // Desbloquear realtime después de completar
+      setTimeout(() => {
+        isMutatingRef.current = false;
+        console.log("🔓 [Ticket Update] Realtime desbloqueado");
+      }, 500);
+      
       toast.success("Estado actualizado");
       
       // FIX: Solo invalidar si es necesario (actualizar cache en lugar de refetch)
@@ -268,6 +279,7 @@ export function usePlatformSupportTickets(options?: UsePlatformSupportTicketsOpt
       options?.onTicketStatusUpdate?.(updatedTicket);
     },
     onError: (error: any, _variables, context: any) => {
+      isMutatingRef.current = false;
       if (!isMountedRef.current) return;
       
       console.error("❌ [Ticket Update] Error en mutación:", {
@@ -300,5 +312,6 @@ export function usePlatformSupportTickets(options?: UsePlatformSupportTicketsOpt
 
     // Utilities
     refetchTickets,
+    isMutatingRef, // Para bloquear realtime durante mutaciones
   };
 }

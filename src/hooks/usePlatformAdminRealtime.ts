@@ -1,4 +1,4 @@
-import { useEffect } from "react";
+import { useEffect, useRef } from "react";
 import { useQueryClient } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
 import { toast } from "sonner";
@@ -8,6 +8,7 @@ interface AdminRealtimeOptions {
   onNewTicket?: (ticket: any) => void;
   onTicketUpdate?: (ticket: any) => void;
   onNewMessage?: (message: any) => void;
+  isMutatingRef?: React.MutableRefObject<boolean>; // Para saber si hay mutación activa
 }
 
 export function usePlatformAdminRealtime({
@@ -15,6 +16,7 @@ export function usePlatformAdminRealtime({
   onNewTicket,
   onTicketUpdate,
   onNewMessage,
+  isMutatingRef,
 }: AdminRealtimeOptions = {}) {
   const queryClient = useQueryClient();
 
@@ -34,7 +36,13 @@ export function usePlatformAdminRealtime({
         (payload) => {
           console.log("🎫 Admin - Ticket change:", payload);
 
-          // Invalidate queries to refresh data
+          // NO invalidar queries durante mutaciones activas para prevenir race conditions
+          if (isMutatingRef?.current) {
+            console.warn("⏸️ [Realtime] invalidateQueries bloqueado durante mutación");
+            return;
+          }
+
+          // Invalidate queries to refresh data SOLO si no hay mutación activa
           queryClient.invalidateQueries({
             queryKey: ["platform-support-tickets"],
           });
@@ -50,7 +58,13 @@ export function usePlatformAdminRealtime({
 
           if (payload.eventType === "UPDATE") {
             const updatedTicket = payload.new as any;
-            onTicketUpdate?.(updatedTicket);
+            
+            // NO llamar callback durante mutaciones para evitar sobrescribir optimistic update
+            if (!isMutatingRef?.current) {
+              onTicketUpdate?.(updatedTicket);
+            } else {
+              console.warn("⏸️ [Realtime] onTicketUpdate bloqueado durante mutación");
+            }
           }
         }
       )
@@ -93,5 +107,5 @@ export function usePlatformAdminRealtime({
       supabase.removeChannel(ticketChannel);
       supabase.removeChannel(messageChannel);
     };
-  }, [enabled, queryClient, onNewTicket, onTicketUpdate, onNewMessage]);
+  }, [enabled, queryClient, onNewTicket, onTicketUpdate, onNewMessage, isMutatingRef]);
 }

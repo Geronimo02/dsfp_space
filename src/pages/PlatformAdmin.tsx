@@ -65,7 +65,15 @@ export default function PlatformAdmin() {
   // Enable realtime for platform admin to receive new tickets and messages
   usePlatformAdminRealtime({
     enabled: isPlatformAdmin,
+    isMutatingRef, // Pasar ref para bloquear realtime durante mutaciones
     onTicketUpdate: (updatedTicket: any) => {
+      // Ignorar realtime updates durante mutaciones para prevenir race conditions
+      if (isMutatingRef?.current) {
+        console.warn("⏸️ [Realtime] Update ignorado durante mutación:", updatedTicket);
+        return;
+      }
+      
+      console.log("📡 [Realtime] Update recibido:", updatedTicket);
       // Update the selected ticket if it's the one being viewed
       if (updatedTicket.id === selectedPlatformTicket?.id) {
         setSelectedPlatformTicket(updatedTicket);
@@ -339,9 +347,11 @@ export default function PlatformAdmin() {
     platformTicketMessages,
     respondPlatformTicketMutation,
     updatePlatformTicketStatusMutation,
+    isMutatingRef,
   } = usePlatformSupportTickets({
     selectedTicketId: selectedPlatformTicket?.id,
     onTicketStatusUpdate: (updatedTicket) => {
+      console.log("📥 [PlatformAdmin] onTicketStatusUpdate callback:", updatedTicket);
       setSelectedPlatformTicket(updatedTicket);
       // Si se cierra, deselecciona después de 1 segundo
       if (updatedTicket.status === "closed") {
