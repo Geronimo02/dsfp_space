@@ -45,6 +45,7 @@ import { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip as RechartsTooltip,
 import { exportToExcel, exportToPDF, formatCurrency, formatDate } from "@/lib/exportUtils";
 import { usePlatformAdmin } from "@/hooks/usePlatformAdmin";
 import { usePlatformAdminRealtime } from "@/hooks/usePlatformAdminRealtime";
+import { usePlatformSupportTickets, type PlatformSupportTicket } from "@/hooks/usePlatformSupportTickets";
 import { useNavigate, Navigate } from "react-router-dom";
 import { PricingConfiguration } from "@/components/settings/PricingConfiguration";
 import { PricingCalculator } from "@/components/settings/PricingCalculator";
@@ -327,149 +328,18 @@ export default function PlatformAdmin() {
   // Fetch support tickets (sistema antiguo)
   // Fetch customer support tickets (nuevo sistema integrado)
   // Estados para gestión de tickets de plataforma
-  const [selectedPlatformTicket, setSelectedPlatformTicket] = useState<any>(null);
+  const [selectedPlatformTicket, setSelectedPlatformTicket] = useState<PlatformSupportTicket | null>(null);
   const [platformTicketMessage, setPlatformTicketMessage] = useState("");
 
-  // Tickets de soporte de PLATAFORMA (empresas reportando problemas a admins)
-  const { data: platformSupportTickets, isLoading: platformTicketsLoading, error: platformTicketsError, refetch: refetchTickets } = useQuery({
-    queryKey: ["platform-support-tickets"],
-    queryFn: async () => {
-      try {
-        const { data, error } = await supabase
-          .from("platform_support_tickets")
-          .select(`
-            *,
-            companies!platform_support_tickets_company_id_fkey (
-              name,
-              email,
-              phone,
-              whatsapp_number
-            )
-          `)
-          .order("created_at", { ascending: false });
-
-        if (error) {
-          console.error("Error fetching platform support tickets:", error);
-          return [];
-        }
-        return data || [];
-      } catch (err) {
-        console.error("Exception fetching tickets:", err);
-        return [];
-      }
-    },
-    retry: 1,
-    staleTime: 30000,
-    gcTime: 5 * 60 * 1000,
-  });
-
-  // Mensajes del ticket seleccionado
-  const { data: platformTicketMessages } = useQuery({
-    queryKey: ["platform-ticket-messages", selectedPlatformTicket?.id],
-    queryFn: async () => {
-      if (!selectedPlatformTicket?.id) return [];
-      const { data, error } = await supabase
-        .from("platform_support_messages")
-        .select("*")
-        .eq("ticket_id", selectedPlatformTicket.id)
-        .order("created_at", { ascending: true });
-      if (error) throw error;
-      return data;
-    },
-    enabled: !!selectedPlatformTicket?.id,
-  });
-
-  // Mutation para responder ticket
-  const respondPlatformTicketMutation = useMutation({
-    mutationFn: async () => {
-      if (!selectedPlatformTicket?.id || !platformTicketMessage.trim()) return;
-      const { data: { user } } = await supabase.auth.getUser();
-      if (!user) throw new Error("Usuario no autenticado");
-
-      const { error } = await supabase
-        .from("platform_support_messages")
-        .insert([{
-          ticket_id: selectedPlatformTicket.id,
-          sender_type: "admin",
-          sender_id: user.id,
-          message: platformTicketMessage,
-        }]);
-
-      if (error) throw error;
-
-      // Retornar info para enviar notificación a la empresa
-      return {
-        ticketId: selectedPlatformTicket.id,
-        ticketNumber: selectedPlatformTicket.ticket_number,
-        companyId: selectedPlatformTicket.company_id,
-        companyEmail: selectedPlatformTicket.companies?.email,
-      };
-    },
-    onSuccess: (data) => {
-      queryClient.invalidateQueries({ queryKey: ["platform-ticket-messages"] });
-      setPlatformTicketMessage("");
-      
-      // Enviar notificación a la empresa (opcional - solo si hay email)
-      if (data?.companyEmail) {
-        supabase.functions.invoke("notify-platform-support-ticket", {
-          body: {
-            ticket_id: data.ticketId,
-            type: "message_received",
-            send_email: true,
-            send_sms: false,
-          }
-        }).catch(() => {});
-      }
-      
-      toast.success("Respuesta enviada");
-    },
-    onError: (error: any) => {
-      toast.error(error.message || "Error al enviar respuesta");
-    },
-  });
-
-  // Mutation para cambiar estado del ticket
-  const updatePlatformTicketStatusMutation = useMutation({
-    mutationFn: async ({ ticketId, status }: { ticketId: string, status: string }) => {
-      const updates: any = { status, updated_at: new Date().toISOString() };
-      if (status === "resolved") updates.resolved_at = new Date().toISOString();
-      if (status === "closed") updates.closed_at = new Date().toISOString();
-
-      const { data, error } = await supabase
-        .from("platform_support_tickets")
-        .update(updates)
-        .eq("id", ticketId)
-        .select(`
-          *,
-          companies!platform_support_tickets_company_id_fkey (
-            name,
-            email,
-            phone,
-            whatsapp_number
-          )
-        `)
-        .maybeSingle();
-
-      if (error) throw error;
-      if (!data) throw new Error("No se pudo actualizar el ticket");
-      return data;
-    },
-    onSuccess: (updatedTicket) => {
-      toast.success("Estado actualizado");
-      queryClient.invalidateQueries({ 
-        queryKey: ["platform-support-tickets"],
-        refetchType: 'all'
-      });
-      // Actualizar el ticket seleccionado con datos frescos de BD
-      if (selectedPlatformTicket && selectedPlatformTicket.id === updatedTicket.id) {
-        setSelectedPlatformTicket(updatedTicket);
-        // Si se cierra, deselecciona después de 1 segundo
-        if (updatedTicket.status === "closed") {
-          setTimeout(() => setSelectedPlatformTicket(null), 1000);
-        }
-      }
-    },
-    onError: (error: any) => {
+  // Usar el hook optimizado para tickets de soporte
+  const {
+    platformSupportTickets,
+    platformTicketsLoading,
+    platformTicketsError,
+    platformTicketMessages,
+    respondPlatformTicketMutation,
+    updatePlatformTicketStatusMutation,
+  } = usePlatformSupportTickets();
       toast.error(error.message || "Error al actualizar el estado del ticket");
     },
   });
