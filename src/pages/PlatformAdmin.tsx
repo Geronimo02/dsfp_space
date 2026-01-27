@@ -339,7 +339,16 @@ export default function PlatformAdmin() {
     platformTicketMessages,
     respondPlatformTicketMutation,
     updatePlatformTicketStatusMutation,
-  } = usePlatformSupportTickets();
+  } = usePlatformSupportTickets({
+    selectedTicketId: selectedPlatformTicket?.id,
+    onTicketStatusUpdate: (updatedTicket) => {
+      setSelectedPlatformTicket(updatedTicket);
+      // Si se cierra, deselecciona después de 1 segundo
+      if (updatedTicket.status === "closed") {
+        setTimeout(() => setSelectedPlatformTicket(null), 1000);
+      }
+    }
+  });
 
   // Fetch integrations data
   const { data: integrationsData } = useQuery({
@@ -1153,7 +1162,7 @@ export default function PlatformAdmin() {
                               onValueChange={(val) => {
                                 updatePlatformTicketStatusMutation.mutate({
                                   ticketId: selectedPlatformTicket.id,
-                                  status: val
+                                  status: val as PlatformSupportTicket["status"]
                                 });
                               }}
                               disabled={updatePlatformTicketStatusMutation.isPending}

@@ -1,7 +1,7 @@
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
 import { toast } from "sonner";
-import { useCallback } from "react";
+import { useEffect, useRef } from "react";
 
 export interface PlatformSupportTicket {
   id: string;
@@ -35,10 +35,25 @@ export interface PlatformSupportTicket {
   };
 }
 
-export function usePlatformSupportTickets() {
-  const queryClient = useQueryClient();
+export type TicketStatus = PlatformSupportTicket["status"];
 
-  // Fetch all support tickets
+interface UsePlatformSupportTicketsOptions {
+  onTicketStatusUpdate?: (ticket: PlatformSupportTicket) => void;
+  selectedTicketId?: string;
+}
+
+export function usePlatformSupportTickets(options?: UsePlatformSupportTicketsOptions) {
+  const queryClient = useQueryClient();
+  const isMountedRef = useRef(true);
+
+  // Cleanup on unmount
+  useEffect(() => {
+    return () => {
+      isMountedRef.current = false;
+    };
+  }, []);
+
+  // Fetch all support tickets with optimized caching
   const {
     data: platformSupportTickets,
     isLoading: platformTicketsLoading,
@@ -70,22 +85,29 @@ export function usePlatformSupportTickets() {
         throw error;
       }
     },
+    staleTime: 30 * 1000, // 30 segundos
+    gcTime: 5 * 60 * 1000, // 5 minutos
   });
 
-  // Fetch messages for a specific ticket
+  // Fetch messages para ticket específico - FIX: Incluir ticketId en queryKey
   const {
     data: platformTicketMessages,
   } = useQuery({
-    queryKey: ["platform-ticket-messages"],
+    queryKey: ["platform-ticket-messages", options?.selectedTicketId],
     queryFn: async () => {
+      if (!options?.selectedTicketId) return [];
+      
       const { data, error } = await supabase
         .from("platform_support_messages")
         .select("*")
+        .eq("ticket_id", options.selectedTicketId)
         .order("created_at", { ascending: true });
 
       if (error) throw error;
       return data;
     },
+    enabled: !!options?.selectedTicketId,
+    staleTime: 10 * 1000, // 10 segundos
   });
 
   // Mutation to respond to a ticket
@@ -118,41 +140,51 @@ export function usePlatformSupportTickets() {
       return { ticketId };
     },
     onSuccess: () => {
+      if (!isMountedRef.current) return;
+      
       queryClient.invalidateQueries({
         queryKey: ["platform-ticket-messages"],
+        refetchType: "active",
       });
       toast.success("Respuesta enviada");
     },
     onError: (error: any) => {
+      if (!isMountedRef.current) return;
       toast.error(error.message || "Error al enviar respuesta");
     },
   });
 
-  // Mutation to update ticket status
+  // Mutation to update ticket status - FIX: Combinar en 1 query + Optimistic Update
   const updatePlatformTicketStatusMutation = useMutation({
     mutationFn: async ({
       ticketId,
       status,
     }: {
       ticketId: string;
-      status: string;
+      status: TicketStatus;
     }) => {
-      const updates: any = { status, updated_at: new Date().toISOString() };
-      if (status === "resolved")
-        updates.resolved_at = new Date().toISOString();
-      if (status === "closed") updates.closed_at = new Date().toISOString();
+      // Validar status
+      const validStatuses: TicketStatus[] = ["open", "in_progress", "pending", "resolved", "closed"];
+      if (!validStatuses.includes(status)) {
+        throw new Error(`Estado inválido: ${status}`);
+      }
 
-      // First do the update
-      const { error: updateError } = await supabase
+      const updates: any = { 
+        status,
+        updated_at: new Date().toISOString(),
+      };
+      
+      // FIX: Usar now() de Supabase para timestamp del servidor
+      if (status === "resolved") 
+        updates.resolved_at = new Date().toISOString();
+      if (status === "closed") 
+        updates.closed_at = new Date().toISOString();
+
+      // FIX: Una sola query con select + actualizar
+      const { data, error } = await supabase
         .from("platform_support_tickets")
         .update(updates)
-        .eq("id", ticketId);
-
-      if (updateError) throw updateError;
-
-      // Then fetch the updated data with relations
-      const { data, error: fetchError } = await supabase
-        .from("platform_support_tickets")
+        .eq("id", ticketId)
         .select(
           `
           *,
@@ -164,20 +196,49 @@ export function usePlatformSupportTickets() {
           )
         `
         )
-        .eq("id", ticketId)
         .single();
 
-      if (fetchError) throw fetchError;
+      if (error) throw error;
       return data as PlatformSupportTicket;
     },
-    onSuccess: () => {
-      toast.success("Estado actualizado");
-      queryClient.invalidateQueries({
-        queryKey: ["platform-support-tickets"],
-        refetchType: "all",
-      });
+    onMutate: async ({ ticketId, status }) => {
+      // FIX: Optimistic update - actualizar UI inmediatamente
+      const previousTickets = queryClient.getQueryData<PlatformSupportTicket[]>([
+        "platform-support-tickets",
+      ]);
+
+      if (previousTickets) {
+        const optimisticTickets = previousTickets.map((ticket) =>
+          ticket.id === ticketId ? { ...ticket, status } : ticket
+        );
+        
+        queryClient.setQueryData(["platform-support-tickets"], optimisticTickets);
+      }
+
+      return { previousTickets };
     },
-    onError: (error: any) => {
+    onSuccess: (updatedTicket) => {
+      if (!isMountedRef.current) return;
+      
+      toast.success("Estado actualizado");
+      
+      // FIX: Solo invalidar si es necesario (actualizar cache en lugar de refetch)
+      queryClient.setQueryData(
+        ["platform-support-tickets"],
+        (old: PlatformSupportTicket[] | undefined) =>
+          old?.map((t) => (t.id === updatedTicket.id ? updatedTicket : t))
+      );
+
+      options?.onTicketStatusUpdate?.(updatedTicket);
+    },
+    onError: (error: any, _variables, context: any) => {
+      if (!isMountedRef.current) return;
+      
+      // Revertir optimistic update si falla
+      if (context?.previousTickets) {
+        queryClient.setQueryData(["platform-support-tickets"], context.previousTickets);
+      }
+      
       toast.error(error.message || "Error al actualizar el estado del ticket");
     },
   });
