@@ -1,172 +1,297 @@
-
-import { useState } from "react";
-import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
+import type { Database } from "@/integrations/supabase/types";
+import { useMemo, useState } from "react";
+import { useQuery } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
 import { Button } from "@/components/ui/button";
-import { Input } from "@/components/ui/input";
-import { Textarea } from "@/components/ui/textarea";
+import { Skeleton } from "@/components/ui/skeleton";
+import { Badge } from "@/components/ui/badge";
+import { LucideMoreVertical } from "lucide-react";
+import { format } from "date-fns";
+
+// --- Types ---
+type OpportunityBaseRow = Database["public"]["Tables"]["crm_opportunities"]["Row"];
+
+// Extend row with the fields you are selecting via joins/aliases.
+// NOTE: If `stage` is a relation (object), change this accordingly.
+type OpportunityRow = OpportunityBaseRow & {
+  customers?: { name: string } | null;
+  owner?: { name: string } | null;
+  stage?: string | null;
+  last_activity_at?: string | null;
+  next_step?: string | null; // you render this, so include it
+};
 
 interface OpportunitiesListProps {
   companyId: string;
   search: string;
+  filters: {
+    pipelineId?: string;
+    stageId?: string;
+    ownerId?: string;
+    status?: string;
+    dateRange?: { from: string; to: string };
+    amountRange?: { min: number; max: number };
+  };
+  onCreate?: () => void;
 }
 
-export function OpportunitiesList({ companyId, search }: OpportunitiesListProps) {
-  const queryClient = useQueryClient();
-  const [form, setForm] = useState({
-    name: "",
-    description: "",
-    value: "",
-    probability: 0,
-    estimated_close_date: "",
-    customer_id: "",
-    owner_id: "",
-  });
-  const [showForm, setShowForm] = useState(false);
+type OpportunitiesQueryResult = {
+  data: OpportunityRow[];
+  total: number;
+};
 
-  // Traer oportunidades con join a clientes
-  const { data: opportunities, isLoading } = useQuery({
-    queryKey: ["crm-opportunities", companyId],
-    queryFn: async () => {
-      const { data, error } = await supabase
-        .from("crm_opportunities" as any)
-        .select("*, customers(name)")
-        .eq("company_id", companyId)
-        .order("created_at", { ascending: false });
+// Only allow sorting by real columns (and optionally custom ones)
+type SortableField = keyof OpportunityBaseRow;
+
+export function OpportunitiesList({
+  companyId,
+  search,
+  filters,
+  onCreate,
+}: OpportunitiesListProps) {
+  // --- Pagination & Sorting ---
+  const [page, setPage] = useState(1);
+  const [pageSize] = useState(10);
+
+  const [sort, setSort] = useState<{ field: SortableField; direction: "asc" | "desc" }>(
+    { field: "close_date", direction: "desc" } as any
+  );
+
+  // --- Stable query key (NO complex object) ---
+  const queryKey = useMemo(
+    () =>
+      [
+        "opportunities",
+        companyId,
+        search ?? "",
+        filters.pipelineId ?? "",
+        filters.stageId ?? "",
+        filters.ownerId ?? "",
+        filters.status ?? "",
+        filters.dateRange?.from ?? "",
+        filters.dateRange?.to ?? "",
+        filters.amountRange?.min ?? "",
+        filters.amountRange?.max ?? "",
+        sort.field,
+        sort.direction,
+        page,
+        pageSize,
+      ] as const,
+    [
+      companyId,
+      search,
+      filters.pipelineId,
+      filters.stageId,
+      filters.ownerId,
+      filters.status,
+      filters.dateRange?.from,
+      filters.dateRange?.to,
+      filters.amountRange?.min,
+      filters.amountRange?.max,
+      sort.field,
+      sort.direction,
+      page,
+      pageSize,
+    ]
+  );
+
+  // --- Data fetching ---
+  const { data, isLoading, isError, refetch, isFetching } = useQuery<
+    OpportunitiesQueryResult,
+    Error
+  >({
+    queryKey,
+    queryFn: async (): Promise<OpportunitiesQueryResult> => {
+      let q: ReturnType<typeof supabase.from> = supabase
+        .from("crm_opportunities")
+        // keep the select string aligned with OpportunityRow extension above
+        .select(
+          "*, customers(name), owner:profiles(name), stage, last_activity_at, next_step",
+          { count: "exact" }
+        )
+        .eq("company_id", companyId);
+
+      if (search) q = q.filter("name", "ilike", `%${search}%`);
+      if (filters.pipelineId) q = q.eq("pipeline_id", filters.pipelineId);
+      if (filters.stageId) q = q.eq("stage_id", filters.stageId);
+      if (filters.ownerId) q = q.eq("owner_id", filters.ownerId);
+      if (filters.status) q = q.eq("status", filters.status);
+
+      if (filters.dateRange) {
+        q = q.gte("estimated_close_date", filters.dateRange.from).lte("estimated_close_date", filters.dateRange.to);
+      }
+
+      if (filters.amountRange) {
+        q = q.gte("value", filters.amountRange.min).lte("value", filters.amountRange.max);
+      }
+
+      // supabase expects a real column name
+      if (sort.field) {
+        q = q.order(sort.field as string, { ascending: sort.direction === "asc" });
+      }
+
+      q = q.range((page - 1) * pageSize, page * pageSize - 1);
+
+      const { data, error, count } = await q;
       if (error) throw error;
-      return data;
+
+      return { data: (data ?? []) as OpportunityRow[], total: count ?? 0 };
     },
-    enabled: !!companyId,
+
+    // TanStack Query v4:
+    placeholderData: (prev) => prev,
   });
 
-  // Filtrar por búsqueda
-  const filteredOpportunities = opportunities?.filter((opp: any) => {
-    const searchLower = search.toLowerCase();
-    return (
-      opp.name?.toLowerCase().includes(searchLower) ||
-      opp.customers?.name?.toLowerCase().includes(searchLower)
-    );
-  });
+  // --- Table columns ---
+  const columns: { key: keyof OpportunityRow | "actions"; label: string }[] = [
+    { key: "name", label: "Oportunidad" },
+    { key: "stage", label: "Etapa" },
+    { key: "value", label: "Monto" },
+    { key: "estimated_close_date", label: "Cierre" },
+    { key: "probability", label: "%" },
+    { key: "next_step", label: "Próximo paso" },
+    { key: "owner", label: "Responsable" },
+    { key: "last_activity_at", label: "Última actividad" },
+    { key: "actions", label: "" },
+  ];
 
-  // Crear oportunidad
-  const mutation = useMutation({
-    mutationFn: async (newOpp: any) => {
-      const { error } = await supabase.from("crm_opportunities" as any).insert([newOpp]);
-      if (error) throw error;
-    },
-    onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ["crm-opportunities", companyId] });
-      setForm({
-        name: "",
-        description: "",
-        value: "",
-        probability: 0,
-        estimated_close_date: "",
-        customer_id: "",
-        owner_id: "",
-      });
-      setShowForm(false);
-    },
-  });
+  const handleSort = (key: keyof OpportunityRow | "actions") => {
+    if (key === "actions") return;
+
+    // only allow sorting by real DB columns
+    if (!Object.prototype.hasOwnProperty.call(({} as OpportunityBaseRow), key)) {
+      // For joined/computed fields like owner/customers/stage strings, ignore sorting to avoid runtime issues
+      return;
+    }
+
+    setSort((s) => ({
+      field: key as SortableField,
+      direction: s.field === key && s.direction === "desc" ? "asc" : "desc",
+    }));
+    setPage(1);
+  };
 
   return (
-    <div className="bg-white rounded-lg shadow p-6">
-      <div className="flex items-center justify-between mb-4">
-        <h2 className="text-xl font-bold">Oportunidades</h2>
-        <Button variant="default" onClick={() => setShowForm(f => !f)}>
-          {showForm ? "Cancelar" : "Nueva oportunidad"}
-        </Button>
+    <div className="bg-white rounded-lg shadow p-0">
+      <div className="overflow-x-auto">
+        <table className="min-w-full border-separate border-spacing-0">
+          <thead className="bg-gray-100">
+            <tr>
+              {columns.map((col) => (
+                <th
+                  key={String(col.key)}
+                  className="px-4 py-2 text-left font-semibold text-sm select-none cursor-pointer"
+                  onClick={() => handleSort(col.key)}
+                  aria-sort={
+                    col.key !== "actions" && sort.field === col.key
+                      ? sort.direction === "asc"
+                        ? "ascending"
+                        : "descending"
+                      : undefined
+                  }
+                >
+                  {col.label}
+                  {col.key !== "actions" && sort.field === col.key && (
+                    <span className="ml-1 text-xs">{sort.direction === "asc" ? "▲" : "▼"}</span>
+                  )}
+                </th>
+              ))}
+            </tr>
+          </thead>
+
+          <tbody>
+            {isLoading || isFetching ? (
+              Array.from({ length: 8 }).map((_, i) => (
+                <tr key={i}>
+                  {columns.map((col) => (
+                    <td key={String(col.key)} className="px-4 py-3">
+                      <Skeleton className="h-5 w-full" />
+                    </td>
+                  ))}
+                </tr>
+              ))
+            ) : isError ? (
+              <tr>
+                <td colSpan={columns.length} className="text-center py-8">
+                  <div className="text-red-500 mb-2">Error al cargar oportunidades.</div>
+                  <Button variant="outline" onClick={() => refetch()}>
+                    Reintentar
+                  </Button>
+                </td>
+              </tr>
+            ) : !data?.data?.length ? (
+              <tr>
+                <td colSpan={columns.length} className="text-center py-12">
+                  <div className="text-muted-foreground mb-2">No hay oportunidades.</div>
+                  <Button onClick={onCreate}>Crear oportunidad</Button>
+                </td>
+              </tr>
+            ) : (
+              data.data.map((opp) => (
+                <tr key={opp.id} className="border-b hover:bg-gray-50 group">
+                  <td className="px-4 py-2 font-semibold max-w-xs truncate">{opp.name}</td>
+
+                  <td className="px-4 py-2">
+                    {opp.stage ? <Badge variant="secondary">{opp.stage}</Badge> : <Badge variant="secondary">-</Badge>}
+                  </td>
+
+                  <td className="px-4 py-2 font-mono">{opp.value ? `$${opp.value}` : "-"}</td>
+
+                  <td className="px-4 py-2">
+                    {opp.estimated_close_date ? format(new Date(opp.estimated_close_date), "dd/MM/yyyy") : "-"}
+                  </td>
+
+                  <td className="px-4 py-2">{opp.probability ?? "-"}%</td>
+
+                  <td className="px-4 py-2 text-xs">
+                    {opp.next_step ?? <span className="text-muted-foreground">-</span>}
+                  </td>
+
+                  <td className="px-4 py-2">
+                    {opp.owner?.name ?? <span className="text-muted-foreground">-</span>}
+                  </td>
+
+                  <td className="px-4 py-2 text-xs">
+                    {opp.last_activity_at ? format(new Date(opp.last_activity_at), "dd/MM/yyyy") : "-"}
+                  </td>
+
+                  <td className="px-2 py-2">
+                    <Button variant="ghost" size="icon" aria-label="Acciones">
+                      <LucideMoreVertical className="w-4 h-4" />
+                    </Button>
+                  </td>
+                </tr>
+              ))
+            )}
+          </tbody>
+        </table>
       </div>
-      {showForm && (
-        <form
-          className="mb-6 grid gap-2 bg-gray-50 p-4 rounded-lg border"
-          onSubmit={e => {
-            e.preventDefault();
-            mutation.mutate({
-              ...form,
-              company_id: companyId,
-              value: form.value ? Number(form.value) : null,
-              probability: form.probability ? Number(form.probability) : 0,
-            });
-          }}
-        >
-          <div className="grid grid-cols-2 gap-4">
-            <Input
-              placeholder="Nombre de la oportunidad"
-              value={form.name}
-              onChange={e => setForm(f => ({ ...f, name: e.target.value }))}
-              required
-            />
-            <Input
-              placeholder="Valor estimado"
-              type="number"
-              value={form.value}
-              onChange={e => setForm(f => ({ ...f, value: e.target.value }))}
-            />
-            <Input
-              placeholder="Probabilidad (%)"
-              type="number"
-              value={form.probability}
-              onChange={e => setForm(f => ({ ...f, probability: Number(e.target.value) }))}
-            />
-            <Input
-              placeholder="Fecha estimada de cierre"
-              type="date"
-              value={form.estimated_close_date}
-              onChange={e => setForm(f => ({ ...f, estimated_close_date: e.target.value }))}
-            />
-          </div>
-          <Textarea
-            placeholder="Descripción"
-            value={form.description}
-            onChange={e => setForm(f => ({ ...f, description: e.target.value }))}
-          />
-          {/* Puedes agregar selects para customer_id y owner_id si tienes esos datos */}
-          <div className="flex justify-end mt-2">
-            <Button type="submit" disabled={mutation.isPending}>
-              Crear oportunidad
+
+      {data?.total ? (
+        <div className="flex items-center justify-between px-4 py-2 border-t bg-gray-50 text-sm">
+          <span>
+            Página {page} de {Math.ceil(data.total / pageSize)}
+          </span>
+          <div className="flex gap-2">
+            <Button
+              variant="outline"
+              size="sm"
+              onClick={() => setPage((p) => Math.max(1, p - 1))}
+              disabled={page === 1}
+            >
+              Anterior
+            </Button>
+            <Button
+              variant="outline"
+              size="sm"
+              onClick={() => setPage((p) => p + 1)}
+              disabled={page * pageSize >= data.total}
+            >
+              Siguiente
             </Button>
           </div>
-        </form>
-      )}
-      {isLoading ? (
-        <p>Cargando...</p>
-      ) : (
-        <div className="overflow-x-auto">
-          <table className="min-w-full border rounded-lg">
-            <thead className="bg-gray-100">
-              <tr>
-                <th className="px-4 py-2 text-left">Nombre</th>
-                <th className="px-4 py-2 text-left">Cliente</th>
-                <th className="px-4 py-2 text-left">Valor</th>
-                <th className="px-4 py-2 text-left">Probabilidad</th>
-                <th className="px-4 py-2 text-left">Etapa</th>
-                <th className="px-4 py-2 text-left">Cierre estimado</th>
-                <th className="px-4 py-2 text-left">Descripción</th>
-              </tr>
-            </thead>
-            <tbody>
-              {filteredOpportunities?.length === 0 ? (
-                <tr>
-                  <td colSpan={7} className="text-center py-4 text-muted-foreground">No se encontraron oportunidades.</td>
-                </tr>
-              ) : (
-                filteredOpportunities?.map((opp: any) => (
-                  <tr key={opp.id} className="border-b hover:bg-gray-50">
-                    <td className="px-4 py-2 font-semibold">{opp.name}</td>
-                    <td className="px-4 py-2">{opp.customers?.name ?? "-"}</td>
-                    <td className="px-4 py-2 font-mono">${opp.value ?? "-"}</td>
-                    <td className="px-4 py-2">{opp.probability}%</td>
-                    <td className="px-4 py-2">{opp.stage}</td>
-                    <td className="px-4 py-2">{opp.estimated_close_date ?? "-"}</td>
-                    <td className="px-4 py-2 text-sm text-muted-foreground">{opp.description}</td>
-                  </tr>
-                ))
-              )}
-            </tbody>
-          </table>
         </div>
-      )}
+      ) : null}
     </div>
   );
 }
