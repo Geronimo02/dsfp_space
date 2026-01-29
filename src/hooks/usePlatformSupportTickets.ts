@@ -210,43 +210,25 @@ export function usePlatformSupportTickets(options?: UsePlatformSupportTicketsOpt
 
       console.log("📝 [Ticket Update] Updates a aplicar:", updates);
 
-      // FIX: Separar UPDATE y SELECT en 2 queries para evitar error 406
-      // 1. Primero hacer el UPDATE sin select
-      const { error: updateError } = await supabase
-        .from("platform_support_tickets")
-        .update(updates)
-        .eq("id", ticketId);
+      // Usar Edge Function para actualizar con service role (evita RLS que revierte estado)
+      const { data: functionResult, error: functionError } = await supabase.functions.invoke(
+        "update-platform-support-ticket-status",
+        {
+          body: {
+            ticket_id: ticketId,
+            status,
+          },
+        }
+      );
 
-      if (updateError) {
-        console.error("❌ [Ticket Update] Error en UPDATE:", updateError);
-        throw updateError;
+      if (functionError) {
+        console.error("❌ [Ticket Update] Error en Edge Function:", functionError);
+        throw functionError;
       }
-      
-      console.log("✅ [Ticket Update] UPDATE exitoso, obteniendo datos...");
 
-      // 2. Luego hacer el SELECT con join
-      const { data, error: selectError } = await supabase
-        .from("platform_support_tickets")
-        .select(
-          `
-          *,
-          companies!platform_support_tickets_company_id_fkey (
-            name,
-            email,
-            phone,
-            whatsapp_number
-          )
-        `
-        )
-        .eq("id", ticketId)
-        .single();
-
-      if (selectError) {
-        console.error("❌ [Ticket Update] Error en SELECT:", selectError);
-        throw selectError;
-      }
+      const data = functionResult?.ticket as PlatformSupportTicket | undefined;
       if (!data) {
-        console.error("❌ [Ticket Update] No se recibió data del SELECT");
+        console.error("❌ [Ticket Update] Edge Function no devolvió ticket");
         throw new Error("No se pudo obtener el ticket actualizado");
       }
 
