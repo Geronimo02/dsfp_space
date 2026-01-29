@@ -370,59 +370,10 @@ export default function PlatformAdmin() {
     },
   });
 
-  // Sync selectedPlatformTicket with cache when platformSupportTickets changes
-  // Este efecto mantiene el ticket seleccionado sincronizado con los datos del cache
-  useEffect(() => {
-    console.log("🔍 [Sync Effect] Triggered", {
-      hasSelectedTicket: !!selectedPlatformTicket,
-      selectedId: selectedPlatformTicket?.id?.slice(0,8),
-      selectedStatus: selectedPlatformTicket?.status,
-      ticketsCount: platformSupportTickets?.length,
-      isMutating: isMutatingRef?.current
-    });
-    
-    if (!selectedPlatformTicket || !platformSupportTickets) {
-      console.log("🔍 [Sync Effect] Early return - missing data");
-      return;
-    }
-    
-    // Skip sync durante mutaciones activas para evitar race conditions
-    if (isMutatingRef?.current) {
-      console.log("⏸️ [Sync Effect] SKIPPED - mutation active");
-      return;
-    }
-    
-    const cachedTicket = platformSupportTickets.find(
-      (t: PlatformSupportTicket) => t.id === selectedPlatformTicket.id
-    );
-    
-    console.log("🔍 [Sync Effect] Comparing:", {
-      selectedStatus: selectedPlatformTicket.status,
-      cachedStatus: cachedTicket?.status,
-      selectedUpdatedAt: selectedPlatformTicket.updated_at,
-      cachedUpdatedAt: cachedTicket?.updated_at
-    });
-    
-    // Solo actualizar si el ticket en cache tiene un updated_at más reciente
-    // Esto previene que datos antiguos sobrescriban datos nuevos
-    if (cachedTicket) {
-      const cachedUpdatedAt = new Date(cachedTicket.updated_at || 0).getTime();
-      const selectedUpdatedAt = new Date(selectedPlatformTicket.updated_at || 0).getTime();
-      
-      if (cachedUpdatedAt > selectedUpdatedAt) {
-        console.log("⚠️ [Sync Effect] UPDATING selectedPlatformTicket from cache:", {
-          oldStatus: selectedPlatformTicket.status,
-          newStatus: cachedTicket.status,
-          cachedUpdatedAt,
-          selectedUpdatedAt,
-          diff: cachedUpdatedAt - selectedUpdatedAt
-        });
-        setSelectedPlatformTicket(cachedTicket);
-      } else {
-        console.log("✅ [Sync Effect] No update needed - selected is same or newer");
-      }
-    }
-  }, [platformSupportTickets]);
+  // NO USAR useEffect para sincronizar - causa race conditions
+  // El callback onTicketStatusUpdate ya actualiza correctamente selectedPlatformTicket
+  // El realtime callback tambien lo actualiza cuando cambia desde otros admin
+
 
   // Fetch integrations data
   const { data: integrationsData } = useQuery({

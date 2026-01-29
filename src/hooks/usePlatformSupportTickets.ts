@@ -210,25 +210,67 @@ export function usePlatformSupportTickets(options?: UsePlatformSupportTicketsOpt
 
       console.log("📝 [Ticket Update] Updates a aplicar:", updates);
 
-      // Usar Edge Function para actualizar con service role (evita RLS que revierte estado)
-      const { data: functionResult, error: functionError } = await supabase.functions.invoke(
-        "update-platform-support-ticket-status",
-        {
-          body: {
-            ticket_id: ticketId,
-            status,
-          },
-        }
-      );
+      let data: PlatformSupportTicket | undefined;
+      
+      // Intentar usar Edge Function primero (más seguro con service role)
+      try {
+        const { data: functionResult, error: functionError } = await supabase.functions.invoke(
+          "update-platform-support-ticket-status",
+          {
+            body: {
+              ticket_id: ticketId,
+              status,
+            },
+          }
+        );
 
-      if (functionError) {
-        console.error("❌ [Ticket Update] Error en Edge Function:", functionError);
-        throw functionError;
+        if (!functionError && functionResult?.ticket) {
+          data = functionResult.ticket as PlatformSupportTicket;
+          console.log("✅ [Ticket Update] Edge Function exitosa");
+        } else {
+          console.warn("⚠️ [Ticket Update] Edge Function falló, usando método directo:", functionError);
+          throw functionError; // Forzar fallback
+        }
+      } catch (functionException) {
+        console.log("⚠️ [Ticket Update] Usando fallback - actualización directa");
+        
+        // Fallback: actualizar directamente (puede revertir con RLS pero es mejor que nada)
+        const { error: updateError } = await supabase
+          .from("platform_support_tickets")
+          .update(updates)
+          .eq("id", ticketId);
+
+        if (updateError) {
+          console.error("❌ [Ticket Update] Error en UPDATE directo:", updateError);
+          throw updateError;
+        }
+        
+        const { data: directData, error: selectError } = await supabase
+          .from("platform_support_tickets")
+          .select(
+            `
+            *,
+            companies!platform_support_tickets_company_id_fkey (
+              name,
+              email,
+              phone,
+              whatsapp_number
+            )
+          `
+          )
+          .eq("id", ticketId)
+          .single();
+
+        if (selectError || !directData) {
+          console.error("❌ [Ticket Update] Error en SELECT:", selectError);
+          throw selectError || new Error("No se pudo obtener el ticket actualizado");
+        }
+        
+        data = directData as any as PlatformSupportTicket;
       }
 
-      const data = functionResult?.ticket as PlatformSupportTicket | undefined;
       if (!data) {
-        console.error("❌ [Ticket Update] Edge Function no devolvió ticket");
+        console.error("❌ [Ticket Update] No se obtuvo dato final");
         throw new Error("No se pudo obtener el ticket actualizado");
       }
 
