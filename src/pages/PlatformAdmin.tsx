@@ -1,4 +1,4 @@
-import { useState, useEffect } from "react";
+import { useState, useEffect, useMemo } from "react";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
@@ -317,7 +317,7 @@ export default function PlatformAdmin() {
   // Fetch support tickets (sistema antiguo)
   // Fetch customer support tickets (nuevo sistema integrado)
   // Estados para gestión de tickets de plataforma
-  const [selectedPlatformTicket, setSelectedPlatformTicket] = useState<PlatformSupportTicket | null>(null);
+  const [selectedPlatformTicketId, setSelectedPlatformTicketId] = useState<string | null>(null);
   const [platformTicketMessage, setPlatformTicketMessage] = useState("");
 
   // Usar el hook optimizado para tickets de soporte
@@ -330,49 +330,30 @@ export default function PlatformAdmin() {
     updatePlatformTicketStatusMutation,
     isMutatingRef,
   } = usePlatformSupportTickets({
-    selectedTicketId: selectedPlatformTicket?.id,
-    onTicketStatusUpdate: (updatedTicket) => {
-      console.log("📥 [PlatformAdmin] onTicketStatusUpdate callback:", updatedTicket);
-      setSelectedPlatformTicket(updatedTicket);
-      // Si se cierra, deselecciona después de 1 segundo
-      if (updatedTicket.status === "closed") {
-        setTimeout(() => setSelectedPlatformTicket(null), 1000);
-      }
-    }
+    selectedTicketId: selectedPlatformTicketId,
   });
 
+  // Derivar selectedPlatformTicket del cache (source of truth única)
+  const selectedPlatformTicket = useMemo(() => {
+    if (!selectedPlatformTicketId || !platformSupportTickets) return null;
+    const ticket = platformSupportTickets.find(t => t.id === selectedPlatformTicketId);
+    console.log("🔍 [useMemo RECOMPUTE] selectedPlatformTicket derived from cache:", {
+      selectedId: selectedPlatformTicketId?.slice(0,8),
+      found: !!ticket,
+      status: ticket?.status,
+      updated_at: ticket?.updated_at,
+      cacheSize: platformSupportTickets?.length
+    });
+    return ticket || null;
+  }, [selectedPlatformTicketId, platformSupportTickets]);
+
   // Enable realtime for platform admin to receive new tickets and messages
+  // El cache de React Query se actualiza automáticamente via realtime
+  // selectedPlatformTicket se deriva del cache, no necesita callbacks
   usePlatformAdminRealtime({
     enabled: isPlatformAdmin,
     isMutatingRef, // Bloquea realtime mientras hay mutaciones
-    onTicketUpdate: (updatedTicket: any) => {
-      console.log("📡 [Realtime Callback] onTicketUpdate called:", {
-        ticketId: updatedTicket?.id?.slice(0,8),
-        status: updatedTicket?.status,
-        isMutating: isMutatingRef?.current,
-        selectedId: selectedPlatformTicket?.id?.slice(0,8)
-      });
-      
-      // Ignorar realtime updates durante mutaciones para prevenir race conditions
-      if (isMutatingRef?.current) {
-        console.warn("⏸️ [Realtime Callback] BLOCKED - mutation active");
-        return;
-      }
-      
-      // Update the selected ticket if it's the one being viewed
-      if (updatedTicket.id === selectedPlatformTicket?.id) {
-        console.log("📡 [Realtime Callback] Setting selectedPlatformTicket:", {
-          oldStatus: selectedPlatformTicket?.status,
-          newStatus: updatedTicket.status
-        });
-        setSelectedPlatformTicket(updatedTicket);
-      }
-    },
   });
-
-  // NO USAR useEffect para sincronizar - causa race conditions
-  // El callback onTicketStatusUpdate ya actualiza correctamente selectedPlatformTicket
-  // El realtime callback tambien lo actualiza cuando cambia desde otros admin
 
 
   // Fetch integrations data
@@ -1074,7 +1055,7 @@ export default function PlatformAdmin() {
                           className={`p-3 border rounded-lg cursor-pointer transition-colors hover:bg-muted/50 ${
                             selectedPlatformTicket?.id === ticket.id ? "bg-muted border-2 border-primary" : ""
                           }`}
-                          onClick={() => setSelectedPlatformTicket(ticket)}
+                          onClick={() => setSelectedPlatformTicketId(ticket.id)}
                         >
                           <div className="flex items-start justify-between mb-2">
                             <div className="flex items-center gap-2 flex-wrap">
@@ -1208,7 +1189,7 @@ export default function PlatformAdmin() {
                         <Button 
                           variant="outline" 
                           size="sm"
-                          onClick={() => setSelectedPlatformTicket(null)}
+                          onClick={() => setSelectedPlatformTicketId(null)}
                           className="mt-1"
                         >
                           ✕ Cerrar

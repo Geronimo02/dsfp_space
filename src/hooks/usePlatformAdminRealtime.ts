@@ -126,22 +126,35 @@ export function usePlatformAdminRealtime({
                 if (currentTicket && currentTicket.updated_at) {
                   const currentTime = new Date(currentTicket.updated_at).getTime();
                   const incomingTime = new Date(fullTicket.updated_at).getTime();
+                  const timeDiff = incomingTime - currentTime;
+                  
+                  console.log("⏱️ [Realtime] Timestamp comparison:", {
+                    ticketId: fullTicket.id?.slice(0,8),
+                    currentStatus: currentTicket.status,
+                    currentTime: currentTicket.updated_at,
+                    incomingStatus: fullTicket.status,
+                    incomingTime: fullTicket.updated_at,
+                    timeDiffMs: timeDiff,
+                    willApply: timeDiff >= 0
+                  });
                   
                   if (incomingTime < currentTime) {
-                    console.warn("⏭️ [Realtime UPDATE] Ignorando update obsoleto:", {
-                      currentTime: currentTicket.updated_at,
-                      incomingTime: fullTicket.updated_at
-                    });
+                    console.warn("⏭️ [Realtime] IGNORING stale update (older than cache)");
                     return; // Ignorar updates obsoletos
                   }
                 }
                 
                 // Actualizar el cache directamente sin invalidar
+                console.log("📡 [Realtime] Applying update to cache:", {
+                  ticketId: fullTicket.id?.slice(0,8),
+                  newStatus: fullTicket.status,
+                  newUpdatedAt: fullTicket.updated_at
+                });
                 queryClient.setQueryData(
                   ["platform-support-tickets"],
                   (old: any[] | undefined) => {
                     const updated = old?.map((t: any) => t.id === fullTicket.id ? fullTicket : t) || [];
-                    console.log("📝 [Realtime UPDATE] Cache after update:", updated.map(t => ({ id: t.id?.slice(0,8), status: t.status })));
+                    console.log("✅ [Realtime] Cache updated from realtime event");
                     return updated;
                   }
                 );

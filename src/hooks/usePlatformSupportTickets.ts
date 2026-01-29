@@ -38,7 +38,6 @@ export interface PlatformSupportTicket {
 export type TicketStatus = PlatformSupportTicket["status"];
 
 interface UsePlatformSupportTicketsOptions {
-  onTicketStatusUpdate?: (ticket: PlatformSupportTicket) => void;
   selectedTicketId?: string;
 }
 
@@ -298,7 +297,7 @@ export function usePlatformSupportTickets(options?: UsePlatformSupportTicketsOpt
       return data as PlatformSupportTicket;
     },
     onMutate: async ({ ticketId, status }) => {
-      console.log("🔄 [Optimistic Update] Aplicando actualización optimista:", { ticketId, status });
+      console.log("🔄 [Optimistic Update] Iniciando...", { ticketId: ticketId.slice(0,8), newStatus: status });
       
       // Cancelar cualquier refetch en progreso para evitar race conditions
       await queryClient.cancelQueries({ queryKey: ["platform-support-tickets"] });
@@ -307,17 +306,30 @@ export function usePlatformSupportTickets(options?: UsePlatformSupportTicketsOpt
       const previousTickets = queryClient.getQueryData<PlatformSupportTicket[]>([
         "platform-support-tickets",
       ]);
+      
+      const currentTicket = previousTickets?.find(t => t.id === ticketId);
+      console.log("📊 [Optimistic] BEFORE update - current cache state:", {
+        ticketId: ticketId.slice(0,8),
+        currentStatus: currentTicket?.status,
+        currentUpdatedAt: currentTicket?.updated_at,
+        newStatus: status
+      });
 
       if (previousTickets) {
         // Aplicar optimistic update inmediatamente
+        const optimisticUpdatedAt = new Date().toISOString();
         const optimisticTickets = previousTickets.map((ticket) =>
           ticket.id === ticketId 
-            ? { ...ticket, status, updated_at: new Date().toISOString() } 
+            ? { ...ticket, status, updated_at: optimisticUpdatedAt } 
             : ticket
         );
         
         queryClient.setQueryData(["platform-support-tickets"], optimisticTickets);
-        console.log("✅ [Optimistic Update] Cache actualizado optimísticamente");
+        console.log("✅ [Optimistic] Cache updated with optimistic data:", {
+          ticketId: ticketId.slice(0,8),
+          newStatus: status,
+          optimisticTimestamp: optimisticUpdatedAt
+        });
       } else {
         console.warn("⚠️ [Optimistic Update] No hay tickets previos en cache");
       }
@@ -330,7 +342,7 @@ export function usePlatformSupportTickets(options?: UsePlatformSupportTicketsOpt
         return;
       }
       
-      console.log("🎉 [Ticket Update] onSuccess - ticket actualizado:", {
+      console.log("🎉 [onSuccess] Server data received:", {
         ticketId: updatedTicket.id?.slice(0,8),
         status: updatedTicket.status,
         updated_at: updatedTicket.updated_at
@@ -340,17 +352,21 @@ export function usePlatformSupportTickets(options?: UsePlatformSupportTicketsOpt
       queryClient.setQueryData(
         ["platform-support-tickets"],
         (old: PlatformSupportTicket[] | undefined) => {
+          const oldTicket = old?.find(t => t.id === updatedTicket.id);
+          console.log("📝 [onSuccess] BEFORE replacing in cache:", {
+            ticketId: updatedTicket.id?.slice(0,8),
+            oldStatus: oldTicket?.status,
+            oldUpdatedAt: oldTicket?.updated_at,
+            newStatus: updatedTicket.status,
+            newUpdatedAt: updatedTicket.updated_at
+          });
           const updated = old?.map((t) => (t.id === updatedTicket.id ? updatedTicket : t));
-          console.log("📝 [onSuccess] Cache after setQueryData:", updated?.map(t => ({ 
-            id: t.id?.slice(0,8), 
-            status: t.status 
-          })));
+          console.log("✅ [onSuccess] Cache updated with real server data");
           return updated;
         }
       );
 
-      console.log("✅ [Ticket Update] Cache actualizado con datos reales, llamando callback...");
-      options?.onTicketStatusUpdate?.(updatedTicket);
+      console.log("✅ [Ticket Update] Cache actualizado con datos reales");
       
       toast.success("Estado actualizado");
       
