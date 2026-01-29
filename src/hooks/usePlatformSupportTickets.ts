@@ -88,8 +88,8 @@ export function usePlatformSupportTickets(options?: UsePlatformSupportTicketsOpt
     },
     staleTime: 30 * 1000, // 30 segundos
     gcTime: 5 * 60 * 1000, // 5 minutos
-    refetchOnWindowFocus: true, // Refetch al volver a la ventana para sincronizar
-    refetchOnMount: "always", // Siempre refetch al montar para datos frescos
+    refetchOnWindowFocus: false, // Deshabilitado para evitar sobrescribir cambios optimistas
+    refetchOnMount: true, // Refetch al montar para datos frescos
   });
 
   // Fetch messages para ticket específico - FIX: Incluir ticketId en queryKey
@@ -274,14 +274,20 @@ export function usePlatformSupportTickets(options?: UsePlatformSupportTicketsOpt
     onMutate: async ({ ticketId, status }) => {
       console.log("🔄 [Optimistic Update] Aplicando actualización optimista:", { ticketId, status });
       
-      // FIX: Optimistic update - actualizar UI inmediatamente
+      // Cancelar cualquier refetch en progreso para evitar race conditions
+      await queryClient.cancelQueries({ queryKey: ["platform-support-tickets"] });
+      
+      // Guardar el estado anterior para rollback
       const previousTickets = queryClient.getQueryData<PlatformSupportTicket[]>([
         "platform-support-tickets",
       ]);
 
       if (previousTickets) {
+        // Aplicar optimistic update inmediatamente
         const optimisticTickets = previousTickets.map((ticket) =>
-          ticket.id === ticketId ? { ...ticket, status } : ticket
+          ticket.id === ticketId 
+            ? { ...ticket, status, updated_at: new Date().toISOString() } 
+            : ticket
         );
         
         queryClient.setQueryData(["platform-support-tickets"], optimisticTickets);

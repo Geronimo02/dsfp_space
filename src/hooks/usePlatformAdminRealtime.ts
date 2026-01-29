@@ -36,16 +36,12 @@ export function usePlatformAdminRealtime({
         async (payload) => {
           console.log("🎫 Admin - Ticket change:", payload);
 
-          // NO invalidar queries durante mutaciones activas para prevenir race conditions
+          // Durante mutaciones activas, ignorar completamente los eventos realtime
+          // El cache ya fue actualizado por el optimistic update y onSuccess
           if (isMutatingRef?.current) {
-            console.warn("⏸️ [Realtime] invalidateQueries bloqueado durante mutación");
+            console.warn("⏸️ [Realtime] Evento ignorado durante mutación activa");
             return;
           }
-
-          // Invalidate queries to refresh data SOLO si no hay mutación activa
-          queryClient.invalidateQueries({
-            queryKey: ["platform-support-tickets"],
-          });
 
           if (payload.eventType === "INSERT") {
             // Fetch full ticket with companies relation for new tickets
@@ -65,6 +61,12 @@ export function usePlatformAdminRealtime({
                 .single();
               
               if (fullTicket) {
+                // Agregar el nuevo ticket al cache directamente
+                queryClient.setQueryData(
+                  ["platform-support-tickets"],
+                  (old: any[] | undefined) => old ? [fullTicket, ...old] : [fullTicket]
+                );
+                
                 toast.info(`Nuevo ticket: ${fullTicket.ticket_number}`, {
                   description: fullTicket.subject?.substring(0, 50),
                   duration: 5000,
@@ -73,45 +75,61 @@ export function usePlatformAdminRealtime({
               }
             } catch (error) {
               console.error("Error fetching full ticket:", error);
-              // Fallback to partial data
-              const newTicket = payload.new as any;
-              toast.info(`Nuevo ticket: ${newTicket.ticket_number}`, {
-                description: newTicket.subject?.substring(0, 50),
-                duration: 5000,
+              // Fallback: invalidar queries para forzar refetch
+              queryClient.invalidateQueries({
+                queryKey: ["platform-support-tickets"],
               });
-              onNewTicket?.(newTicket);
             }
           }
 
           if (payload.eventType === "UPDATE") {
-            // NO llamar callback durante mutaciones para evitar sobrescribir optimistic update
-            if (!isMutatingRef?.current) {
-              // Fetch full ticket with companies relation to ensure complete data
-              try {
-                const { data: fullTicket } = await supabase
-                  .from("platform_support_tickets")
-                  .select(`
-                    *,
-                    companies!platform_support_tickets_company_id_fkey (
-                      name,
-                      email,
-                      phone,
-                      whatsapp_number
-                    )
-                  `)
-                  .eq("id", (payload.new as any).id)
-                  .single();
+            const updatedData = payload.new as any;
+            
+            // Fetch full ticket with companies relation to ensure complete data
+            try {
+              const { data: fullTicket } = await supabase
+                .from("platform_support_tickets")
+                .select(`
+                  *,
+                  companies!platform_support_tickets_company_id_fkey (
+                    name,
+                    email,
+                    phone,
+                    whatsapp_number
+                  )
+                `)
+                .eq("id", updatedData.id)
+                .single();
+              
+              if (fullTicket) {
+                // Actualizar el cache directamente sin invalidar
+                queryClient.setQueryData(
+                  ["platform-support-tickets"],
+                  (old: any[] | undefined) => 
+                    old?.map((t: any) => t.id === fullTicket.id ? fullTicket : t) || []
+                );
                 
-                if (fullTicket) {
-                  onTicketUpdate?.(fullTicket);
-                }
-              } catch (error) {
-                console.error("Error fetching full ticket on update:", error);
-                // Fallback to partial data - but preserve companies if possible
-                onTicketUpdate?.(payload.new as any);
+                onTicketUpdate?.(fullTicket);
               }
-            } else {
-              console.warn("⏸️ [Realtime] onTicketUpdate bloqueado durante mutación");
+            } catch (error) {
+              console.error("Error fetching full ticket on update:", error);
+              // En caso de error, actualizar con datos parciales del payload
+              queryClient.setQueryData(
+                ["platform-support-tickets"],
+                (old: any[] | undefined) => 
+                  old?.map((t: any) => t.id === updatedData.id ? { ...t, ...updatedData } : t) || []
+              );
+              onTicketUpdate?.(updatedData);
+            }
+          }
+
+          if (payload.eventType === "DELETE") {
+            const deletedId = (payload.old as any)?.id;
+            if (deletedId) {
+              queryClient.setQueryData(
+                ["platform-support-tickets"],
+                (old: any[] | undefined) => old?.filter((t: any) => t.id !== deletedId) || []
+              );
             }
           }
         }

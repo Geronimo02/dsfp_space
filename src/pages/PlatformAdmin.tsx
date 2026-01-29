@@ -361,27 +361,37 @@ export default function PlatformAdmin() {
   });
 
   // Sync selectedPlatformTicket with cache when platformSupportTickets changes
+  // Este efecto mantiene el ticket seleccionado sincronizado con los datos del cache
   useEffect(() => {
     if (!selectedPlatformTicket || !platformSupportTickets) return;
     
-    // Skip sync during active mutations to prevent race conditions
+    // Skip sync durante mutaciones activas para evitar race conditions
     if (isMutatingRef?.current) {
       console.log("⏸️ [Sync] Skipped during mutation");
       return;
     }
     
-    const updatedTicket = platformSupportTickets.find(
+    const cachedTicket = platformSupportTickets.find(
       (t: PlatformSupportTicket) => t.id === selectedPlatformTicket.id
     );
     
-    if (updatedTicket && updatedTicket.status !== selectedPlatformTicket.status) {
-      console.log("🔄 [Sync] Updating selectedPlatformTicket from cache:", {
-        oldStatus: selectedPlatformTicket.status,
-        newStatus: updatedTicket.status
-      });
-      setSelectedPlatformTicket(updatedTicket);
+    // Solo actualizar si el ticket en cache tiene un updated_at más reciente
+    // Esto previene que datos antiguos sobrescriban datos nuevos
+    if (cachedTicket) {
+      const cachedUpdatedAt = new Date(cachedTicket.updated_at || 0).getTime();
+      const selectedUpdatedAt = new Date(selectedPlatformTicket.updated_at || 0).getTime();
+      
+      if (cachedUpdatedAt > selectedUpdatedAt) {
+        console.log("🔄 [Sync] Updating selectedPlatformTicket from cache (newer data):", {
+          oldStatus: selectedPlatformTicket.status,
+          newStatus: cachedTicket.status,
+          cachedUpdatedAt,
+          selectedUpdatedAt
+        });
+        setSelectedPlatformTicket(cachedTicket);
+      }
     }
-  }, [platformSupportTickets, selectedPlatformTicket?.id]);
+  }, [platformSupportTickets]);
 
   // Fetch integrations data
   const { data: integrationsData } = useQuery({
