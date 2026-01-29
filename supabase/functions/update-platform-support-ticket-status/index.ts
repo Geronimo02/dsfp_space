@@ -21,6 +21,8 @@ serve(async (req: Request) => {
     const body = (await req.json()) as UpdateStatusRequest;
     const { ticket_id, status } = body || {};
 
+    console.log("📥 [Edge Function] Request received:", { ticket_id: ticket_id?.slice(0, 8), status });
+
     if (!ticket_id || !status) {
       return new Response(
         JSON.stringify({ error: "ticket_id y status son requeridos" }),
@@ -29,12 +31,19 @@ serve(async (req: Request) => {
     }
 
     const serviceRoleKey = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY");
-    const anonKey = Deno.env.get("SUPABASE_ANON_KEY");
+    
+    if (!serviceRoleKey) {
+      console.error("❌ [Edge Function] SUPABASE_SERVICE_ROLE_KEY not configured!");
+      return new Response(
+        JSON.stringify({ error: "Server configuration error: service role key missing" }),
+        { status: 500, headers: { "Content-Type": "application/json", ...corsHeaders } }
+      );
+    }
 
+    // Usar SOLO service role key (sin Authorization header del usuario)
     const supabase = createClient(
       Deno.env.get("SUPABASE_URL") ?? "",
-      serviceRoleKey ?? anonKey ?? "",
-      { global: { headers: { Authorization: req.headers.get("Authorization") ?? "" } } }
+      serviceRoleKey
     );
 
     const updates: any = {
@@ -45,17 +54,22 @@ serve(async (req: Request) => {
     if (status === "resolved") updates.resolved_at = new Date().toISOString();
     if (status === "closed") updates.closed_at = new Date().toISOString();
 
+    console.log("📝 [Edge Function] Executing UPDATE:", { ticket_id: ticket_id.slice(0, 8), updates });
+
     const { error: updateError } = await supabase
       .from("platform_support_tickets")
       .update(updates)
       .eq("id", ticket_id);
 
     if (updateError) {
+      console.error("❌ [Edge Function] UPDATE failed:", updateError);
       return new Response(
         JSON.stringify({ error: updateError.message }),
         { status: 400, headers: { "Content-Type": "application/json", ...corsHeaders } }
       );
     }
+
+    console.log("✅ [Edge Function] UPDATE successful, fetching updated ticket...");
 
     const { data: fullTicket, error: selectError } = await supabase
       .from("platform_support_tickets")
@@ -74,16 +88,24 @@ serve(async (req: Request) => {
       .single();
 
     if (selectError || !fullTicket) {
+      console.error("❌ [Edge Function] SELECT failed:", selectError);
       return new Response(
         JSON.stringify({ error: selectError?.message ?? "No se pudo obtener el ticket actualizado" }),
         { status: 400, headers: { "Content-Type": "application/json", ...corsHeaders } }
       );
     }
 
+    console.log("✅ [Edge Function] Returning ticket:", { 
+      ticket_id: fullTicket.id.slice(0, 8), 
+      status: fullTicket.status,
+      updated_at: fullTicket.updated_at
+    });
+
     return new Response(JSON.stringify({ ticket: fullTicket }), {
       headers: { "Content-Type": "application/json", ...corsHeaders },
     });
   } catch (error) {
+    console.error("❌ [Edge Function] Unexpected error:", error);
     return new Response(
       JSON.stringify({ error: error?.message ?? "Error interno" }),
       { status: 500, headers: { "Content-Type": "application/json", ...corsHeaders } }
