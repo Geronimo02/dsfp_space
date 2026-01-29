@@ -33,7 +33,7 @@ export function usePlatformAdminRealtime({
           schema: "public",
           table: "platform_support_tickets",
         },
-        (payload) => {
+        async (payload) => {
           console.log("🎫 Admin - Ticket change:", payload);
 
           // NO invalidar queries durante mutaciones activas para prevenir race conditions
@@ -48,20 +48,68 @@ export function usePlatformAdminRealtime({
           });
 
           if (payload.eventType === "INSERT") {
-            const newTicket = payload.new as any;
-            toast.info(`Nuevo ticket: ${newTicket.ticket_number}`, {
-              description: newTicket.subject?.substring(0, 50),
-              duration: 5000,
-            });
-            onNewTicket?.(newTicket);
+            // Fetch full ticket with companies relation for new tickets
+            try {
+              const { data: fullTicket } = await supabase
+                .from("platform_support_tickets")
+                .select(`
+                  *,
+                  companies!platform_support_tickets_company_id_fkey (
+                    name,
+                    email,
+                    phone,
+                    whatsapp_number
+                  )
+                `)
+                .eq("id", (payload.new as any).id)
+                .single();
+              
+              if (fullTicket) {
+                toast.info(`Nuevo ticket: ${fullTicket.ticket_number}`, {
+                  description: fullTicket.subject?.substring(0, 50),
+                  duration: 5000,
+                });
+                onNewTicket?.(fullTicket);
+              }
+            } catch (error) {
+              console.error("Error fetching full ticket:", error);
+              // Fallback to partial data
+              const newTicket = payload.new as any;
+              toast.info(`Nuevo ticket: ${newTicket.ticket_number}`, {
+                description: newTicket.subject?.substring(0, 50),
+                duration: 5000,
+              });
+              onNewTicket?.(newTicket);
+            }
           }
 
           if (payload.eventType === "UPDATE") {
-            const updatedTicket = payload.new as any;
-            
             // NO llamar callback durante mutaciones para evitar sobrescribir optimistic update
             if (!isMutatingRef?.current) {
-              onTicketUpdate?.(updatedTicket);
+              // Fetch full ticket with companies relation to ensure complete data
+              try {
+                const { data: fullTicket } = await supabase
+                  .from("platform_support_tickets")
+                  .select(`
+                    *,
+                    companies!platform_support_tickets_company_id_fkey (
+                      name,
+                      email,
+                      phone,
+                      whatsapp_number
+                    )
+                  `)
+                  .eq("id", (payload.new as any).id)
+                  .single();
+                
+                if (fullTicket) {
+                  onTicketUpdate?.(fullTicket);
+                }
+              } catch (error) {
+                console.error("Error fetching full ticket on update:", error);
+                // Fallback to partial data - but preserve companies if possible
+                onTicketUpdate?.(payload.new as any);
+              }
             } else {
               console.warn("⏸️ [Realtime] onTicketUpdate bloqueado durante mutación");
             }

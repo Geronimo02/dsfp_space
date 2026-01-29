@@ -88,8 +88,8 @@ export function usePlatformSupportTickets(options?: UsePlatformSupportTicketsOpt
     },
     staleTime: 30 * 1000, // 30 segundos
     gcTime: 5 * 60 * 1000, // 5 minutos
-    refetchOnWindowFocus: false, // Prevenir refetch que sobrescribe cambios
-    refetchOnMount: false, // Solo refetch manual
+    refetchOnWindowFocus: true, // Refetch al volver a la ventana para sincronizar
+    refetchOnMount: "always", // Siempre refetch al montar para datos frescos
   });
 
   // Fetch messages para ticket específico - FIX: Incluir ticketId en queryKey
@@ -300,11 +300,11 @@ export function usePlatformSupportTickets(options?: UsePlatformSupportTicketsOpt
       
       console.log("🎉 [Ticket Update] onSuccess ejecutado:", updatedTicket);
       
-      // Desbloquear realtime después de completar
+      // Desbloquear realtime después de completar - timeout más largo para evitar race conditions
       setTimeout(() => {
         isMutatingRef.current = false;
         console.log("🔓 [Ticket Update] Realtime desbloqueado");
-      }, 500);
+      }, 2000);
       
       toast.success("Estado actualizado");
       

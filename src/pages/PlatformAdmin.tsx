@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
@@ -359,6 +359,29 @@ export default function PlatformAdmin() {
       }
     },
   });
+
+  // Sync selectedPlatformTicket with cache when platformSupportTickets changes
+  useEffect(() => {
+    if (!selectedPlatformTicket || !platformSupportTickets) return;
+    
+    // Skip sync during active mutations to prevent race conditions
+    if (isMutatingRef?.current) {
+      console.log("⏸️ [Sync] Skipped during mutation");
+      return;
+    }
+    
+    const updatedTicket = platformSupportTickets.find(
+      (t: PlatformSupportTicket) => t.id === selectedPlatformTicket.id
+    );
+    
+    if (updatedTicket && updatedTicket.status !== selectedPlatformTicket.status) {
+      console.log("🔄 [Sync] Updating selectedPlatformTicket from cache:", {
+        oldStatus: selectedPlatformTicket.status,
+        newStatus: updatedTicket.status
+      });
+      setSelectedPlatformTicket(updatedTicket);
+    }
+  }, [platformSupportTickets, selectedPlatformTicket?.id]);
 
   // Fetch integrations data
   const { data: integrationsData } = useQuery({
