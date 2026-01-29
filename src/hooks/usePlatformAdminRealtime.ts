@@ -115,8 +115,27 @@ export function usePlatformAdminRealtime({
               if (fullTicket) {
                 console.log("✅ [Realtime UPDATE] Updating cache with full ticket:", {
                   ticketId: fullTicket.id?.slice(0,8),
-                  status: fullTicket.status
+                  status: fullTicket.status,
+                  updated_at: fullTicket.updated_at
                 });
+                
+                // Verificar si el update es más reciente que el cache actual
+                const currentTickets = queryClient.getQueryData<any[]>(["platform-support-tickets"]);
+                const currentTicket = currentTickets?.find(t => t.id === fullTicket.id);
+                
+                if (currentTicket && currentTicket.updated_at) {
+                  const currentTime = new Date(currentTicket.updated_at).getTime();
+                  const incomingTime = new Date(fullTicket.updated_at).getTime();
+                  
+                  if (incomingTime < currentTime) {
+                    console.warn("⏭️ [Realtime UPDATE] Ignorando update obsoleto:", {
+                      currentTime: currentTicket.updated_at,
+                      incomingTime: fullTicket.updated_at
+                    });
+                    return; // Ignorar updates obsoletos
+                  }
+                }
+                
                 // Actualizar el cache directamente sin invalidar
                 queryClient.setQueryData(
                   ["platform-support-tickets"],

@@ -35,10 +35,14 @@ serve(async (req: Request) => {
 
   try {
     console.log("📨 Procesando notificación a admins...");
-    const supabase = createClient(
-      Deno.env.get("SUPABASE_URL") ?? "",
-      Deno.env.get("SUPABASE_SERVICE_ROLE_KEY") ?? ""
-    );
+    const supabaseUrl = Deno.env.get("SUPABASE_URL") ?? "";
+    const serviceRoleKey = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY") ?? "";
+
+    if (!supabaseUrl || !serviceRoleKey) {
+      throw new Error("Missing SUPABASE_URL or SUPABASE_SERVICE_ROLE_KEY");
+    }
+
+    const supabase = createClient(supabaseUrl, serviceRoleKey);
 
     const body = await req.json() as TicketNotificationRequest;
     const {
@@ -53,20 +57,46 @@ serve(async (req: Request) => {
       sendWhatsApp = true,
     } = body;
 
-    // Obtener admins activos con sus preferencias
-    const { data: admins, error: adminsError } = await supabase
+    // Obtener admins activos
+    const { data: adminRows, error: adminsError } = await supabase
       .from("platform_admins")
-      .select(`
-        user_id,
-        email,
-        phone,
-        notification_preferences
-      `)
+      .select("user_id, email")
       .eq("active", true);
 
-    if (adminsError || !admins) {
-      throw new Error("Error al obtener administradores");
+    if (adminsError) {
+      throw new Error(`Error al obtener administradores: ${adminsError.message}`);
     }
+
+    const adminIds = (adminRows ?? []).map((admin: any) => admin.user_id);
+    let adminProfiles: any[] = [];
+
+    if (adminIds.length > 0) {
+      const { data: profilesData, error: profilesError } = await supabase
+        .from("profiles")
+        .select("id, notification_email, notification_whatsapp, whatsapp_number")
+        .in("id", adminIds);
+
+      if (profilesError) {
+        console.warn("No se pudieron obtener preferencias de admins:", profilesError.message);
+      } else {
+        adminProfiles = profilesData ?? [];
+      }
+    }
+
+    const profilesById = new Map(
+      adminProfiles.map((profile: any) => [profile.id, profile])
+    );
+
+    const admins = (adminRows ?? []).map((admin: any) => {
+      const profile = profilesById.get(admin.user_id);
+      return {
+        user_id: admin.user_id,
+        email: admin.email,
+        notification_email: profile?.notification_email ?? true,
+        notification_whatsapp: profile?.notification_whatsapp ?? false,
+        whatsapp_number: profile?.whatsapp_number ?? null,
+      };
+    });
 
     const results = {
       email_sent: 0,
@@ -78,7 +108,7 @@ serve(async (req: Request) => {
     if (sendEmail && RESEND_API_KEY && admins.length > 0) {
       const resend = new Resend(RESEND_API_KEY);
       const emailAddresses = admins
-        .filter((a: any) => a.email)
+        .filter((a: any) => a.email && a.notification_email)
         .map((a: any) => a.email);
 
       if (emailAddresses.length > 0) {
@@ -128,8 +158,8 @@ serve(async (req: Request) => {
       TWILIO_PHONE_NUMBER
     ) {
       const phoneNumbers = admins
-        .filter((a: any) => a.phone)
-        .map((a: any) => a.phone);
+        .filter((a: any) => a.whatsapp_number && a.notification_whatsapp)
+        .map((a: any) => a.whatsapp_number);
 
       const priorityEmoji = {
         urgent: "🔴",

@@ -354,11 +354,11 @@ export function usePlatformSupportTickets(options?: UsePlatformSupportTicketsOpt
       
       toast.success("Estado actualizado");
       
-      // Desbloquear realtime después de que todo se complete
+      // Desbloquear realtime inmediatamente después del update exitoso
       setTimeout(() => {
-        console.log("🔓 [Ticket Update] Desbloqueando realtime (timeout 3s)");
+        console.log("🔓 [Ticket Update] Desbloqueando realtime (timeout 500ms)");
         isMutatingRef.current = false;
-      }, 3000);
+      }, 500); // 500ms de bloqueo para evitar race conditions
     },
     onError: (error: any, _variables, context: any) => {
       isMutatingRef.current = false;
