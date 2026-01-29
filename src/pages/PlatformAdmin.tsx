@@ -346,15 +346,25 @@ export default function PlatformAdmin() {
     enabled: isPlatformAdmin,
     isMutatingRef, // Bloquea realtime mientras hay mutaciones
     onTicketUpdate: (updatedTicket: any) => {
+      console.log("📡 [Realtime Callback] onTicketUpdate called:", {
+        ticketId: updatedTicket?.id?.slice(0,8),
+        status: updatedTicket?.status,
+        isMutating: isMutatingRef?.current,
+        selectedId: selectedPlatformTicket?.id?.slice(0,8)
+      });
+      
       // Ignorar realtime updates durante mutaciones para prevenir race conditions
       if (isMutatingRef?.current) {
-        console.warn("⏸️ [Realtime] Update ignorado durante mutación:", updatedTicket);
+        console.warn("⏸️ [Realtime Callback] BLOCKED - mutation active");
         return;
       }
       
-      console.log("📡 [Realtime] Update recibido:", updatedTicket);
       // Update the selected ticket if it's the one being viewed
       if (updatedTicket.id === selectedPlatformTicket?.id) {
+        console.log("📡 [Realtime Callback] Setting selectedPlatformTicket:", {
+          oldStatus: selectedPlatformTicket?.status,
+          newStatus: updatedTicket.status
+        });
         setSelectedPlatformTicket(updatedTicket);
       }
     },
@@ -363,17 +373,35 @@ export default function PlatformAdmin() {
   // Sync selectedPlatformTicket with cache when platformSupportTickets changes
   // Este efecto mantiene el ticket seleccionado sincronizado con los datos del cache
   useEffect(() => {
-    if (!selectedPlatformTicket || !platformSupportTickets) return;
+    console.log("🔍 [Sync Effect] Triggered", {
+      hasSelectedTicket: !!selectedPlatformTicket,
+      selectedId: selectedPlatformTicket?.id?.slice(0,8),
+      selectedStatus: selectedPlatformTicket?.status,
+      ticketsCount: platformSupportTickets?.length,
+      isMutating: isMutatingRef?.current
+    });
+    
+    if (!selectedPlatformTicket || !platformSupportTickets) {
+      console.log("🔍 [Sync Effect] Early return - missing data");
+      return;
+    }
     
     // Skip sync durante mutaciones activas para evitar race conditions
     if (isMutatingRef?.current) {
-      console.log("⏸️ [Sync] Skipped during mutation");
+      console.log("⏸️ [Sync Effect] SKIPPED - mutation active");
       return;
     }
     
     const cachedTicket = platformSupportTickets.find(
       (t: PlatformSupportTicket) => t.id === selectedPlatformTicket.id
     );
+    
+    console.log("🔍 [Sync Effect] Comparing:", {
+      selectedStatus: selectedPlatformTicket.status,
+      cachedStatus: cachedTicket?.status,
+      selectedUpdatedAt: selectedPlatformTicket.updated_at,
+      cachedUpdatedAt: cachedTicket?.updated_at
+    });
     
     // Solo actualizar si el ticket en cache tiene un updated_at más reciente
     // Esto previene que datos antiguos sobrescriban datos nuevos
@@ -382,13 +410,16 @@ export default function PlatformAdmin() {
       const selectedUpdatedAt = new Date(selectedPlatformTicket.updated_at || 0).getTime();
       
       if (cachedUpdatedAt > selectedUpdatedAt) {
-        console.log("🔄 [Sync] Updating selectedPlatformTicket from cache (newer data):", {
+        console.log("⚠️ [Sync Effect] UPDATING selectedPlatformTicket from cache:", {
           oldStatus: selectedPlatformTicket.status,
           newStatus: cachedTicket.status,
           cachedUpdatedAt,
-          selectedUpdatedAt
+          selectedUpdatedAt,
+          diff: cachedUpdatedAt - selectedUpdatedAt
         });
         setSelectedPlatformTicket(cachedTicket);
+      } else {
+        console.log("✅ [Sync Effect] No update needed - selected is same or newer");
       }
     }
   }, [platformSupportTickets]);

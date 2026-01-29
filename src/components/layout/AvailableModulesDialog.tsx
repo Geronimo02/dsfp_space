@@ -44,6 +44,7 @@ import {
   ChevronDown,
   Mail,
   Phone,
+  X,
 } from "lucide-react";
 import { toast } from "sonner";
 import { useQuery } from "@tanstack/react-query";
@@ -212,6 +213,20 @@ export function AvailableModulesDialog({
     );
   };
 
+  const selectAllModules = () => {
+    const allModuleCodes = unavailableModules.map(m => m.code);
+    setSelectedModules(allModuleCodes);
+    // Abrir todas las categorías para mostrar la selección
+    setOpenCategories(Object.keys(modulesByCategory));
+  };
+
+  const deselectAllModules = () => {
+    setSelectedModules([]);
+  };
+
+  const allSelected = unavailableModules.length > 0 && 
+    selectedModules.length === unavailableModules.length;
+
   const handleSendRequest = async () => {
     if (selectedModules.length === 0) {
       toast.error("Selecciona al menos un módulo");
@@ -378,6 +393,28 @@ export function AvailableModulesDialog({
           </div>
         ) : (
           <>
+            {/* Botón Seleccionar/Deseleccionar todos */}
+            <div className="flex justify-end mb-2">
+              <Button
+                variant="outline"
+                size="sm"
+                onClick={allSelected ? deselectAllModules : selectAllModules}
+                className="text-xs"
+              >
+                {allSelected ? (
+                  <>
+                    <X className="w-3.5 h-3.5 mr-1.5" />
+                    Deseleccionar todos
+                  </>
+                ) : (
+                  <>
+                    <CheckCircle className="w-3.5 h-3.5 mr-1.5" />
+                    Seleccionar todos ({unavailableModules.length})
+                  </>
+                )}
+              </Button>
+            </div>
+
             <div className="space-y-2 max-h-[40vh] sm:max-h-[350px] overflow-y-auto pr-2">
               {Object.entries(modulesByCategory).map(([category, modules]) => {
                 const CategoryIcon = CATEGORY_ICONS[category] || Package;

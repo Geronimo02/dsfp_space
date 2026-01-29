@@ -63,6 +63,7 @@ export function usePlatformSupportTickets(options?: UsePlatformSupportTicketsOpt
   } = useQuery({
     queryKey: ["platform-support-tickets"],
     queryFn: async () => {
+      console.log("🔍 [Query] Fetching tickets from DB...");
       try {
         const { data, error } = await supabase
           .from("platform_support_tickets")
@@ -80,6 +81,7 @@ export function usePlatformSupportTickets(options?: UsePlatformSupportTicketsOpt
           .order("created_at", { ascending: false });
 
         if (error) throw error;
+        console.log("🔍 [Query] Tickets fetched from DB:", data?.map(t => ({ id: t.id.slice(0,8), status: t.status, ticket_number: t.ticket_number })));
         return data as PlatformSupportTicket[];
       } catch (error) {
         console.error("Error fetching support tickets:", error);
@@ -304,25 +306,35 @@ export function usePlatformSupportTickets(options?: UsePlatformSupportTicketsOpt
         return;
       }
       
-      console.log("🎉 [Ticket Update] onSuccess ejecutado:", updatedTicket);
+      console.log("🎉 [Ticket Update] onSuccess - ticket actualizado:", {
+        ticketId: updatedTicket.id?.slice(0,8),
+        status: updatedTicket.status,
+        updated_at: updatedTicket.updated_at
+      });
       
-      // Desbloquear realtime después de completar - timeout más largo para evitar race conditions
-      setTimeout(() => {
-        isMutatingRef.current = false;
-        console.log("🔓 [Ticket Update] Realtime desbloqueado");
-      }, 2000);
+      // Actualizar cache con datos reales del servidor
+      queryClient.setQueryData(
+        ["platform-support-tickets"],
+        (old: PlatformSupportTicket[] | undefined) => {
+          const updated = old?.map((t) => (t.id === updatedTicket.id ? updatedTicket : t));
+          console.log("📝 [onSuccess] Cache after setQueryData:", updated?.map(t => ({ 
+            id: t.id?.slice(0,8), 
+            status: t.status 
+          })));
+          return updated;
+        }
+      );
+
+      console.log("✅ [Ticket Update] Cache actualizado con datos reales, llamando callback...");
+      options?.onTicketStatusUpdate?.(updatedTicket);
       
       toast.success("Estado actualizado");
       
-      // FIX: Solo invalidar si es necesario (actualizar cache en lugar de refetch)
-      queryClient.setQueryData(
-        ["platform-support-tickets"],
-        (old: PlatformSupportTicket[] | undefined) =>
-          old?.map((t) => (t.id === updatedTicket.id ? updatedTicket : t))
-      );
-
-      console.log("✅ [Ticket Update] Cache actualizado con datos reales");
-      options?.onTicketStatusUpdate?.(updatedTicket);
+      // Desbloquear realtime después de que todo se complete
+      setTimeout(() => {
+        console.log("🔓 [Ticket Update] Desbloqueando realtime (timeout 3s)");
+        isMutatingRef.current = false;
+      }, 3000);
     },
     onError: (error: any, _variables, context: any) => {
       isMutatingRef.current = false;

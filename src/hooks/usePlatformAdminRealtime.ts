@@ -34,12 +34,18 @@ export function usePlatformAdminRealtime({
           table: "platform_support_tickets",
         },
         async (payload) => {
-          console.log("🎫 Admin - Ticket change:", payload);
+          console.log("🎫 [Realtime] Ticket change received:", {
+            eventType: payload.eventType,
+            ticketId: (payload.new as any)?.id?.slice(0,8),
+            newStatus: (payload.new as any)?.status,
+            oldStatus: (payload.old as any)?.status,
+            isMutating: isMutatingRef?.current
+          });
 
           // Durante mutaciones activas, ignorar completamente los eventos realtime
           // El cache ya fue actualizado por el optimistic update y onSuccess
           if (isMutatingRef?.current) {
-            console.warn("⏸️ [Realtime] Evento ignorado durante mutación activa");
+            console.warn("⏸️ [Realtime] Evento BLOQUEADO - mutación activa");
             return;
           }
 
@@ -84,6 +90,11 @@ export function usePlatformAdminRealtime({
 
           if (payload.eventType === "UPDATE") {
             const updatedData = payload.new as any;
+            console.log("🔄 [Realtime UPDATE] Processing update for ticket:", {
+              ticketId: updatedData.id?.slice(0,8),
+              newStatus: updatedData.status,
+              isMutating: isMutatingRef?.current
+            });
             
             // Fetch full ticket with companies relation to ensure complete data
             try {
@@ -102,11 +113,18 @@ export function usePlatformAdminRealtime({
                 .single();
               
               if (fullTicket) {
+                console.log("✅ [Realtime UPDATE] Updating cache with full ticket:", {
+                  ticketId: fullTicket.id?.slice(0,8),
+                  status: fullTicket.status
+                });
                 // Actualizar el cache directamente sin invalidar
                 queryClient.setQueryData(
                   ["platform-support-tickets"],
-                  (old: any[] | undefined) => 
-                    old?.map((t: any) => t.id === fullTicket.id ? fullTicket : t) || []
+                  (old: any[] | undefined) => {
+                    const updated = old?.map((t: any) => t.id === fullTicket.id ? fullTicket : t) || [];
+                    console.log("📝 [Realtime UPDATE] Cache after update:", updated.map(t => ({ id: t.id?.slice(0,8), status: t.status })));
+                    return updated;
+                  }
                 );
                 
                 onTicketUpdate?.(fullTicket);
