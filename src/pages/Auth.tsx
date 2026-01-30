@@ -208,11 +208,11 @@ export default function Auth() {
             <Button type="submit" className="w-full mt-2 h-11 bg-primary hover:bg-primary/90 text-white font-semibold shadow-lg" disabled={isLoading}>
               {isLoading ? "Iniciando sesión..." : "Iniciar Sesión"}
             </Button>
-            <div className="flex items-center justify-between mt-4 pt-2 border-t border-primary/30">
+            <div className="flex flex-col sm:flex-row items-center justify-between gap-2 sm:gap-0 mt-4 pt-2 border-t border-primary/30">
               <Button
                 type="button"
                 variant="link"
-                className="text-sm text-slate-300 hover:text-white"
+                className="text-xs sm:text-sm text-slate-300 hover:text-white w-full sm:w-auto text-center"
                 onClick={() => setShowForgotPassword(true)}
               >
                 ¿Olvidaste tu contraseña?
@@ -220,7 +220,7 @@ export default function Auth() {
               <Button
                 type="button"
                 variant="link"
-                className="text-sm text-primary hover:text-primary/80 font-medium"
+                className="text-xs sm:text-sm text-primary hover:text-primary/80 font-medium w-full sm:w-auto text-center"
                 onClick={() => navigate("/signup")}
               >
                 ¿No tienes cuenta? Regístrate
