@@ -3,6 +3,7 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription } f
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Textarea } from "@/components/ui/textarea";
+import { useIsMobile } from "@/hooks/use-mobile";
 import { 
   Package, 
   ShoppingBag, 
@@ -159,11 +160,13 @@ export function AvailableModulesDialog({
   activeModules 
 }: AvailableModulesDialogProps) {
   const { currentCompany } = useCompany();
+  const isMobile = useIsMobile();
   const [selectedModules, setSelectedModules] = useState<string[]>([]);
   const [message, setMessage] = useState("");
   const [sending, setSending] = useState(false);
   const [sent, setSent] = useState(false);
   const [openCategories, setOpenCategories] = useState<string[]>([]);
+  const [activeTab, setActiveTab] = useState<"modules" | "contact">("modules");
 
   // Obtener todos los módulos de la plataforma con categorías
   const { data: allModules, isLoading } = useQuery({
@@ -373,181 +376,261 @@ export function AvailableModulesDialog({
 
   return (
     <Dialog open={open} onOpenChange={handleClose}>
-      <DialogContent className="w-full max-w-full sm:max-w-2xl max-h-[100vh] h-[100vh] sm:h-auto p-0 sm:p-6 overflow-y-auto">
-        <DialogHeader>
-          <DialogTitle className="flex items-center gap-2">
-            <Sparkles className="w-5 h-5 text-primary" />
-            Solicitar Funcionalidades
+      <DialogContent className={cn(
+        "w-full overflow-hidden flex flex-col",
+        isMobile 
+          ? "max-w-full max-h-[100vh] h-[100vh] p-0 rounded-none" 
+          : "max-w-2xl max-h-[90vh] p-6 rounded-lg"
+      )}>
+        {/* Header - Fixed en mobile */}
+        <div className={cn(
+          "flex flex-col gap-2 border-b",
+          isMobile ? "sticky top-0 z-10 bg-background p-4 pb-3" : "mb-4"
+        )}>
+          <DialogTitle className="flex items-center gap-2 text-lg sm:text-xl">
+            <Sparkles className="w-5 h-5 text-primary flex-shrink-0" />
+            <span className="truncate">Solicitar Funcionalidades</span>
           </DialogTitle>
-          <DialogDescription>
-            Selecciona los módulos que te interesa activar y envía una solicitud.
+          <DialogDescription className="text-xs sm:text-sm">
+            Selecciona los módulos que te interesa activar
           </DialogDescription>
-        </DialogHeader>
+        </div>
 
         {sent ? (
-          <div className="flex flex-col items-center py-8 gap-4">
-            <CheckCircle className="w-16 h-16 text-green-500" />
-            <p className="text-center text-muted-foreground">
-              ¡Solicitud enviada! Nos pondremos en contacto contigo pronto.
-            </p>
+          <div className={cn(
+            "flex flex-col items-center justify-center gap-4",
+            isMobile ? "flex-1 px-4" : "py-8"
+          )}>
+            <CheckCircle className="w-16 h-16 text-green-500 flex-shrink-0" />
+            <div className="text-center">
+              <p className="font-medium text-foreground">¡Solicitud enviada!</p>
+              <p className="text-sm text-muted-foreground mt-1">
+                Nos pondremos en contacto contigo pronto.
+              </p>
+            </div>
           </div>
         ) : (
-          <>
-            {/* Botón Seleccionar/Deseleccionar todos */}
-            <div className="flex justify-end mb-2">
-              <Button
-                variant="outline"
-                size="sm"
-                onClick={allSelected ? deselectAllModules : selectAllModules}
-                className="text-xs"
-              >
-                {allSelected ? (
-                  <>
-                    <X className="w-3.5 h-3.5 mr-1.5" />
-                    Deseleccionar todos
-                  </>
-                ) : (
-                  <>
-                    <CheckCircle className="w-3.5 h-3.5 mr-1.5" />
-                    Seleccionar todos ({unavailableModules.length})
-                  </>
-                )}
-              </Button>
-            </div>
+          <div className="flex flex-1 overflow-hidden flex-col">
+            {/* Tabs en mobile */}
+            {isMobile && (
+              <div className="flex gap-1 px-4 mb-3 border-b">
+                <button
+                  onClick={() => setActiveTab("modules")}
+                  className={cn(
+                    "flex-1 py-2 px-3 text-sm font-medium rounded-t-lg transition-colors",
+                    activeTab === "modules"
+                      ? "bg-primary text-primary-foreground"
+                      : "text-muted-foreground"
+                  )}
+                >
+                  Módulos ({unavailableModules.length})
+                </button>
+                <button
+                  onClick={() => setActiveTab("contact")}
+                  className={cn(
+                    "flex-1 py-2 px-3 text-sm font-medium rounded-t-lg transition-colors",
+                    activeTab === "contact"
+                      ? "bg-primary text-primary-foreground"
+                      : "text-muted-foreground"
+                  )}
+                >
+                  Mensaje
+                </button>
+              </div>
+            )}
 
-            <div className="space-y-2 max-h-[40vh] sm:max-h-[350px] overflow-y-auto pr-2">
-              {Object.entries(modulesByCategory).map(([category, modules]) => {
-                const CategoryIcon = CATEGORY_ICONS[category] || Package;
-                const isOpen = openCategories.includes(category);
-                const selectedInCategory = modules.filter(m => selectedModules.includes(m.code)).length;
-                
-                return (
-                  <Collapsible
-                    key={category}
-                    open={isOpen}
-                    onOpenChange={() => toggleCategory(category)}
+            {/* Módulos - visible según tab en mobile o siempre en desktop */}
+            {(!isMobile || activeTab === "modules") && (
+              <div className={cn(
+                "overflow-y-auto flex-1 flex flex-col",
+                isMobile ? "px-4" : "pr-4"
+              )}>
+                {/* Botón Seleccionar/Deseleccionar todos */}
+                <div className={cn(
+                  "flex justify-end mb-3 flex-shrink-0",
+                  isMobile ? "sticky top-0 bg-background py-2" : ""
+                )}>
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    onClick={allSelected ? deselectAllModules : selectAllModules}
+                    className="text-xs h-8"
                   >
-                    <CollapsibleTrigger className="flex items-center justify-between w-full p-3 rounded-lg bg-muted/50 hover:bg-muted transition-colors">
-                      <div className="flex items-center gap-3">
-                        <CategoryIcon className="w-5 h-5 text-primary" />
-                        <span className="font-medium">
-                          {CATEGORY_NAMES[category] || category}
-                        </span>
-                        <Badge variant="secondary" className="text-xs">
-                          {modules.length} disponibles
-                        </Badge>
-                        {selectedInCategory > 0 && (
-                          <Badge variant="default" className="text-xs">
-                            {selectedInCategory} seleccionados
-                          </Badge>
-                        )}
-                      </div>
-                      <ChevronDown className={cn(
-                        "w-4 h-4 transition-transform",
-                        isOpen && "rotate-180"
-                      )} />
-                    </CollapsibleTrigger>
-                    <CollapsibleContent className="pl-4 pt-2 space-y-2">
-                      {modules.map((module) => {
-                        const Icon = MODULE_ICONS[module.code] || Package;
-                        const isSelected = selectedModules.includes(module.code);
-                        
-                        return (
-                          <div
-                            key={module.code}
-                            onClick={() => toggleModule(module.code)}
-                            className={cn(
-                              "p-3 rounded-lg border cursor-pointer transition-all",
-                              isSelected 
-                                ? "border-primary bg-primary/5 ring-1 ring-primary/20" 
-                                : "border-border hover:border-primary/50 hover:bg-muted/50"
-                            )}
-                          >
-                            <div className="flex items-center gap-3">
-                              <Checkbox 
-                                checked={isSelected}
-                                onCheckedChange={() => toggleModule(module.code)}
-                                className="pointer-events-none"
-                              />
-                              <div className={cn(
-                                "p-2 rounded-lg",
-                                isSelected ? "bg-primary/10" : "bg-muted"
-                              )}>
-                                <Icon className={cn(
-                                  "w-4 h-4",
-                                  isSelected ? "text-primary" : "text-muted-foreground"
-                                )} />
-                              </div>
-                              <div className="flex-1 min-w-0">
-                                <h4 className="font-medium text-sm">{module.name}</h4>
-                                {module.description && (
-                                  <p className="text-xs text-muted-foreground mt-0.5 truncate">
-                                    {module.description}
-                                  </p>
-                                )}
-                              </div>
-                            </div>
-                          </div>
-                        );
-                      })}
-                    </CollapsibleContent>
-                  </Collapsible>
-                );
-              })}
-            </div>
+                    {allSelected ? (
+                      <>
+                        <X className="w-3.5 h-3.5 mr-1.5 flex-shrink-0" />
+                        <span className="hidden xs:inline">Deseleccionar todos</span>
+                        <span className="xs:hidden">Limpiar</span>
+                      </>
+                    ) : (
+                      <>
+                        <CheckCircle className="w-3.5 h-3.5 mr-1.5 flex-shrink-0" />
+                        <span className="hidden xs:inline">Seleccionar todos</span>
+                        <span className="xs:hidden">Todos</span>
+                      </>
+                    )}
+                  </Button>
+                </div>
 
-            {selectedModules.length > 0 && (
-              <div className="p-3 bg-primary/5 rounded-lg border border-primary/20">
-                <div className="text-sm font-medium">
-                  {selectedModules.length} módulos seleccionados
+                {/* Contador de selección en mobile */}
+                {isMobile && selectedModules.length > 0 && (
+                  <div className="mb-3 p-2 bg-primary/10 rounded-lg border border-primary/20 flex-shrink-0">
+                    <div className="text-sm font-medium text-primary">
+                      {selectedModules.length} módulos seleccionados
+                    </div>
+                  </div>
+                )}
+
+                {/* Categorías y módulos */}
+                <div className="space-y-2 flex-1 min-h-0">
+                  {Object.entries(modulesByCategory).map(([category, modules]) => {
+                    const CategoryIcon = CATEGORY_ICONS[category] || Package;
+                    const isOpen = openCategories.includes(category);
+                    const selectedInCategory = modules.filter(m => selectedModules.includes(m.code)).length;
+                    
+                    return (
+                      <Collapsible
+                        key={category}
+                        open={isOpen}
+                        onOpenChange={() => toggleCategory(category)}
+                      >
+                        <CollapsibleTrigger className="flex items-center justify-between w-full p-2.5 sm:p-3 rounded-lg bg-muted/50 hover:bg-muted transition-colors active:bg-muted/75">
+                          <div className="flex items-center gap-2 sm:gap-3 min-w-0">
+                            <CategoryIcon className="w-4 h-4 sm:w-5 sm:h-5 text-primary flex-shrink-0" />
+                            <span className="font-medium text-sm sm:text-base truncate">
+                              {CATEGORY_NAMES[category] || category}
+                            </span>
+                            <Badge variant="secondary" className="text-xs flex-shrink-0">
+                              {modules.length}
+                            </Badge>
+                            {selectedInCategory > 0 && (
+                              <Badge variant="default" className="text-xs flex-shrink-0">
+                                {selectedInCategory}
+                              </Badge>
+                            )}
+                          </div>
+                          <ChevronDown className={cn(
+                            "w-4 h-4 transition-transform flex-shrink-0 ml-2",
+                            isOpen && "rotate-180"
+                          )} />
+                        </CollapsibleTrigger>
+                        <CollapsibleContent className="pl-0 pt-2 space-y-2">
+                          {modules.map((module) => {
+                            const Icon = MODULE_ICONS[module.code] || Package;
+                            const isSelected = selectedModules.includes(module.code);
+                            
+                            return (
+                              <div
+                                key={module.code}
+                                onClick={() => toggleModule(module.code)}
+                                className={cn(
+                                  "p-2.5 sm:p-3 rounded-lg border cursor-pointer transition-all active:scale-95",
+                                  isSelected 
+                                    ? "border-primary bg-primary/5 ring-1 ring-primary/20" 
+                                    : "border-border hover:border-primary/50 hover:bg-muted/50"
+                                )}
+                              >
+                                <div className="flex items-center gap-2.5 sm:gap-3">
+                                  <Checkbox 
+                                    checked={isSelected}
+                                    onCheckedChange={() => toggleModule(module.code)}
+                                    className="pointer-events-none flex-shrink-0"
+                                  />
+                                  <div className={cn(
+                                    "p-1.5 rounded-lg flex-shrink-0",
+                                    isSelected ? "bg-primary/10" : "bg-muted"
+                                  )}>
+                                    <Icon className={cn(
+                                      "w-4 h-4",
+                                      isSelected ? "text-primary" : "text-muted-foreground"
+                                    )} />
+                                  </div>
+                                  <div className="flex-1 min-w-0">
+                                    <h4 className="font-medium text-xs sm:text-sm leading-tight">{module.name}</h4>
+                                    {module.description && !isMobile && (
+                                      <p className="text-xs text-muted-foreground mt-0.5 truncate">
+                                        {module.description}
+                                      </p>
+                                    )}
+                                  </div>
+                                </div>
+                              </div>
+                            );
+                          })}
+                        </CollapsibleContent>
+                      </Collapsible>
+                    );
+                  })}
                 </div>
               </div>
             )}
 
-            <div className="space-y-3 pt-2 border-t">
-              <Textarea
-                placeholder="Mensaje adicional (opcional) - Cuéntanos por qué necesitas estos módulos..."
-                value={message}
-                onChange={(e) => setMessage(e.target.value)}
-                rows={2}
-              />
-              
-              <div className="p-3 bg-muted/50 rounded-lg text-xs text-muted-foreground">
-                <p className="flex items-center gap-2 mb-1">
-                  <Mail className="w-3.5 h-3.5" />
-                  Recibirás una respuesta por email
-                </p>
-                <p className="flex items-center gap-2">
-                  <Phone className="w-3.5 h-3.5" />
-                  O podemos contactarte por WhatsApp
-                </p>
+            {/* Contacto y mensaje - visible según tab en mobile */}
+            {(!isMobile || activeTab === "contact") && (
+              <div className={cn(
+                "space-y-3 flex-1 flex flex-col",
+                isMobile ? "px-4 pb-4" : ""
+              )}>
+                <div className="flex-1 min-h-0 overflow-y-auto">
+                  <Textarea
+                    placeholder="Mensaje adicional (opcional) - Cuéntanos por qué necesitas estos módulos..."
+                    value={message}
+                    onChange={(e) => setMessage(e.target.value)}
+                    rows={isMobile ? 4 : 3}
+                    className="text-sm resize-none"
+                  />
+                  
+                  <div className="p-3 bg-muted/50 rounded-lg text-xs text-muted-foreground mt-3 space-y-1.5">
+                    <p className="flex items-center gap-2">
+                      <Mail className="w-3.5 h-3.5 flex-shrink-0" />
+                      <span>Recibirás una respuesta por email</span>
+                    </p>
+                    <p className="flex items-center gap-2">
+                      <Phone className="w-3.5 h-3.5 flex-shrink-0" />
+                      <span>O podemos contactarte por WhatsApp</span>
+                    </p>
+                  </div>
+                </div>
               </div>
-            </div>
+            )}
 
-            <div className="flex gap-2 pt-2">
+            {/* Footer con botones - Fixed en mobile */}
+            <div className={cn(
+              "flex gap-2 flex-shrink-0",
+              isMobile 
+                ? "sticky bottom-0 bg-background border-t p-4 mt-4" 
+                : "pt-4 border-t mt-4"
+            )}>
               <Button
                 variant="outline"
                 onClick={handleClose}
-                className="flex-1"
+                className={cn(
+                  "flex-1 font-medium",
+                  isMobile ? "h-10 sm:h-11" : ""
+                )}
               >
                 Cancelar
               </Button>
               <Button
                 onClick={handleSendRequest}
                 disabled={selectedModules.length === 0 || sending}
-                className="flex-1"
+                className={cn(
+                  "flex-1 font-medium",
+                  isMobile ? "h-10 sm:h-11" : ""
+                )}
               >
                 {sending ? (
                   <>Enviando...</>
                 ) : (
                   <>
-                    <Send className="w-4 h-4 mr-2" />
-                    Enviar Solicitud
+                    <Send className="w-4 h-4 mr-2 flex-shrink-0" />
+                    <span className="hidden xs:inline">Enviar Solicitud</span>
+                    <span className="xs:hidden">Enviar</span>
                   </>
                 )}
               </Button>
             </div>
-          </>
+          </div>
         )}
       </DialogContent>
     </Dialog>

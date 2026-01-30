@@ -815,6 +815,14 @@ export function Sidebar() {
               value={searchQuery}
               onChange={(e) => setSearchQuery(e.target.value)}
               className="pl-9 h-8 text-sm bg-sidebar-accent/50 border-sidebar-accent"
+              autoFocus={false}
+              readOnly={false}
+              onFocus={(e) => {
+                // Prevenir que se abra el teclado automáticamente en mobile
+                if (window.innerWidth < 768) {
+                  e.target.blur();
+                }
+              }}
             />
           </div>
         </div>
