@@ -1407,6 +1407,125 @@ export type Database = {
           },
         ]
       }
+      crm_opportunities: {
+        Row: {
+          company_id: string
+          created_at: string | null
+          customer_id: string
+          description: string | null
+          estimated_close_date: string | null
+          id: string
+          name: string
+          owner_id: string | null
+          pipeline_id: string | null
+          probability: number | null
+          stage: string
+          updated_at: string | null
+          value: number | null
+        }
+        Insert: {
+          company_id: string
+          created_at?: string | null
+          customer_id: string
+          description?: string | null
+          estimated_close_date?: string | null
+          id?: string
+          name: string
+          owner_id?: string | null
+          pipeline_id?: string | null
+          probability?: number | null
+          stage?: string
+          updated_at?: string | null
+          value?: number | null
+        }
+        Update: {
+          company_id?: string
+          created_at?: string | null
+          customer_id?: string
+          description?: string | null
+          estimated_close_date?: string | null
+          id?: string
+          name?: string
+          owner_id?: string | null
+          pipeline_id?: string | null
+          probability?: number | null
+          stage?: string
+          updated_at?: string | null
+          value?: number | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "crm_opportunities_company_id_fkey"
+            columns: ["company_id"]
+            isOneToOne: false
+            referencedRelation: "companies"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "crm_opportunities_customer_id_fkey"
+            columns: ["customer_id"]
+            isOneToOne: false
+            referencedRelation: "customer_pos_view"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "crm_opportunities_customer_id_fkey"
+            columns: ["customer_id"]
+            isOneToOne: false
+            referencedRelation: "customers"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "crm_opportunities_owner_id_fkey"
+            columns: ["owner_id"]
+            isOneToOne: false
+            referencedRelation: "employees"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "crm_opportunities_pipeline_id_fkey"
+            columns: ["pipeline_id"]
+            isOneToOne: false
+            referencedRelation: "crm_pipelines"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      crm_pipelines: {
+        Row: {
+          company_id: string
+          created_at: string | null
+          id: string
+          name: string
+          stages: string[]
+          updated_at: string | null
+        }
+        Insert: {
+          company_id: string
+          created_at?: string | null
+          id?: string
+          name: string
+          stages?: string[]
+          updated_at?: string | null
+        }
+        Update: {
+          company_id?: string
+          created_at?: string | null
+          id?: string
+          name?: string
+          stages?: string[]
+          updated_at?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "crm_pipelines_company_id_fkey"
+            columns: ["company_id"]
+            isOneToOne: false
+            referencedRelation: "companies"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       customer_account_movements: {
         Row: {
           balance: number | null
@@ -4044,7 +4163,7 @@ export type Database = {
             foreignKeyName: "platform_payments_subscription_id_fkey"
             columns: ["subscription_id"]
             isOneToOne: false
-            referencedRelation: "subscriptions"
+            referencedRelation: "company_subscriptions"
             referencedColumns: ["id"]
           },
         ]
@@ -7143,7 +7262,13 @@ export type Database = {
           p_company_id: string
           p_invoice_volume?: number
         }
-        Returns: Json
+        Returns: {
+          base_price: number
+          breakdown: Json
+          modules_price: number
+          total_price: number
+          volume_price: number
+        }[]
       }
       check_expiring_checks: { Args: never; Returns: undefined }
       check_expiring_products: { Args: never; Returns: undefined }
@@ -7329,6 +7454,8 @@ export type Database = {
         }[]
       }
       is_company_admin: { Args: { company_uuid: string }; Returns: boolean }
+      is_company_admin_only: { Args: never; Returns: boolean }
+      is_company_admin_or_manager: { Args: never; Returns: boolean }
       is_platform_admin: { Args: { _user_id: string }; Returns: boolean }
       is_platform_admin_secure: { Args: never; Returns: boolean }
       save_company_oauth_app: {
@@ -7544,4 +7671,3 @@ export const Constants = {
     },
   },
 } as const
-

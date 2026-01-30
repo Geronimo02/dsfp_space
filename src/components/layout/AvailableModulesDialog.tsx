@@ -250,8 +250,8 @@ export function AvailableModulesDialog({
       // Create a platform support ticket for the request
       const ticketNumber = `MOD-${new Date().toISOString().split('T')[0].replace(/-/g, '')}-${Math.random().toString(36).substring(2, 5).toUpperCase()}`;
       
-      const { data: createdTickets, error } = await (supabase as any)
-        .from("platform_support_tickets")
+      const { data: createdTickets, error } = await supabase
+        .from("platform_support_tickets" as any)
         .insert([{
           ticket_number: ticketNumber,
           company_id: currentCompany?.id,
@@ -261,8 +261,7 @@ export function AvailableModulesDialog({
           category: "feature_request",
           priority: "medium",
         }])
-        .select("id, ticket_number")
-        .returns<any[]>();
+        .select("id, ticket_number") as unknown as { data: any[]; error: any };
       
       if (error) {
         console.error("Error creating ticket:", error);

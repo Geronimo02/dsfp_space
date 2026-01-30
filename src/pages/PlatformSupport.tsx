@@ -100,16 +100,15 @@ export default function PlatformSupport() {
       const randomStr = Math.random().toString(36).substring(2, 5).toUpperCase();
       const ticketNumber = `TKT-${dateStr}-${randomStr}`;
 
-      const { data: createdTickets, error: ticketError } = await (supabase as any)
-        .from("platform_support_tickets")
+      const { data: createdTickets, error: ticketError } = await supabase
+        .from("platform_support_tickets" as any)
         .insert([{
           ...ticketForm,
           ticket_number: ticketNumber,
           company_id: currentCompany.id,
           created_by: user.id,
         }])
-        .select("id, ticket_number")
-        .returns<any[]>();
+        .select("id, ticket_number") as unknown as { data: any[]; error: any };
 
       if (ticketError) throw ticketError;
 
