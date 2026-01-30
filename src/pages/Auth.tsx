@@ -106,7 +106,7 @@ export default function Auth() {
 
   return (
     <>
-      <div className="flex min-h-screen items-center justify-center bg-gradient-to-br from-slate-900 via-slate-800 to-slate-900 p-4 md:p-6">
+      <div className="fixed inset-0 flex items-center justify-center bg-gradient-to-br from-slate-900 via-slate-800 to-slate-900 overflow-auto">
         {/* Advanced animated background effects */}
         <div className="fixed inset-0 overflow-hidden pointer-events-none">
           {/* Main breathing orbs */}
@@ -128,10 +128,11 @@ export default function Auth() {
           <div className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-[800px] h-[800px] border border-cyan-500/5 rounded-full" style={{animation: 'pulse 12s infinite ease-in-out 2s'}}></div>
         </div>
 
-        <Card
-          className="w-full max-w-3xl shadow-[0_28px_80px_rgba(0,0,0,0.55)] border-primary/40 relative z-10 bg-gradient-to-br from-slate-800/90 via-slate-700/90 to-slate-800/90 backdrop-blur-2xl p-6 md:p-8"
-          style={{animation: 'fadeInUp 0.6s ease-out'}}
-        >
+        <div className="relative z-10 w-full max-w-3xl p-4 md:p-6 my-auto">
+          <Card
+            className="w-full shadow-[0_28px_80px_rgba(0,0,0,0.55)] border-primary/40 bg-gradient-to-br from-slate-800/90 via-slate-700/90 to-slate-800/90 backdrop-blur-2xl p-6 md:p-8"
+            style={{animation: 'fadeInUp 0.6s ease-out'}}
+          >
         <style>{`
           @keyframes fadeInUp {
             from { opacity: 0; transform: translateY(20px); }
@@ -229,6 +230,7 @@ export default function Auth() {
           </form>
         </CardContent>
       </Card>
+        </div>
       </div>
 
       {/* Forgot Password Dialog */}
