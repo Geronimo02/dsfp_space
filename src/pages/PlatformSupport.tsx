@@ -47,6 +47,12 @@ export default function PlatformSupport() {
   usePlatformSupportRealtime({
     companyId: currentCompany?.id,
     ticketId: selectedTicket?.id,
+    onTicketUpdate: (updatedTicket: any) => {
+      // Update the selected ticket if it's the one being viewed
+      if (updatedTicket.id === selectedTicket?.id) {
+        setSelectedTicket(updatedTicket);
+      }
+    },
   });
 
   // Fetch tickets
@@ -94,16 +100,55 @@ export default function PlatformSupport() {
       const randomStr = Math.random().toString(36).substring(2, 5).toUpperCase();
       const ticketNumber = `TKT-${dateStr}-${randomStr}`;
 
-      const { error: ticketError } = await (supabase as any)
-        .from("platform_support_tickets")
+      const { data: createdTickets, error: ticketError } = await supabase
+        .from("platform_support_tickets" as any)
         .insert([{
           ...ticketForm,
           ticket_number: ticketNumber,
           company_id: currentCompany.id,
           created_by: user.id,
-        }]);
+        }])
+        .select("id, ticket_number") as unknown as { data: any[]; error: any };
 
       if (ticketError) throw ticketError;
+
+      const createdTicket = createdTickets?.[0];
+
+      if (createdTicket) {
+        try {
+          const [adminNotification, companyNotification] = await Promise.all([
+            supabase.functions.invoke("notify-admins-platform-ticket", {
+              body: {
+                ticketId: createdTicket.id,
+                ticketNumber,
+                companyId: currentCompany.id,
+                companyName: currentCompany.name,
+                subject: ticketForm.subject,
+                description: ticketForm.description,
+                priority: ticketForm.priority,
+                category: ticketForm.category,
+              },
+            }),
+            supabase.functions.invoke("notify-platform-support-ticket", {
+              body: {
+                ticket_id: createdTicket.id,
+                type: "ticket_created",
+                send_email: true,
+                send_whatsapp: true,
+              },
+            }),
+          ]);
+
+          if (adminNotification.error) {
+            console.error("Error notificando a admins:", adminNotification.error);
+          }
+          if (companyNotification.error) {
+            console.error("Error notificando a la empresa:", companyNotification.error);
+          }
+        } catch (notificationError) {
+          console.error("Error llamando a edge functions de notificación:", notificationError);
+        }
+      }
     },
     onSuccess: () => {
       toast.success("Ticket creado. Los administradores lo revisarán pronto.");
@@ -118,6 +163,37 @@ export default function PlatformSupport() {
     },
     onError: (error: any) => {
       toast.error(error.message || "Error al crear ticket");
+    },
+  });
+
+  // Update ticket status mutation
+  const updateTicketStatusMutation = useMutation({
+    mutationFn: async (newStatus: string) => {
+      if (!selectedTicket?.id) throw new Error("No hay ticket seleccionado");
+
+      const { data, error } = await (supabase as any)
+        .from("platform_support_tickets")
+        .update({ status: newStatus, updated_at: new Date().toISOString() })
+        .eq("id", selectedTicket.id)
+        .select("*")
+        .single();
+
+      if (error) throw error;
+      if (!data) throw new Error("No se pudo actualizar el ticket");
+      return data;
+    },
+    onSuccess: (updatedTicket) => {
+      // Update the selected ticket with fresh data from DB
+      setSelectedTicket(updatedTicket);
+      // Invalidate and refetch the tickets list
+      queryClient.invalidateQueries({ 
+        queryKey: ["platform-support-tickets", currentCompany?.id],
+        refetchType: 'all'
+      });
+      toast.success("Estado actualizado correctamente");
+    },
+    onError: (error: any) => {
+      toast.error(error.message || "Error al actualizar estado");
     },
   });
 
@@ -425,6 +501,24 @@ export default function PlatformSupport() {
                           </div>
                         </div>
                         <CardDescription>{selectedTicket.subject}</CardDescription>
+                        <div className="flex items-center gap-2 mt-3">
+                          <Label className="text-xs">Estado:</Label>
+                          <Select
+                            value={selectedTicket.status}
+                            onValueChange={(newStatus) => updateTicketStatusMutation.mutate(newStatus)}
+                            disabled={updateTicketStatusMutation.isPending}
+                          >
+                            <SelectTrigger className="w-auto h-8">
+                              <SelectValue />
+                            </SelectTrigger>
+                            <SelectContent>
+                              <SelectItem value="open">Abierto</SelectItem>
+                              <SelectItem value="in_progress">En Progreso</SelectItem>
+                              <SelectItem value="resolved">Resuelto</SelectItem>
+                              <SelectItem value="closed">Cerrado</SelectItem>
+                            </SelectContent>
+                          </Select>
+                        </div>
                         {selectedTicket.sla_response_hours && (
                           <div className="text-xs text-muted-foreground mt-2">
                             SLA: Respuesta en {selectedTicket.sla_response_hours}h | Resolución en {selectedTicket.sla_resolution_hours}h

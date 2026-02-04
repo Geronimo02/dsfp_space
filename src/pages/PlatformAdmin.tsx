@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useState, useEffect, useMemo } from "react";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
@@ -45,6 +45,7 @@ import { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip as RechartsTooltip,
 import { exportToExcel, exportToPDF, formatCurrency, formatDate } from "@/lib/exportUtils";
 import { usePlatformAdmin } from "@/hooks/usePlatformAdmin";
 import { usePlatformAdminRealtime } from "@/hooks/usePlatformAdminRealtime";
+import { usePlatformSupportTickets, type PlatformSupportTicket } from "@/hooks/usePlatformSupportTickets";
 import { useNavigate, Navigate } from "react-router-dom";
 import { PricingConfiguration } from "@/components/settings/PricingConfiguration";
 import { PricingCalculator } from "@/components/settings/PricingCalculator";
@@ -60,9 +61,6 @@ export default function PlatformAdmin() {
   const { isPlatformAdmin, isLoading: adminLoading } = usePlatformAdmin();
   const navigate = useNavigate();
   const queryClient = useQueryClient();
-  
-  // Enable realtime for platform admin to receive new tickets and messages
-  usePlatformAdminRealtime({ enabled: isPlatformAdmin });
   
   // State for filters and dialogs
   const [companySearch, setCompanySearch] = useState("");
@@ -166,8 +164,8 @@ export default function PlatformAdmin() {
         .from("platform_payments")
         .select(`
           *,
-          companies (name),
-          subscriptions (status)
+          companies:company_id (name),
+          subscriptions:subscription_id (status)
         `)
         .order("payment_date", { ascending: false });
 
@@ -319,140 +317,44 @@ export default function PlatformAdmin() {
   // Fetch support tickets (sistema antiguo)
   // Fetch customer support tickets (nuevo sistema integrado)
   // Estados para gestión de tickets de plataforma
-  const [selectedPlatformTicket, setSelectedPlatformTicket] = useState<any>(null);
+  const [selectedPlatformTicketId, setSelectedPlatformTicketId] = useState<string | null>(null);
   const [platformTicketMessage, setPlatformTicketMessage] = useState("");
 
-  // Tickets de soporte de PLATAFORMA (empresas reportando problemas a admins)
-  const { data: platformSupportTickets, isLoading: platformTicketsLoading, error: platformTicketsError, refetch: refetchTickets } = useQuery({
-    queryKey: ["platform-support-tickets"],
-    queryFn: async () => {
-      try {
-        const { data, error } = await (supabase as any)
-          .from("platform_support_tickets")
-          .select(`
-            *,
-            companies!platform_support_tickets_company_id_fkey (
-              name,
-              email,
-              phone,
-              whatsapp_number
-            )
-          `)
-          .order("created_at", { ascending: false });
-
-        if (error) {
-          console.error("Error fetching platform support tickets:", error);
-          return [];
-        }
-        return data || [];
-      } catch (err) {
-        console.error("Exception fetching tickets:", err);
-        return [];
-      }
-    },
-    retry: 1,
-    staleTime: 30000,
-    gcTime: 5 * 60 * 1000,
+  // Usar el hook optimizado para tickets de soporte
+  const {
+    platformSupportTickets,
+    platformTicketsLoading,
+    platformTicketsError,
+    platformTicketMessages,
+    respondPlatformTicketMutation,
+    updatePlatformTicketStatusMutation,
+    isMutatingRef,
+  } = usePlatformSupportTickets({
+    selectedTicketId: selectedPlatformTicketId,
   });
 
-  // Mensajes del ticket seleccionado
-  const { data: platformTicketMessages } = useQuery({
-    queryKey: ["platform-ticket-messages", selectedPlatformTicket?.id],
-    queryFn: async () => {
-      if (!selectedPlatformTicket?.id) return [];
-      const { data, error } = await (supabase as any)
-        .from("platform_support_messages")
-        .select("*")
-        .eq("ticket_id", selectedPlatformTicket.id)
-        .order("created_at", { ascending: true });
-      if (error) throw error;
-      return data;
-    },
-    enabled: !!selectedPlatformTicket?.id,
+  // Derivar selectedPlatformTicket del cache (source of truth única)
+  const selectedPlatformTicket = useMemo(() => {
+    if (!selectedPlatformTicketId || !platformSupportTickets) return null;
+    const ticket = platformSupportTickets.find(t => t.id === selectedPlatformTicketId);
+    console.log("🔍 [useMemo RECOMPUTE] selectedPlatformTicket derived from cache:", {
+      selectedId: selectedPlatformTicketId?.slice(0,8),
+      found: !!ticket,
+      status: ticket?.status,
+      updated_at: ticket?.updated_at,
+      cacheSize: platformSupportTickets?.length
+    });
+    return ticket || null;
+  }, [selectedPlatformTicketId, platformSupportTickets]);
+
+  // Enable realtime for platform admin to receive new tickets and messages
+  // El cache de React Query se actualiza automáticamente via realtime
+  // selectedPlatformTicket se deriva del cache, no necesita callbacks
+  usePlatformAdminRealtime({
+    enabled: isPlatformAdmin,
+    isMutatingRef, // Bloquea realtime mientras hay mutaciones
   });
 
-  // Mutation para responder ticket
-  const respondPlatformTicketMutation = useMutation({
-    mutationFn: async () => {
-      if (!selectedPlatformTicket?.id || !platformTicketMessage.trim()) return;
-      const { data: { user } } = await supabase.auth.getUser();
-      if (!user) throw new Error("Usuario no autenticado");
-
-      const { error } = await (supabase as any)
-        .from("platform_support_messages")
-        .insert([{
-          ticket_id: selectedPlatformTicket.id,
-          sender_type: "admin",
-          sender_id: user.id,
-          message: platformTicketMessage,
-        }]);
-
-      if (error) throw error;
-
-      // Retornar info para enviar notificación a la empresa
-      return {
-        ticketId: selectedPlatformTicket.id,
-        ticketNumber: selectedPlatformTicket.ticket_number,
-        companyId: selectedPlatformTicket.company_id,
-        companyEmail: selectedPlatformTicket.companies?.email,
-      };
-    },
-    onSuccess: (data) => {
-      queryClient.invalidateQueries({ queryKey: ["platform-ticket-messages"] });
-      setPlatformTicketMessage("");
-      
-      // Enviar notificación a la empresa (opcional - solo si hay email)
-      if (data?.companyEmail) {
-        supabase.functions.invoke("notify-platform-support-ticket", {
-          body: {
-            ticket_id: data.ticketId,
-            type: "message_received",
-            send_email: true,
-            send_sms: false,
-          }
-        }).catch(() => {});
-      }
-      
-      toast.success("Respuesta enviada");
-    },
-    onError: (error: any) => {
-      toast.error(error.message || "Error al enviar respuesta");
-    },
-  });
-
-  // Mutation para cambiar estado del ticket
-  const updatePlatformTicketStatusMutation = useMutation({
-    mutationFn: async ({ ticketId, status }: { ticketId: string, status: string }) => {
-      const updates: any = { status };
-      if (status === "resolved") updates.resolved_at = new Date().toISOString();
-      if (status === "closed") updates.closed_at = new Date().toISOString();
-
-      const { error } = await (supabase as any)
-        .from("platform_support_tickets")
-        .update(updates)
-        .eq("id", ticketId);
-
-      if (error) throw error;
-      return { ticketId, status, ...updates };
-    },
-    onSuccess: (data) => {
-      toast.success("Estado actualizado");
-      queryClient.invalidateQueries({ queryKey: ["platform-support-tickets"] });
-      // Actualizar el ticket seleccionado localmente
-      if (selectedPlatformTicket && selectedPlatformTicket.id === data.ticketId) {
-        setSelectedPlatformTicket({
-          ...selectedPlatformTicket,
-          status: data.status,
-          resolved_at: data.resolved_at,
-          closed_at: data.closed_at
-        });
-        // Si se cierra, deselecciona después de 1 segundo
-        if (data.status === "closed") {
-          setTimeout(() => setSelectedPlatformTicket(null), 1000);
-        }
-      }
-    },
-  });
 
   // Fetch integrations data
   const { data: integrationsData } = useQuery({
@@ -1137,8 +1039,6 @@ export default function PlatformAdmin() {
                           filtered = filtered.filter((t: any) => t.status === 'open');
                         } else if (platformSupportStatusFilter === 'in_progress') {
                           filtered = filtered.filter((t: any) => t.status === 'in_progress');
-                        } else if (platformSupportStatusFilter !== 'all') {
-                          filtered = filtered.filter((t: any) => t.status === platformSupportStatusFilter);
                         }
                         
                         if (filtered.length === 0) {
@@ -1155,7 +1055,7 @@ export default function PlatformAdmin() {
                           className={`p-3 border rounded-lg cursor-pointer transition-colors hover:bg-muted/50 ${
                             selectedPlatformTicket?.id === ticket.id ? "bg-muted border-2 border-primary" : ""
                           }`}
-                          onClick={() => setSelectedPlatformTicket(ticket)}
+                          onClick={() => setSelectedPlatformTicketId(ticket.id)}
                         >
                           <div className="flex items-start justify-between mb-2">
                             <div className="flex items-center gap-2 flex-wrap">
@@ -1268,9 +1168,10 @@ export default function PlatformAdmin() {
                               onValueChange={(val) => {
                                 updatePlatformTicketStatusMutation.mutate({
                                   ticketId: selectedPlatformTicket.id,
-                                  status: val
+                                  status: val as PlatformSupportTicket["status"]
                                 });
                               }}
+                              disabled={updatePlatformTicketStatusMutation.isPending}
                             >
                               <SelectTrigger className="w-[140px] h-8">
                                 <SelectValue />
@@ -1278,7 +1179,6 @@ export default function PlatformAdmin() {
                               <SelectContent>
                                 <SelectItem value="open">Abierto</SelectItem>
                                 <SelectItem value="in_progress">En Progreso</SelectItem>
-                                <SelectItem value="pending">Pendiente</SelectItem>
                                 <SelectItem value="resolved">Resuelto</SelectItem>
                                 <SelectItem value="closed">Cerrado</SelectItem>
                               </SelectContent>
@@ -1289,7 +1189,7 @@ export default function PlatformAdmin() {
                         <Button 
                           variant="outline" 
                           size="sm"
-                          onClick={() => setSelectedPlatformTicket(null)}
+                          onClick={() => setSelectedPlatformTicketId(null)}
                           className="mt-1"
                         >
                           ✕ Cerrar
@@ -1463,12 +1363,21 @@ export default function PlatformAdmin() {
                           <div className="space-y-2">
                             <div className="grid grid-cols-3 gap-2">
                               <Button
-                                onClick={() => respondPlatformTicketMutation.mutate()}
-                                disabled={!platformTicketMessage.trim()}
+                                onClick={() => {
+                                  if (!selectedPlatformTicket?.id || !platformTicketMessage.trim()) {
+                                    toast.error("Completa el mensaje antes de enviar");
+                                    return;
+                                  }
+                                  respondPlatformTicketMutation.mutate({
+                                    ticketId: selectedPlatformTicket.id,
+                                    message: platformTicketMessage
+                                  });
+                                }}
+                                disabled={!platformTicketMessage.trim() || respondPlatformTicketMutation.isPending}
                                 className="col-span-1"
                               >
                                 <MessageSquare className="h-4 w-4 mr-2" />
-                                Enviar
+                                {respondPlatformTicketMutation.isPending ? "Enviando..." : "Enviar"}
                               </Button>
                               <Button
                                 variant="outline"

@@ -1,4 +1,4 @@
-import { useEffect } from "react";
+import { useEffect, useRef } from "react";
 import { useQueryClient } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
 import { toast } from "sonner";
@@ -8,6 +8,7 @@ interface AdminRealtimeOptions {
   onNewTicket?: (ticket: any) => void;
   onTicketUpdate?: (ticket: any) => void;
   onNewMessage?: (message: any) => void;
+  isMutatingRef?: React.MutableRefObject<boolean>; // Para saber si hay mutación activa
 }
 
 export function usePlatformAdminRealtime({
@@ -15,6 +16,7 @@ export function usePlatformAdminRealtime({
   onNewTicket,
   onTicketUpdate,
   onNewMessage,
+  isMutatingRef,
 }: AdminRealtimeOptions = {}) {
   const queryClient = useQueryClient();
 
@@ -31,26 +33,154 @@ export function usePlatformAdminRealtime({
           schema: "public",
           table: "platform_support_tickets",
         },
-        (payload) => {
-          console.log("🎫 Admin - Ticket change:", payload);
-
-          // Invalidate queries to refresh data
-          queryClient.invalidateQueries({
-            queryKey: ["platform-support-tickets"],
+        async (payload) => {
+          console.log("🎫 [Realtime] Ticket change received:", {
+            eventType: payload.eventType,
+            ticketId: (payload.new as any)?.id?.slice(0,8),
+            newStatus: (payload.new as any)?.status,
+            oldStatus: (payload.old as any)?.status,
+            isMutating: isMutatingRef?.current
           });
 
+          // Durante mutaciones activas, ignorar completamente los eventos realtime
+          // El cache ya fue actualizado por el optimistic update y onSuccess
+          if (isMutatingRef?.current) {
+            console.warn("⏸️ [Realtime] Evento BLOQUEADO - mutación activa");
+            return;
+          }
+
           if (payload.eventType === "INSERT") {
-            const newTicket = payload.new as any;
-            toast.info(`Nuevo ticket: ${newTicket.ticket_number}`, {
-              description: newTicket.subject?.substring(0, 50),
-              duration: 5000,
-            });
-            onNewTicket?.(newTicket);
+            // Fetch full ticket with companies relation for new tickets
+            try {
+              const { data: fullTicket } = await supabase
+                .from("platform_support_tickets")
+                .select(`
+                  *,
+                  companies!platform_support_tickets_company_id_fkey (
+                    name,
+                    email,
+                    phone,
+                    whatsapp_number
+                  )
+                `)
+                .eq("id", (payload.new as any).id)
+                .single();
+              
+              if (fullTicket) {
+                // Agregar el nuevo ticket al cache directamente
+                queryClient.setQueryData(
+                  ["platform-support-tickets"],
+                  (old: any[] | undefined) => old ? [fullTicket, ...old] : [fullTicket]
+                );
+                
+                toast.info(`Nuevo ticket: ${fullTicket.ticket_number}`, {
+                  description: fullTicket.subject?.substring(0, 50),
+                  duration: 5000,
+                });
+                onNewTicket?.(fullTicket);
+              }
+            } catch (error) {
+              console.error("Error fetching full ticket:", error);
+              // Fallback: invalidar queries para forzar refetch
+              queryClient.invalidateQueries({
+                queryKey: ["platform-support-tickets"],
+              });
+            }
           }
 
           if (payload.eventType === "UPDATE") {
-            const updatedTicket = payload.new as any;
-            onTicketUpdate?.(updatedTicket);
+            const updatedData = payload.new as any;
+            console.log("🔄 [Realtime UPDATE] Processing update for ticket:", {
+              ticketId: updatedData.id?.slice(0,8),
+              newStatus: updatedData.status,
+              isMutating: isMutatingRef?.current
+            });
+            
+            // Fetch full ticket with companies relation to ensure complete data
+            try {
+              const { data: fullTicket } = await supabase
+                .from("platform_support_tickets")
+                .select(`
+                  *,
+                  companies!platform_support_tickets_company_id_fkey (
+                    name,
+                    email,
+                    phone,
+                    whatsapp_number
+                  )
+                `)
+                .eq("id", updatedData.id)
+                .single();
+              
+              if (fullTicket) {
+                console.log("✅ [Realtime UPDATE] Updating cache with full ticket:", {
+                  ticketId: fullTicket.id?.slice(0,8),
+                  status: fullTicket.status,
+                  updated_at: fullTicket.updated_at
+                });
+                
+                // Verificar si el update es más reciente que el cache actual
+                const currentTickets = queryClient.getQueryData<any[]>(["platform-support-tickets"]);
+                const currentTicket = currentTickets?.find(t => t.id === fullTicket.id);
+                
+                if (currentTicket && currentTicket.updated_at) {
+                  const currentTime = new Date(currentTicket.updated_at).getTime();
+                  const incomingTime = new Date(fullTicket.updated_at).getTime();
+                  const timeDiff = incomingTime - currentTime;
+                  
+                  console.log("⏱️ [Realtime] Timestamp comparison:", {
+                    ticketId: fullTicket.id?.slice(0,8),
+                    currentStatus: currentTicket.status,
+                    currentTime: currentTicket.updated_at,
+                    incomingStatus: fullTicket.status,
+                    incomingTime: fullTicket.updated_at,
+                    timeDiffMs: timeDiff,
+                    willApply: timeDiff >= 0
+                  });
+                  
+                  if (incomingTime < currentTime) {
+                    console.warn("⏭️ [Realtime] IGNORING stale update (older than cache)");
+                    return; // Ignorar updates obsoletos
+                  }
+                }
+                
+                // Actualizar el cache directamente sin invalidar
+                console.log("📡 [Realtime] Applying update to cache:", {
+                  ticketId: fullTicket.id?.slice(0,8),
+                  newStatus: fullTicket.status,
+                  newUpdatedAt: fullTicket.updated_at
+                });
+                queryClient.setQueryData(
+                  ["platform-support-tickets"],
+                  (old: any[] | undefined) => {
+                    const updated = old?.map((t: any) => t.id === fullTicket.id ? fullTicket : t) || [];
+                    console.log("✅ [Realtime] Cache updated from realtime event");
+                    return updated;
+                  }
+                );
+                
+                onTicketUpdate?.(fullTicket);
+              }
+            } catch (error) {
+              console.error("Error fetching full ticket on update:", error);
+              // En caso de error, actualizar con datos parciales del payload
+              queryClient.setQueryData(
+                ["platform-support-tickets"],
+                (old: any[] | undefined) => 
+                  old?.map((t: any) => t.id === updatedData.id ? { ...t, ...updatedData } : t) || []
+              );
+              onTicketUpdate?.(updatedData);
+            }
+          }
+
+          if (payload.eventType === "DELETE") {
+            const deletedId = (payload.old as any)?.id;
+            if (deletedId) {
+              queryClient.setQueryData(
+                ["platform-support-tickets"],
+                (old: any[] | undefined) => old?.filter((t: any) => t.id !== deletedId) || []
+              );
+            }
           }
         }
       )
@@ -93,5 +223,5 @@ export function usePlatformAdminRealtime({
       supabase.removeChannel(ticketChannel);
       supabase.removeChannel(messageChannel);
     };
-  }, [enabled, queryClient, onNewTicket, onTicketUpdate, onNewMessage]);
+  }, [enabled, queryClient, onNewTicket, onTicketUpdate, onNewMessage, isMutatingRef]);
 }

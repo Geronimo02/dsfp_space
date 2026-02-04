@@ -106,7 +106,7 @@ export default function Auth() {
 
   return (
     <>
-      <div className="flex min-h-screen items-center justify-center bg-gradient-to-br from-slate-900 via-slate-800 to-slate-900 p-4 md:p-6">
+      <div className="fixed inset-0 flex items-center justify-center bg-gradient-to-br from-slate-900 via-slate-800 to-slate-900 overflow-auto">
         {/* Advanced animated background effects */}
         <div className="fixed inset-0 overflow-hidden pointer-events-none">
           {/* Main breathing orbs */}
@@ -128,10 +128,11 @@ export default function Auth() {
           <div className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-[800px] h-[800px] border border-cyan-500/5 rounded-full" style={{animation: 'pulse 12s infinite ease-in-out 2s'}}></div>
         </div>
 
-        <Card
-          className="w-full max-w-3xl shadow-[0_28px_80px_rgba(0,0,0,0.55)] border-primary/40 relative z-10 bg-gradient-to-br from-slate-800/90 via-slate-700/90 to-slate-800/90 backdrop-blur-2xl p-6 md:p-8"
-          style={{animation: 'fadeInUp 0.6s ease-out'}}
-        >
+        <div className="relative z-10 w-full max-w-3xl p-4 md:p-6 my-auto">
+          <Card
+            className="w-full shadow-[0_28px_80px_rgba(0,0,0,0.55)] border-primary/40 bg-gradient-to-br from-slate-800/90 via-slate-700/90 to-slate-800/90 backdrop-blur-2xl p-6 md:p-8"
+            style={{animation: 'fadeInUp 0.6s ease-out'}}
+          >
         <style>{`
           @keyframes fadeInUp {
             from { opacity: 0; transform: translateY(20px); }
@@ -208,11 +209,11 @@ export default function Auth() {
             <Button type="submit" className="w-full mt-2 h-11 bg-primary hover:bg-primary/90 text-white font-semibold shadow-lg" disabled={isLoading}>
               {isLoading ? "Iniciando sesión..." : "Iniciar Sesión"}
             </Button>
-            <div className="flex items-center justify-between mt-4 pt-2 border-t border-primary/30">
+            <div className="flex flex-col sm:flex-row items-center justify-between gap-2 sm:gap-0 mt-4 pt-2 border-t border-primary/30">
               <Button
                 type="button"
                 variant="link"
-                className="text-sm text-slate-300 hover:text-white"
+                className="text-xs sm:text-sm text-slate-300 hover:text-white w-full sm:w-auto text-center"
                 onClick={() => setShowForgotPassword(true)}
               >
                 ¿Olvidaste tu contraseña?
@@ -220,7 +221,7 @@ export default function Auth() {
               <Button
                 type="button"
                 variant="link"
-                className="text-sm text-primary hover:text-primary/80 font-medium"
+                className="text-xs sm:text-sm text-primary hover:text-primary/80 font-medium w-full sm:w-auto text-center"
                 onClick={() => navigate("/signup")}
               >
                 ¿No tienes cuenta? Regístrate
@@ -229,6 +230,7 @@ export default function Auth() {
           </form>
         </CardContent>
       </Card>
+        </div>
       </div>
 
       {/* Forgot Password Dialog */}

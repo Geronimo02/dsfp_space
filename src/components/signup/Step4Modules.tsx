@@ -10,7 +10,7 @@ const AVAILABLE_MODULES = [
   { id: "reports", name: "Reportes", description: "Informes y análisis avanzados" },
   { id: "pos", name: "Punto de Venta", description: "Sistema de ventas integrado" },
   { id: "accounting", name: "Contabilidad", description: "Gestión contable completa" },
-  { id: "crm", name: "CRM", description: "Gestión de clientes" },
+  { id: "CRM", name: "CRM", description: "Gestión de clientes" },
   { id: "hr", name: "Recursos Humanos", description: "Gestión de empleados y nómina" },
 ];
 

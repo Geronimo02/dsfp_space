@@ -4,10 +4,31 @@ import { createClient } from "https://esm.sh/@supabase/supabase-js@2.45.4?dts";
 
 const corsHeaders = {
   "Access-Control-Allow-Origin": "*",
-  "Access-Control-Allow-Headers": "authorization, x-client-info, apikey, content-type",
+  "Access-Control-Allow-Headers": "authorization, x-client-info, apikey, content-type, x-webhook-signature, x-webhook-timestamp",
   "Access-Control-Allow-Methods": "POST, OPTIONS",
 };
 
+// Rate limiting: track requests per integration (in-memory, resets on cold start)
+const rateLimitMap = new Map<string, { count: number; resetTime: number }>();
+const RATE_LIMIT_MAX = 100; // requests per window
+const RATE_LIMIT_WINDOW_MS = 60 * 1000; // 1 minute
+
+function checkRateLimit(integrationId: string): { allowed: boolean; remaining: number } {
+  const now = Date.now();
+  const entry = rateLimitMap.get(integrationId);
+  
+  if (!entry || now > entry.resetTime) {
+    rateLimitMap.set(integrationId, { count: 1, resetTime: now + RATE_LIMIT_WINDOW_MS });
+    return { allowed: true, remaining: RATE_LIMIT_MAX - 1 };
+  }
+  
+  if (entry.count >= RATE_LIMIT_MAX) {
+    return { allowed: false, remaining: 0 };
+  }
+  
+  entry.count++;
+  return { allowed: true, remaining: RATE_LIMIT_MAX - entry.count };
+}
 
 function normalizeKey(s: string) {
   return s.replace(/\s+/g, " ").trim().toLowerCase();
@@ -39,10 +60,10 @@ function pickItemField(
 }
 
 
-function json(body: any, status = 200) {
+function json(body: any, status = 200, extraHeaders: Record<string, string> = {}) {
   return new Response(JSON.stringify(body), {
     status,
-    headers: { ...corsHeaders, "Content-Type": "application/json" },
+    headers: { ...corsHeaders, "Content-Type": "application/json", ...extraHeaders },
   });
 }
 
@@ -154,6 +175,45 @@ function safeIsoDate(input: any): string {
   return new Date().toISOString();
 }
 
+// HMAC signature verification helper
+async function verifyHmacSignature(
+  rawBody: string,
+  signature: string,
+  secret: string
+): Promise<boolean> {
+  try {
+    const encoder = new TextEncoder();
+    const keyData = encoder.encode(secret);
+    const key = await crypto.subtle.importKey(
+      "raw",
+      keyData,
+      { name: "HMAC", hash: "SHA-256" },
+      false,
+      ["sign"]
+    );
+    
+    const signatureData = await crypto.subtle.sign(
+      "HMAC",
+      key,
+      encoder.encode(rawBody)
+    );
+    
+    // Convert to hex string
+    const expectedSignature = Array.from(new Uint8Array(signatureData))
+      .map(b => b.toString(16).padStart(2, "0"))
+      .join("");
+    
+    // Constant-time comparison to prevent timing attacks
+    if (signature.length !== expectedSignature.length) return false;
+    let result = 0;
+    for (let i = 0; i < signature.length; i++) {
+      result |= signature.charCodeAt(i) ^ expectedSignature.charCodeAt(i);
+    }
+    return result === 0;
+  } catch {
+    return false;
+  }
+}
 
 type Item = {
   product: string;
@@ -167,9 +227,11 @@ Deno.serve(async (req) => {
   if (req.method === "OPTIONS") return new Response(null, { status: 204, headers: corsHeaders });
   if (req.method !== "POST") return json({ error: "Method not allowed" }, 405);
 
+  // Read raw body for signature verification
+  const rawBody = await req.text();
   let body: any = {};
   try {
-    body = await req.json();
+    body = JSON.parse(rawBody);
   } catch (e) {
     return json({ error: "Invalid JSON body", detail: String(e) }, 400);
   }
@@ -185,7 +247,12 @@ Deno.serve(async (req) => {
   const supabaseAdmin = createClient(supabaseUrl, serviceKey);
 
   const integrationId = body?.integrationId ?? new URL(req.url).searchParams.get("integrationId");
-  const secret = body?.secret;
+  
+  // Support secret from Authorization header (preferred) or body (legacy)
+  const authHeader = req.headers.get("Authorization");
+  const secret = authHeader?.startsWith("Bearer ") 
+    ? authHeader.slice(7) 
+    : body?.secret;
 
   const namedValues = body?.namedValues ?? {};
   const values = body?.values ?? [];
@@ -195,7 +262,17 @@ Deno.serve(async (req) => {
   const meta = body?.meta ?? {};
 
   if (!integrationId) return json({ error: "Missing integrationId" }, 400);
-  if (!secret) return json({ error: "Missing secret" }, 400);
+  if (!secret) return json({ error: "Missing secret. Provide via Authorization header (Bearer <secret>) or body.secret" }, 400);
+
+  // Rate limiting check
+  const rateCheck = checkRateLimit(integrationId);
+  if (!rateCheck.allowed) {
+    return json(
+      { error: "Rate limit exceeded. Try again later." },
+      429,
+      { "Retry-After": "60", "X-RateLimit-Remaining": "0" }
+    );
+  }
 
   // Credenciales
   const { data: cred, error: credErr } = await supabaseAdmin
@@ -209,6 +286,29 @@ Deno.serve(async (req) => {
 
   const expected = (cred as any).credentials?.webhookSecret;
   if (!expected || expected !== secret) return json({ error: "Unauthorized (bad secret)" }, 401);
+
+  // Optional: Verify HMAC signature if provided (enhanced security)
+  const hmacSignature = req.headers.get("x-webhook-signature");
+  if (hmacSignature) {
+    const isValidSignature = await verifyHmacSignature(rawBody, hmacSignature, expected);
+    if (!isValidSignature) {
+      console.warn(`Invalid HMAC signature for integration ${integrationId}`);
+      return json({ error: "Invalid signature" }, 401);
+    }
+  }
+
+  // Optional: Timestamp validation to prevent replay attacks
+  const timestamp = req.headers.get("x-webhook-timestamp");
+  if (timestamp) {
+    const requestTime = parseInt(timestamp, 10);
+    const now = Date.now();
+    const MAX_AGE_MS = 5 * 60 * 1000; // 5 minutes
+    
+    if (isNaN(requestTime) || Math.abs(now - requestTime) > MAX_AGE_MS) {
+      console.warn(`Request timestamp too old for integration ${integrationId}: ${timestamp}`);
+      return json({ error: "Request timestamp too old or invalid" }, 401);
+    }
+  }
 
   if (body?._test === true) {
     return json({ ok: true, message: "Test received (secret ok)" }, 200);
@@ -385,6 +485,7 @@ for (let i = 1; i <= MAX_ITEMS; i++) {
         items,
       },
     },
-    200
+    200,
+    { "X-RateLimit-Remaining": String(rateCheck.remaining) }
   );
 });
