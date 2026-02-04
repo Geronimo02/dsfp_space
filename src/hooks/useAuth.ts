@@ -10,7 +10,7 @@ import { useEffect, useRef } from "react";
  */
 export function useAuth() {
   const queryClient = useQueryClient();
-  const subscriptionRef = useRef<ReturnType<typeof supabase.auth.onAuthStateChange> | null>(null);
+  const subscriptionRef = useRef<{ unsubscribe: () => void } | null>(null);
 
   // Cache user data with React Query
   const { data: user, isLoading, error } = useQuery({
@@ -65,7 +65,7 @@ export function useAuth() {
       }
     );
 
-    subscriptionRef.current = subscription;
+    subscriptionRef.current = { unsubscribe: subscription.unsubscribe };
 
     return () => {
       if (subscriptionRef.current) {

@@ -17,7 +17,7 @@ import {
   SelectValue,
 } from "@/components/ui/select";
 import { ChevronLeft, ChevronRight, Search } from "lucide-react";
-import { LoadingState } from "./LoadingState";
+import { LoadingState } from "../LoadingState";
 
 export interface Column<T> {
   key: string;
