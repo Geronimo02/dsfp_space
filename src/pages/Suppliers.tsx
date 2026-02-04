@@ -33,6 +33,7 @@ import { usePermissions } from "@/hooks/usePermissions";
 import { useCompany } from "@/contexts/CompanyContext";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { format } from "date-fns";
+import { useDebounce } from "@/hooks/useDebounce";
 
 interface Supplier {
   id: string;
@@ -57,6 +58,7 @@ export default function Suppliers() {
   const canEdit = hasPermission('suppliers', 'edit');
   
   const [searchQuery, setSearchQuery] = useState("");
+  const debouncedSearch = useDebounce(searchQuery, 300);
   const [dialogOpen, setDialogOpen] = useState(false);
   const [editingSupplier, setEditingSupplier] = useState<Supplier | null>(null);
   const [paymentDialogOpen, setPaymentDialogOpen] = useState(false);
@@ -83,7 +85,7 @@ export default function Suppliers() {
   const queryClient = useQueryClient();
 
   const { data: suppliers = [] } = useQuery({
-    queryKey: ["suppliers", searchQuery, currentCompany?.id],
+    queryKey: ["suppliers", debouncedSearch, currentCompany?.id],
     queryFn: async () => {
       let query = supabase
         .from("suppliers")
@@ -92,9 +94,9 @@ export default function Suppliers() {
         .limit(500)
         .order("name");
 
-      if (searchQuery) {
+      if (debouncedSearch) {
         query = query.or(
-          `name.ilike.%${searchQuery}%,contact_name.ilike.%${searchQuery}%,email.ilike.%${searchQuery}%`
+          `name.ilike.%${debouncedSearch}%,contact_name.ilike.%${debouncedSearch}%,email.ilike.%${debouncedSearch}%`
         );
       }
 

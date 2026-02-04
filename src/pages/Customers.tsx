@@ -23,6 +23,7 @@ import { es } from "date-fns/locale";
 import { z } from "zod";
 import { usePermissions } from "@/hooks/usePermissions";
 import { useCompany } from "@/contexts/CompanyContext";
+import { useDebounce } from "@/hooks/useDebounce";
 
 const customerSchema = z.object({
   name: z.string().trim().min(1, "El nombre es requerido").max(200, "El nombre debe tener máximo 200 caracteres"),
@@ -48,6 +49,7 @@ export default function Customers() {
   const canEdit = hasPermission('customers', 'edit');
   
   const [searchQuery, setSearchQuery] = useState("");
+  const debouncedSearch = useDebounce(searchQuery, 300);
   const [isDialogOpen, setIsDialogOpen] = useState(false);
   const [isHistoryOpen, setIsHistoryOpen] = useState(false);
   const [selectedCustomer, setSelectedCustomer] = useState<any>(null);
@@ -71,14 +73,14 @@ export default function Customers() {
   const queryClient = useQueryClient();
 
   const { data: customers } = useQuery({
-    queryKey: ["customers", searchQuery, currentCompany?.id],
+    queryKey: ["customers", debouncedSearch, currentCompany?.id],
     queryFn: async () => {
       if (!currentCompany?.id) return [];
       
       let query = supabase.from("customers").select("*").eq("company_id", currentCompany.id).order("created_at", { ascending: false }).limit(500);
       
-      if (searchQuery) {
-        const sanitized = sanitizeSearchQuery(searchQuery);
+      if (debouncedSearch) {
+        const sanitized = sanitizeSearchQuery(debouncedSearch);
         if (sanitized) {
           query = query.or(`name.ilike.%${sanitized}%,email.ilike.%${sanitized}%,phone.ilike.%${sanitized}%`);
         }

@@ -27,6 +27,7 @@ import { compressImage, isValidImage, formatFileSize } from "@/lib/imageUtils";
 import { ComboComponentsDialog } from "@/components/products/ComboComponentsDialog";
 import { Switch } from "@/components/ui/switch";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
+import { useDebounce } from "@/hooks/useDebounce";
 
 const productSchema = z.object({
   name: z.string().trim().min(1, "El nombre es requerido").max(200, "El nombre debe tener máximo 200 caracteres"),
@@ -81,6 +82,7 @@ export default function Products() {
   }, [currentCompany, permissionsLoading, hasPermission, canCreate, canEdit, canDelete, canExport]);
 
   const [searchQuery, setSearchQuery] = useState("");
+  const debouncedSearch = useDebounce(searchQuery, 300);
   const [categoryFilter, setCategoryFilter] = useState<string>("");
   
   // Cargar parámetro de búsqueda desde URL
@@ -158,14 +160,14 @@ export default function Products() {
   const queryClient = useQueryClient();
 
   const { data: products, isLoading } = useQuery({
-    queryKey: ["products", searchQuery, categoryFilter, currentCompany?.id],
+    queryKey: ["products", debouncedSearch, categoryFilter, currentCompany?.id],
     queryFn: async () => {
       if (!currentCompany?.id) return [];
       
       let query = supabase.from("products").select("*").eq("company_id", currentCompany.id).order("created_at", { ascending: false }).limit(500);
       
-      if (searchQuery) {
-        const sanitized = sanitizeSearchQuery(searchQuery);
+      if (debouncedSearch) {
+        const sanitized = sanitizeSearchQuery(debouncedSearch);
         if (sanitized) {
           query = query.or(`name.ilike.%${sanitized}%,barcode.ilike.%${sanitized}%,sku.ilike.%${sanitized}%`);
         }
