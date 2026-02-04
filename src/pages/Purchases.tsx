@@ -16,6 +16,7 @@ import { Plus, Search, Eye, Trash2, ShoppingCart, Package, DollarSign, AlertCirc
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip";
 import { toast } from "sonner";
 import { sanitizeSearchQuery } from "@/lib/searchUtils";
+import { getErrorMessage } from "@/lib/errorHandling";
 import { format } from "date-fns";
 import { useCompany } from "@/contexts/CompanyContext";
 
@@ -187,8 +188,10 @@ const Purchases = () => {
       setIsDialogOpen(false);
     },
     onError: (error) => {
-      toast.error("Error al registrar la compra");
-      console.error(error);
+      toast.error(getErrorMessage(error));
+      if (import.meta.env.DEV) {
+        console.error("Purchase creation error:", error);
+      }
     },
   });
 

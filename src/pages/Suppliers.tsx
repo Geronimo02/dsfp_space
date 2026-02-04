@@ -34,6 +34,8 @@ import { useCompany } from "@/contexts/CompanyContext";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { format } from "date-fns";
 import { useDebounce } from "@/hooks/useDebounce";
+import { useRateLimit } from "@/hooks/useRateLimit";
+import { getErrorMessage } from "@/lib/errorHandling";
 
 interface Supplier {
   id: string;
@@ -83,6 +85,7 @@ export default function Suppliers() {
   });
 
   const queryClient = useQueryClient();
+  const paymentRateLimiter = useRateLimit(15, 60000); // 15 pagos por minuto
 
   const { data: suppliers = [] } = useQuery({
     queryKey: ["suppliers", debouncedSearch, currentCompany?.id],
@@ -148,16 +151,19 @@ export default function Suppliers() {
       resetForm();
     },
     onError: (error) => {
-      toast.error("Error al crear el proveedor: " + error.message);
+      toast.error(getErrorMessage(error));
     },
   });
 
+  const paymentRateLimiter = useRateLimit(15, 60000); // 15 pagos por minuto
+
   const createPaymentMutation = useMutation({
     mutationFn: async () => {
-      if (!selectedSupplier) throw new Error("No supplier selected");
-      
-      const { data: { user } } = await supabase.auth.getUser();
-      if (!user) throw new Error("No user found");
+      return await paymentRateLimiter.execute(async () => {
+        if (!selectedSupplier) throw new Error("No supplier selected");
+        
+        const { data: { user } } = await supabase.auth.getUser();
+        if (!user) throw new Error("No user found");
 
       const amount = parseFloat(paymentFormData.amount);
       
@@ -183,6 +189,7 @@ export default function Suppliers() {
         .eq("id", selectedSupplier.id);
 
       if (balanceError) throw balanceError;
+      });
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["suppliers"] });
@@ -193,7 +200,7 @@ export default function Suppliers() {
       setSelectedSupplier(null);
     },
     onError: (error) => {
-      toast.error("Error al registrar el pago: " + error.message);
+      toast.error(getErrorMessage(error));
     },
   });
 
@@ -224,7 +231,7 @@ export default function Suppliers() {
       resetForm();
     },
     onError: (error) => {
-      toast.error("Error al actualizar el proveedor: " + error.message);
+      toast.error(getErrorMessage(error));
     },
   });
 

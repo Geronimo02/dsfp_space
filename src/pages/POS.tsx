@@ -1,4 +1,6 @@
 import { useState, useRef, useEffect } from "react";
+import { useRateLimit } from "@/hooks/useRateLimit";
+import { getErrorMessage } from "@/lib/errorHandling";
 import { Layout } from "@/components/layout/Layout";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -436,10 +438,14 @@ export default function POS() {
     }
   });
 
+  const saleRateLimiter = useRateLimit(10, 60000); // 10 ventas por minuto
+
   const processSaleMutation = useMutation({
     mutationFn: async () => {
-      const { data: { user } } = await supabase.auth.getUser();
-      if (!user) throw new Error("Usuario no autenticado");
+      // Verificar rate limit
+      const canProceed = await saleRateLimiter.execute(async () => {
+        const { data: { user } } = await supabase.auth.getUser();
+        if (!user) throw new Error("Usuario no autenticado");
 
       // Validate payment is complete
       if (remaining > 0.01) {
@@ -658,7 +664,11 @@ export default function POS() {
       queryClient.invalidateQueries({ queryKey: ["customers-pos"] });
     },
     onError: (error: any) => {
-      toast.error(error.message || "Error al procesar la venta");
+      const message = getErrorMessage(error);
+      toast.error(message);
+      if (import.meta.env.DEV) {
+        console.error("Sale processing error:", error);
+      }
     }
   });
 

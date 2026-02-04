@@ -254,7 +254,7 @@ export default function Customers() {
       resetForm();
     },
     onError: (error: any) => {
-      toast.error(error.message || "Error al crear cliente");
+      toast.error(getErrorMessage(error));
     },
   });
 
@@ -271,14 +271,17 @@ export default function Customers() {
       resetForm();
     },
     onError: (error: any) => {
-      toast.error(error.message || "Error al actualizar cliente");
+      toast.error(getErrorMessage(error));
     },
   });
 
+  const paymentRateLimiter = useRateLimit(15, 60000); // 15 pagos por minuto
+
   const createPaymentMutation = useMutation({
     mutationFn: async (data: any) => {
-      const { data: { user } } = await supabase.auth.getUser();
-      if (!user) throw new Error("Usuario no autenticado");
+      return await paymentRateLimiter.execute(async () => {
+        const { data: { user } } = await supabase.auth.getUser();
+        if (!user) throw new Error("Usuario no autenticado");
 
       // Crear el pago usando RPC con casting de tipos
       const { data: result, error } = await (supabase as any)
@@ -291,7 +294,8 @@ export default function Customers() {
         });
 
       if (error) throw error;
-      return result;
+        return result;
+      });
     },
     onSuccess: () => {
       toast.success("Pago registrado exitosamente");
@@ -302,7 +306,7 @@ export default function Customers() {
       setPaymentData({ amount: "", payment_method: "cash", notes: "" });
     },
     onError: (error: any) => {
-      toast.error(error.message || "Error al registrar pago");
+      toast.error(getErrorMessage(error));
     },
   });
 
@@ -333,7 +337,7 @@ export default function Customers() {
       queryClient.invalidateQueries({ queryKey: ["customer-movements"] });
     },
     onError: (error: any) => {
-      toast.error(error.message || "Error al aplicar pago");
+      toast.error(getErrorMessage(error));
     },
   });
 
