@@ -1,4 +1,4 @@
-import React, { createContext, useContext, useState, useEffect } from 'react';
+import React, { createContext, useContext, useState, useEffect, useRef } from 'react';
 import { supabase } from '@/integrations/supabase/client';
 import { useToast } from '@/hooks/use-toast';
 
@@ -40,6 +40,8 @@ export function CompanyProvider({ children }: { children: React.ReactNode }) {
   const [currentCompanyRole, setCurrentCompanyRole] = useState<CompanyUser['role'] | null>(null);
   const [loading, setLoading] = useState(true);
   const { toast } = useToast();
+  const isMountedRef = useRef(true);
+  const subscriptionRef = useRef<ReturnType<typeof supabase.channel> | null>(null);
 
   const fetchUserCompanies = async () => {
     try {
@@ -119,17 +121,26 @@ export function CompanyProvider({ children }: { children: React.ReactNode }) {
   };
 
   useEffect(() => {
-    let subscription: ReturnType<typeof supabase.channel> | null = null;
+    isMountedRef.current = true;
 
     const setupSubscription = async () => {
       await fetchUserCompanies();
 
+      // Check if component is still mounted
+      if (!isMountedRef.current) return;
+
       // Get current user to filter subscription
       const { data: { user } } = await supabase.auth.getUser();
-      if (!user) return;
+      if (!user || !isMountedRef.current) return;
+
+      // Clean up old subscription if exists
+      if (subscriptionRef.current) {
+        await supabase.removeChannel(subscriptionRef.current);
+        subscriptionRef.current = null;
+      }
 
       // Subscribe to changes only for current user's company_users
-      subscription = supabase
+      subscriptionRef.current = supabase
         .channel(`company_users_changes_${user.id}`)
         .on(
           'postgres_changes',
@@ -140,7 +151,9 @@ export function CompanyProvider({ children }: { children: React.ReactNode }) {
             filter: `user_id=eq.${user.id}`,
           },
           () => {
-            fetchUserCompanies();
+            if (isMountedRef.current) {
+              fetchUserCompanies();
+            }
           }
         )
         .subscribe();
@@ -149,8 +162,10 @@ export function CompanyProvider({ children }: { children: React.ReactNode }) {
     setupSubscription();
 
     return () => {
-      if (subscription) {
-        subscription.unsubscribe();
+      isMountedRef.current = false;
+      if (subscriptionRef.current) {
+        supabase.removeChannel(subscriptionRef.current);
+        subscriptionRef.current = null;
       }
     };
   }, []);

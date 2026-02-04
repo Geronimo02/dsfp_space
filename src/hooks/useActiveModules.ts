@@ -1,7 +1,7 @@
 import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { supabase } from '@/integrations/supabase/client';
 import { useCompany } from '@/contexts/CompanyContext';
-import { useEffect } from 'react';
+import { useEffect, useRef } from "react";
 
 // Módulos base que siempre están activos para todas las empresas
 const BASE_MODULES = ['dashboard', 'pos', 'sales', 'products', 'customers', 'settings'];
@@ -9,6 +9,8 @@ const BASE_MODULES = ['dashboard', 'pos', 'sales', 'products', 'customers', 'set
 export const useActiveModules = () => {
   const { currentCompany } = useCompany();
   const queryClient = useQueryClient();
+  const channelRef = useRef<ReturnType<typeof supabase.channel> | null>(null);
+  const isMountedRef = useRef(true);
 
   const query = useQuery({
     queryKey: ['activeModules', currentCompany?.id],
@@ -50,11 +52,19 @@ export const useActiveModules = () => {
 
   // Suscribirse a cambios en tiempo real de company_modules
   useEffect(() => {
+    isMountedRef.current = true;
+    
     if (!currentCompany?.id) return;
 
     if (import.meta.env.DEV) console.log('[useActiveModules] Setting up realtime subscription for company_modules:', currentCompany.id);
 
-    const channel = supabase
+    // Clean up old channel if exists
+    if (channelRef.current) {
+      supabase.removeChannel(channelRef.current);
+      channelRef.current = null;
+    }
+
+    channelRef.current = supabase
       .channel(`company_modules_realtime_${currentCompany.id}`)
       .on(
         'postgres_changes',
@@ -65,6 +75,7 @@ export const useActiveModules = () => {
           filter: `company_id=eq.${currentCompany.id}`,
         },
         (payload) => {
+          if (!isMountedRef.current) return;
           if (import.meta.env.DEV) console.log('[useActiveModules] Realtime change detected:', payload);
           queryClient.invalidateQueries({ queryKey: ['activeModules', currentCompany.id] });
         }
@@ -74,8 +85,12 @@ export const useActiveModules = () => {
       });
 
     return () => {
+      isMountedRef.current = false;
       if (import.meta.env.DEV) console.log('[useActiveModules] Cleaning up realtime subscription');
-      supabase.removeChannel(channel);
+      if (channelRef.current) {
+        supabase.removeChannel(channelRef.current);
+        channelRef.current = null;
+      }
     };
   }, [currentCompany?.id, queryClient]);
 
