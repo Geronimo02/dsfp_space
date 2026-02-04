@@ -68,6 +68,7 @@ export default function Expenses() {
         .select("id, name")
         .eq("company_id", currentCompany?.id)
         .eq("active", true)
+        .limit(200)
         .order("name");
       if (error) throw error;
       return data;
@@ -87,6 +88,7 @@ export default function Expenses() {
           suppliers(name)
         `)
         .eq("company_id", currentCompany?.id)
+        .limit(500)
         .order("expense_date", { ascending: false });
       if (error) throw error;
       return data;

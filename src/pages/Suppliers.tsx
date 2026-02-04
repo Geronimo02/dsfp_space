@@ -89,6 +89,7 @@ export default function Suppliers() {
         .from("suppliers")
         .select("*")
         .eq("company_id", currentCompany?.id)
+        .limit(500)
         .order("name");
 
       if (searchQuery) {

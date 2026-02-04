@@ -87,6 +87,7 @@ const Employees = () => {
         .from("employees")
         .select("*")
         .eq("company_id", currentCompany.id)
+        .limit(300)
         .order("created_at", { ascending: false });
 
       if (employeesError) throw employeesError;

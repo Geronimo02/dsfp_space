@@ -75,7 +75,8 @@ const PurchaseOrders = () => {
         .from("suppliers")
         .select("*")
         .eq("company_id", currentCompany.id)
-        .eq("active", true);
+        .eq("active", true)
+        .limit(200);
       if (error) throw error;
       return data || [];
     },

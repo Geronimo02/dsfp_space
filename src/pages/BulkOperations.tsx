@@ -66,7 +66,7 @@ export default function BulkOperations() {
   const { data: customers } = useQuery({
     queryKey: ["customers-bulk", currentCompany?.id],
     queryFn: async () => {
-      let query = supabase.from("customers").select("id, name, email, phone").eq("company_id", currentCompany?.id);
+      let query = supabase.from("customers").select("id, name, email, phone").eq("company_id", currentCompany?.id).limit(500);
       
       if (filterType === "with_email") {
         query = query.not("email", "is", null);

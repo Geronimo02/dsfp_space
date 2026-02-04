@@ -64,7 +64,7 @@ const Purchases = () => {
         }
       }
 
-      const { data, error } = await query;
+      const { data, error } = await query.limit(200);
       if (error) throw error;
       return data;
     },
@@ -79,6 +79,7 @@ const Purchases = () => {
         .select("*")
         .eq("company_id", currentCompany?.id)
         .eq("active", true)
+        .limit(200)
         .order("name");
       if (error) throw error;
       return data;
@@ -94,7 +95,8 @@ const Purchases = () => {
         .select("*")
         .eq("company_id", currentCompany?.id)
         .eq("active", true)
-        .order("name");
+        .order("name")
+        .limit(500);
       if (error) throw error;
       return data;
     },

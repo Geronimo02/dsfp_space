@@ -65,7 +65,7 @@ export default function Customers() {
   const { data: customers } = useQuery({
     queryKey: ["customers", searchQuery],
     queryFn: async () => {
-      let query = supabase.from("customers").select("*").order("created_at", { ascending: false });
+      let query = supabase.from("customers").select("*").order("created_at", { ascending: false }).limit(200);
       
       if (searchQuery) {
         const sanitized = sanitizeSearchQuery(searchQuery);

@@ -162,7 +162,7 @@ export default function Products() {
     queryFn: async () => {
       if (!currentCompany?.id) return [];
       
-      let query = supabase.from("products").select("*").eq("company_id", currentCompany.id).order("created_at", { ascending: false });
+      let query = supabase.from("products").select("*").eq("company_id", currentCompany.id).order("created_at", { ascending: false }).limit(500);
       
       if (searchQuery) {
         const sanitized = sanitizeSearchQuery(searchQuery);

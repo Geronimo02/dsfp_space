@@ -79,6 +79,7 @@ const PurchaseReturns = () => {
         .from("suppliers")
         .select("*")
         .eq("company_id", currentCompany.id)
+        .limit(200)
         .eq("active", true);
       if (error) throw error;
       return data || [];

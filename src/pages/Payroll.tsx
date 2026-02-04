@@ -62,7 +62,8 @@ const Payroll = () => {
         .from("employees")
         .select("*")
         .eq("company_id", currentCompany.id)
-        .eq("active", true);
+        .eq("active", true)
+        .limit(300);
       
       if (error) throw error;
       return data;

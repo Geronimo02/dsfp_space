@@ -89,7 +89,7 @@ export default function POS() {
     queryFn: async () => {
       if (!currentCompany?.id) return [];
       
-      let query = supabase.from("products").select("*").eq("active", true).eq("company_id", currentCompany.id);
+      let query = supabase.from("products").select("*").eq("active", true).eq("company_id", currentCompany.id).limit(500);
       
       if (searchQuery) {
         const sanitized = sanitizeSearchQuery(searchQuery);
