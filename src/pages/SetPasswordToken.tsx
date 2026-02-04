@@ -20,7 +20,10 @@ export default function SetPasswordToken() {
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!token) return toast.error("Token inválido");
-    if (password.length < 6) return toast.error("La contraseña debe tener al menos 6 caracteres");
+    if (password.length < 8) return toast.error("La contraseña debe tener al menos 8 caracteres");
+    if (!/[A-Z]/.test(password)) return toast.error("La contraseña debe contener al menos una mayúscula");
+    if (!/[a-z]/.test(password)) return toast.error("La contraseña debe contener al menos una minúscula");
+    if (!/[0-9]/.test(password)) return toast.error("La contraseña debe contener al menos un número");
     if (password !== confirm) return toast.error("Las contraseñas no coinciden");
 
     setLoading(true);
@@ -81,9 +84,9 @@ export default function SetPasswordToken() {
                   type={showPassword ? "text" : "password"}
                   value={password}
                   onChange={(e) => setPassword(e.target.value)}
-                  placeholder="Mínimo 6 caracteres"
+                  placeholder="Mínimo 8 caracteres"
                   required
-                  minLength={6}
+                  minLength={8}
                 />
                 <Button
                   type="button"

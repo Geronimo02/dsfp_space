@@ -52,7 +52,7 @@ export const useActiveModules = () => {
   useEffect(() => {
     if (!currentCompany?.id) return;
 
-    console.log('[useActiveModules] Setting up realtime subscription for company_modules:', currentCompany.id);
+    if (import.meta.env.DEV) console.log('[useActiveModules] Setting up realtime subscription for company_modules:', currentCompany.id);
 
     const channel = supabase
       .channel(`company_modules_realtime_${currentCompany.id}`)
@@ -65,16 +65,16 @@ export const useActiveModules = () => {
           filter: `company_id=eq.${currentCompany.id}`,
         },
         (payload) => {
-          console.log('[useActiveModules] Realtime change detected:', payload);
+          if (import.meta.env.DEV) console.log('[useActiveModules] Realtime change detected:', payload);
           queryClient.invalidateQueries({ queryKey: ['activeModules', currentCompany.id] });
         }
       )
       .subscribe((status) => {
-        console.log('[useActiveModules] Realtime subscription status:', status);
+        if (import.meta.env.DEV) console.log('[useActiveModules] Realtime subscription status:', status);
       });
 
     return () => {
-      console.log('[useActiveModules] Cleaning up realtime subscription');
+      if (import.meta.env.DEV) console.log('[useActiveModules] Cleaning up realtime subscription');
       supabase.removeChannel(channel);
     };
   }, [currentCompany?.id, queryClient]);

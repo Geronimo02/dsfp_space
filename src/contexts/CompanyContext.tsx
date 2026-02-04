@@ -45,12 +45,12 @@ export function CompanyProvider({ children }: { children: React.ReactNode }) {
     try {
       const { data: { user } } = await supabase.auth.getUser();
       if (!user) {
-        console.log("No authenticated user found");
+        if (import.meta.env.DEV) console.log("No authenticated user found");
         setLoading(false);
         return;
       }
 
-      console.log("Fetching companies for user:", user.id);
+      if (import.meta.env.DEV) console.log("Fetching companies for user:", user.id);
 
       const { data, error } = await supabase
         .from('company_users')
@@ -77,11 +77,11 @@ export function CompanyProvider({ children }: { children: React.ReactNode }) {
         .order('created_at', { ascending: true });
 
       if (error) {
-        console.error("Error fetching company_users:", error);
+        if (import.meta.env.DEV) console.error("Error fetching company_users:", error);
         throw error;
       }
 
-      console.log("Companies fetched:", data?.length || 0, "companies");
+      if (import.meta.env.DEV) console.log("Companies fetched:", data?.length || 0, "companies");
       const companyUsers = data as CompanyUser[];
       setUserCompanies(companyUsers);
 
@@ -107,7 +107,7 @@ export function CompanyProvider({ children }: { children: React.ReactNode }) {
         localStorage.setItem('currentCompanyId', data[0].company_id);
       }
     } catch (error) {
-      console.error('Error fetching companies:', error);
+      if (import.meta.env.DEV) console.error('Error fetching companies:', error);
       toast({
         title: 'Error',
         description: 'No se pudieron cargar las empresas',
@@ -165,8 +165,8 @@ export function CompanyProvider({ children }: { children: React.ReactNode }) {
         title: 'Empresa cambiada',
         description: `Ahora estás trabajando en ${company.companies.name}`,
       });
-      // Reload page to refresh all data and clear cache
-      window.location.reload();
+      // Instead of reload, we'll let React Query handle the refresh
+      // The currentCompany change will trigger re-renders and new queries
     } else {
       // Si la empresa no existe en la lista del usuario, limpiar localStorage
       localStorage.removeItem('currentCompanyId');

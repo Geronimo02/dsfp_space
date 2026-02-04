@@ -9,8 +9,7 @@ import { CompanyProvider, useCompany } from "@/contexts/CompanyContext";
 import { User, Session } from "@supabase/supabase-js";
 import { usePlatformAdmin } from "@/hooks/usePlatformAdmin";
 import { ModuleProtectedRoute } from "./components/ModuleProtectedRoute";
-import { usePermissions } from "@/hooks/usePermissions";
-
+import { usePermissions } from "@/hooks/usePermissions";import { LoadingState } from "./components/LoadingState";
 // Lazy load all page components
 const Landing = lazy(() => import("./pages/Landing"));
 const Dashboard = lazy(() => import("./pages/Dashboard"));
@@ -78,11 +77,7 @@ const queryClient = new QueryClient();
 
 
 // Loading fallback component
-const PageLoader = () => (
-  <div className="flex items-center justify-center min-h-screen">
-    <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-primary"></div>
-  </div>
-);
+const PageLoader = () => <LoadingState fullScreen />;
 
 
 // Landing (static) routing is handled in src/pages/Landing.tsx
@@ -142,7 +137,7 @@ function CompanyCheck({ children }: { children: React.ReactNode }) {
 
   // During the wait, keep showing loader unless we already have a current company
   if (loading || isLoadingAdmin || (pendingCheck && !currentCompany)) {
-    return <div className="flex items-center justify-center min-h-screen">Cargando...</div>;
+    return <LoadingState fullScreen message="Cargando empresa..." />;
   }
 
   // La redirección de admin ahora se maneja en ProtectedRoute
@@ -153,11 +148,11 @@ function CompanyCheck({ children }: { children: React.ReactNode }) {
 
   // If companies exist but currentCompany hasn't been set yet, keep loading instead of showing the empty state
   if (!currentCompany && userCompanies.length > 0) {
-    return <div className="flex items-center justify-center min-h-screen">Cargando empresa...</div>;
+    return <LoadingState fullScreen message="Seleccionando empresa..." />;
   }
 
   if (!currentCompany) {
-    return <div className="flex items-center justify-center min-h-screen">Sin empresa seleccionada...</div>;
+    return <LoadingState fullScreen message="Configurando acceso..." />;
   }
 
   return <>{children}</>;
@@ -190,11 +185,11 @@ function AuthOnlyRoute({ children }: { children: React.ReactNode }) {
 
 
   if (loading || isLoadingAdmin) {
-    return <div className="flex items-center justify-center min-h-screen">Cargando...</div>;
+    return <LoadingState fullScreen />;
   }
 
   if (!user) {
-    console.warn("No hay usuario autenticado. Redirigiendo a login.");
+    if (import.meta.env.DEV) console.warn("No hay usuario autenticado. Redirigiendo a login.");
     return (
       <div className="flex flex-col items-center justify-center min-h-screen">
         <p className="text-lg text-destructive font-bold mb-4">No hay sesión activa. Por favor inicia sesión.</p>
@@ -234,11 +229,11 @@ function PlatformAdminRoute({ children }: { children: React.ReactNode }) {
 
 
   if (loading) {
-    return <div className="flex items-center justify-center min-h-screen">Cargando...</div>;
+    return <LoadingState fullScreen />;
   }
 
   if (!user) {
-    console.warn("No hay usuario autenticado (admin route). Redirigiendo a login.");
+    if (import.meta.env.DEV) console.warn("No hay usuario autenticado (admin route). Redirigiendo a login.");
     return (
       <div className="flex flex-col items-center justify-center min-h-screen">
         <p className="text-lg text-destructive font-bold mb-4">No hay sesión activa. Por favor inicia sesión.</p>
@@ -278,7 +273,7 @@ function ProtectedRoute({ children }: { children: React.ReactNode }) {
   }, []);
 
   if (loading) {
-    return <div className="flex items-center justify-center min-h-screen">Cargando...</div>;
+    return <LoadingState fullScreen />;
   }
 
   if (!user) {
