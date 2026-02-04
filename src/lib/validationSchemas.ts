@@ -191,3 +191,19 @@ export function validateData<T>(schema: z.ZodSchema<T>, data: unknown) {
     errorMessages: result.error.errors.map(e => e.message)
   };
 }
+
+// Expense schema
+export const expenseSchema = z.object({
+  category_id: z.string().uuid("ID de categoría inválido").optional().nullable(),
+  description: z.string().trim().min(1, "La descripción es requerida").max(500, "La descripción debe tener máximo 500 caracteres"),
+  amount: priceSchema,
+  expense_date: dateSchema,
+  payment_method: z.enum(["cash", "card", "transfer", "check"], {
+    errorMap: () => ({ message: "Método de pago inválido" })
+  }),
+  reference_number: z.string().max(100, "El número de referencia debe tener máximo 100 caracteres").optional().nullable(),
+  supplier_id: z.string().uuid("ID de proveedor inválido").optional().nullable(),
+  notes: descriptionSchema,
+  status: z.enum(["pending", "approved", "paid", "rejected"]).default("pending"),
+});
+

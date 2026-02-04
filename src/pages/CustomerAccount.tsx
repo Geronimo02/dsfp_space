@@ -45,9 +45,13 @@ export default function CustomerAccount() {
           .select("*")
           .eq("company_id", currentCompany?.id)
           .eq("customer_id", selectedCustomer)
+          .limit(200)
           .order("created_at", { ascending: false }),
         supabase
           .from("customer_payments")
+          .select("*")
+          .eq("customer_id", selectedCustomer)
+          .limit(200)
           .select("*")
           .eq("customer_id", selectedCustomer)
           .order("payment_date", { ascending: false }),
