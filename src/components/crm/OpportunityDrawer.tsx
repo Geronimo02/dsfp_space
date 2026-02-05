@@ -98,25 +98,28 @@ export function OpportunityDrawer({ open, onClose, companyId, opportunity }: Opp
 
   const mutation = useMutation({
     mutationFn: async (values: OpportunityForm) => {
+      const normalizeNumber = (val?: number) =>
+        typeof val === "number" && !Number.isNaN(val) ? val : null;
+      const normalizeText = (val?: string) => (val && val.trim() ? val : null);
+
       const payload: any = {
-        company_id: companyId,
         name: values.name,
         customer_id: values.customer_id || null,
         pipeline_id: values.pipeline_id || null,
         stage: values.stage,
-        value: values.value || null,
-        estimated_close_date: values.estimated_close_date || null,
-        probability: values.probability || null,
-        description: values.description || null,
+        value: normalizeNumber(values.value),
+        estimated_close_date: normalizeText(values.estimated_close_date),
+        probability: normalizeNumber(values.probability),
+        description: normalizeText(values.description),
         owner_id: values.owner_id || null,
-        status: values.status || null,
-        close_date: values.close_date || null,
-        lost_reason: values.lost_reason || null,
-        won_reason: values.won_reason || null,
-        source: values.source || null,
-        currency: values.currency || null,
-        expected_revenue: values.expected_revenue || null,
-        next_step: values.next_step || null,
+        status: normalizeText(values.status),
+        close_date: normalizeText(values.close_date),
+        lost_reason: normalizeText(values.lost_reason),
+        won_reason: normalizeText(values.won_reason),
+        source: normalizeText(values.source),
+        currency: normalizeText(values.currency),
+        expected_revenue: normalizeNumber(values.expected_revenue),
+        next_step: normalizeText(values.next_step),
         tags: values.tags ? values.tags.split(",").map(t => t.trim()).filter(Boolean) : null,
       };
 
@@ -129,7 +132,7 @@ export function OpportunityDrawer({ open, onClose, companyId, opportunity }: Opp
       } else {
         const { error } = await supabase
           .from("crm_opportunities")
-          .insert([payload]);
+          .insert([{ ...payload, company_id: companyId }]);
         if (error) throw error;
       }
     },
