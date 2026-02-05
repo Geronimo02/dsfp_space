@@ -45,6 +45,7 @@ export function OpportunitiesList({
   onCreate,
 }: OpportunitiesListProps) {
   const queryClient = useQueryClient();
+  const [editingOpportunity, setEditingOpportunity] = useState<OpportunityRow | null>(null);
   
   // --- Pagination & Sorting ---
   const [page, setPage] = useState(1);
@@ -274,6 +275,10 @@ export function OpportunitiesList({
                         </Button>
                       </DropdownMenuTrigger>
                       <DropdownMenuContent align="end">
+                        <DropdownMenuItem onClick={() => setEditingOpportunity(opp)}>
+                          <Pencil className="w-4 h-4 mr-2" />
+                          Editar
+                        </DropdownMenuItem>
                         <DropdownMenuItem
                           onClick={() => handleDeleteOpportunity(opp.id, opp.name)}
                           className="text-destructive focus:text-destructive"
@@ -316,6 +321,22 @@ export function OpportunitiesList({
           </div>
         </div>
       ) : null}
+
+      {/* Edit Opportunity Dialog - Placeholder */}
+      {editingOpportunity && (
+        <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50">
+          <div className="bg-white p-6 rounded-lg shadow-lg max-w-md">
+            <h2 className="text-lg font-semibold mb-4">Editar Oportunidad</h2>
+            <p className="text-sm text-muted-foreground mb-4">
+              Edición de: {editingOpportunity.name}
+            </p>
+            <p className="text-sm text-muted-foreground mb-4">
+              (Funcionalidad de edición pendiente de implementar)
+            </p>
+            <Button onClick={() => setEditingOpportunity(null)}>Cerrar</Button>
+          </div>
+        </div>
+      )}
     </div>
   );
 }

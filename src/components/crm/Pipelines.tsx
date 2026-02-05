@@ -63,6 +63,7 @@ export function Pipelines({ companyId }: { companyId: string }) {
   const [quickCreateStage, setQuickCreateStage] = useState<string | null>(null);
   const [quickCreateOpen, setQuickCreateOpen] = useState(false);
   const [addExistingOpen, setAddExistingOpen] = useState<string | null>(null);
+  const [editingOpportunity, setEditingOpportunity] = useState<Opportunity | null>(null);
 
   // Fetch pipelines
   const { data: pipelines, isLoading: pipelinesLoading } = useQuery<Pipeline[]>({
@@ -427,7 +428,8 @@ export function Pipelines({ companyId }: { companyId: string }) {
                         key={opp.id}
                         draggable
                         onDragStart={() => handleDragStart(opp)}
-                        className="p-3 bg-white border rounded-lg cursor-move hover:shadow-md transition-shadow"
+                        onClick={() => setEditingOpportunity(opp)}
+                        className="p-3 bg-white border rounded-lg cursor-pointer hover:shadow-md transition-shadow"
                       >
                         <div className="flex items-start justify-between mb-2">
                           <div className="flex items-start gap-2 flex-1">
@@ -446,6 +448,15 @@ export function Pipelines({ companyId }: { companyId: string }) {
                               </Button>
                             </DropdownMenuTrigger>
                             <DropdownMenuContent align="end">
+                              <DropdownMenuItem
+                                onClick={(e) => {
+                                  e.stopPropagation();
+                                  setEditingOpportunity(opp);
+                                }}
+                              >
+                                <Pencil className="w-4 h-4 mr-2" />
+                                Editar
+                              </DropdownMenuItem>
                               <DropdownMenuItem
                                 onClick={(e) => {
                                   e.stopPropagation();
@@ -543,6 +554,22 @@ export function Pipelines({ companyId }: { companyId: string }) {
                 </Card>
               </div>
             ))}
+          </div>
+        </div>
+      )}
+
+      {/* Edit Opportunity Dialog - Placeholder */}
+      {editingOpportunity && (
+        <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50">
+          <div className="bg-white p-6 rounded-lg shadow-lg max-w-md">
+            <h2 className="text-lg font-semibold mb-4">Editar Oportunidad</h2>
+            <p className="text-sm text-muted-foreground mb-4">
+              Edición de: {editingOpportunity.name}
+            </p>
+            <p className="text-sm text-muted-foreground mb-4">
+              (Funcionalidad de edición pendiente de implementar)
+            </p>
+            <Button onClick={() => setEditingOpportunity(null)}>Cerrar</Button>
           </div>
         </div>
       )}
