@@ -94,12 +94,9 @@ export function OpportunitiesList({
     queryKey,
     queryFn: async (): Promise<OpportunitiesQueryResult> => {
       let q = supabase
-      .from("crm_opportunities")
-      .select(
-        "*, customers(name), owner:profiles(name), stage",
-        { count: "exact" }
-      )
-      .eq("company_id", companyId);
+        .from("crm_opportunities")
+        .select("*, customers(name), owner:employees(name), stage", { count: "exact" })
+        .eq("company_id", companyId);
 
 
       if (search) q = q.ilike("name",`%${search}%`);
@@ -125,6 +122,8 @@ export function OpportunitiesList({
       const typedData = (data ?? []) as unknown as OpportunityRow[];
       return { data: typedData, total: count ?? 0 };
     },
+
+    enabled: !!companyId,
 
     // TanStack Query v4:
     placeholderData: (prev) => prev,
@@ -198,6 +197,13 @@ export function OpportunitiesList({
                   ))}
                 </tr>
               ))
+            ) : !data?.data?.length ? (
+              <tr>
+                <td colSpan={columns.length} className="text-center py-12">
+                  <div className="text-muted-foreground mb-2">Aún no hay oportunidades.</div>
+                  <Button onClick={onCreate}>Crear oportunidad</Button>
+                </td>
+              </tr>
             ) : isError ? (
               <tr>
                 <td colSpan={columns.length} className="text-center py-8">
@@ -205,13 +211,6 @@ export function OpportunitiesList({
                   <Button variant="outline" onClick={() => refetch()}>
                     Reintentar
                   </Button>
-                </td>
-              </tr>
-            ) : !data?.data?.length ? (
-              <tr>
-                <td colSpan={columns.length} className="text-center py-12">
-                  <div className="text-muted-foreground mb-2">No hay oportunidades.</div>
-                  <Button onClick={onCreate}>Crear oportunidad</Button>
                 </td>
               </tr>
             ) : (

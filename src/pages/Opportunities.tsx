@@ -3,6 +3,13 @@ import { useState, useMemo, useEffect } from "react";
 import { Layout } from "@/components/layout/Layout";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select";
 import { useCompany } from "@/contexts/CompanyContext";
 import { OpportunitiesList } from "@/components/crm/OpportunitiesList";
 import { LucidePlus, LucideFilter, LucideDownload } from "lucide-react";
@@ -17,6 +24,19 @@ import { supabase } from "@/integrations/supabase/client";
 // --- Data hooks reutilizables ---
 type OpportunityRow = Database["public"]["Tables"]["crm_opportunities"]["Row"];
 type OpportunityInsert = Database["public"]["Tables"]["crm_opportunities"]["Insert"];
+type OpportunityInsertExtended = OpportunityInsert & {
+  status?: string | null;
+  close_date?: string | null;
+  closed_at?: string | null;
+  lost_reason?: string | null;
+  won_reason?: string | null;
+  source?: string | null;
+  currency?: string | null;
+  expected_revenue?: number | null;
+  next_step?: string | null;
+  last_activity_at?: string | null;
+  tags?: string[] | null;
+};
 type OpportunityUpdate = Database["public"]["Tables"]["crm_opportunities"]["Update"];
 
 export function useOpportunitiesQuery(params: {
@@ -32,7 +52,7 @@ export function useOpportunitiesQuery(params: {
     queryFn: async () => {
       let q = supabase
         .from("crm_opportunities")
-        .select("*, customers(name), owner:profiles(name), stage", { count: "exact" })
+        .select("*, customers(name), owner:employees(name), stage", { count: "exact" })
         .eq("company_id", params.companyId);
       if (params.search) q = q.ilike("name", `%${params.search}%`);
       if (params.filters?.pipelineId) q = q.eq("pipeline_id", params.filters.pipelineId);
@@ -56,7 +76,7 @@ export function useOpportunitiesQuery(params: {
 export function useCreateOpportunityMutation(companyId: string, onSuccess?: () => void) {
   const queryClient = useQueryClient();
   return useMutation({
-    mutationFn: async (values: OpportunityInsert) => {
+    mutationFn: async (values: OpportunityInsertExtended) => {
       const { error } = await supabase.from("crm_opportunities").insert([
         { ...values, company_id: companyId },
       ]);
@@ -87,9 +107,9 @@ function useAccountsAutocomplete(companyId: string, query: string) {
   });
 }
 
-function useContactsAutocomplete(companyId: string, query: string) {
+function useCustomersAutocomplete(companyId: string, query: string) {
   return useQuery({
-    queryKey: ["contacts-autocomplete", companyId, query],
+    queryKey: ["customers-autocomplete", companyId, query],
     queryFn: async () => {
       const { data, error } = await supabase
         .from("customers")
@@ -187,26 +207,33 @@ const opportunitySchema = z.object({
   name: z.string().min(2, "Requerido"),
   pipeline_id: z.string().min(1, "Requerido"),
   stage: z.string().min(1, "Requerido"),
-  customer_id: z.string().min(1, "Requerido"),
-  value: z.number().min(0.01, "Monto requerido"),
+  customer_id: z.string().optional(),
+  value: z.number().min(0.01, "Monto requerido").optional(),
   currency: z.string().default("ARS"),
   estimated_close_date: z.string().min(1, "Requerido"),
   probability: z.number().min(0).max(100).optional(),
   description: z.string().optional(),
   owner_id: z.string().optional(),
-  company_id: z.string().min(1, "Requerido"),
+  status: z.string().default("abierta"),
+  close_date: z.string().optional(),
+  lost_reason: z.string().optional(),
+  won_reason: z.string().optional(),
+  source: z.string().optional(),
+  expected_revenue: z.number().optional(),
+  next_step: z.string().optional(),
+  tags: z.string().optional(),
 });
 
 type OpportunityForm = z.infer<typeof opportunitySchema>;
 
 function CreateOpportunityDrawer({ open, onClose, companyId }: { open: boolean; onClose: () => void; companyId: string }) {
-  const currentUserId = undefined; // TODO: fetch from supabase.auth.getUser()
   const form = useForm<OpportunityForm>({
     resolver: zodResolver(opportunitySchema),
     defaultValues: {
       probability: 50,
-      owner_id: currentUserId,
-      company_id: companyId,
+      status: "abierta",
+      currency: "ARS",
+      owner_id: undefined,
     },
     mode: "onChange",
   });
@@ -216,11 +243,43 @@ function CreateOpportunityDrawer({ open, onClose, companyId }: { open: boolean; 
   });
 
   // --- Autocomplete cuentas/contactos ---
-  const [accountQuery, setAccountQuery] = useState("");
-  const [contactQuery, setContactQuery] = useState("");
-  const customerId = form.watch("customer_id");
-  const { data: accounts = [] } = useAccountsAutocomplete(companyId, accountQuery);
-  const { data: contacts = [] } = useContactsAutocomplete(companyId, contactQuery);
+  const [customerQuery, setCustomerQuery] = useState("");
+  const { data: customers = [] } = useCustomersAutocomplete(companyId, customerQuery);
+
+  const { data: pipelines = [] } = useQuery({
+    queryKey: ["crm-pipelines", companyId],
+    queryFn: async () => {
+      const { data, error } = await supabase
+        .from("crm_pipelines")
+        .select("id, name, stages")
+        .eq("company_id", companyId)
+        .order("created_at", { ascending: false });
+      if (error) throw error;
+      return data || [];
+    },
+    enabled: !!companyId,
+  });
+
+  const { data: owners = [] } = useQuery({
+    queryKey: ["crm-owners", companyId],
+    queryFn: async () => {
+      const { data, error } = await supabase
+        .from("employees")
+        .select("id, name")
+        .eq("company_id", companyId)
+        .order("name", { ascending: true });
+      if (error) throw error;
+      return data || [];
+    },
+    enabled: !!companyId,
+  });
+
+  const selectedPipelineId = form.watch("pipeline_id");
+  const selectedPipeline = useMemo(
+    () => pipelines.find((p: any) => p.id === selectedPipelineId),
+    [pipelines, selectedPipelineId]
+  );
+  const pipelineStages: string[] = selectedPipeline?.stages ?? [];
 
   // --- AI Assist stub ---
   function handleAIAssist() {
@@ -244,11 +303,30 @@ function CreateOpportunityDrawer({ open, onClose, companyId }: { open: boolean; 
           className="flex-1 overflow-y-auto p-4 grid gap-4"
           onSubmit={form.handleSubmit(values => {
             // Forzar que los campos requeridos estén presentes y no opcionales
-            const { name, pipeline_id, stage, customer_id, value, estimated_close_date, probability, description, owner_id, currency } = values;
-            const payload: OpportunityInsert = {
+            const {
+              name,
+              pipeline_id,
+              stage,
+              customer_id,
+              value,
+              estimated_close_date,
+              probability,
+              description,
+              owner_id,
+              status,
+              close_date,
+              lost_reason,
+              won_reason,
+              source,
+              currency,
+              expected_revenue,
+              next_step,
+              tags,
+            } = values;
+            const payload: OpportunityInsertExtended = {
               company_id: companyId,
               name: name!,
-              customer_id: customer_id!,
+              customer_id: customer_id ?? null,
               // pipeline_id y stage pueden ser opcionales según el tipo, pero si son requeridos, forzar
               pipeline_id: pipeline_id ?? null,
               stage: stage!,
@@ -257,80 +335,164 @@ function CreateOpportunityDrawer({ open, onClose, companyId }: { open: boolean; 
               probability: probability ?? null,
               description: description ?? null,
               owner_id: owner_id ?? null,
-              // currency no está en el tipo Insert, pero si tu tabla lo tiene, agrégalo aquí
+              status: status ?? null,
+              close_date: close_date ?? null,
+              lost_reason: lost_reason ?? null,
+              won_reason: won_reason ?? null,
+              source: source ?? null,
+              currency: currency ?? null,
+              expected_revenue: expected_revenue ?? null,
+              next_step: next_step ?? null,
+              tags: tags ? tags.split(",").map(t => t.trim()).filter(Boolean) : null,
             };
             mutation.mutate(payload);
           })}
         >
+          <div className="text-xs text-muted-foreground">
+            Los campos con * son obligatorios.
+          </div>
+
+          <div className="text-sm font-semibold text-muted-foreground">Datos básicos</div>
           <div className="grid gap-2">
             <label className="font-medium">Nombre *</label>
-            <Input {...form.register("name")} autoFocus aria-invalid={!!form.formState.errors.name} />
+            <Input
+              {...form.register("name")}
+              autoFocus
+              placeholder="Ej: Renovación contrato ACME"
+              aria-invalid={!!form.formState.errors.name}
+            />
             {form.formState.errors.name && <span className="text-xs text-red-500">{form.formState.errors.name.message}</span>}
           </div>
           <div className="grid grid-cols-2 gap-2">
             <div>
               <label className="font-medium">Pipeline *</label>
-              <Input {...form.register("pipeline_id")} aria-invalid={!!form.formState.errors.pipeline_id} />
-              {/* TODO: Select real pipeline */}
+              <Select
+                value={form.watch("pipeline_id") || ""}
+                onValueChange={(value) => {
+                  form.setValue("pipeline_id", value, { shouldValidate: true });
+                  const pipeline = pipelines.find((p: any) => p.id === value);
+                  const nextStage = pipeline?.stages?.[0];
+                  if (nextStage) {
+                    form.setValue("stage", nextStage, { shouldValidate: true });
+                  }
+                }}
+              >
+                <SelectTrigger aria-invalid={!!form.formState.errors.pipeline_id}>
+                  <SelectValue placeholder="Elegí un pipeline" />
+                </SelectTrigger>
+                <SelectContent>
+                  {pipelines.map((p: any) => (
+                    <SelectItem key={p.id} value={p.id}>
+                      {p.name}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
               {form.formState.errors.pipeline_id && <span className="text-xs text-red-500">{form.formState.errors.pipeline_id.message}</span>}
+              <p className="text-xs text-muted-foreground">Define las etapas disponibles.</p>
             </div>
             <div>
               <label className="font-medium">Etapa *</label>
-              <Input {...form.register("stage")} aria-invalid={!!form.formState.errors.stage} />
-              {/* TODO: Select real stage */}
+              <Select
+                value={form.watch("stage") || ""}
+                onValueChange={(value) => form.setValue("stage", value, { shouldValidate: true })}
+                disabled={!pipelineStages.length}
+              >
+                <SelectTrigger aria-invalid={!!form.formState.errors.stage}>
+                  <SelectValue placeholder={pipelineStages.length ? "Seleccionar etapa" : "Elegí un pipeline"} />
+                </SelectTrigger>
+                <SelectContent>
+                  {pipelineStages.map((stage: string) => (
+                    <SelectItem key={stage} value={stage}>
+                      {stage}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
               {form.formState.errors.stage && <span className="text-xs text-red-500">{form.formState.errors.stage.message}</span>}
             </div>
           </div>
           <div className="grid grid-cols-2 gap-2">
             <div>
-              <label className="font-medium">Cuenta *</label>
-              <Input
-                {...form.register("customer_id")}
-                aria-invalid={!!form.formState.errors.customer_id}
-                list="accounts-list"
-                onChange={e => {
-                  form.setValue("customer_id", e.target.value);
-                  setAccountQuery(e.target.value);
+              <label className="font-medium">Cliente</label>
+              <Select
+                value={form.watch("customer_id") || "__none__"}
+                onValueChange={(value) => {
+                  form.setValue("customer_id", value === "__none__" ? undefined : value, { shouldValidate: true });
+                  setCustomerQuery("");
                 }}
-              />
-              <datalist id="accounts-list">
-                {accounts.map((a: any) => (
-                  <option key={a.id} value={a.id}>{a.name}</option>
-                ))}
-              </datalist>
+              >
+                <SelectTrigger aria-invalid={!!form.formState.errors.customer_id}>
+                  <SelectValue placeholder="Elegí un cliente (opcional)" />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="__none__">Sin cliente</SelectItem>
+                  {customers.map((c: any) => (
+                    <SelectItem key={c.id} value={c.id}>
+                      {c.name}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
               {form.formState.errors.customer_id && <span className="text-xs text-red-500">{form.formState.errors.customer_id.message}</span>}
+              <p className="text-xs text-muted-foreground">Si no hay cliente, dejalo en “Sin cliente”.</p>
             </div>
             <div>
-              <label className="font-medium">Contacto</label>
-              <Input
-                {...form.register("customer_id")}
-                list="contacts-list"
-                onChange={e => {
-                  form.setValue("customer_id", e.target.value);
-                  setContactQuery(e.target.value);
-                }}
-              />
-              <datalist id="contacts-list">
-                {contacts.map((c: any) => (
-                  <option key={c.id} value={c.id}>{c.name}</option>
-                ))}
-              </datalist>
+              <label className="font-medium">Responsable</label>
+              <Select
+                value={form.watch("owner_id") || "__none__"}
+                onValueChange={(value) =>
+                  form.setValue("owner_id", value === "__none__" ? undefined : value)
+                }
+              >
+                <SelectTrigger>
+                  <SelectValue placeholder="Asignar responsable" />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="__none__">Sin responsable</SelectItem>
+                  {owners.map((o: any) => (
+                    <SelectItem key={o.id} value={o.id}>
+                      {o.name}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
             </div>
           </div>
+
+          <div className="text-sm font-semibold text-muted-foreground">Monto y fechas</div>
           <div className="grid grid-cols-2 gap-2">
             <div>
-              <label className="font-medium">Monto *</label>
+              <label className="font-medium">Monto</label>
               <Input type="number" step="0.01" {...form.register("value", { valueAsNumber: true })} aria-invalid={!!form.formState.errors.value} />
               {form.formState.errors.value && <span className="text-xs text-red-500">{form.formState.errors.value.message}</span>}
             </div>
             <div>
               <label className="font-medium">Moneda</label>
-              <Input {...form.register("currency")} />
+              <Select
+                value={form.watch("currency") || "ARS"}
+                onValueChange={(value) => form.setValue("currency", value)}
+              >
+                <SelectTrigger>
+                  <SelectValue placeholder="Seleccionar moneda" />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="ARS">ARS - Peso Argentino</SelectItem>
+                  <SelectItem value="USD">USD - Dólar</SelectItem>
+                  <SelectItem value="BRL">BRL - Real Brasileño</SelectItem>
+                  <SelectItem value="MXN">MXN - Peso Mexicano</SelectItem>
+                  <SelectItem value="CLP">CLP - Peso Chileno</SelectItem>
+                  <SelectItem value="COP">COP - Peso Colombiano</SelectItem>
+                  <SelectItem value="PEN">PEN - Sol Peruano</SelectItem>
+                  <SelectItem value="UYU">UYU - Peso Uruguayo</SelectItem>
+                  <SelectItem value="EUR">EUR - Euro</SelectItem>
+                </SelectContent>
+              </Select>
             </div>
           </div>
           <div className="grid grid-cols-2 gap-2">
             <div>
-              <label className="font-medium">Cierre *</label>
+              <label className="font-medium">Cierre estimado *</label>
               <Input type="date" {...form.register("estimated_close_date")} aria-invalid={!!form.formState.errors.estimated_close_date} />
               {form.formState.errors.estimated_close_date && <span className="text-xs text-red-500">{form.formState.errors.estimated_close_date.message}</span>}
             </div>
@@ -339,9 +501,68 @@ function CreateOpportunityDrawer({ open, onClose, companyId }: { open: boolean; 
               <Input type="number" {...form.register("probability", { valueAsNumber: true })} />
             </div>
           </div>
+
+          <div className="text-sm font-semibold text-muted-foreground">Estado y seguimiento</div>
+          <div className="grid grid-cols-2 gap-2">
+            <div>
+              <label className="font-medium">Estado</label>
+              <Select
+                value={form.watch("status") || "abierta"}
+                onValueChange={(value) => form.setValue("status", value)}
+              >
+                <SelectTrigger>
+                  <SelectValue placeholder="Seleccionar estado" />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="abierta">Abierta</SelectItem>
+                  <SelectItem value="ganada">Ganada</SelectItem>
+                  <SelectItem value="perdida">Perdida</SelectItem>
+                </SelectContent>
+              </Select>
+            </div>
+            <div>
+              <label className="font-medium">Fecha de cierre real</label>
+              <Input type="date" {...form.register("close_date")} />
+              <p className="text-xs text-muted-foreground">Solo si se ganó o perdió.</p>
+            </div>
+          </div>
+          <div className="grid grid-cols-2 gap-2">
+            <div>
+              <label className="font-medium">Fuente</label>
+              <Input {...form.register("source")} placeholder="Ej: Referido, Web, Ads" />
+            </div>
+            <div>
+              <label className="font-medium">Ingreso esperado</label>
+              <Input type="number" step="0.01" {...form.register("expected_revenue", { valueAsNumber: true })} />
+            </div>
+          </div>
+          <div className="grid gap-2">
+            <label className="font-medium">Próximo paso</label>
+            <Input {...form.register("next_step")} placeholder="Ej: Llamar el martes" />
+          </div>
+          <div className="grid gap-2">
+            <label className="font-medium">Motivo ganado</label>
+            <Input {...form.register("won_reason")} placeholder="Opcional" />
+            <p className="text-xs text-muted-foreground">Completar solo si se ganó.</p>
+          </div>
+          <div className="grid gap-2">
+            <label className="font-medium">Motivo perdido</label>
+            <Input {...form.register("lost_reason")} placeholder="Opcional" />
+            <p className="text-xs text-muted-foreground">Completar solo si se perdió.</p>
+          </div>
+          <div className="grid gap-2">
+            <label className="font-medium">Tags (separadas por coma)</label>
+            <Input {...form.register("tags")} placeholder="Ej: upsell, prioridad-alta" />
+          </div>
+
+          <div className="text-sm font-semibold text-muted-foreground">Notas</div>
           <div className="grid gap-2">
             <label className="font-medium">Notas</label>
-            <textarea {...form.register("description")} className="border rounded px-2 py-1 min-h-[60px]" />
+            <textarea
+              {...form.register("description")}
+              className="border rounded px-2 py-1 min-h-[60px]"
+              placeholder="Escribí un resumen corto de la oportunidad"
+            />
           </div>
           <div className="flex gap-2 items-center mt-2">
             <Button type="button" variant="outline" onClick={handleAIAssist}>AI Assist</Button>
