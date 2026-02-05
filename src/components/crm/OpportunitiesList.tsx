@@ -9,16 +9,8 @@ import { LucideMoreVertical } from "lucide-react";
 import { format } from "date-fns";
 
 // --- Types ---
-type OpportunityBaseRow = Database["public"]["Tables"]["crm_opportunities"]["Row"];
-
-// Extend row with the fields you are selecting via joins/aliases.
-// NOTE: If `stage` is a relation (object), change this accordingly.
-type OpportunityRow = OpportunityBaseRow & {
-  customers?: { name: string } | null;
-  owner?: { name: string } | null; // you render this, so include it
-  next_step?: string | null;
-  last_activity_at?: string | null;
-};
+type SortableField = keyof Omit<Database["public"]["Tables"]["crm_opportunities"]["Row"], "closed_at" | "close_date" | "currency" | "expected_revenue" | "last_activity_at" | "lost_reason" | "next_step" | "source" | "status" | "tags" | "won_reason">;
+type OpportunityRow = Database["public"]["Tables"]["crm_opportunities"]["Row"];
 
 interface OpportunitiesListProps {
   companyId: string;
@@ -38,7 +30,6 @@ type OpportunitiesQueryResult = {
 };
 
 // Only allow sorting by real columns (and optionally custom ones)
-type SortableField = keyof OpportunityBaseRow;
 
 export function OpportunitiesList({
   companyId,
@@ -95,7 +86,7 @@ export function OpportunitiesList({
     queryFn: async (): Promise<OpportunitiesQueryResult> => {
       let q = supabase
         .from("crm_opportunities")
-        .select("*, customers(name), owner:employees(name), stage")
+        .select("*")
         .eq("company_id", companyId);
 
 
@@ -137,7 +128,6 @@ export function OpportunitiesList({
     { key: "estimated_close_date", label: "Cierre" },
     { key: "probability", label: "%" },
     { key: "next_step", label: "Próximo paso" },
-    { key: "owner", label: "Responsable" },
     { key: "last_activity_at", label: "Última actividad" },
     { key: "actions", label: "" },
   ];
@@ -145,9 +135,13 @@ export function OpportunitiesList({
   const handleSort = (key: keyof OpportunityRow | "actions") => {
     if (key === "actions") return;
 
-    // only allow sorting by real DB columns
-    if (!Object.prototype.hasOwnProperty.call(({} as OpportunityBaseRow), key)) {
-      // For joined/computed fields like owner/customers/stage strings, ignore sorting to avoid runtime issues
+    // only allow sorting by real DB columns (numeric, string, date)
+    const sortableFields: (keyof OpportunityRow)[] = [
+      "id", "company_id", "customer_id", "name", "value", "stage", 
+      "probability", "estimated_close_date", "owner_id", "created_at", 
+      "updated_at", "pipeline_id", "description"
+    ];
+    if (!sortableFields.includes(key as keyof OpportunityRow)) {
       return;
     }
 
@@ -232,10 +226,6 @@ export function OpportunitiesList({
 
                   <td className="px-4 py-2 text-xs">
                     {opp.next_step ?? <span className="text-muted-foreground">-</span>}
-                  </td>
-
-                  <td className="px-4 py-2">
-                    {opp.owner?.name ?? <span className="text-muted-foreground">-</span>}
                   </td>
 
                   <td className="px-4 py-2 text-xs">
