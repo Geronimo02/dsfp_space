@@ -515,8 +515,8 @@ function CreateOpportunityDrawer({ open, onClose, companyId }: { open: boolean; 
                 </SelectTrigger>
                 <SelectContent>
                   <SelectItem value="abierta">Abierta</SelectItem>
-                  <SelectItem value="ganada">Ganada</SelectItem>
-                  <SelectItem value="perdida">Perdida</SelectItem>
+                  <SelectItem value="ganado">Ganado</SelectItem>
+                  <SelectItem value="perdido">Perdido</SelectItem>
                 </SelectContent>
               </Select>
             </div>
