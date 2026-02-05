@@ -1,79 +1,440 @@
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
-import { useState } from "react";
+import { useState, useMemo } from "react";
 import { supabase } from "@/integrations/supabase/client";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
+import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select";
+import {
+  Dialog,
+  DialogContent,
+  DialogHeader,
+  DialogTitle,
+  DialogTrigger,
+} from "@/components/ui/dialog";
+import { Badge } from "@/components/ui/badge";
+import { toast } from "sonner";
+import { Plus, X, GripVertical, Pencil, Trash2 } from "lucide-react";
+
+interface Pipeline {
+  id: string;
+  name: string;
+  stages: string[];
+  company_id: string;
+  created_at: string;
+}
+
+interface Opportunity {
+  id: string;
+  name: string;
+  value: number | null;
+  stage: string;
+  customer_id: string | null;
+  probability: number | null;
+  customers?: { name: string } | null;
+}
 
 export function Pipelines({ companyId }: { companyId: string }) {
   const queryClient = useQueryClient();
-  const [newPipeline, setNewPipeline] = useState({ name: "", stages: "nuevo,en_proceso,ganado,perdido" });
+  const [selectedPipelineId, setSelectedPipelineId] = useState<string | null>(null);
+  const [isCreateDialogOpen, setIsCreateDialogOpen] = useState(false);
+  const [newPipelineName, setNewPipelineName] = useState("");
+  const [newStages, setNewStages] = useState([
+    "Nuevo",
+    "Contactado",
+    "Propuesta",
+    "Negociación",
+    "Ganado",
+    "Perdido",
+  ]);
+  const [draggedOpportunity, setDraggedOpportunity] = useState<Opportunity | null>(null);
 
-  // Traer pipelines
-  const { data: pipelines, isLoading } = useQuery({
+  // Fetch pipelines
+  const { data: pipelines, isLoading: pipelinesLoading } = useQuery<Pipeline[]>({
     queryKey: ["crm-pipelines", companyId],
     queryFn: async () => {
       const { data, error } = await supabase
-        .from("crm_pipelines" as any)
+        .from("crm_pipelines")
         .select("*")
         .eq("company_id", companyId)
         .order("created_at", { ascending: false });
       if (error) throw error;
-      return data;
+      return data as Pipeline[];
     },
     enabled: !!companyId,
   });
 
-  // Crear pipeline
-  const mutation = useMutation({
-    mutationFn: async (pipeline: any) => {
-      const { error } = await supabase.from("crm_pipelines" as any).insert([
-        { ...pipeline, company_id: companyId, stages: pipeline.stages.split(",") }
+  // Auto-select first pipeline
+  const selectedPipeline = useMemo(() => {
+    if (!pipelines?.length) return null;
+    if (selectedPipelineId) {
+      return pipelines.find((p) => p.id === selectedPipelineId) || pipelines[0];
+    }
+    return pipelines[0];
+  }, [pipelines, selectedPipelineId]);
+
+  // Fetch opportunities for selected pipeline
+  const { data: opportunities = [] } = useQuery<Opportunity[]>({
+    queryKey: ["crm-opportunities-pipeline", companyId, selectedPipeline?.id],
+    queryFn: async () => {
+      if (!selectedPipeline) return [];
+      const { data, error } = await supabase
+        .from("crm_opportunities")
+        .select("id, name, value, stage, customer_id, probability, customers(name)")
+        .eq("company_id", companyId)
+        .eq("pipeline_id", selectedPipeline.id)
+        .order("created_at", { ascending: false });
+      if (error) throw error;
+      return data as Opportunity[];
+    },
+    enabled: !!companyId && !!selectedPipeline,
+  });
+
+  // Create pipeline mutation
+  const createPipelineMutation = useMutation({
+    mutationFn: async () => {
+      if (!newPipelineName.trim()) throw new Error("El nombre es requerido");
+      const { error } = await supabase.from("crm_pipelines").insert([
+        {
+          company_id: companyId,
+          name: newPipelineName.trim(),
+          stages: newStages.filter((s) => s.trim()),
+        },
       ]);
       if (error) throw error;
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["crm-pipelines", companyId] });
-      setNewPipeline({ name: "", stages: "nuevo,en_proceso,ganado,perdido" });
+      toast.success("Pipeline creado exitosamente");
+      setIsCreateDialogOpen(false);
+      setNewPipelineName("");
+      setNewStages(["Nuevo", "Contactado", "Propuesta", "Negociación", "Ganado", "Perdido"]);
+    },
+    onError: (error: any) => {
+      toast.error(error.message || "Error al crear pipeline");
     },
   });
 
+  // Update opportunity stage mutation
+  const updateStageMutation = useMutation({
+    mutationFn: async ({ opportunityId, newStage }: { opportunityId: string; newStage: string }) => {
+      const { error } = await supabase
+        .from("crm_opportunities")
+        .update({ stage: newStage })
+        .eq("id", opportunityId);
+      if (error) throw error;
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["crm-opportunities-pipeline"] });
+      toast.success("Etapa actualizada");
+    },
+    onError: () => {
+      toast.error("Error al actualizar etapa");
+    },
+  });
+
+  // Delete pipeline mutation
+  const deletePipelineMutation = useMutation({
+    mutationFn: async (pipelineId: string) => {
+      const { error } = await supabase.from("crm_pipelines").delete().eq("id", pipelineId);
+      if (error) throw error;
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["crm-pipelines", companyId] });
+      toast.success("Pipeline eliminado");
+      setSelectedPipelineId(null);
+    },
+    onError: () => {
+      toast.error("Error al eliminar pipeline");
+    },
+  });
+
+  const handleDragStart = (opportunity: Opportunity) => {
+    setDraggedOpportunity(opportunity);
+  };
+
+  const handleDragOver = (e: React.DragEvent) => {
+    e.preventDefault();
+  };
+
+  const handleDrop = (stage: string) => {
+    if (!draggedOpportunity) return;
+    if (draggedOpportunity.stage === stage) {
+      setDraggedOpportunity(null);
+      return;
+    }
+    updateStageMutation.mutate({
+      opportunityId: draggedOpportunity.id,
+      newStage: stage,
+    });
+    setDraggedOpportunity(null);
+  };
+
+  const addStage = () => {
+    setNewStages([...newStages, ""]);
+  };
+
+  const removeStage = (index: number) => {
+    setNewStages(newStages.filter((_, i) => i !== index));
+  };
+
+  const updateStage = (index: number, value: string) => {
+    const updated = [...newStages];
+    updated[index] = value;
+    setNewStages(updated);
+  };
+
+  const opportunitiesByStage = useMemo(() => {
+    const grouped: Record<string, Opportunity[]> = {};
+    selectedPipeline?.stages.forEach((stage) => {
+      grouped[stage] = [];
+    });
+    opportunities.forEach((opp) => {
+      if (grouped[opp.stage]) {
+        grouped[opp.stage].push(opp);
+      }
+    });
+    return grouped;
+  }, [opportunities, selectedPipeline]);
+
+  if (pipelinesLoading) {
+    return <div className="p-6">Cargando pipelines...</div>;
+  }
+
+  if (!pipelines?.length) {
+    return (
+      <div className="p-6">
+        <div className="flex items-center justify-between mb-6">
+          <h1 className="text-2xl font-bold">Pipelines</h1>
+        </div>
+        <Card>
+          <CardContent className="py-12 text-center">
+            <p className="text-muted-foreground mb-4">No hay pipelines creados.</p>
+            <Dialog open={isCreateDialogOpen} onOpenChange={setIsCreateDialogOpen}>
+              <DialogTrigger asChild>
+                <Button>
+                  <Plus className="w-4 h-4 mr-2" />
+                  Crear primer pipeline
+                </Button>
+              </DialogTrigger>
+              <DialogContent>
+                <DialogHeader>
+                  <DialogTitle>Crear Pipeline</DialogTitle>
+                </DialogHeader>
+                <CreatePipelineForm
+                  newPipelineName={newPipelineName}
+                  setNewPipelineName={setNewPipelineName}
+                  newStages={newStages}
+                  updateStage={updateStage}
+                  removeStage={removeStage}
+                  addStage={addStage}
+                  onSubmit={() => createPipelineMutation.mutate()}
+                  isPending={createPipelineMutation.isPending}
+                />
+              </DialogContent>
+            </Dialog>
+          </CardContent>
+        </Card>
+      </div>
+    );
+  }
+
   return (
-    <div>
-      <h2 className="text-xl font-bold mb-4">Pipelines</h2>
-      <form
-        className="mb-6 flex gap-2"
-        onSubmit={e => {
-          e.preventDefault();
-          mutation.mutate(newPipeline);
-        }}
-      >
-        <Input
-          placeholder="Nombre del pipeline"
-          value={newPipeline.name}
-          onChange={e => setNewPipeline(f => ({ ...f, name: e.target.value }))}
-          required
-        />
-        <Input
-          placeholder="Etapas (separadas por coma)"
-          value={newPipeline.stages}
-          onChange={e => setNewPipeline(f => ({ ...f, stages: e.target.value }))}
-        />
-        <Button type="submit" disabled={mutation.isPending}>
-          Crear
-        </Button>
-      </form>
-      {isLoading ? (
-        <p>Cargando...</p>
-      ) : (
-        <ul className="space-y-2">
-          {pipelines?.map((p: any) => (
-            <li key={p.id} className="border rounded p-3">
-              <div className="font-semibold">{p.name}</div>
-              <div className="text-xs text-muted-foreground">Etapas: {p.stages.join(", ")}</div>
-            </li>
-          ))}
-        </ul>
+    <div className="p-6 space-y-6">
+      <div className="flex items-center justify-between">
+        <h1 className="text-2xl font-bold">Pipelines</h1>
+        <Dialog open={isCreateDialogOpen} onOpenChange={setIsCreateDialogOpen}>
+          <DialogTrigger asChild>
+            <Button>
+              <Plus className="w-4 h-4 mr-2" />
+              Nuevo Pipeline
+            </Button>
+          </DialogTrigger>
+          <DialogContent>
+            <DialogHeader>
+              <DialogTitle>Crear Pipeline</DialogTitle>
+            </DialogHeader>
+            <CreatePipelineForm
+              newPipelineName={newPipelineName}
+              setNewPipelineName={setNewPipelineName}
+              newStages={newStages}
+              updateStage={updateStage}
+              removeStage={removeStage}
+              addStage={addStage}
+              onSubmit={() => createPipelineMutation.mutate()}
+              isPending={createPipelineMutation.isPending}
+            />
+          </DialogContent>
+        </Dialog>
+      </div>
+
+      <div className="flex items-center gap-4">
+        <Select
+          value={selectedPipeline?.id || ""}
+          onValueChange={(value) => setSelectedPipelineId(value)}
+        >
+          <SelectTrigger className="w-64">
+            <SelectValue placeholder="Seleccionar pipeline" />
+          </SelectTrigger>
+          <SelectContent>
+            {pipelines.map((pipeline) => (
+              <SelectItem key={pipeline.id} value={pipeline.id}>
+                {pipeline.name}
+              </SelectItem>
+            ))}
+          </SelectContent>
+        </Select>
+        {selectedPipeline && (
+          <Button
+            variant="outline"
+            size="sm"
+            onClick={() => {
+              if (confirm("¿Eliminar este pipeline? Esta acción no se puede deshacer.")) {
+                deletePipelineMutation.mutate(selectedPipeline.id);
+              }
+            }}
+          >
+            <Trash2 className="w-4 h-4 mr-2" />
+            Eliminar
+          </Button>
+        )}
+      </div>
+
+      {selectedPipeline && (
+        <div className="overflow-x-auto">
+          <div className="flex gap-4 min-w-max pb-4">
+            {selectedPipeline.stages.map((stage) => (
+              <div
+                key={stage}
+                className="flex-shrink-0 w-80"
+                onDragOver={handleDragOver}
+                onDrop={() => handleDrop(stage)}
+              >
+                <Card>
+                  <CardHeader className="pb-3">
+                    <CardTitle className="text-sm font-medium flex items-center justify-between">
+                      <span>{stage}</span>
+                      <Badge variant="secondary">{opportunitiesByStage[stage]?.length || 0}</Badge>
+                    </CardTitle>
+                  </CardHeader>
+                  <CardContent className="space-y-2 min-h-[200px]">
+                    {opportunitiesByStage[stage]?.map((opp) => (
+                      <div
+                        key={opp.id}
+                        draggable
+                        onDragStart={() => handleDragStart(opp)}
+                        className="p-3 bg-white border rounded-lg cursor-move hover:shadow-md transition-shadow"
+                      >
+                        <div className="flex items-start justify-between mb-2">
+                          <div className="flex items-start gap-2 flex-1">
+                            <GripVertical className="w-4 h-4 text-muted-foreground mt-0.5" />
+                            <div className="flex-1">
+                              <p className="font-medium text-sm">{opp.name}</p>
+                              {opp.customers?.name && (
+                                <p className="text-xs text-muted-foreground">{opp.customers.name}</p>
+                              )}
+                            </div>
+                          </div>
+                        </div>
+                        <div className="flex items-center justify-between text-xs">
+                          {opp.value && <span className="font-mono">${opp.value}</span>}
+                          {opp.probability !== null && (
+                            <Badge variant="outline" className="text-xs">
+                              {opp.probability}%
+                            </Badge>
+                          )}
+                        </div>
+                      </div>
+                    ))}
+                  </CardContent>
+                </Card>
+              </div>
+            ))}
+          </div>
+        </div>
       )}
     </div>
+  );
+}
+
+function CreatePipelineForm({
+  newPipelineName,
+  setNewPipelineName,
+  newStages,
+  updateStage,
+  removeStage,
+  addStage,
+  onSubmit,
+  isPending,
+}: {
+  newPipelineName: string;
+  setNewPipelineName: (name: string) => void;
+  newStages: string[];
+  updateStage: (index: number, value: string) => void;
+  removeStage: (index: number) => void;
+  addStage: () => void;
+  onSubmit: () => void;
+  isPending: boolean;
+}) {
+  return (
+    <form
+      className="space-y-4"
+      onSubmit={(e) => {
+        e.preventDefault();
+        onSubmit();
+      }}
+    >
+      <div className="space-y-2">
+        <label className="text-sm font-medium">Nombre del Pipeline *</label>
+        <Input
+          value={newPipelineName}
+          onChange={(e) => setNewPipelineName(e.target.value)}
+          placeholder="Ej: Ventas B2B"
+          required
+        />
+      </div>
+      <div className="space-y-2">
+        <label className="text-sm font-medium">Etapas</label>
+        <p className="text-xs text-muted-foreground">
+          Define las etapas del pipeline. Podés editar, eliminar o agregar más.
+        </p>
+        <div className="space-y-2">
+          {newStages.map((stage, index) => (
+            <div key={index} className="flex items-center gap-2">
+              <Input
+                value={stage}
+                onChange={(e) => updateStage(index, e.target.value)}
+                placeholder={`Etapa ${index + 1}`}
+              />
+              {newStages.length > 2 && (
+                <Button
+                  type="button"
+                  variant="ghost"
+                  size="icon"
+                  onClick={() => removeStage(index)}
+                >
+                  <X className="w-4 h-4" />
+                </Button>
+              )}
+            </div>
+          ))}
+        </div>
+        <Button type="button" variant="outline" onClick={addStage} className="w-full">
+          <Plus className="w-4 h-4 mr-2" />
+          Agregar etapa
+        </Button>
+      </div>
+      <div className="flex justify-end gap-2">
+        <Button type="submit" disabled={isPending}>
+          Crear Pipeline
+        </Button>
+      </div>
+    </form>
   );
 }
