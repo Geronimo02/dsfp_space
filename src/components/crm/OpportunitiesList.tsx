@@ -95,7 +95,7 @@ export function OpportunitiesList({
     queryFn: async (): Promise<OpportunitiesQueryResult> => {
       let q = supabase
         .from("crm_opportunities")
-        .select("*, customers(name), owner:employees(name), stage", { count: "exact" })
+        .select("*, customers(name), owner:employees(name), stage")
         .eq("company_id", companyId);
 
 
@@ -116,11 +116,11 @@ export function OpportunitiesList({
 
       q = q.range((page - 1) * pageSize, page * pageSize - 1);
 
-      const { data, error, count } = await q;
+      const { data, error } = await q;
       if (error) throw error;
 
       const typedData = (data ?? []) as unknown as OpportunityRow[];
-      return { data: typedData, total: count ?? 0 };
+      return { data: typedData, total: typedData.length };
     },
 
     enabled: !!companyId,

@@ -54,6 +54,9 @@ export function Pipelines({ companyId }: { companyId: string }) {
     "Perdido",
   ]);
   const [draggedOpportunity, setDraggedOpportunity] = useState<Opportunity | null>(null);
+  const [quickCreateStage, setQuickCreateStage] = useState<string | null>(null);
+  const [quickCreateOpen, setQuickCreateOpen] = useState(false);
+  const [addExistingOpen, setAddExistingOpen] = useState<string | null>(null);
 
   // Fetch pipelines
   const { data: pipelines, isLoading: pipelinesLoading } = useQuery<Pipeline[]>({
@@ -153,6 +156,70 @@ export function Pipelines({ companyId }: { companyId: string }) {
     onError: () => {
       toast.error("Error al eliminar pipeline");
     },
+  });
+
+  // Quick create opportunity mutation
+  const quickCreateMutation = useMutation({
+    mutationFn: async ({ name, stage }: { name: string; stage: string }) => {
+      if (!selectedPipeline) throw new Error("Pipeline no seleccionado");
+      const { error } = await supabase.from("crm_opportunities").insert([
+        {
+          company_id: companyId,
+          name: name.trim(),
+          stage,
+          pipeline_id: selectedPipeline.id,
+          customer_id: null,
+          probability: 50,
+        },
+      ]);
+      if (error) throw error;
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["crm-opportunities-pipeline"] });
+      toast.success("Oportunidad creada");
+      setQuickCreateOpen(false);
+      setQuickCreateStage(null);
+    },
+    onError: (error: any) => {
+      toast.error(error.message || "Error al crear oportunidad");
+    },
+  });
+
+  // Assign existing opportunity to pipeline
+  const assignOpportunityMutation = useMutation({
+    mutationFn: async ({ opportunityId, stage }: { opportunityId: string; stage: string }) => {
+      if (!selectedPipeline) throw new Error("Pipeline no seleccionado");
+      const { error } = await supabase
+        .from("crm_opportunities")
+        .update({ pipeline_id: selectedPipeline.id, stage })
+        .eq("id", opportunityId);
+      if (error) throw error;
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["crm-opportunities-pipeline"] });
+      toast.success("Oportunidad asignada");
+      setAddExistingOpen(null);
+    },
+    onError: () => {
+      toast.error("Error al asignar oportunidad");
+    },
+  });
+
+  // Fetch unassigned opportunities
+  const { data: unassignedOpportunities = [] } = useQuery<Opportunity[]>({
+    queryKey: ["crm-opportunities-unassigned", companyId, selectedPipeline?.id],
+    queryFn: async () => {
+      if (!selectedPipeline) return [];
+      const { data, error } = await supabase
+        .from("crm_opportunities")
+        .select("id, name, value, stage, customer_id, probability, customers(name)")
+        .eq("company_id", companyId)
+        .neq("pipeline_id", selectedPipeline.id)
+        .order("created_at", { ascending: false });
+      if (error) throw error;
+      return data as Opportunity[];
+    },
+    enabled: !!companyId && !!selectedPipeline,
   });
 
   const handleDragStart = (opportunity: Opportunity) => {
@@ -352,6 +419,76 @@ export function Pipelines({ companyId }: { companyId: string }) {
                         </div>
                       </div>
                     ))}
+                    <div className="flex gap-2 pt-2">
+                      <Dialog open={quickCreateStage === stage && quickCreateOpen} onOpenChange={(open) => {
+                        if (!open) {
+                          setQuickCreateStage(null);
+                          setQuickCreateOpen(false);
+                        }
+                      }}>
+                        <DialogTrigger asChild>
+                          <Button
+                            variant="outline"
+                            size="sm"
+                            className="flex-1 text-xs"
+                            onClick={() => {
+                              setQuickCreateStage(stage);
+                              setQuickCreateOpen(true);
+                            }}
+                          >
+                            <Plus className="w-3 h-3 mr-1" />
+                            Crear
+                          </Button>
+                        </DialogTrigger>
+                        {quickCreateStage === stage && (
+                          <DialogContent>
+                            <DialogHeader>
+                              <DialogTitle>Crear Oportunidad - {stage}</DialogTitle>
+                            </DialogHeader>
+                            <QuickCreateOpportunityForm
+                              stage={stage}
+                              onSubmit={(name) => {
+                                quickCreateMutation.mutate({ name, stage });
+                              }}
+                              isPending={quickCreateMutation.isPending}
+                            />
+                          </DialogContent>
+                        )}
+                      </Dialog>
+                      <Dialog open={addExistingOpen === stage} onOpenChange={(open) => {
+                        if (!open) setAddExistingOpen(null);
+                      }}>
+                        <DialogTrigger asChild>
+                          <Button
+                            variant="outline"
+                            size="sm"
+                            className="flex-1 text-xs"
+                            onClick={() => setAddExistingOpen(stage)}
+                          >
+                            <Plus className="w-3 h-3 mr-1" />
+                            Agregar
+                          </Button>
+                        </DialogTrigger>
+                        {addExistingOpen === stage && (
+                          <DialogContent>
+                            <DialogHeader>
+                              <DialogTitle>Agregar Oportunidad - {stage}</DialogTitle>
+                            </DialogHeader>
+                            <AddExistingOpportunityForm
+                              stage={stage}
+                              unassignedOpportunities={unassignedOpportunities}
+                              onSubmit={(opportunityId) => {
+                                assignOpportunityMutation.mutate({
+                                  opportunityId,
+                                  stage,
+                                });
+                              }}
+                              isPending={assignOpportunityMutation.isPending}
+                            />
+                          </DialogContent>
+                        )}
+                      </Dialog>
+                    </div>
                   </CardContent>
                 </Card>
               </div>
@@ -433,6 +570,99 @@ function CreatePipelineForm({
       <div className="flex justify-end gap-2">
         <Button type="submit" disabled={isPending}>
           Crear Pipeline
+        </Button>
+      </div>
+    </form>
+  );
+}
+
+function QuickCreateOpportunityForm({
+  stage,
+  onSubmit,
+  isPending,
+}: {
+  stage: string;
+  onSubmit: (name: string) => void;
+  isPending: boolean;
+}) {
+  const [name, setName] = useState("");
+
+  return (
+    <form
+      className="space-y-4"
+      onSubmit={(e) => {
+        e.preventDefault();
+        if (name.trim()) {
+          onSubmit(name);
+          setName("");
+        }
+      }}
+    >
+      <div className="space-y-2">
+        <label className="text-sm font-medium">Nombre de la Oportunidad *</label>
+        <Input
+          value={name}
+          onChange={(e) => setName(e.target.value)}
+          placeholder="Ej: Venta importante"
+          required
+          autoFocus
+        />
+      </div>
+      <div className="flex justify-end gap-2">
+        <Button type="submit" disabled={isPending || !name.trim()}>
+          Crear Oportunidad
+        </Button>
+      </div>
+    </form>
+  );
+}
+
+function AddExistingOpportunityForm({
+  stage,
+  unassignedOpportunities,
+  onSubmit,
+  isPending,
+}: {
+  stage: string;
+  unassignedOpportunities: Opportunity[];
+  onSubmit: (opportunityId: string) => void;
+  isPending: boolean;
+}) {
+  const [selectedId, setSelectedId] = useState("");
+
+  return (
+    <form
+      className="space-y-4"
+      onSubmit={(e) => {
+        e.preventDefault();
+        if (selectedId) {
+          onSubmit(selectedId);
+          setSelectedId("");
+        }
+      }}
+    >
+      <div className="space-y-2">
+        <label className="text-sm font-medium">Seleccionar Oportunidad *</label>
+        {unassignedOpportunities.length === 0 ? (
+          <p className="text-xs text-muted-foreground">No hay oportunidades disponibles.</p>
+        ) : (
+          <Select value={selectedId} onValueChange={setSelectedId}>
+            <SelectTrigger>
+              <SelectValue placeholder="Elegir oportunidad..." />
+            </SelectTrigger>
+            <SelectContent>
+              {unassignedOpportunities.map((opp) => (
+                <SelectItem key={opp.id} value={opp.id}>
+                  {opp.name} {opp.customers?.name && `(${opp.customers.name})`}
+                </SelectItem>
+              ))}
+            </SelectContent>
+          </Select>
+        )}
+      </div>
+      <div className="flex justify-end gap-2">
+        <Button type="submit" disabled={isPending || !selectedId}>
+          Agregar Oportunidad
         </Button>
       </div>
     </form>
