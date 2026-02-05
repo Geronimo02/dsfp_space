@@ -18,9 +18,15 @@ import {
   DialogTitle,
   DialogTrigger,
 } from "@/components/ui/dialog";
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuTrigger,
+} from "@/components/ui/dropdown-menu";
 import { Badge } from "@/components/ui/badge";
 import { toast } from "sonner";
-import { Plus, X, GripVertical, Pencil, Trash2 } from "lucide-react";
+import { Plus, X, GripVertical, Pencil, Trash2, MoreVertical } from "lucide-react";
 
 interface Pipeline {
   id: string;
@@ -222,6 +228,31 @@ export function Pipelines({ companyId }: { companyId: string }) {
     enabled: !!companyId && !!selectedPipeline,
   });
 
+  // Delete opportunity mutation
+  const deleteOpportunityMutation = useMutation({
+    mutationFn: async (opportunityId: string) => {
+      const { error } = await supabase
+        .from("crm_opportunities")
+        .delete()
+        .eq("id", opportunityId);
+      if (error) throw error;
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["crm-opportunities-pipeline"] });
+      queryClient.invalidateQueries({ queryKey: ["opportunities", companyId] });
+      toast.success("Oportunidad eliminada");
+    },
+    onError: () => {
+      toast.error("Error al eliminar oportunidad");
+    },
+  });
+
+  const handleDeleteOpportunity = (opportunityId: string, opportunityName: string) => {
+    if (confirm(`¿Eliminar la oportunidad "${opportunityName}"?`)) {
+      deleteOpportunityMutation.mutate(opportunityId);
+    }
+  };
+
   const handleDragStart = (opportunity: Opportunity) => {
     setDraggedOpportunity(opportunity);
   };
@@ -408,6 +439,25 @@ export function Pipelines({ companyId }: { companyId: string }) {
                               )}
                             </div>
                           </div>
+                          <DropdownMenu>
+                            <DropdownMenuTrigger asChild onClick={(e) => e.stopPropagation()}>
+                              <Button variant="ghost" size="icon" className="h-6 w-6">
+                                <MoreVertical className="w-3 h-3" />
+                              </Button>
+                            </DropdownMenuTrigger>
+                            <DropdownMenuContent align="end">
+                              <DropdownMenuItem
+                                onClick={(e) => {
+                                  e.stopPropagation();
+                                  handleDeleteOpportunity(opp.id, opp.name);
+                                }}
+                                className="text-destructive focus:text-destructive"
+                              >
+                                <Trash2 className="w-4 h-4 mr-2" />
+                                Eliminar
+                              </DropdownMenuItem>
+                            </DropdownMenuContent>
+                          </DropdownMenu>
                         </div>
                         <div className="flex items-center justify-between text-xs">
                           {opp.value && <span className="font-mono">${opp.value}</span>}

@@ -1,12 +1,19 @@
 import type { Database } from "@/integrations/supabase/types";
 import { useMemo, useState } from "react";
-import { useQuery } from "@tanstack/react-query";
+import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
 import { Button } from "@/components/ui/button";
 import { Skeleton } from "@/components/ui/skeleton";
 import { Badge } from "@/components/ui/badge";
-import { LucideMoreVertical } from "lucide-react";
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuTrigger,
+} from "@/components/ui/dropdown-menu";
+import { LucideMoreVertical, Pencil, Trash2 } from "lucide-react";
 import { format } from "date-fns";
+import { toast } from "sonner";
 
 // --- Types ---
 type SortableField = keyof Omit<Database["public"]["Tables"]["crm_opportunities"]["Row"], "closed_at" | "close_date" | "currency" | "expected_revenue" | "last_activity_at" | "lost_reason" | "next_step" | "source" | "status" | "tags" | "won_reason">;
@@ -37,6 +44,8 @@ export function OpportunitiesList({
   filters,
   onCreate,
 }: OpportunitiesListProps) {
+  const queryClient = useQueryClient();
+  
   // --- Pagination & Sorting ---
   const [page, setPage] = useState(1);
   const [pageSize] = useState(10);
@@ -119,6 +128,31 @@ export function OpportunitiesList({
     // TanStack Query v4:
     placeholderData: (prev) => prev,
   });
+
+  // Delete opportunity mutation
+  const deleteOpportunityMutation = useMutation({
+    mutationFn: async (opportunityId: string) => {
+      const { error } = await supabase
+        .from("crm_opportunities")
+        .delete()
+        .eq("id", opportunityId);
+      if (error) throw error;
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["opportunities", companyId] });
+      queryClient.invalidateQueries({ queryKey: ["crm-opportunities-pipeline"] });
+      toast.success("Oportunidad eliminada");
+    },
+    onError: () => {
+      toast.error("Error al eliminar oportunidad");
+    },
+  });
+
+  const handleDeleteOpportunity = (opportunityId: string, opportunityName: string) => {
+    if (confirm(`¿Eliminar la oportunidad "${opportunityName}"?`)) {
+      deleteOpportunityMutation.mutate(opportunityId);
+    }
+  };
 
   // --- Table columns ---
   const columns: { key: keyof OpportunityRow | "actions"; label: string }[] = [
@@ -233,9 +267,22 @@ export function OpportunitiesList({
                   </td>
 
                   <td className="px-2 py-2">
-                    <Button variant="ghost" size="icon" aria-label="Acciones">
-                      <LucideMoreVertical className="w-4 h-4" />
-                    </Button>
+                    <DropdownMenu>
+                      <DropdownMenuTrigger asChild>
+                        <Button variant="ghost" size="icon" aria-label="Acciones">
+                          <LucideMoreVertical className="w-4 h-4" />
+                        </Button>
+                      </DropdownMenuTrigger>
+                      <DropdownMenuContent align="end">
+                        <DropdownMenuItem
+                          onClick={() => handleDeleteOpportunity(opp.id, opp.name)}
+                          className="text-destructive focus:text-destructive"
+                        >
+                          <Trash2 className="w-4 h-4 mr-2" />
+                          Eliminar
+                        </DropdownMenuItem>
+                      </DropdownMenuContent>
+                    </DropdownMenu>
                   </td>
                 </tr>
               ))
