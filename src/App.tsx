@@ -9,7 +9,9 @@ import { CompanyProvider, useCompany } from "@/contexts/CompanyContext";
 import { User, Session } from "@supabase/supabase-js";
 import { usePlatformAdmin } from "@/hooks/usePlatformAdmin";
 import { ModuleProtectedRoute } from "./components/ModuleProtectedRoute";
-import { usePermissions } from "@/hooks/usePermissions";import { LoadingState } from "./components/LoadingState";
+import { usePermissions } from "@/hooks/usePermissions";
+import { LoadingState } from "./components/LoadingState";
+import { SkipLink } from "./components/SkipLink";
 // Lazy load all page components
 const Landing = lazy(() => import("./pages/Landing"));
 const Dashboard = lazy(() => import("./pages/Dashboard"));
@@ -297,6 +299,7 @@ const App = () => (
       <Sonner />
       <BrowserRouter>
         <CompanyProvider>
+          <SkipLink />
           <Suspense fallback={<PageLoader />}>
             <Routes>
             <Route path="/signup" element={<SignupWizard />} />

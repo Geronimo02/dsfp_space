@@ -37,8 +37,8 @@ export function Layout({ children }: LayoutProps) {
     <SidebarProvider defaultOpen={!isMobile}>
       <div className="flex min-h-screen w-full bg-background">
         <Sidebar />
-        <main className="flex-1 overflow-y-auto">
-          <div className="sticky top-0 z-10 bg-background/95 backdrop-blur supports-[backdrop-filter]:bg-background/60 border-b">
+        <main className="flex-1 overflow-y-auto" id="main-content" role="main" aria-label="Contenido principal">
+          <div className="sticky top-0 z-10 bg-background/95 backdrop-blur supports-[backdrop-filter]:bg-background/60 border-b" role="banner">
             <div className="container mx-auto py-3 md:py-4 flex justify-between items-center gap-2 md:gap-4">
               <div className="flex items-center gap-2 md:gap-4">
                 <SidebarTrigger />

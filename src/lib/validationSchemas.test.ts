@@ -7,7 +7,7 @@ import {
   customerSchema,
   productSchema,
   validateData,
-} from '../validationSchemas';
+} from '@/lib/validationSchemas';
 
 describe('validationSchemas', () => {
   describe('emailSchema', () => {

@@ -1,6 +1,6 @@
 import { describe, it, expect } from 'vitest';
 import { renderHook, act } from '@testing-library/react';
-import { useServerPagination } from '../useServerPagination';
+import { useServerPagination } from '@/hooks/useServerPagination';
 
 describe('useServerPagination', () => {
   it('should initialize with default values', () => {

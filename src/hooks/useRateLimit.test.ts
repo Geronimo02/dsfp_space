@@ -1,6 +1,6 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 import { renderHook, act, waitFor } from '@testing-library/react';
-import { useRateLimit } from '../useRateLimit';
+import { useRateLimit } from '@/hooks/useRateLimit';
 
 // Mock toast
 vi.mock('@/hooks/use-toast', () => ({

@@ -329,7 +329,11 @@ export default function Suppliers() {
                     {editingSupplier ? "Editar Proveedor" : "Nuevo Proveedor"}
                   </DialogTitle>
                 </DialogHeader>
-                <form onSubmit={handleSubmit} className="space-y-6">
+                <form 
+                  onSubmit={handleSubmit} 
+                  className="space-y-6"
+                  aria-label={editingSupplier ? "Formulario de edición de proveedor" : "Formulario de nuevo proveedor"}
+                >
                 {/* Sección Identidad */}
                 <div className="space-y-4">
                   <div className="flex items-center gap-2 pb-2 border-b">
@@ -690,7 +694,11 @@ export default function Suppliers() {
             <DialogHeader>
               <DialogTitle>Registrar Pago a Proveedor</DialogTitle>
             </DialogHeader>
-            <form onSubmit={handlePaymentSubmit} className="space-y-4">
+            <form 
+              onSubmit={handlePaymentSubmit} 
+              className="space-y-4"
+              aria-label="Formulario de pago a proveedor"
+            >
               <div className="space-y-2">
                 <Label>Proveedor</Label>
                 <Input value={selectedSupplier?.name || ""} disabled />

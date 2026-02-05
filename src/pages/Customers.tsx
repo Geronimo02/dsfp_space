@@ -24,6 +24,7 @@ import { z } from "zod";
 import { usePermissions } from "@/hooks/usePermissions";
 import { useCompany } from "@/contexts/CompanyContext";
 import { useDebounce } from "@/hooks/useDebounce";
+import { useServerPagination } from "@/hooks/useServerPagination";
 
 const customerSchema = z.object({
   name: z.string().trim().min(1, "El nombre es requerido").max(200, "El nombre debe tener máximo 200 caracteres"),
@@ -71,13 +72,20 @@ export default function Customers() {
     notes: "",
   });
   const queryClient = useQueryClient();
+  
+  // Server-side pagination
+  const pagination = useServerPagination({ pageSize: 50 });
 
-  const { data: customers } = useQuery({
-    queryKey: ["customers", debouncedSearch, currentCompany?.id],
+  const { data: customersData } = useQuery({
+    queryKey: ["customers", debouncedSearch, currentCompany?.id, pagination.currentPage],
     queryFn: async () => {
-      if (!currentCompany?.id) return [];
+      if (!currentCompany?.id) return { data: [], count: 0 };
       
-      let query = supabase.from("customers").select("*").eq("company_id", currentCompany.id).order("created_at", { ascending: false }).limit(500);
+      let query = supabase
+        .from("customers")
+        .select("*", { count: "exact" })
+        .eq("company_id", currentCompany.id)
+        .order("created_at", { ascending: false });
       
       if (debouncedSearch) {
         const sanitized = sanitizeSearchQuery(debouncedSearch);
@@ -86,12 +94,18 @@ export default function Customers() {
         }
       }
       
-      const { data, error } = await query;
+      // Apply pagination
+      query = query.range(pagination.from, pagination.to);
+      
+      const { data, error, count } = await query;
       if (error) throw error;
-      return data;
+      return { data: data || [], count: count || 0 };
     },
     enabled: !!currentCompany?.id,
   });
+  
+  const customers = customersData?.data || [];
+  const totalCount = customersData?.count || 0;
 
   const { data: priceLists } = useQuery({
     queryKey: ["price-lists", currentCompany?.id],
@@ -547,7 +561,11 @@ export default function Customers() {
                     {editingCustomer ? "Editar Cliente" : "Nuevo Cliente"}
                   </DialogTitle>
                 </DialogHeader>
-                <form onSubmit={handleSubmit} className="space-y-6">
+                <form 
+                  onSubmit={handleSubmit} 
+                  className="space-y-6"
+                  aria-label={editingCustomer ? "Formulario de edición de cliente" : "Formulario de nuevo cliente"}
+                >
                   {/* Sección Información Básica */}
                   <div className="space-y-4">
                     <div className="flex items-center gap-2 pb-2 border-b">
@@ -759,6 +777,38 @@ export default function Customers() {
               </TableBody>
             </Table>
           </CardContent>
+          
+          {/* Pagination Controls */}
+          {totalCount > 0 && (
+            <div className="px-6 py-4 border-t flex items-center justify-between">
+              <div className="text-sm text-muted-foreground">
+                Mostrando {pagination.getPageInfo(totalCount).start} - {pagination.getPageInfo(totalCount).end} de {totalCount} clientes
+              </div>
+              <div className="flex items-center gap-2">
+                <Button
+                  variant="outline"
+                  size="sm"
+                  onClick={pagination.goToPreviousPage}
+                  disabled={!pagination.canGoPrevious}
+                  aria-label="Página anterior"
+                >
+                  Anterior
+                </Button>
+                <span className="text-sm">
+                  Página {pagination.currentPage} de {pagination.getTotalPages(totalCount)}
+                </span>
+                <Button
+                  variant="outline"
+                  size="sm"
+                  onClick={pagination.goToNextPage}
+                  disabled={!pagination.canGoNext(totalCount)}
+                  aria-label="Página siguiente"
+                >
+                  Siguiente
+                </Button>
+              </div>
+            </div>
+          )}
         </Card>
 
         <Dialog open={isHistoryOpen} onOpenChange={setIsHistoryOpen}>
@@ -1198,7 +1248,11 @@ export default function Customers() {
                 }
               </DialogTitle>
             </DialogHeader>
-            <form onSubmit={handlePaymentSubmit} className="space-y-4">
+            <form 
+              onSubmit={handlePaymentSubmit} 
+              className="space-y-4"
+              aria-label="Formulario de pago de cliente"
+            >
               {!selectedCustomer?.selectedSale && (
                 <Card>
                   <CardContent className="pt-6">
