@@ -15,7 +15,7 @@ describe('useRateLimit', () => {
   });
 
   it('should allow operations within limit', async () => {
-    const { result } = renderHook(() => useRateLimit(3, 60000)); // 3 per minute
+    const { result } = renderHook(() => useRateLimit({ maxAttempts: 3, windowMs: 60000 })); // 3 per minute
 
     const mockFn = vi.fn().mockResolvedValue('success');
 
@@ -38,7 +38,7 @@ describe('useRateLimit', () => {
   });
 
   it('should block operations exceeding limit', async () => {
-    const { result } = renderHook(() => useRateLimit(2, 60000)); // 2 per minute
+    const { result } = renderHook(() => useRateLimit({ maxAttempts: 2, windowMs: 60000 })); // 2 per minute
 
     const mockFn = vi.fn().mockResolvedValue('success');
 
@@ -56,7 +56,7 @@ describe('useRateLimit', () => {
   });
 
   it('should reset after time window', async () => {
-    const { result } = renderHook(() => useRateLimit(2, 1000)); // 2 per second
+    const { result } = renderHook(() => useRateLimit({ maxAttempts: 2, windowMs: 1000 })); // 2 per second
 
     const mockFn = vi.fn().mockResolvedValue('success');
 
@@ -79,7 +79,7 @@ describe('useRateLimit', () => {
   });
 
   it('should track remaining attempts correctly', async () => {
-    const { result } = renderHook(() => useRateLimit(3, 60000));
+    const { result } = renderHook(() => useRateLimit({ maxAttempts: 3, windowMs: 60000 }));
 
     expect(result.current.getRemainingAttempts()).toBe(3);
 
@@ -103,7 +103,7 @@ describe('useRateLimit', () => {
   });
 
   it('should allow manual reset', async () => {
-    const { result } = renderHook(() => useRateLimit(2, 60000));
+    const { result } = renderHook(() => useRateLimit({ maxAttempts: 2, windowMs: 60000 }));
 
     const mockFn = vi.fn().mockResolvedValue('success');
 
@@ -129,7 +129,7 @@ describe('useRateLimit', () => {
   });
 
   it('should handle async function errors', async () => {
-    const { result } = renderHook(() => useRateLimit(3, 60000));
+    const { result } = renderHook(() => useRateLimit({ maxAttempts: 3, windowMs: 60000 }));
 
     const mockFn = vi.fn().mockRejectedValue(new Error('Test error'));
 
