@@ -15,10 +15,9 @@ type OpportunityBaseRow = Database["public"]["Tables"]["crm_opportunities"]["Row
 // NOTE: If `stage` is a relation (object), change this accordingly.
 type OpportunityRow = OpportunityBaseRow & {
   customers?: { name: string } | null;
-  owner?: { name: string } | null;
-  stage?: string | null;
+  owner?: { name: string } | null; // you render this, so include it
+  next_step?: string | null;
   last_activity_at?: string | null;
-  next_step?: string | null; // you render this, so include it
 };
 
 interface OpportunitiesListProps {
@@ -28,9 +27,7 @@ interface OpportunitiesListProps {
     pipelineId?: string;
     stageId?: string;
     ownerId?: string;
-    status?: string;
-    dateRange?: { from: string; to: string };
-    amountRange?: { min: number; max: number };
+    value?: { min: number; max: number };
   };
   onCreate?: () => void;
 }
@@ -67,11 +64,8 @@ export function OpportunitiesList({
         filters.pipelineId ?? "",
         filters.stageId ?? "",
         filters.ownerId ?? "",
-        filters.status ?? "",
-        filters.dateRange?.from ?? "",
-        filters.dateRange?.to ?? "",
-        filters.amountRange?.min ?? "",
-        filters.amountRange?.max ?? "",
+        filters.value?.min ?? "",
+        filters.value?.max ?? "",
         sort.field,
         sort.direction,
         page,
@@ -83,11 +77,8 @@ export function OpportunitiesList({
       filters.pipelineId,
       filters.stageId,
       filters.ownerId,
-      filters.status,
-      filters.dateRange?.from,
-      filters.dateRange?.to,
-      filters.amountRange?.min,
-      filters.amountRange?.max,
+      filters.value?.min,
+      filters.value?.max,
       sort.field,
       sort.direction,
       page,
@@ -102,27 +93,23 @@ export function OpportunitiesList({
   >({
     queryKey,
     queryFn: async (): Promise<OpportunitiesQueryResult> => {
-      let q: ReturnType<typeof supabase.from> = supabase
-        .from("crm_opportunities")
-        // keep the select string aligned with OpportunityRow extension above
-        .select(
-          "*, customers(name), owner:profiles(name), stage, last_activity_at, next_step",
-          { count: "exact" }
-        )
-        .eq("company_id", companyId);
+      let q = supabase
+      .from("crm_opportunities")
+      .select(
+        "*, customers(name), owner:profiles(name), stage",
+        { count: "exact" }
+      )
+      .eq("company_id", companyId);
 
-      if (search) q = q.filter("name", "ilike", `%${search}%`);
+
+      if (search) q = q.ilike("name",`%${search}%`);
       if (filters.pipelineId) q = q.eq("pipeline_id", filters.pipelineId);
-      if (filters.stageId) q = q.eq("stage_id", filters.stageId);
+      if (filters.stageId) q = q.eq("stage", filters.stageId);
       if (filters.ownerId) q = q.eq("owner_id", filters.ownerId);
-      if (filters.status) q = q.eq("status", filters.status);
 
-      if (filters.dateRange) {
-        q = q.gte("estimated_close_date", filters.dateRange.from).lte("estimated_close_date", filters.dateRange.to);
-      }
 
-      if (filters.amountRange) {
-        q = q.gte("value", filters.amountRange.min).lte("value", filters.amountRange.max);
+      if (filters.value) {
+        q = q.gte("value", filters.value.min).lte("value", filters.value.max);
       }
 
       // supabase expects a real column name
@@ -135,7 +122,8 @@ export function OpportunitiesList({
       const { data, error, count } = await q;
       if (error) throw error;
 
-      return { data: (data ?? []) as OpportunityRow[], total: count ?? 0 };
+      const typedData = (data ?? []) as unknown as OpportunityRow[];
+      return { data: typedData, total: count ?? 0 };
     },
 
     // TanStack Query v4:
@@ -295,3 +283,4 @@ export function OpportunitiesList({
     </div>
   );
 }
+  

@@ -32,24 +32,24 @@ export function useOpportunitiesQuery(params: {
     queryFn: async () => {
       let q = supabase
         .from("crm_opportunities")
-        .select("*, customers(name), owner:profiles(name), stage, last_activity_at", { count: "exact" })
+        .select("*, customers(name), owner:profiles(name), stage", { count: "exact" })
         .eq("company_id", params.companyId);
       if (params.search) q = q.ilike("name", `%${params.search}%`);
       if (params.filters?.pipelineId) q = q.eq("pipeline_id", params.filters.pipelineId);
-      if (params.filters?.stageId) q = q.eq("stage_id", params.filters.stageId);
       if (params.filters?.ownerId) q = q.eq("owner_id", params.filters.ownerId);
-      if (params.filters?.status) q = q.eq("status", params.filters.status);
-      if (params.filters?.dateRange) q = q.gte("close_date", params.filters.dateRange.from).lte("close_date", params.filters.dateRange.to);
-      if (params.filters?.amountRange) q = q.gte("amount", params.filters.amountRange.min).lte("amount", params.filters.amountRange.max);
+      if (params.filters?.stage) q = q.eq("stage", params.filters.stage);
+      if (params.filters?.dateRange) q = q.gte("estimated_close_date", params.filters.dateRange.from).lte("estimated_close_date", params.filters.dateRange.to);
+      if (params.filters?.valueRange) q = q.gte("value", params.filters.valueRange.min).lte("value", params.filters.valueRange.max);
       if (params.sort?.field) q = q.order(params.sort.field, { ascending: params.sort.direction === "asc" });
       const page = params.page || 1;
       const pageSize = params.pageSize || 10;
       q = q.range((page - 1) * pageSize, page * pageSize - 1);
       const { data, error, count } = await q;
       if (error) throw error;
-      return { data: data as OpportunityRow[], total: count ?? 0 };
+      return { data: (data ?? []) as OpportunityRow[], total: count ?? 0 };
     },
-    keepPreviousData: true,
+    // keepPreviousData: true, // Si usas TanStack Query v5, esta prop ya no existe
+    placeholderData: (prev) => prev,
   });
 }
 
@@ -75,7 +75,7 @@ function useAccountsAutocomplete(companyId: string, query: string) {
     queryKey: ["accounts-autocomplete", companyId, query],
     queryFn: async () => {
       const { data, error } = await supabase
-        .from("accounts")
+        .from("employees")
         .select("id, name")
         .eq("company_id", companyId)
         .ilike("name", `%${query}%`)
@@ -87,20 +87,20 @@ function useAccountsAutocomplete(companyId: string, query: string) {
   });
 }
 
-function useContactsAutocomplete(accountId: string, query: string) {
+function useContactsAutocomplete(companyId: string, query: string) {
   return useQuery({
-    queryKey: ["contacts-autocomplete", accountId, query],
+    queryKey: ["contacts-autocomplete", companyId, query],
     queryFn: async () => {
       const { data, error } = await supabase
-        .from("contacts")
+        .from("customers")
         .select("id, name")
-        .eq("account_id", accountId)
+        .eq("company_id", companyId)
         .ilike("name", `%${query}%`)
         .limit(10);
       if (error) throw error;
       return data || [];
     },
-    enabled: !!accountId && !!query,
+    enabled: !!companyId && !!query,
   });
 }
 
@@ -117,7 +117,7 @@ export default function OpportunitiesPage() {
     status: undefined as string | undefined,
     dateRange: undefined as { from: string; to: string } | undefined,
     amountRange: undefined as { min: number; max: number } | undefined,
-  });
+  })
 
   // Saved views (basic: default + last used in localStorage)
   const [savedView, setSavedView] = useState<string>("default");
@@ -179,25 +179,22 @@ export default function OpportunitiesPage() {
 
       </div>
     </Layout>
-  );
+  )};
 
 
 // --- CreateOpportunityDrawer ---
 const opportunitySchema = z.object({
   name: z.string().min(2, "Requerido"),
   pipeline_id: z.string().min(1, "Requerido"),
-  stage_id: z.string().min(1, "Requerido"),
-  account_id: z.string().min(1, "Requerido"),
-  contact_id: z.string().optional(),
-  amount: z.number().min(0.01, "Monto requerido"),
+  stage: z.string().min(1, "Requerido"),
+  customer_id: z.string().min(1, "Requerido"),
+  value: z.number().min(0.01, "Monto requerido"),
   currency: z.string().default("ARS"),
-  close_date: z.string().min(1, "Requerido"),
+  estimated_close_date: z.string().min(1, "Requerido"),
   probability: z.number().min(0).max(100).optional(),
-  source: z.string().optional(),
-  priority: z.enum(["Low", "Medium", "High"]).default("Medium"),
-  next_step: z.string().optional(),
   description: z.string().optional(),
   owner_id: z.string().optional(),
+  company_id: z.string().min(1, "Requerido"),
 });
 
 type OpportunityForm = z.infer<typeof opportunitySchema>;
@@ -207,10 +204,9 @@ function CreateOpportunityDrawer({ open, onClose, companyId }: { open: boolean; 
   const form = useForm<OpportunityForm>({
     resolver: zodResolver(opportunitySchema),
     defaultValues: {
-      currency: "ARS",
-      priority: "Medium",
       probability: 50,
       owner_id: currentUserId,
+      company_id: companyId,
     },
     mode: "onChange",
   });
@@ -222,13 +218,12 @@ function CreateOpportunityDrawer({ open, onClose, companyId }: { open: boolean; 
   // --- Autocomplete cuentas/contactos ---
   const [accountQuery, setAccountQuery] = useState("");
   const [contactQuery, setContactQuery] = useState("");
-  const accountId = form.watch("account_id");
+  const customerId = form.watch("customer_id");
   const { data: accounts = [] } = useAccountsAutocomplete(companyId, accountQuery);
-  const { data: contacts = [] } = useContactsAutocomplete(accountId, contactQuery);
+  const { data: contacts = [] } = useContactsAutocomplete(companyId, contactQuery);
 
   // --- AI Assist stub ---
   function handleAIAssist() {
-    form.setValue("next_step", "Llamar al cliente para seguimiento");
     form.setValue("description", "Sugerencia generada por IA: revisar documentación enviada y agendar demo.");
   }
 
@@ -247,7 +242,25 @@ function CreateOpportunityDrawer({ open, onClose, companyId }: { open: boolean; 
         </div>
         <form
           className="flex-1 overflow-y-auto p-4 grid gap-4"
-          onSubmit={form.handleSubmit(values => mutation.mutate(values))}
+          onSubmit={form.handleSubmit(values => {
+            // Forzar que los campos requeridos estén presentes y no opcionales
+            const { name, pipeline_id, stage, customer_id, value, estimated_close_date, probability, description, owner_id, currency } = values;
+            const payload: OpportunityInsert = {
+              company_id: companyId,
+              name: name!,
+              customer_id: customer_id!,
+              // pipeline_id y stage pueden ser opcionales según el tipo, pero si son requeridos, forzar
+              pipeline_id: pipeline_id ?? null,
+              stage: stage!,
+              value: value ?? null,
+              estimated_close_date: estimated_close_date ?? null,
+              probability: probability ?? null,
+              description: description ?? null,
+              owner_id: owner_id ?? null,
+              // currency no está en el tipo Insert, pero si tu tabla lo tiene, agrégalo aquí
+            };
+            mutation.mutate(payload);
+          })}
         >
           <div className="grid gap-2">
             <label className="font-medium">Nombre *</label>
@@ -263,20 +276,20 @@ function CreateOpportunityDrawer({ open, onClose, companyId }: { open: boolean; 
             </div>
             <div>
               <label className="font-medium">Etapa *</label>
-              <Input {...form.register("stage_id")} aria-invalid={!!form.formState.errors.stage_id} />
+              <Input {...form.register("stage")} aria-invalid={!!form.formState.errors.stage} />
               {/* TODO: Select real stage */}
-              {form.formState.errors.stage_id && <span className="text-xs text-red-500">{form.formState.errors.stage_id.message}</span>}
+              {form.formState.errors.stage && <span className="text-xs text-red-500">{form.formState.errors.stage.message}</span>}
             </div>
           </div>
           <div className="grid grid-cols-2 gap-2">
             <div>
               <label className="font-medium">Cuenta *</label>
               <Input
-                {...form.register("account_id")}
-                aria-invalid={!!form.formState.errors.account_id}
+                {...form.register("customer_id")}
+                aria-invalid={!!form.formState.errors.customer_id}
                 list="accounts-list"
                 onChange={e => {
-                  form.setValue("account_id", e.target.value);
+                  form.setValue("customer_id", e.target.value);
                   setAccountQuery(e.target.value);
                 }}
               />
@@ -285,15 +298,15 @@ function CreateOpportunityDrawer({ open, onClose, companyId }: { open: boolean; 
                   <option key={a.id} value={a.id}>{a.name}</option>
                 ))}
               </datalist>
-              {form.formState.errors.account_id && <span className="text-xs text-red-500">{form.formState.errors.account_id.message}</span>}
+              {form.formState.errors.customer_id && <span className="text-xs text-red-500">{form.formState.errors.customer_id.message}</span>}
             </div>
             <div>
               <label className="font-medium">Contacto</label>
               <Input
-                {...form.register("contact_id")}
+                {...form.register("customer_id")}
                 list="contacts-list"
                 onChange={e => {
-                  form.setValue("contact_id", e.target.value);
+                  form.setValue("customer_id", e.target.value);
                   setContactQuery(e.target.value);
                 }}
               />
@@ -307,8 +320,8 @@ function CreateOpportunityDrawer({ open, onClose, companyId }: { open: boolean; 
           <div className="grid grid-cols-2 gap-2">
             <div>
               <label className="font-medium">Monto *</label>
-              <Input type="number" step="0.01" {...form.register("amount", { valueAsNumber: true })} aria-invalid={!!form.formState.errors.amount} />
-              {form.formState.errors.amount && <span className="text-xs text-red-500">{form.formState.errors.amount.message}</span>}
+              <Input type="number" step="0.01" {...form.register("value", { valueAsNumber: true })} aria-invalid={!!form.formState.errors.value} />
+              {form.formState.errors.value && <span className="text-xs text-red-500">{form.formState.errors.value.message}</span>}
             </div>
             <div>
               <label className="font-medium">Moneda</label>
@@ -318,31 +331,13 @@ function CreateOpportunityDrawer({ open, onClose, companyId }: { open: boolean; 
           <div className="grid grid-cols-2 gap-2">
             <div>
               <label className="font-medium">Cierre *</label>
-              <Input type="date" {...form.register("close_date")} aria-invalid={!!form.formState.errors.close_date} />
-              {form.formState.errors.close_date && <span className="text-xs text-red-500">{form.formState.errors.close_date.message}</span>}
+              <Input type="date" {...form.register("estimated_close_date")} aria-invalid={!!form.formState.errors.estimated_close_date} />
+              {form.formState.errors.estimated_close_date && <span className="text-xs text-red-500">{form.formState.errors.estimated_close_date.message}</span>}
             </div>
             <div>
               <label className="font-medium">Probabilidad (%)</label>
               <Input type="number" {...form.register("probability", { valueAsNumber: true })} />
             </div>
-          </div>
-          <div className="grid grid-cols-2 gap-2">
-            <div>
-              <label className="font-medium">Fuente</label>
-              <Input {...form.register("source")} />
-            </div>
-            <div>
-              <label className="font-medium">Prioridad</label>
-              <select {...form.register("priority")} className="border rounded px-2 py-1">
-                <option value="Low">Baja</option>
-                <option value="Medium">Media</option>
-                <option value="High">Alta</option>
-              </select>
-            </div>
-          </div>
-          <div className="grid gap-2">
-            <label className="font-medium">Próximo paso</label>
-            <Input {...form.register("next_step")} />
           </div>
           <div className="grid gap-2">
             <label className="font-medium">Notas</label>
