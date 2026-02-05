@@ -295,7 +295,7 @@ export function OpportunityDrawer({ open, onClose, companyId, opportunity }: Opp
               </Select>
             </div>
             <div>
-              <label className="font-medium">Responsable</label>
+              <label className="font-medium">Responsable (empleado)</label>
               <Select
                 value={form.watch("owner_id") || "__none__"}
                 onValueChange={(value) =>
@@ -303,7 +303,7 @@ export function OpportunityDrawer({ open, onClose, companyId, opportunity }: Opp
                 }
               >
                 <SelectTrigger>
-                  <SelectValue placeholder="Sin asignar" />
+                  <SelectValue placeholder="Seleccionar empleado (opcional)" />
                 </SelectTrigger>
                 <SelectContent>
                   <SelectItem value="__none__">Sin asignar</SelectItem>
@@ -314,6 +314,7 @@ export function OpportunityDrawer({ open, onClose, companyId, opportunity }: Opp
                   ))}
                 </SelectContent>
               </Select>
+              <p className="text-xs text-muted-foreground">Puede quedar vacío.</p>
             </div>
           </div>
 
