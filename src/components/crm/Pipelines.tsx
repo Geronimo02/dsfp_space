@@ -27,6 +27,10 @@ import {
 import { Badge } from "@/components/ui/badge";
 import { toast } from "sonner";
 import { Plus, X, GripVertical, Pencil, Trash2, MoreVertical } from "lucide-react";
+import { OpportunityDrawer } from "./OpportunityDrawer";
+import type { Database } from "@/integrations/supabase/types";
+
+type OpportunityRow = Database["public"]["Tables"]["crm_opportunities"]["Row"];
 
 interface Pipeline {
   id: string;
@@ -63,7 +67,7 @@ export function Pipelines({ companyId }: { companyId: string }) {
   const [quickCreateStage, setQuickCreateStage] = useState<string | null>(null);
   const [quickCreateOpen, setQuickCreateOpen] = useState(false);
   const [addExistingOpen, setAddExistingOpen] = useState<string | null>(null);
-  const [editingOpportunity, setEditingOpportunity] = useState<Opportunity | null>(null);
+  const [editingOpportunity, setEditingOpportunity] = useState<OpportunityRow | null>(null);
 
   // Fetch pipelines
   const { data: pipelines, isLoading: pipelinesLoading } = useQuery<Pipeline[]>({
@@ -254,6 +258,22 @@ export function Pipelines({ companyId }: { companyId: string }) {
     }
   };
 
+  const handleEditOpportunity = async (oppId: string) => {
+    // Fetch full opportunity data
+    const { data, error } = await supabase
+      .from("crm_opportunities")
+      .select("*")
+      .eq("id", oppId)
+      .single();
+    
+    if (error) {
+      toast.error("Error al cargar oportunidad");
+      return;
+    }
+    
+    setEditingOpportunity(data as OpportunityRow);
+  };
+
   const handleDragStart = (opportunity: Opportunity) => {
     setDraggedOpportunity(opportunity);
   };
@@ -428,7 +448,7 @@ export function Pipelines({ companyId }: { companyId: string }) {
                         key={opp.id}
                         draggable
                         onDragStart={() => handleDragStart(opp)}
-                        onClick={() => setEditingOpportunity(opp)}
+                        onClick={() => handleEditOpportunity(opp.id)}
                         className="p-3 bg-white border rounded-lg cursor-pointer hover:shadow-md transition-shadow"
                       >
                         <div className="flex items-start justify-between mb-2">
@@ -451,7 +471,7 @@ export function Pipelines({ companyId }: { companyId: string }) {
                               <DropdownMenuItem
                                 onClick={(e) => {
                                   e.stopPropagation();
-                                  setEditingOpportunity(opp);
+                                  handleEditOpportunity(opp.id);
                                 }}
                               >
                                 <Pencil className="w-4 h-4 mr-2" />
@@ -558,21 +578,12 @@ export function Pipelines({ companyId }: { companyId: string }) {
         </div>
       )}
 
-      {/* Edit Opportunity Dialog - Placeholder */}
-      {editingOpportunity && (
-        <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50">
-          <div className="bg-white p-6 rounded-lg shadow-lg max-w-md">
-            <h2 className="text-lg font-semibold mb-4">Editar Oportunidad</h2>
-            <p className="text-sm text-muted-foreground mb-4">
-              Edición de: {editingOpportunity.name}
-            </p>
-            <p className="text-sm text-muted-foreground mb-4">
-              (Funcionalidad de edición pendiente de implementar)
-            </p>
-            <Button onClick={() => setEditingOpportunity(null)}>Cerrar</Button>
-          </div>
-        </div>
-      )}
+      <OpportunityDrawer
+        open={!!editingOpportunity}
+        onClose={() => setEditingOpportunity(null)}
+        companyId={companyId}
+        opportunity={editingOpportunity}
+      />
     </div>
   );
 }

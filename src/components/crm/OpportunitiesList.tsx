@@ -14,6 +14,7 @@ import {
 import { LucideMoreVertical, Pencil, Trash2 } from "lucide-react";
 import { format } from "date-fns";
 import { toast } from "sonner";
+import { OpportunityDrawer } from "./OpportunityDrawer";
 
 // --- Types ---
 type SortableField = keyof Omit<Database["public"]["Tables"]["crm_opportunities"]["Row"], "closed_at" | "close_date" | "currency" | "expected_revenue" | "last_activity_at" | "lost_reason" | "next_step" | "source" | "status" | "tags" | "won_reason">;
@@ -322,21 +323,12 @@ export function OpportunitiesList({
         </div>
       ) : null}
 
-      {/* Edit Opportunity Dialog - Placeholder */}
-      {editingOpportunity && (
-        <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50">
-          <div className="bg-white p-6 rounded-lg shadow-lg max-w-md">
-            <h2 className="text-lg font-semibold mb-4">Editar Oportunidad</h2>
-            <p className="text-sm text-muted-foreground mb-4">
-              Edición de: {editingOpportunity.name}
-            </p>
-            <p className="text-sm text-muted-foreground mb-4">
-              (Funcionalidad de edición pendiente de implementar)
-            </p>
-            <Button onClick={() => setEditingOpportunity(null)}>Cerrar</Button>
-          </div>
-        </div>
-      )}
+      <OpportunityDrawer
+        open={!!editingOpportunity}
+        onClose={() => setEditingOpportunity(null)}
+        companyId={companyId}
+        opportunity={editingOpportunity}
+      />
     </div>
   );
 }

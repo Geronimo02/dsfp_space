@@ -12,6 +12,7 @@ import {
 } from "@/components/ui/select";
 import { useCompany } from "@/contexts/CompanyContext";
 import { OpportunitiesList } from "@/components/crm/OpportunitiesList";
+import { OpportunityDrawer } from "@/components/crm/OpportunityDrawer";
 import { LucidePlus, LucideFilter, LucideDownload } from "lucide-react";
 import { useForm } from "react-hook-form";
 import { z } from "zod";
@@ -189,13 +190,12 @@ export default function OpportunitiesPage() {
           onCreate={() => setShowDrawer(true)}
         />
         {/* Drawer/modal for create opportunity */}
-        {showDrawer && (
-          <CreateOpportunityDrawer
-            open={showDrawer}
-            onClose={() => setShowDrawer(false)}
-            companyId={currentCompany.id}
-          />
-        )}
+        <OpportunityDrawer
+          open={showDrawer}
+          onClose={() => setShowDrawer(false)}
+          companyId={currentCompany.id}
+          opportunity={null}
+        />
 
       </div>
     </Layout>
