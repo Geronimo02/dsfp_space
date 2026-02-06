@@ -68,32 +68,46 @@ export function OpportunityDrawer({ open, onClose, companyId, opportunity }: Opp
   useEffect(() => {
     if (opportunity && open) {
       console.log("Loading opportunity for edit:", opportunity);
-      form.reset({
-        name: opportunity.name,
+      const formValues = {
+        name: opportunity.name || "",
         customer_id: opportunity.customer_id || undefined,
         pipeline_id: opportunity.pipeline_id || undefined,
-        stage: opportunity.stage,
-        value: opportunity.value || undefined,
+        stage: opportunity.stage || "",
+        value: opportunity.value ?? undefined,
         estimated_close_date: opportunity.estimated_close_date || undefined,
-        probability: opportunity.probability || 50,
-        description: opportunity.description || undefined,
+        probability: opportunity.probability ?? 50,
+        description: opportunity.description || "",
         owner_id: opportunity.owner_id || undefined,
-        status: opportunity.status,
+        status: opportunity.status || "abierta",
         close_date: opportunity.close_date || undefined,
-        lost_reason: opportunity.lost_reason || undefined,
-        won_reason: opportunity.won_reason || undefined,
-        source: opportunity.source || undefined,
+        lost_reason: opportunity.lost_reason || "",
+        won_reason: opportunity.won_reason || "",
+        source: opportunity.source || "",
         currency: opportunity.currency || "ARS",
-        expected_revenue: opportunity.expected_revenue || undefined,
-        next_step: opportunity.next_step || undefined,
-        tags: opportunity.tags?.join(", ") || undefined,
-      });
-      console.log("Form reset with values:", form.getValues());
+        expected_revenue: opportunity.expected_revenue ?? undefined,
+        next_step: opportunity.next_step || "",
+        tags: opportunity.tags?.join(", ") || "",
+      };
+      console.log("Form values to reset:", formValues);
+      form.reset(formValues);
+      // Force stage update after pipeline loads
+      setTimeout(() => {
+        if (opportunity.stage) {
+          form.setValue("stage", opportunity.stage, { shouldValidate: false });
+        }
+      }, 100);
     } else if (!opportunity && open) {
       form.reset({
+        name: "",
         probability: 50,
         status: "abierta",
         currency: "ARS",
+        description: "",
+        next_step: "",
+        source: "",
+        tags: "",
+        lost_reason: "",
+        won_reason: "",
       });
     }
   }, [opportunity, open]);
@@ -222,7 +236,16 @@ export function OpportunityDrawer({ open, onClose, companyId, opportunity }: Opp
         </div>
         <form
           className="flex-1 overflow-y-auto p-4 grid gap-4"
-          onSubmit={form.handleSubmit((values) => mutation.mutate(values))}
+          onSubmit={form.handleSubmit(
+            (values) => {
+              console.log("Form submitted with values:", values);
+              mutation.mutate(values);
+            },
+            (errors) => {
+              console.log("Form validation errors:", errors);
+              toast.error("Hay errores en el formulario");
+            }
+          )}
         >
           <div className="text-xs text-muted-foreground">
             Los campos con * son obligatorios.
