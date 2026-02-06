@@ -67,6 +67,7 @@ export function OpportunityDrawer({ open, onClose, companyId, opportunity }: Opp
   // Populate form when editing
   useEffect(() => {
     if (opportunity && open) {
+      console.log("Loading opportunity for edit:", opportunity);
       form.reset({
         name: opportunity.name,
         customer_id: opportunity.customer_id || undefined,
@@ -87,6 +88,7 @@ export function OpportunityDrawer({ open, onClose, companyId, opportunity }: Opp
         next_step: opportunity.next_step || undefined,
         tags: opportunity.tags?.join(", ") || undefined,
       });
+      console.log("Form reset with values:", form.getValues());
     } else if (!opportunity && open) {
       form.reset({
         probability: 50,
@@ -94,7 +96,7 @@ export function OpportunityDrawer({ open, onClose, companyId, opportunity }: Opp
         currency: "ARS",
       });
     }
-  }, [opportunity, open, form]);
+  }, [opportunity, open]);
 
   const mutation = useMutation({
     mutationFn: async (values: OpportunityForm) => {
@@ -124,16 +126,26 @@ export function OpportunityDrawer({ open, onClose, companyId, opportunity }: Opp
       };
 
       if (isEditing) {
-        const { error } = await supabase
+        const { data, error } = await supabase
           .from("crm_opportunities")
           .update(payload)
-          .eq("id", opportunity!.id);
-        if (error) throw error;
+          .eq("id", opportunity!.id)
+          .select();
+        if (error) {
+          console.error("Error updating opportunity:", error);
+          throw error;
+        }
+        console.log("Updated opportunity:", data);
       } else {
-        const { error } = await supabase
+        const { data, error } = await supabase
           .from("crm_opportunities")
-          .insert([{ ...payload, company_id: companyId }]);
-        if (error) throw error;
+          .insert([{ ...payload, company_id: companyId }])
+          .select();
+        if (error) {
+          console.error("Error creating opportunity:", error);
+          throw error;
+        }
+        console.log("Created opportunity:", data);
       }
     },
     onSuccess: () => {
@@ -143,6 +155,7 @@ export function OpportunityDrawer({ open, onClose, companyId, opportunity }: Opp
       onClose();
     },
     onError: (error: any) => {
+      console.error("Mutation error:", error);
       toast.error(error.message || "Error al guardar oportunidad");
     },
   });
