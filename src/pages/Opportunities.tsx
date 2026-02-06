@@ -53,7 +53,7 @@ export function useOpportunitiesQuery(params: {
     queryFn: async () => {
       let q = supabase
         .from("crm_opportunities")
-        .select("*, customers(name), owner:employees(name), stage", { count: "exact" })
+        .select("*, customers(name), owner:employees(first_name,last_name), stage", { count: "exact" })
         .eq("company_id", params.companyId);
       if (params.search) q = q.ilike("name", `%${params.search}%`);
       if (params.filters?.pipelineId) q = q.eq("pipeline_id", params.filters.pipelineId);
@@ -97,9 +97,9 @@ function useAccountsAutocomplete(companyId: string, query: string) {
     queryFn: async () => {
       const { data, error } = await supabase
         .from("employees")
-        .select("id, name")
+        .select("id, first_name, last_name")
         .eq("company_id", companyId)
-        .ilike("name", `%${query}%`)
+        .or(`first_name.ilike.%${query}%,last_name.ilike.%${query}%`)
         .limit(10);
       if (error) throw error;
       return data || [];

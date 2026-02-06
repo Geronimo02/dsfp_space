@@ -180,9 +180,9 @@ export function OpportunityDrawer({ open, onClose, companyId, opportunity }: Opp
     queryFn: async () => {
       const { data, error } = await supabase
         .from("employees")
-        .select("id, name")
+        .select("id, first_name, last_name")
         .eq("company_id", companyId)
-        .order("name", { ascending: true });
+        .order("first_name", { ascending: true });
       if (error) throw error;
       return data || [];
     },
@@ -312,7 +312,7 @@ export function OpportunityDrawer({ open, onClose, companyId, opportunity }: Opp
                   <SelectItem value="__none__">Sin asignar</SelectItem>
                   {owners.map((o: any) => (
                     <SelectItem key={o.id} value={o.id}>
-                      {o.name}
+                      {`${o.first_name} ${o.last_name}`.trim()}
                     </SelectItem>
                   ))}
                 </SelectContent>
