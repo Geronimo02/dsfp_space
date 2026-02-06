@@ -64,54 +64,6 @@ export function OpportunityDrawer({ open, onClose, companyId, opportunity }: Opp
     mode: "onChange",
   });
 
-  // Populate form when editing
-  useEffect(() => {
-    if (opportunity && open) {
-      console.log("Loading opportunity for edit:", opportunity);
-      const formValues = {
-        name: opportunity.name || "",
-        customer_id: opportunity.customer_id || undefined,
-        pipeline_id: opportunity.pipeline_id || undefined,
-        stage: opportunity.stage || "",
-        value: opportunity.value ?? undefined,
-        estimated_close_date: opportunity.estimated_close_date || undefined,
-        probability: opportunity.probability ?? 50,
-        description: opportunity.description || "",
-        owner_id: opportunity.owner_id || undefined,
-        status: opportunity.status || "abierta",
-        close_date: opportunity.close_date || undefined,
-        lost_reason: opportunity.lost_reason || "",
-        won_reason: opportunity.won_reason || "",
-        source: opportunity.source || "",
-        currency: opportunity.currency || "ARS",
-        expected_revenue: opportunity.expected_revenue ?? undefined,
-        next_step: opportunity.next_step || "",
-        tags: opportunity.tags?.join(", ") || "",
-      };
-      console.log("Form values to reset:", formValues);
-      form.reset(formValues);
-      // Force stage update after pipeline loads
-      setTimeout(() => {
-        if (opportunity.stage) {
-          form.setValue("stage", opportunity.stage, { shouldValidate: false });
-        }
-      }, 100);
-    } else if (!opportunity && open) {
-      form.reset({
-        name: "",
-        probability: 50,
-        status: "abierta",
-        currency: "ARS",
-        description: "",
-        next_step: "",
-        source: "",
-        tags: "",
-        lost_reason: "",
-        won_reason: "",
-      });
-    }
-  }, [opportunity, open]);
-
   const mutation = useMutation({
     mutationFn: async (values: OpportunityForm) => {
       const normalizeNumber = (val?: number) =>
@@ -174,7 +126,7 @@ export function OpportunityDrawer({ open, onClose, companyId, opportunity }: Opp
     },
   });
 
-  const { data: pipelines = [] } = useQuery({
+  const { data: pipelines = [], isLoading: pipelinesLoading } = useQuery({
     queryKey: ["crm-pipelines", companyId],
     queryFn: async () => {
       const { data, error } = await supabase
@@ -188,7 +140,7 @@ export function OpportunityDrawer({ open, onClose, companyId, opportunity }: Opp
     enabled: !!companyId && open,
   });
 
-  const { data: customers = [] } = useQuery({
+  const { data: customers = [], isLoading: customersLoading } = useQuery({
     queryKey: ["customers", companyId],
     queryFn: async () => {
       const { data, error } = await supabase
@@ -202,7 +154,7 @@ export function OpportunityDrawer({ open, onClose, companyId, opportunity }: Opp
     enabled: !!companyId && open,
   });
 
-  const { data: owners = [] } = useQuery({
+  const { data: owners = [], isLoading: ownersLoading } = useQuery({
     queryKey: ["crm-owners", companyId],
     queryFn: async () => {
       const { data, error } = await supabase
@@ -222,6 +174,56 @@ export function OpportunityDrawer({ open, onClose, companyId, opportunity }: Opp
     [pipelines, selectedPipelineId]
   );
   const pipelineStages: string[] = selectedPipeline?.stages ?? [];
+
+  // Populate form when editing - wait for data to load first
+  useEffect(() => {
+    if (!open) return;
+    
+    // Don't populate form until queries finish loading
+    if (isEditing && (pipelinesLoading || customersLoading || ownersLoading)) {
+      console.log("Waiting for data to load...");
+      return;
+    }
+
+    if (opportunity && isEditing) {
+      console.log("Loading opportunity for edit:", opportunity);
+      const formValues = {
+        name: opportunity.name || "",
+        customer_id: opportunity.customer_id || undefined,
+        pipeline_id: opportunity.pipeline_id || undefined,
+        stage: opportunity.stage || "",
+        value: opportunity.value ?? undefined,
+        estimated_close_date: opportunity.estimated_close_date || undefined,
+        probability: opportunity.probability ?? 50,
+        description: opportunity.description || "",
+        owner_id: opportunity.owner_id || undefined,
+        status: opportunity.status || "abierta",
+        close_date: opportunity.close_date || undefined,
+        lost_reason: opportunity.lost_reason || "",
+        won_reason: opportunity.won_reason || "",
+        source: opportunity.source || "",
+        currency: opportunity.currency || "ARS",
+        expected_revenue: opportunity.expected_revenue ?? undefined,
+        next_step: opportunity.next_step || "",
+        tags: opportunity.tags?.join(", ") || "",
+      };
+      console.log("Form values to reset:", formValues);
+      form.reset(formValues);
+    } else if (!opportunity && !isEditing) {
+      form.reset({
+        name: "",
+        probability: 50,
+        status: "abierta",
+        currency: "ARS",
+        description: "",
+        next_step: "",
+        source: "",
+        tags: "",
+        lost_reason: "",
+        won_reason: "",
+      });
+    }
+  }, [opportunity, open, isEditing, pipelinesLoading, customersLoading, ownersLoading, form]);
 
   if (!open) return null;
 
