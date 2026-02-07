@@ -1,6 +1,7 @@
 import React, { createContext, useContext, useState, useEffect, useRef } from 'react';
 import { supabase } from '@/integrations/supabase/client';
 import { useToast } from '@/hooks/use-toast';
+import { logger } from '@/lib/logger';
 
 interface Company {
   id: string;
@@ -47,12 +48,12 @@ export function CompanyProvider({ children }: { children: React.ReactNode }) {
     try {
       const { data: { user } } = await supabase.auth.getUser();
       if (!user) {
-        if (import.meta.env.DEV) console.log("No authenticated user found");
+        logger.debug("No authenticated user found");
         setLoading(false);
         return;
       }
 
-      if (import.meta.env.DEV) console.log("Fetching companies for user:", user.id);
+      logger.debug("Fetching companies for user:", user.id);
 
       const { data, error } = await supabase
         .from('company_users')
@@ -83,7 +84,7 @@ export function CompanyProvider({ children }: { children: React.ReactNode }) {
         throw error;
       }
 
-      if (import.meta.env.DEV) console.log("Companies fetched:", data?.length || 0, "companies");
+      logger.debug("Companies fetched:", data?.length || 0, "companies");
       const companyUsers = data as CompanyUser[];
       setUserCompanies(companyUsers);
 

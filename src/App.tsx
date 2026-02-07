@@ -75,7 +75,18 @@ const SignupWizard = lazy(() => import("./pages/SignupWizard"));
 const SignupSuccess = lazy(() => import("./pages/SignupSuccess"));
 const SignupCancel = lazy(() => import("./pages/SignupCancel"));
 
-const queryClient = new QueryClient();
+const queryClient = new QueryClient({
+  defaultOptions: {
+    queries: {
+      staleTime: 1000 * 60 * 5, // 5 minutos - datos considerados frescos
+      gcTime: 1000 * 60 * 10, // 10 minutos - mantener en caché (antes: cacheTime)
+      refetchOnWindowFocus: false, // No refetch al cambiar de ventana
+      refetchOnMount: false, // No refetch al montar si hay datos en caché
+      refetchOnReconnect: false, // No refetch al reconectar
+      retry: 1, // Solo 1 reintento en caso de error
+    },
+  },
+});
 
 
 // Loading fallback component

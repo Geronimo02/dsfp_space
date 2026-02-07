@@ -54,7 +54,8 @@ export default function BankMovements() {
         .select("*")
         .eq("company_id", currentCompany?.id)
         .eq("active", true)
-        .order("bank_name");
+        .order("bank_name")
+        .limit(100);
 
       if (error) throw error;
       return data;
@@ -73,7 +74,8 @@ export default function BankMovements() {
           destination:bank_accounts!bank_movements_destination_account_id_fkey(bank_name, account_number)
         `)
         .eq("company_id", currentCompany?.id)
-        .order("movement_date", { ascending: false });
+        .order("movement_date", { ascending: false })
+        .limit(500);
 
       if (error) throw error;
       return data;

@@ -114,7 +114,8 @@ export default function PlatformAdmin() {
             active
           )
         `)
-        .order("created_at", { ascending: false });
+        .order("created_at", { ascending: false })
+        .limit(1000);
 
       if (error) throw error;
       return data;
@@ -131,7 +132,8 @@ export default function PlatformAdmin() {
           *,
           companies (name)
         `)
-        .order("created_at", { ascending: false });
+        .order("created_at", { ascending: false })
+        .limit(500);
 
       if (error) throw error;
       return data;
@@ -167,7 +169,8 @@ export default function PlatformAdmin() {
           companies:company_id (name),
           subscriptions:subscription_id (status)
         `)
-        .order("payment_date", { ascending: false });
+        .order("payment_date", { ascending: false })
+        .limit(500);
 
       if (error) throw error;
       return data;
@@ -201,7 +204,8 @@ export default function PlatformAdmin() {
             name
           )
         `)
-        .order("created_at", { ascending: false });
+        .order("created_at", { ascending: false })
+        .limit(1000);
 
       if (error) throw error;
       return data;

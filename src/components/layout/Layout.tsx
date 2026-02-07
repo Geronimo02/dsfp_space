@@ -35,24 +35,33 @@ export function Layout({ children }: LayoutProps) {
 
   return (
     <SidebarProvider defaultOpen={!isMobile}>
+      <a
+        href="#main-content"
+        className="sr-only focus:not-sr-only focus:absolute focus:z-50 focus:p-4 focus:bg-primary focus:text-primary-foreground"
+      >
+        Saltar al contenido principal
+      </a>
       <div className="flex min-h-screen w-full bg-background">
         <Sidebar />
-        <main className="flex-1 overflow-y-auto" id="main-content" role="main" aria-label="Contenido principal">
+        <main className="flex-1 overflow-y-auto" id="main-content" role="main" aria-label="Contenido principal" tabIndex={-1}>
           <div className="sticky top-0 z-10 bg-background/95 backdrop-blur supports-[backdrop-filter]:bg-background/60 border-b" role="banner">
             <div className="container mx-auto py-3 md:py-4 flex justify-between items-center gap-2 md:gap-4">
               <div className="flex items-center gap-2 md:gap-4">
-                <SidebarTrigger />
+                <SidebarTrigger aria-label="Toggle menu de navegación" />
                 <CompanySelector />
                 {roleInfo && !isMobile && (
-                  <Badge className={`${roleInfo.color} text-white shadow-sm hidden sm:inline-flex`}>
+                  <Badge 
+                    className={`${roleInfo.color} text-white shadow-sm hidden sm:inline-flex`}
+                    aria-label={`Rol actual: ${roleInfo.label}`}
+                  >
                     {roleInfo.label}
                   </Badge>
                 )}
               </div>
-              <div className="flex items-center gap-2 md:gap-4">
+              <nav className="flex items-center gap-2 md:gap-4" aria-label="Navegación de utilidades">
                 <GlobalSearch />
                 <NotificationCenter />
-              </div>
+              </nav>
             </div>
           </div>
           <div className="container mx-auto py-4 md:py-8">

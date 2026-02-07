@@ -33,9 +33,9 @@ describe('useDebounce', () => {
     expect(result.current).toBe('initial'); // Still old value
 
     vi.advanceTimersByTime(1);
-    await waitFor(() => {
-      expect(result.current).toBe('updated'); // Now updated
-    });
+    // Need to wait for React to re-render
+    await vi.runAllTimersAsync();
+    expect(result.current).toBe('updated'); // Now updated
   });
 
   it('should cancel previous timeout on rapid changes', async () => {
@@ -53,9 +53,8 @@ describe('useDebounce', () => {
     rerender({ value: 'fourth' });
     vi.advanceTimersByTime(500);
 
-    await waitFor(() => {
-      expect(result.current).toBe('fourth');
-    });
+    await vi.runAllTimersAsync();
+    expect(result.current).toBe('fourth');
   });
 
   it('should work with different data types', async () => {
@@ -69,9 +68,8 @@ describe('useDebounce', () => {
     rerender({ value: 456 });
     vi.advanceTimersByTime(300);
 
-    await waitFor(() => {
-      expect(result.current).toBe(456);
-    });
+    await vi.runAllTimersAsync();
+    expect(result.current).toBe(456);
   });
 
   it('should handle zero delay', async () => {
@@ -82,8 +80,7 @@ describe('useDebounce', () => {
 
     rerender({ value: 'updated' });
     
-    await waitFor(() => {
-      expect(result.current).toBe('updated');
-    });
+    await vi.runAllTimersAsync();
+    expect(result.current).toBe('updated');
   });
 });

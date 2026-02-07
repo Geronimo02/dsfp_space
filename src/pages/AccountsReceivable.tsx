@@ -38,6 +38,7 @@ export default function AccountsReceivable() {
         .select("*")
         .eq("company_id", currentCompany?.id)
         .gt("current_balance", 0)
+        .limit(500)
         .order("current_balance", { ascending: false });
       
       if (searchQuery) {

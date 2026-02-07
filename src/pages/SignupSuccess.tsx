@@ -6,6 +6,8 @@ import { Button } from "@/components/ui/button";
 import { Loader2, CheckCircle2, XCircle, Clock } from "lucide-react";
 import { toast } from "sonner";
 
+import { logger } from "@/lib/logger";
+
 export default function SignupSuccess() {
   const [searchParams] = useSearchParams();
   const navigate = useNavigate();
@@ -23,11 +25,11 @@ export default function SignupSuccess() {
   useEffect(() => {
     // Try to get password from localStorage
     const savedData = localStorage.getItem("signup_wizard_data");
-    console.log("[SignupSuccess] Loading saved data:", savedData);
+    logger.debug("[SignupSuccess] Loading saved data:", savedData);
     if (savedData) {
       try {
         const data = JSON.parse(savedData);
-        console.log("[SignupSuccess] Parsed data:", { email: data.email, hasPassword: !!data.password });
+        logger.debug("[SignupSuccess] Parsed data:", { email: data.email, hasPassword: !!data.password });
         setPassword(data.password);
         setPasswordLoaded(true);
       } catch (e) {
@@ -61,7 +63,7 @@ export default function SignupSuccess() {
 
         if (error) throw error;
 
-        console.log("[SignupSuccess] Intent status:", data.status);
+        logger.debug("[SignupSuccess] Intent status:", data.status);
 
         if (data.status === "paid_ready") {
           setStatus("paid_ready");

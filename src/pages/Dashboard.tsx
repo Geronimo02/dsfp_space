@@ -21,6 +21,7 @@ export default function Dashboard() {
   // Ventas del mes actual vs mes pasado
   const { data: monthlyComparison } = useQuery({
     queryKey: ["monthly-comparison", currentCompany?.id],
+    enabled: !!currentCompany?.id && canViewSales,
     queryFn: async () => {
       const currentMonthStart = startOfMonth(new Date());
       const currentMonthEnd = endOfMonth(new Date());

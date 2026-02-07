@@ -46,7 +46,8 @@ const Payroll = () => {
         `)
         .eq("company_id", currentCompany.id)
         .order("period_year", { ascending: false })
-        .order("period_month", { ascending: false });
+        .order("period_month", { ascending: false })
+        .limit(500);
       
       if (error) throw error;
       return data;

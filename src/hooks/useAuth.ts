@@ -2,6 +2,7 @@ import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
 import { User, Session } from "@supabase/supabase-js";
 import { useEffect, useRef } from "react";
+import { logger } from "@/lib/logger";
 
 /**
  * Centralized authentication hook
@@ -44,9 +45,7 @@ export function useAuth() {
 
     const { data: { subscription } } = supabase.auth.onAuthStateChange(
       async (event, session) => {
-        if (import.meta.env.DEV) {
-          console.log('[useAuth] Auth state changed:', event);
-        }
+        logger.debug('[useAuth] Auth state changed:', event);
 
         // Update cached data
         queryClient.setQueryData(['auth-session'], session);

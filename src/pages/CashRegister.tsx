@@ -105,7 +105,8 @@ export default function CashRegister() {
         .from("cash_movements")
         .select("*")
         .eq("cash_register_id", currentRegister.id)
-        .order("created_at", { ascending: false });
+        .order("created_at", { ascending: false })
+        .limit(500);
 
       if (movementsError) throw movementsError;
       return movementsData || [];

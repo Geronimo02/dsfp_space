@@ -42,7 +42,8 @@ const MonthlyClosing = () => {
         .select("*, sale_items(*)")
         .eq("company_id", currentCompany?.id)
         .gte("created_at", monthStart.toISOString())
-        .lte("created_at", monthEnd.toISOString());
+        .lte("created_at", monthEnd.toISOString())
+        .limit(1000);
       
       if (error) throw error;
       return data;
@@ -58,7 +59,8 @@ const MonthlyClosing = () => {
         .select("*, purchase_items(*)")
         .eq("company_id", currentCompany?.id)
         .gte("created_at", monthStart.toISOString())
-        .lte("created_at", monthEnd.toISOString());
+        .lte("created_at", monthEnd.toISOString())
+        .limit(1000);
       
       if (error) throw error;
       return data;
@@ -74,7 +76,8 @@ const MonthlyClosing = () => {
         .select("*")
         .eq("company_id", currentCompany?.id)
         .gte("created_at", monthStart.toISOString())
-        .lte("created_at", monthEnd.toISOString());
+        .lte("created_at", monthEnd.toISOString())
+        .limit(1000);
       
       if (error) throw error;
       return data;
@@ -90,7 +93,8 @@ const MonthlyClosing = () => {
         .select("*")
         .eq("company_id", currentCompany?.id)
         .gte("created_at", monthStart.toISOString())
-        .lte("created_at", monthEnd.toISOString());
+        .lte("created_at", monthEnd.toISOString())
+        .limit(1000);
       
       if (error) throw error;
       return data;

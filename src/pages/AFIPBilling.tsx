@@ -52,7 +52,8 @@ const AFIPBilling = () => {
           sales:sale_id(id, customer_name, total)
         `)
         .eq("company_id", currentCompany.id)
-        .order("created_at", { ascending: false });
+        .order("created_at", { ascending: false })
+        .limit(500);
       
       if (error) throw error;
       return data;
@@ -69,7 +70,8 @@ const AFIPBilling = () => {
         .from("pos_afip")
         .select("*")
         .eq("company_id", currentCompany.id)
-        .eq("active", true);
+        .eq("active", true)
+        .limit(100);
       
       if (error) throw error;
       return data;

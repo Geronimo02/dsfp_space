@@ -64,6 +64,7 @@ export default function Products() {
   const canEdit = hasPermission('products', 'edit');
   const canDelete = hasPermission('products', 'delete');
   const canExport = hasPermission('products', 'export');
+  const canView = hasPermission('products', 'view');
 
   // Verificar que el usuario tenga acceso a la empresa actual
   useEffect(() => {

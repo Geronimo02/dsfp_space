@@ -85,7 +85,6 @@ export default function Suppliers() {
   });
 
   const queryClient = useQueryClient();
-  const paymentRateLimiter = useRateLimit(15, 60000); // 15 pagos por minuto
 
   const { data: suppliers = [] } = useQuery({
     queryKey: ["suppliers", debouncedSearch, currentCompany?.id],
@@ -155,7 +154,7 @@ export default function Suppliers() {
     },
   });
 
-  const paymentRateLimiter = useRateLimit(15, 60000); // 15 pagos por minuto
+  const paymentRateLimiter = useRateLimit({ maxAttempts: 15, windowMs: 60000 }); // 15 pagos por minuto
 
   const createPaymentMutation = useMutation({
     mutationFn: async () => {

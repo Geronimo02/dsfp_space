@@ -10,6 +10,8 @@ import { supabase } from "@/integrations/supabase/client";
 import { toast } from "sonner";
 import { Building2 } from "lucide-react";
 
+import { logger } from "@/lib/logger";
+
 export default function SignupWizard() {
   const {
     currentStep,
@@ -31,7 +33,7 @@ export default function SignupWizard() {
   const totalSteps = stepLabels.length;
 
   const handleCreateIntent = async () => {
-    console.log("[SignupWizard] Creating intent with:", formData);
+    logger.debug("[SignupWizard] Creating intent with:", formData);
 
     try {
       // Use the provider and payment method from formData
@@ -57,7 +59,7 @@ export default function SignupWizard() {
         throw error;
       }
 
-      console.log("[SignupWizard] Intent created:", data);
+      logger.debug("[SignupWizard] Intent created:", data);
 
       if (!data?.intent_id) {
         throw new Error("No intent_id returned");
@@ -67,7 +69,7 @@ export default function SignupWizard() {
 
       // For test tokens (starting with "test_"), skip checkout and go directly to success
       if (paymentMethodRef?.startsWith("test_")) {
-        console.log("[SignupWizard] Test payment detected, skipping checkout");
+        logger.debug("[SignupWizard] Test payment detected, skipping checkout");
         toast.success("¡Cuenta creada exitosamente!");
         setTimeout(() => {
           window.location.href = `/signup/success?intent_id=${data.intent_id}`;
@@ -95,11 +97,11 @@ export default function SignupWizard() {
         throw checkoutError;
       }
 
-      console.log("[SignupWizard] Checkout created:", checkoutData);
+      logger.debug("[SignupWizard] Checkout created:", checkoutData);
 
       // If payment was captured inline, navigate to success directly
       if (checkoutData?.is_paid_ready || (formData.payment_method_ref && formData.payment_provider)) {
-        console.log("[SignupWizard] Payment method ready, navigating to success");
+        logger.debug("[SignupWizard] Payment method ready, navigating to success");
         window.location.href = `/signup/success?intent_id=${data.intent_id}`;
         return;
       }

@@ -25,6 +25,8 @@ import { usePermissions } from "@/hooks/usePermissions";
 import { useCompany } from "@/contexts/CompanyContext";
 import { useDebounce } from "@/hooks/useDebounce";
 import { useServerPagination } from "@/hooks/useServerPagination";
+import { useRateLimit } from "@/hooks/useRateLimit";
+import { getErrorMessage } from "@/lib/errorHandling";
 
 const customerSchema = z.object({
   name: z.string().trim().min(1, "El nombre es requerido").max(200, "El nombre debe tener máximo 200 caracteres"),
@@ -289,7 +291,7 @@ export default function Customers() {
     },
   });
 
-  const paymentRateLimiter = useRateLimit(15, 60000); // 15 pagos por minuto
+  const paymentRateLimiter = useRateLimit({ maxAttempts: 15, windowMs: 60000 }); // 15 pagos por minuto
 
   const createPaymentMutation = useMutation({
     mutationFn: async (data: any) => {

@@ -36,6 +36,10 @@ import { useQuery, useQueryClient, useMutation } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
 import { ReceiptPDF } from "@/components/pos/ReceiptPDF";
 import { InvoicePDF } from "@/components/pos/InvoicePDF";
+import { ProductSearch } from "@/components/pos/ProductSearch";
+import { CartSummary } from "@/components/pos/CartSummary";
+import { CustomerSelector } from "@/components/pos/CustomerSelector";
+import { PaymentSection } from "@/components/pos/PaymentSection";
 import { format } from "date-fns";
 import { useCompany } from "@/contexts/CompanyContext";
 
@@ -208,24 +212,29 @@ export default function POS() {
   };
 
   const { data: customers } = useQuery({
-    queryKey: ["customers-pos"],
+    queryKey: ["customers-pos", currentCompany?.id],
     queryFn: async () => {
+      if (!currentCompany?.id) return [];
       const { data, error } = await supabase
         .from("customer_pos_view")
         .select("*")
+        .eq("company_id", currentCompany.id)
         .order("name", { ascending: true });
       
       if (error) throw error;
       return data;
     },
+    enabled: !!currentCompany?.id,
   });
 
   const { data: warehouses } = useQuery({
-    queryKey: ["warehouses"],
+    queryKey: ["warehouses", currentCompany?.id],
     queryFn: async () => {
+      if (!currentCompany?.id) return [];
       const { data, error } = await supabase
         .from("warehouses")
         .select("id, name, code")
+        .eq("company_id", currentCompany.id)
         .eq("active", true)
         .order("is_main", { ascending: false });
       
@@ -236,6 +245,7 @@ export default function POS() {
       }
       return data;
     },
+    enabled: !!currentCompany?.id,
   });
 
   const handleBarcodeScanner = (code: string) => {
@@ -438,14 +448,12 @@ export default function POS() {
     }
   });
 
-  const saleRateLimiter = useRateLimit(10, 60000); // 10 ventas por minuto
+  const saleRateLimiter = useRateLimit({ maxAttempts: 10, windowMs: 60000 }); // 10 ventas por minuto
 
   const processSaleMutation = useMutation({
     mutationFn: async () => {
-      // Verificar rate limit
-      const canProceed = await saleRateLimiter.execute(async () => {
-        const { data: { user } } = await supabase.auth.getUser();
-        if (!user) throw new Error("Usuario no autenticado");
+      const { data: { user } } = await supabase.auth.getUser();
+      if (!user) throw new Error("Usuario no autenticado");
 
       // Validate payment is complete
       if (remaining > 0.01) {
@@ -1111,89 +1119,14 @@ Impuestos: $${saleData.tax.toFixed(2)}
         <div className="grid grid-cols-1 lg:grid-cols-3 gap-4 md:gap-6">
           {/* Panel de productos */}
           <div className="lg:col-span-2 space-y-4 order-2 lg:order-1">
-            {/* Barra de búsqueda */}
-            <div className="relative">
-              <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 text-muted-foreground h-4 w-4" />
-              <Input
-                ref={searchInputRef}
-                placeholder="Buscar productos..."
-                value={searchQuery}
-                onChange={(e) => setSearchQuery(sanitizeSearchQuery(e.target.value))}
-                className="pl-10 h-10"
-              />
-            </div>
-
-            {/* Grid de productos */}
-            {isLoadingProducts ? (
-              <div className="grid grid-cols-2 sm:grid-cols-3 xl:grid-cols-4 gap-2 md:gap-4">
-                {[...Array(8)].map((_, i) => (
-                  <Card key={i} className="animate-pulse">
-                    <CardHeader className="pb-2 p-2 md:p-4">
-                      <div className="h-4 bg-muted rounded w-3/4"></div>
-                      <div className="h-3 bg-muted rounded w-1/2"></div>
-                    </CardHeader>
-                    <CardContent className="p-2 md:p-4 pt-0">
-                      <div className="h-6 bg-muted rounded w-full mb-2"></div>
-                    </CardContent>
-                  </Card>
-                ))}
-              </div>
-            ) : (
-              <div className="grid grid-cols-2 sm:grid-cols-3 xl:grid-cols-4 gap-2 md:gap-4">
-                {filteredProducts.map((product) => (
-                  <Card 
-                    key={product.id} 
-                    className="hover:shadow-md transition-shadow cursor-pointer active:scale-95"
-                    onClick={() => addToCart(product)}
-                  >
-                    <CardHeader className="pb-1 md:pb-2 p-2 md:p-4">
-                      <div className="flex items-center gap-2">
-                        {product.image_url ? (
-                          <img 
-                            src={product.image_url} 
-                            alt={product.name}
-                            className="w-8 h-8 md:w-12 md:h-12 object-cover rounded border flex-shrink-0"
-                          />
-                        ) : (
-                          <div className="w-8 h-8 md:w-12 md:h-12 bg-muted rounded border flex items-center justify-center flex-shrink-0">
-                            <Package className="h-4 w-4 md:h-6 md:w-6 text-muted-foreground" />
-                          </div>
-                        )}
-                        <div className="min-w-0 flex-1">
-                          <CardTitle className="text-xs md:text-sm font-medium line-clamp-2">
-                            {product.name}
-                          </CardTitle>
-                          <CardDescription className="text-[10px] md:text-xs hidden sm:block">
-                            {product.sku || product.barcode || "N/A"}
-                          </CardDescription>
-                        </div>
-                      </div>
-                    </CardHeader>
-                    <CardContent className="p-2 md:p-4 pt-0">
-                      <div className="flex items-center justify-center gap-1">
-                        <span className="text-base md:text-lg font-bold text-primary">
-                          ${product.price.toFixed(0)}
-                        </span>
-                      </div>
-                      {product.stock === 0 && (
-                        <div className="text-center text-[10px] md:text-xs text-destructive mt-1">
-                          Sin stock
-                        </div>
-                      )}
-                    </CardContent>
-                  </Card>
-                ))}
-              </div>
-            )}
-
-            {filteredProducts.length === 0 && !isLoadingProducts && (
-              <Alert>
-                <Package className="h-4 w-4" />
-                <AlertDescription>
-                  No se encontraron productos. {searchQuery ? 'Intenta con otros términos de búsqueda.' : 'Agrega productos desde el inventario.'}
-                </AlertDescription>
-              </Alert>
-            )}
+            <ProductSearch
+              searchQuery={searchQuery}
+              onSearchChange={(value) => setSearchQuery(sanitizeSearchQuery(value))}
+              products={filteredProducts}
+              isLoading={isLoadingProducts}
+              onAddToCart={addToCart}
+              searchInputRef={searchInputRef}
+            />
           </div>
 
           {/* Panel de carrito y checkout */}
@@ -1206,136 +1139,27 @@ Impuestos: $${saleData.tax.toFixed(2)}
                 </CardTitle>
               </CardHeader>
               <CardContent className="p-3 md:p-6 pt-0">
-                <div className="space-y-2 max-h-48 md:max-h-64 overflow-y-auto">
-                  {cart.map((item, index) => (
-                    <div 
-                      key={item.product_id} 
-                      className="flex items-center justify-between p-2 md:p-3 bg-muted rounded-lg animate-slide-in-right"
-                      style={{ animationDelay: `${index * 50}ms` }}
-                    >
-                      <div className="flex-1 min-w-0 mr-2">
-                        <p className="font-medium text-xs md:text-sm truncate">{item.product_name}</p>
-                        <p className="text-[10px] md:text-xs text-muted-foreground">${item.unit_price.toFixed(0)} x {item.quantity}</p>
-                      </div>
-                      <div className="flex items-center gap-1">
-                        <Button size="icon" variant="outline" className="h-6 w-6 md:h-7 md:w-7" onClick={() => updateQuantity(item.product_id, -1)}>
-                          <Minus className="h-3 w-3" />
-                        </Button>
-                        <span className="w-6 md:w-8 text-center text-sm font-medium">{item.quantity}</span>
-                        <Button size="icon" variant="outline" className="h-6 w-6 md:h-7 md:w-7" onClick={() => updateQuantity(item.product_id, 1)}>
-                          <Plus className="h-3 w-3" />
-                        </Button>
-                        <Button size="icon" variant="ghost" className="h-6 w-6 md:h-7 md:w-7 text-destructive" onClick={() => removeFromCart(item.product_id)}>
-                          <Trash2 className="h-3 w-3" />
-                        </Button>
-                      </div>
-                    </div>
-                  ))}
-                </div>
+                <CartSummary
+                  cart={cart}
+                  discountRate={discountRate}
+                  onDiscountChange={setDiscountRate}
+                  onUpdateQuantity={updateQuantity}
+                  onRemoveItem={removeFromCart}
+                  onClearCart={clearCart}
+                  loyaltyDiscount={{
+                    customer: selectedCustomer,
+                    rate: loyaltyDiscountRate,
+                    pointsToUse: loyaltyPointsToUse,
+                    pointsValue: loyaltyPointsValue,
+                    onPointsChange: setLoyaltyPointsToUse,
+                    companySettings: companySettings
+                  }}
+                />
 
                 {cart.length > 0 && (
                   <>
-                    <Separator />
+                    <Separator className="my-4" />
                     <div className="space-y-3">
-                      <Label className="text-base font-semibold">Resumen</Label>
-                      
-                      <div className="space-y-2">
-                        <Label className="text-xs">Descuento Manual (%)</Label>
-                        <Input
-                          type="number"
-                          min="0"
-                          max="100"
-                          value={discountRate}
-                          onChange={(e) => setDiscountRate(parseFloat(e.target.value) || 0)}
-                          placeholder="0"
-                        />
-                      </div>
-
-                      <div className="space-y-1 text-sm p-3 bg-muted/30 rounded-lg animate-fade-in">
-                        <div className="flex justify-between">
-                          <span className="text-muted-foreground">Subtotal:</span>
-                          <span className="font-medium">${subtotal.toFixed(2)}</span>
-                        </div>
-                        {manualDiscountAmount > 0 && (
-                          <div className="flex justify-between text-destructive animate-slide-in-right">
-                            <span>Descuento Manual ({discountRate}%):</span>
-                            <span>-${manualDiscountAmount.toFixed(2)}</span>
-                          </div>
-                        )}
-                        {loyaltyDiscountAmount > 0 && (
-                          <div className="flex justify-between text-primary animate-slide-in-right">
-                            <span>Descuento Fidelidad ({loyaltyDiscountRate}%):</span>
-                            <span>-${loyaltyDiscountAmount.toFixed(2)}</span>
-                          </div>
-                        )}
-                        {loyaltyPointsValue > 0 && (
-                          <div className="flex justify-between text-primary animate-slide-in-right">
-                            <span>Puntos Canjeados ({loyaltyPointsToUse}):</span>
-                            <span>-${loyaltyPointsValue.toFixed(2)}</span>
-                          </div>
-                        )}
-                        {taxAmount > 0 && (
-                          <div className="flex justify-between">
-                            <span className="text-muted-foreground">Impuesto ({taxRate}%):</span>
-                            <span>${taxAmount.toFixed(2)}</span>
-                          </div>
-                        )}
-                        {recargo_pagado > 0 && (
-                          <div className="flex justify-between text-warning animate-slide-in-right">
-                            <span>Recargo Tarjeta (pagado):</span>
-                            <span>+${recargo_pagado.toFixed(2)}</span>
-                          </div>
-                        )}
-                        {potentialCardSurcharge > 0 && (
-                          <div className="flex justify-between text-warning animate-pulse-subtle">
-                            <span>Recargo Tarjeta Potencial:</span>
-                            <span>+${potentialCardSurcharge.toFixed(2)}</span>
-                          </div>
-                        )}
-                        
-                        <Separator className="my-2" />
-                        
-                        <div className="flex justify-between text-base font-bold pt-1 animate-scale-in">
-                          <span>Total a Pagar:</span>
-                          <span className="text-primary text-lg">${total.toFixed(2)}</span>
-                        </div>
-                      </div>
-
-                      {selectedCustomer && companySettings?.loyalty_enabled && (
-                        <div className="bg-primary/10 p-3 rounded-lg space-y-2">
-                          <div className="flex items-center justify-between">
-                            <div className="flex items-center gap-2">
-                              <Award className="h-4 w-4 text-primary" />
-                              <span className="text-sm font-medium">Nivel: {selectedCustomer.loyalty_tier?.toUpperCase()}</span>
-                            </div>
-                            <Badge variant="secondary">
-                              <Star className="h-3 w-3 mr-1" />
-                              {selectedCustomer.loyalty_points || 0} pts
-                            </Badge>
-                          </div>
-                          {loyaltyDiscountRate > 0 && (
-                            <p className="text-xs text-muted-foreground">
-                              <Percent className="h-3 w-3 inline mr-1" />
-                              Descuento aplicado: {loyaltyDiscountRate}%
-                            </p>
-                          )}
-                          <div className="space-y-1">
-                            <Label className="text-xs">Canjear Puntos</Label>
-                            <Input
-                              type="number"
-                              min="0"
-                              max={selectedCustomer.loyalty_points || 0}
-                              value={loyaltyPointsToUse}
-                              onChange={(e) => setLoyaltyPointsToUse(parseInt(e.target.value) || 0)}
-                              placeholder="0"
-                            />
-                            <p className="text-xs text-muted-foreground">
-                              Valor: ${loyaltyPointsValue.toFixed(2)}
-                            </p>
-                          </div>
-                        </div>
-                      )}
-
                       <div className="space-y-2">
                         <Label>Depósito</Label>
                         <Select 
@@ -1355,44 +1179,19 @@ Impuestos: $${saleData.tax.toFixed(2)}
                         </Select>
                       </div>
 
-                      <div className="space-y-2">
-                        <div className="flex justify-between items-center">
-                          <Label>Cliente (Opcional)</Label>
-                          <Button 
-                            type="button" 
-                            variant="ghost" 
-                            size="sm"
-                            onClick={() => setCreateCustomerDialog(true)}
-                          >
-                            <Plus className="h-3 w-3 mr-1" />
-                            Nuevo
-                          </Button>
-                        </div>
-                        <Select
-                          value={selectedCustomer?.id || "none"} 
-                          onValueChange={(val) => {
-                            if (val === "none") {
-                              setSelectedCustomer(null);
-                              setLoyaltyPointsToUse(0);
-                            } else {
-                              const customer = customers?.find(c => c.id === val);
-                              setSelectedCustomer(customer || null);
-                            }
-                          }}
-                        >
-                          <SelectTrigger>
-                            <SelectValue placeholder="Seleccionar cliente..." />
-                          </SelectTrigger>
-                          <SelectContent>
-                            <SelectItem value="none">Sin cliente</SelectItem>
-                            {customers?.map((customer) => (
-                              <SelectItem key={customer.id} value={customer.id}>
-                                {customer.name}
-                              </SelectItem>
-                            ))}
-                          </SelectContent>
-                        </Select>
-                      </div>
+                      <CustomerSelector
+                        customers={customers || []}
+                        selectedCustomer={selectedCustomer}
+                        onSelectCustomer={(customer) => {
+                          setSelectedCustomer(customer);
+                          if (!customer) {
+                            setLoyaltyPointsToUse(0);
+                          }
+                        }}
+                        onCreateCustomer={() => setCreateCustomerDialog(true)}
+                        walkInSale={walkInSale}
+                        onWalkInToggle={setWalkInSale}
+                      />
 
                       <Separator />
                       

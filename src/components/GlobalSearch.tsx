@@ -167,8 +167,10 @@ export function GlobalSearch() {
         variant="outline"
         className="relative w-full justify-start text-sm text-muted-foreground sm:pr-12 md:w-40 lg:w-64"
         onClick={() => setOpen(true)}
+        aria-label="Abrir búsqueda global"
+        aria-keyshortcuts="Control+K"
       >
-        <Search className="mr-2 h-4 w-4" />
+        <Search className="mr-2 h-4 w-4" aria-hidden="true" />
         <span className="hidden lg:inline-flex">Buscar...</span>
         <span className="inline-flex lg:hidden">Buscar</span>
         <kbd className="pointer-events-none absolute right-1.5 top-2 hidden h-5 select-none items-center gap-1 rounded border bg-muted px-1.5 font-mono text-[10px] font-medium opacity-100 sm:flex">
@@ -176,14 +178,15 @@ export function GlobalSearch() {
         </kbd>
       </Button>
 
-      <CommandDialog open={open} onOpenChange={setOpen}>
+      <CommandDialog open={open} onOpenChange={setOpen} aria-label="Diálogo de búsqueda global">
         <CommandInput 
           placeholder="Buscar productos, clientes, facturas..." 
           value={search}
           onValueChange={setSearch}
+          aria-label="Campo de búsqueda"
         />
-        <CommandList>
-          <CommandEmpty>
+        <CommandList role="listbox" aria-label="Resultados de búsqueda">
+          <CommandEmpty role="status">
             {search.length < 2 
               ? "Escribe al menos 2 caracteres para buscar..."
               : "No se encontraron resultados."}

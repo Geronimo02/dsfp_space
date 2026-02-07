@@ -89,17 +89,14 @@ describe('useRateLimit', () => {
       await result.current.execute(mockFn);
     });
 
-    await waitFor(() => {
-      expect(result.current.getRemainingAttempts()).toBe(2);
-    });
+    // Check directly instead of using waitFor with fake timers
+    expect(result.current.getRemainingAttempts()).toBe(2);
 
     await act(async () => {
       await result.current.execute(mockFn);
     });
 
-    await waitFor(() => {
-      expect(result.current.getRemainingAttempts()).toBe(1);
-    });
+    expect(result.current.getRemainingAttempts()).toBe(1);
   });
 
   it('should allow manual reset', async () => {
