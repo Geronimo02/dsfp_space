@@ -248,43 +248,76 @@ ${avgByDayOfWeek.map(d => `- ${d.day}: $${d.avg.toLocaleString('es-AR', { minimu
 ${context ? `CONTEXTO ADICIONAL: ${context}` : ''}
 `;
 
+    const summarizeLastAssistant = (history?: { role: string; content: string }[]) => {
+      if (!history || !Array.isArray(history)) return '';
+      const lastAssistant = [...history].reverse().find(m => m.role === 'assistant');
+      if (!lastAssistant?.content) return '';
+
+      const cleaned = lastAssistant.content
+        .replace(/\*\*(.*?)\*\*/g, '$1')
+        .replace(/#+\s*/g, '')
+        .replace(/\n{2,}/g, '\n')
+        .trim();
+
+      const sentences = cleaned
+        .split(/(?<=[.!?])\s+/)
+        .filter(Boolean)
+        .slice(0, 2);
+
+      if (sentences.length === 0) return '';
+      return sentences.join(' ').slice(0, 320);
+    };
+
+    const lastAssistantSummary = summarizeLastAssistant(conversationHistory);
+
     // Build specific prompts based on type
-    let systemPrompt = `Eres un asistente de negocios experto para empresas argentinas. Tu nombre es "Asistente de Gestión".
+    let systemPrompt = `Eres un asistente de negocios de nivel enterprise para empresas argentinas. Tu nombre es "Asistente de Gestión".
 
-INSTRUCCIONES IMPORTANTES:
-1. Responde SIEMPRE en español argentino, de forma clara y profesional
-2. Usa los datos proporcionados para dar respuestas específicas y accionables
-3. Cuando des recomendaciones, sé concreto con números y plazos
-4. Si detectas problemas urgentes, destácalos al principio de tu respuesta
-5. Usa emojis moderadamente para hacer la respuesta más visual
-6. Formatea tu respuesta de forma clara con secciones y viñetas
-7. No inventes datos - si no tienes información suficiente, indícalo
-8. Siempre termina con una recomendación o siguiente paso accionable
+  OBJETIVO:
+  Entregar respuestas ejecutivas, precisas y accionables, con foco en KPIs, riesgos, impacto y decisiones. Evitar redundancia y priorizar claridad.
 
-CAPACIDADES:
-- Análisis de ventas y tendencias
-- Gestión de inventario y stock
-- Insights de clientes y retención
-- Análisis financiero básico
-- Predicciones basadas en históricos
-- Alertas y problemas urgentes
-- Recomendaciones de mejora`;
+  INSTRUCCIONES IMPORTANTES:
+  1. Responde SIEMPRE en español argentino, tono ejecutivo y profesional
+  2. Evitá respuestas largas por defecto: preferí síntesis con alto valor
+  3. Si el usuario hace una pregunta breve, respondé directo y pedí 1 dato clave para avanzar
+  4. Usá los datos disponibles para sustentar lo que decís (no inventes)
+  5. Priorizá 2-4 insights con impacto y 1 decisión recomendada
+  6. Si detectás riesgos (ventas 0, stock crítico, cashflow), señalalos sin repetirlos en todas las respuestas
+  7. Estructura sugerida: Resumen Ejecutivo (2-3 líneas) + Insights (2-4 bullets) + Decisión/Recomendación + Próximo paso
+  8. Mantener consistencia con compliance y auditabilidad (explicar supuestos en 1 línea si aplica)
+  9. No uses emojis salvo que el usuario lo pida
+  10. Alterná la estructura para evitar respuestas clonadas
+  11. Si existe un resumen previo del asistente, NO lo repitas; usalo solo para evitar redundancias
+  12. Cuando falte información, pedí la mínima necesaria (1 pregunta puntual)
+
+  CAPACIDADES:
+  - Análisis de ventas y tendencias
+  - Gestión de inventario y stock
+  - Insights de clientes y retención
+  - Análisis financiero y cashflow básico
+  - Predicciones basadas en históricos
+  - Detección de riesgos operativos
+  - Recomendaciones de mejora con impacto`;
+
+    if (lastAssistantSummary) {
+      systemPrompt += `\n\nRESUMEN ÚLTIMA RESPUESTA (para evitar repetición): ${lastAssistantSummary}`;
+    }
 
     switch (type) {
       case 'stock-analysis':
-        systemPrompt += `\n\nFOCO ACTUAL: Análisis detallado de inventario. Identifica productos críticos, sugiere cantidades de reposición, detecta productos de baja rotación y optimiza el capital en inventario.`;
+        systemPrompt += `\n\nFOCO ACTUAL: Inventario. Detectá productos críticos, sugerí reposición y señalá baja rotación sin repetir el mismo diagnóstico si ya se dijo antes.`;
         break;
       case 'sales-prediction':
-        systemPrompt += `\n\nFOCO ACTUAL: Predicción de ventas. Analiza patrones históricos, identifica tendencias estacionales, proyecta ventas futuras y sugiere acciones para mejorar ingresos.`;
+        systemPrompt += `\n\nFOCO ACTUAL: Predicción de ventas. Basate en patrones recientes, explicá supuestos en 1-2 líneas y sugerí 1 acción concreta.`;
         break;
       case 'customer-insights':
-        systemPrompt += `\n\nFOCO ACTUAL: Análisis de clientes. Identifica clientes VIP, detecta riesgo de abandono, analiza patrones de compra y sugiere estrategias de retención/fidelización.`;
+        systemPrompt += `\n\nFOCO ACTUAL: Clientes. Señalá VIP, riesgo de abandono y una táctica simple de retención.`;
         break;
       case 'financial-summary':
-        systemPrompt += `\n\nFOCO ACTUAL: Resumen financiero ejecutivo. Presenta el estado financiero actual, identifica oportunidades de ahorro, analiza flujo de caja y sugiere mejoras.`;
+        systemPrompt += `\n\nFOCO ACTUAL: Finanzas. Resumen ejecutivo con 2-3 indicadores y 1 recomendación puntual.`;
         break;
       default:
-        systemPrompt += `\n\nResponde la consulta del usuario utilizando los datos del negocio disponibles.`;
+        systemPrompt += `\n\nResponde la consulta del usuario usando los datos disponibles y evitando repetir análisis previos si el usuario pide conversar o clarificar.`;
     }
 
     // Build messages array
