@@ -1407,51 +1407,172 @@ export type Database = {
           },
         ]
       }
-      crm_opportunities: {
+      crm_custom_field_values: {
+        Row: {
+          created_at: string
+          entity_id: string
+          field_id: string
+          id: string
+          value_bool: boolean | null
+          value_date: string | null
+          value_json: Json | null
+          value_number: number | null
+          value_text: string | null
+        }
+        Insert: {
+          created_at?: string
+          entity_id: string
+          field_id: string
+          id?: string
+          value_bool?: boolean | null
+          value_date?: string | null
+          value_json?: Json | null
+          value_number?: number | null
+          value_text?: string | null
+        }
+        Update: {
+          created_at?: string
+          entity_id?: string
+          field_id?: string
+          id?: string
+          value_bool?: boolean | null
+          value_date?: string | null
+          value_json?: Json | null
+          value_number?: number | null
+          value_text?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "crm_custom_field_values_field_id_fkey"
+            columns: ["field_id"]
+            isOneToOne: false
+            referencedRelation: "crm_custom_fields"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      crm_custom_fields: {
         Row: {
           company_id: string
-          created_at: string | null
-          customer_id: string
-          description: string | null
-          estimated_close_date: string | null
+          created_at: string
+          entity: string
           id: string
           name: string
-          owner_id: string | null
-          pipeline_id: string | null
-          probability: number | null
-          stage: string
-          updated_at: string | null
-          value: number | null
+          options: Json | null
+          order: number
+          required: boolean
+          type: string
         }
         Insert: {
           company_id: string
-          created_at?: string | null
-          customer_id: string
-          description?: string | null
-          estimated_close_date?: string | null
+          created_at?: string
+          entity: string
           id?: string
           name: string
-          owner_id?: string | null
-          pipeline_id?: string | null
-          probability?: number | null
-          stage?: string
-          updated_at?: string | null
-          value?: number | null
+          options?: Json | null
+          order?: number
+          required?: boolean
+          type: string
         }
         Update: {
           company_id?: string
-          created_at?: string | null
-          customer_id?: string
-          description?: string | null
-          estimated_close_date?: string | null
+          created_at?: string
+          entity?: string
           id?: string
           name?: string
+          options?: Json | null
+          order?: number
+          required?: boolean
+          type?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "crm_custom_fields_company_id_fkey"
+            columns: ["company_id"]
+            isOneToOne: false
+            referencedRelation: "companies"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      crm_opportunities: {
+        Row: {
+          close_date: string | null
+          closed_at: string | null
+          company_id: string
+          created_at: string | null
+          currency: string | null
+          customer_id: string | null
+          description: string | null
+          estimated_close_date: string | null
+          expected_revenue: number | null
+          id: string
+          last_activity_at: string | null
+          lost_reason: string | null
+          name: string
+          next_step: string | null
+          owner_id: string | null
+          pipeline_id: string | null
+          probability: number | null
+          source: string | null
+          stage: string
+          status: string
+          tags: string[] | null
+          updated_at: string | null
+          value: number | null
+          won_reason: string | null
+        }
+        Insert: {
+          close_date?: string | null
+          closed_at?: string | null
+          company_id: string
+          created_at?: string | null
+          currency?: string | null
+          customer_id?: string | null
+          description?: string | null
+          estimated_close_date?: string | null
+          expected_revenue?: number | null
+          id?: string
+          last_activity_at?: string | null
+          lost_reason?: string | null
+          name: string
+          next_step?: string | null
           owner_id?: string | null
           pipeline_id?: string | null
           probability?: number | null
+          source?: string | null
           stage?: string
+          status?: string
+          tags?: string[] | null
           updated_at?: string | null
           value?: number | null
+          won_reason?: string | null
+        }
+        Update: {
+          close_date?: string | null
+          closed_at?: string | null
+          company_id?: string
+          created_at?: string | null
+          currency?: string | null
+          customer_id?: string | null
+          description?: string | null
+          estimated_close_date?: string | null
+          expected_revenue?: number | null
+          id?: string
+          last_activity_at?: string | null
+          lost_reason?: string | null
+          name?: string
+          next_step?: string | null
+          owner_id?: string | null
+          pipeline_id?: string | null
+          probability?: number | null
+          source?: string | null
+          stage?: string
+          status?: string
+          tags?: string[] | null
+          updated_at?: string | null
+          value?: number | null
+          won_reason?: string | null
         }
         Relationships: [
           {
