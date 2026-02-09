@@ -38,24 +38,24 @@ export function Layout({ children }: LayoutProps) {
       <div className="flex min-h-screen w-full bg-background">
         <Sidebar />
         <main className="flex-1 overflow-y-auto">
-          <div className="sticky top-0 z-10 bg-background/95 backdrop-blur supports-[backdrop-filter]:bg-background/60 border-b">
-            <div className="container mx-auto py-3 md:py-4 flex justify-between items-center gap-2 md:gap-4">
-              <div className="flex items-center gap-2 md:gap-4">
-                <SidebarTrigger />
+          <div className="sticky top-0 z-10 bg-background/95 backdrop-blur-md supports-[backdrop-filter]:bg-background/60 border-b shadow-sm">
+            <div className="px-3 md:px-6 py-2.5 md:py-3 flex justify-between items-center gap-2">
+              <div className="flex items-center gap-2 md:gap-3 min-w-0">
+                <SidebarTrigger className="shrink-0" />
                 <CompanySelector />
                 {roleInfo && !isMobile && (
-                  <Badge className={`${roleInfo.color} text-white shadow-sm hidden sm:inline-flex`}>
+                  <Badge className={`${roleInfo.color} text-white shadow-sm hidden sm:inline-flex text-[11px] px-2 py-0.5`}>
                     {roleInfo.label}
                   </Badge>
                 )}
               </div>
-              <div className="flex items-center gap-2 md:gap-4">
+              <div className="flex items-center gap-1.5 md:gap-3 shrink-0">
                 <GlobalSearch />
                 <NotificationCenter />
               </div>
             </div>
           </div>
-          <div className="container mx-auto py-4 md:py-8">
+          <div className="px-3 md:px-6 py-4 md:py-8">
             {children}
           </div>
         </main>

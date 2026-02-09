@@ -134,7 +134,7 @@ export default function SignupWizard() {
   };
 
   return (
-    <div className="min-h-screen bg-gradient-to-br from-slate-900 via-slate-800 to-slate-900 p-4 md:p-8 relative overflow-hidden">
+    <div className="min-h-screen bg-gradient-to-br from-slate-900 via-slate-800 to-slate-900 px-3 py-4 md:p-8 relative overflow-hidden">
       {/* Advanced animated background effects */}
       <div className="fixed inset-0 overflow-hidden pointer-events-none">
         {/* Main breathing orbs */}
@@ -156,19 +156,17 @@ export default function SignupWizard() {
         </div>
       </div>
 
-      <div className="max-w-5xl mx-auto relative z-10">
+      <div className="max-w-2xl mx-auto relative z-10">
         {/* Header */}
-        <div className="text-center mb-8 p-6">
-          <div className="flex items-center justify-center gap-4 mb-4">
-            {/* Logo with elegant animation */}
-            <div className="w-16 h-16 rounded-2xl bg-gradient-to-br from-primary/20 to-primary/5 border border-primary/30 flex items-center justify-center relative overflow-hidden group" style={{animation: 'softGlow 4s infinite ease-in-out'}}>
-              {/* Animated background shine */}
+        <div className="text-center mb-4 md:mb-8 px-2">
+          <div className="flex items-center justify-center gap-3 mb-2 md:mb-4">
+            <div className="w-12 h-12 md:w-16 md:h-16 rounded-2xl bg-gradient-to-br from-primary/20 to-primary/5 border border-primary/30 flex items-center justify-center relative overflow-hidden group" style={{animation: 'softGlow 4s infinite ease-in-out'}}>
               <div className="absolute inset-0 bg-gradient-to-tr from-transparent via-primary/10 to-transparent opacity-0 group-hover:opacity-100 transition-opacity duration-500" style={{animation: 'shine 3s infinite'}}></div>
-              <img src="/landing/images/logo_transparente_hd.png" alt="Ventify Space" className="w-10 h-10 relative z-10 drop-shadow-lg" />
+              <img src="/landing/images/logo_transparente_hd.png" alt="Ventify Space" className="w-8 h-8 md:w-10 md:h-10 relative z-10 drop-shadow-lg" />
             </div>
-            <h1 className="text-4xl font-bold text-white">Ventify</h1>
+            <h1 className="text-2xl md:text-4xl font-bold text-white">Ventify</h1>
           </div>
-          <h2 className="text-xl text-slate-100 font-medium">Crea tu cuenta empresarial</h2>
+          <h2 className="text-base md:text-xl text-slate-100 font-medium">Crea tu cuenta empresarial</h2>
         </div>
 
         {/* Custom animations */}
@@ -206,17 +204,17 @@ export default function SignupWizard() {
         `}</style>
 
         {/* Stepper */}
-        <div className="mb-4 flex items-center justify-between text-slate-100">
-          <div className="px-3 py-1 rounded-full bg-slate-800/80 border border-white/15 shadow-inner text-sm text-white">
-            Paso {currentStep + 1} de {totalSteps}
+        <div className="mb-3 md:mb-4 flex items-center justify-between text-slate-100 px-1">
+          <div className="px-2.5 py-1 rounded-full bg-slate-800/80 border border-white/15 shadow-inner text-xs md:text-sm text-white">
+            Paso {currentStep + 1}/{totalSteps}
           </div>
-          <span className="text-sm text-slate-100/90">{currentStepLabel}</span>
+          <span className="text-xs md:text-sm text-slate-100/90 font-medium">{currentStepLabel}</span>
         </div>
         <SignupStepper currentStep={currentStep} />
 
         {/* Content */}
         <Card
-          className="p-6 md:p-8 mt-8 bg-gradient-to-br from-slate-900/90 via-slate-800/90 to-slate-900/90 backdrop-blur-2xl border-white/10 shadow-[0_24px_64px_rgba(0,0,0,0.55)] rounded-2xl text-white"
+          className="p-4 md:p-8 mt-4 md:mt-8 bg-gradient-to-br from-slate-900/90 via-slate-800/90 to-slate-900/90 backdrop-blur-2xl border-white/10 shadow-[0_24px_64px_rgba(0,0,0,0.55)] rounded-2xl text-white"
           style={{animation: 'fadeInUp 0.6s ease-out'}}
         >
         <style>{`
@@ -262,7 +260,7 @@ export default function SignupWizard() {
         </Card>
 
         {/* Footer */}
-        <p className="text-center text-sm text-slate-200 mt-6">
+        <p className="text-center text-xs md:text-sm text-slate-200 mt-4 md:mt-6 pb-2">
           ¿Ya tienes una cuenta?{" "}
           <a href="/auth" className="text-cyan-200 hover:text-cyan-100 underline-offset-4 hover:underline font-medium">
             Inicia sesión

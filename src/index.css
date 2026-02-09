@@ -167,4 +167,15 @@ All colors MUST be HSL.
   .sidebar-scroll::-webkit-scrollbar-thumb:hover {
     @apply bg-sidebar-foreground/40;
   }
+
+  /* Mobile touch improvements */
+  @media (max-width: 767px) {
+    button, a, [role="button"] {
+      -webkit-tap-highlight-color: transparent;
+    }
+
+    input, select, textarea {
+      font-size: 16px !important; /* Prevent iOS zoom on focus */
+    }
+  }
 }

@@ -442,10 +442,10 @@ export default function Dashboard() {
 
   return (
     <Layout>
-      <div className="space-y-4 md:space-y-8">
+      <div className="space-y-4 md:space-y-6">
         <div>
-          <h1 className="text-2xl md:text-3xl font-bold text-foreground">Dashboard</h1>
-          <p className="text-sm md:text-base text-muted-foreground">Panel de control y salud del negocio</p>
+          <h1 className="text-xl md:text-3xl font-bold text-foreground">Dashboard</h1>
+          <p className="text-xs md:text-base text-muted-foreground">Panel de control y salud del negocio</p>
         </div>
 
         {/* Business Health Panel */}
