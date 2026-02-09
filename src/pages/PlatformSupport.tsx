@@ -241,19 +241,19 @@ export default function PlatformSupport() {
     <Layout>
       <div className="space-y-6">
         {/* Header */}
-        <div className="flex justify-between items-center">
+        <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4">
           <div>
-            <h1 className="text-3xl font-bold flex items-center gap-2">
-              <LifeBuoy className="h-8 w-8" />
+            <h1 className="text-2xl sm:text-3xl font-bold flex items-center gap-2">
+              <LifeBuoy className="h-7 w-7 sm:h-8 sm:w-8 shrink-0" />
               Soporte de Plataforma
             </h1>
-            <p className="text-muted-foreground">
+            <p className="text-muted-foreground text-sm sm:text-base">
               ¿Tienes problemas o necesitas ayuda? Crea un ticket y te ayudaremos
             </p>
           </div>
           <Dialog open={isNewTicketOpen} onOpenChange={setIsNewTicketOpen}>
             <DialogTrigger asChild>
-              <Button size="lg">
+              <Button size="lg" className="w-full sm:w-auto shrink-0">
                 <Plus className="h-4 w-4 mr-2" />
                 Reportar Problema
               </Button>

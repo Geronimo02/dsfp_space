@@ -165,7 +165,7 @@ const AIAssistantPage = () => {
 
   return (
     <Layout>
-      <div className="container mx-auto p-6 max-w-6xl">
+      <div className="w-full p-6 max-w-none min-h-screen">
         <div className="flex items-center justify-between mb-6">
           <div>
             <h1 className="text-3xl font-bold flex items-center gap-2">
