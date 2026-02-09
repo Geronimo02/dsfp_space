@@ -246,7 +246,10 @@ export const AIAssistant = () => {
                     {example}
                   </Badge>
                 ))}
-             (response || isStreaming) && (
+              </div>
+            </div>
+
+            {(response || isStreaming) && (
               <div className="space-y-2">
                 <div className="flex items-center justify-between">
                   <label className="text-sm font-medium">Respuesta:</label>
@@ -266,19 +269,16 @@ export const AIAssistant = () => {
                   </div>
                 </div>
                 <div className="bg-muted rounded-lg p-4 prose prose-sm max-w-none dark:prose-invert min-h-[100px]">
-                  <pre className="whitespace-pre-wrap font-sans text-sm leading-relaxed">
+                  <div className="whitespace-pre-wrap font-sans text-sm leading-relaxed">
                     {response || ""}
                     {isStreaming && <span className="inline-block w-2 h-4 bg-primary animate-pulse ml-1" />}
-                  </pre>
+                  </div>
                 </div>
                 {streamError && (
                   <div className="text-sm text-destructive bg-destructive/10 p-3 rounded-lg">
                     ⚠️ {streamError}
                   </div>
-                )} className="whitespace-pre-wrap font-sans text-sm leading-relaxed">
-                    {response}
-                  </pre>
-                </div>
+                )}
               </div>
             )}
           </TabsContent>
