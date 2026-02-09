@@ -310,14 +310,14 @@ export function EmployeeRoleAssignment() {
   return (
     <Card>
       <CardHeader>
-        <div className="flex items-center justify-between">
+        <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3">
           <div className="flex items-center gap-2">
-            <UserCog className="h-5 w-5 text-primary" />
+            <UserCog className="h-5 w-5 text-primary shrink-0" />
             <CardTitle>Asignación de Roles</CardTitle>
           </div>
           <Dialog open={inviteDialogOpen} onOpenChange={setInviteDialogOpen}>
             <DialogTrigger asChild>
-              <Button>
+              <Button className="w-full sm:w-auto">
                 <UserPlus className="mr-2 h-4 w-4" />
                 Invitar Usuario
               </Button>

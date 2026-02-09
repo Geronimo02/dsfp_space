@@ -280,14 +280,15 @@ const MonthlyClosing = () => {
           </div>
         </div>
         
-        <div className="flex items-center justify-between pt-4">
-          <Button variant="outline" onClick={() => window.open('/sales', '_blank')}>
+        <div className="flex flex-col sm:flex-row items-stretch sm:items-center justify-between gap-2 pt-4">
+          <Button variant="outline" onClick={() => window.open('/sales', '_blank')} className="w-full sm:w-auto">
             <FileText className="h-4 w-4 mr-2" />
             Ver Ventas Completas
           </Button>
           <Button
             onClick={() => toggleStep(1)}
             variant={completedSteps.has(1) ? "secondary" : "default"}
+            className="w-full sm:w-auto"
           >
             {completedSteps.has(1) ? (
               <>
@@ -330,14 +331,15 @@ const MonthlyClosing = () => {
           </div>
         </div>
         
-        <div className="flex items-center justify-between pt-4">
-          <Button variant="outline" onClick={() => window.open('/purchases', '_blank')}>
+        <div className="flex flex-col sm:flex-row items-stretch sm:items-center justify-between gap-2 pt-4">
+          <Button variant="outline" onClick={() => window.open('/purchases', '_blank')} className="w-full sm:w-auto">
             <FileText className="h-4 w-4 mr-2" />
             Ver Compras Completas
           </Button>
           <Button
             onClick={() => toggleStep(2)}
             variant={completedSteps.has(2) ? "secondary" : "default"}
+            className="w-full sm:w-auto"
           >
             {completedSteps.has(2) ? (
               <>
@@ -393,12 +395,12 @@ const MonthlyClosing = () => {
             </div>
           </div>
 
-          <div className="flex items-center justify-between pt-4">
-            <Button variant="outline" onClick={downloadIVASales}>
+          <div className="flex flex-col sm:flex-row items-stretch sm:items-center justify-between gap-2 pt-4">
+            <Button variant="outline" onClick={downloadIVASales} className="w-full sm:w-auto">
               <Download className="h-4 w-4 mr-2" />
               Descargar Libro IVA Ventas
             </Button>
-            <Button variant="outline" onClick={downloadIVAPurchases}>
+            <Button variant="outline" onClick={downloadIVAPurchases} className="w-full sm:w-auto">
               <Download className="h-4 w-4 mr-2" />
               Descargar Libro IVA Compras
             </Button>
