@@ -35,7 +35,7 @@ Complete REST API for DSFP Space ERP/POS system with 60+ endpoints covering:
 
 ---
 
-## Authentication
+  ## Authentication
 
 All endpoints (except `/health`) require JWT authentication via Supabase Auth.
 
