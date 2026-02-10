@@ -344,14 +344,14 @@ export default function TechnicalServices() {
   return (
     <Layout>
       <div className="space-y-6">
-        <div className="flex justify-between items-center">
+        <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4">
           <div>
-            <h1 className="text-3xl font-bold">Servicios Técnicos</h1>
-            <p className="text-muted-foreground">Gestión de reparaciones y servicios</p>
+            <h1 className="text-2xl sm:text-3xl font-bold">Servicios Técnicos</h1>
+            <p className="text-muted-foreground text-sm sm:text-base">Gestión de reparaciones y servicios</p>
           </div>
           <Dialog open={dialogOpen} onOpenChange={setDialogOpen}>
             <DialogTrigger asChild>
-              <Button onClick={resetForm}>
+              <Button onClick={resetForm} className="w-full sm:w-auto">
                 <Plus className="mr-2 h-4 w-4" />
                 Nuevo Servicio
               </Button>

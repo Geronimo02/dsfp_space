@@ -465,14 +465,14 @@ export default function Reservations() {
   return (
     <Layout>
       <div className="space-y-6">
-        <div className="flex justify-between items-center">
+        <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4">
           <div>
-            <h1 className="text-3xl font-bold text-foreground">Reservas / Layaway</h1>
-            <p className="text-muted-foreground">Gestiona productos apartados con anticipo</p>
+            <h1 className="text-2xl sm:text-3xl font-bold text-foreground">Reservas / Layaway</h1>
+            <p className="text-muted-foreground text-sm sm:text-base">Gestiona productos apartados con anticipo</p>
           </div>
           <Dialog open={isNewReservationOpen} onOpenChange={setIsNewReservationOpen}>
             <DialogTrigger asChild>
-              <Button onClick={resetReservationForm}>
+              <Button onClick={resetReservationForm} className="w-full sm:w-auto">
                 <Plus className="mr-2 h-4 w-4" />
                 Nueva Reserva
               </Button>

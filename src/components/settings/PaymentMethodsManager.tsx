@@ -249,11 +249,11 @@ export function PaymentMethodsManager({
   return (
     <div className={cn("space-y-4", compact && "space-y-3")}>
       {showTitle && (
-        <div className="flex items-center justify-between">
+        <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3">
           <h3 className="text-lg font-semibold">Tus tarjetas de pago</h3>
           <Dialog open={addDialogOpen} onOpenChange={setAddDialogOpen}>
             <DialogTrigger asChild>
-              <Button size="sm" variant="outline" onClick={handleAddCard}>
+              <Button size="sm" variant="outline" onClick={handleAddCard} className="w-full sm:w-auto">
                 <Plus className="h-4 w-4 mr-2" />
                 Añadir tarjeta
               </Button>

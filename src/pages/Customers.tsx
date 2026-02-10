@@ -510,12 +510,13 @@ export default function Customers() {
   return (
     <Layout>
       <div className="space-y-6">
-        <div className="flex justify-between items-center">
+        <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4">
           <div>
-            <h1 className="text-3xl font-bold text-foreground">Clientes</h1>
-            <p className="text-muted-foreground">Gestiona tu base de clientes</p>
+            <h1 className="text-2xl sm:text-3xl font-bold text-foreground">Clientes</h1>
+            <p className="text-muted-foreground text-sm sm:text-base">Gestiona tu base de clientes</p>
           </div>
-            <Button variant="outline" onClick={() => navigate("/reports?tab=customers")}>
+          <div className="flex flex-wrap gap-2 w-full sm:w-auto">
+            <Button variant="outline" onClick={() => navigate("/reports?tab=customers")} className="w-full sm:w-auto">
               <BarChart3 className="h-4 w-4 mr-2" />
               Ver Reportes
             </Button>
@@ -1057,10 +1058,11 @@ export default function Customers() {
 
                 <TabsContent value="sales" className="mt-4">
                   <div className="space-y-4">
-                    <div className="flex justify-between items-center">
+                    <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-2">
                       <h3 className="text-lg font-semibold">Facturas Pendientes</h3>
                       <Button 
-                        size="sm" 
+                        size="sm"
+                        className="w-full sm:w-auto"
                         onClick={() => {
                           window.open(`/customers/${selectedCustomer.id}/account-statement`, '_blank');
                         }}

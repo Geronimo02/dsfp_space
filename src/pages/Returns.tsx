@@ -309,7 +309,7 @@ export default function Returns() {
 
         <Card className="shadow-soft">
           <CardHeader>
-            <div className="flex items-center justify-between gap-2">
+            <div className="flex flex-col sm:flex-row items-stretch sm:items-center justify-between gap-2">
               <div className="relative flex-1">
                 <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
                 <Input
@@ -324,7 +324,7 @@ export default function Returns() {
                   <Tooltip>
                     <TooltipTrigger asChild>
                       <DialogTrigger asChild>
-                        <Button className="gap-2">
+                        <Button className="gap-2 w-full sm:w-auto">
                           <RotateCcw className="h-4 w-4" />
                           Nueva Devolución
                         </Button>

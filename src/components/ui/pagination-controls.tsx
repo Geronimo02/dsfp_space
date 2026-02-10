@@ -40,7 +40,7 @@ export function PaginationControls({
   if (totalItems === 0) return null;
 
   return (
-    <div className="flex items-center justify-between px-2 py-4 border-t">
+    <div className="flex flex-col sm:flex-row items-center justify-between gap-3 px-2 py-4 border-t">
       <div className="flex items-center gap-2 text-sm text-muted-foreground">
         <span>Mostrando</span>
         <span className="font-medium text-foreground">{startIndex}</span>
