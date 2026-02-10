@@ -1,18 +1,25 @@
 import { useState } from "react";
 import { useCompany } from "@/contexts/CompanyContext";
-import { supabase } from "@/integrations/supabase/client";
+import { useSSEStream } from "@/hooks/useSSEStream";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Sheet, SheetContent, SheetDescription, SheetHeader, SheetTitle, SheetTrigger } from "@/components/ui/sheet";
-import { Sparkles, Loader2, Send } from "lucide-react";
+import { Sparkles, Loader2, Send, StopCircle } from "lucide-react";
 import { toast } from "sonner";
 
 export const AIAssistantFloating = () => {
   const { currentCompany } = useCompany();
   const [query, setQuery] = useState("");
-  const [response, setResponse] = useState("");
-  const [loading, setLoading] = useState(false);
   const [open, setOpen] = useState(false);
+
+  const { text: response, isStreaming, error: streamError, startStream, stopStream } = useSSEStream({
+    onComplete: (fullText) => {
+      console.log("Streaming completado:", fullText.length, "caracteres");
+    },
+    onError: (error) => {
+      toast.error(error || "Error al procesar tu consulta");
+    },
+  });
 
   const handleQuery = async (text?: string) => {
     const finalQuery = text || query;
@@ -22,36 +29,26 @@ export const AIAssistantFloating = () => {
       return;
     }
 
-    setLoading(true);
-    setResponse("");
+    if (isStreaming) {
+      stopStream();
+      return;
+    }
+
     setQuery(finalQuery);
 
-    try {
-      // Auto-detectar el tipo de consulta
-      const type = finalQuery.toLowerCase().includes("suger") || finalQuery.toLowerCase().includes("recomend") 
-        ? "suggestion"
-        : finalQuery.toLowerCase().includes("por qué") || finalQuery.toLowerCase().includes("explica") || finalQuery.toLowerCase().includes("compar")
-        ? "report"
-        : "search";
+    // Auto-detectar el tipo de consulta
+    const type = finalQuery.toLowerCase().includes("suger") || finalQuery.toLowerCase().includes("recomend") 
+      ? "suggestion"
+      : finalQuery.toLowerCase().includes("por qué") || finalQuery.toLowerCase().includes("explica") || finalQuery.toLowerCase().includes("compar")
+      ? "report"
+      : "search";
 
-      const { data, error } = await supabase.functions.invoke("ai-assistant", {
-        body: {
-          query: finalQuery,
-          type,
-          companyId: currentCompany?.id,
-          context: type === "report" ? finalQuery : undefined,
-        },
-      });
-
-      if (error) throw error;
-
-      setResponse(data.response);
-    } catch (error) {
-      console.error("Error al consultar IA:", error);
-      toast.error("Error al procesar tu consulta");
-    } finally {
-      setLoading(false);
-    }
+    await startStream("ai-assistant-stream", {
+      query: finalQuery,
+      type,
+      companyId: currentCompany?.id,
+      context: type === "report" ? finalQuery : undefined,
+    });
   };
 
   const exampleQueries = [
@@ -94,12 +91,12 @@ export const AIAssistantFloating = () => {
                 onChange={(e) => setQuery(e.target.value)}
                 placeholder="Escribe tu consulta aquí..."
                 onKeyDown={(e) => e.key === "Enter" && handleQuery()}
-                disabled={loading}
+                disabled={isStreaming}
                 className="flex-1"
               />
-              <Button onClick={() => handleQuery()} disabled={loading} size="icon">
-                {loading ? (
-                  <Loader2 className="h-4 w-4 animate-spin" />
+              <Button onClick={() => handleQuery()} disabled={false} size="icon" variant={isStreaming ? "destructive" : "default"}>
+                {isStreaming ? (
+                  <StopCircle className="h-4 w-4" />
                 ) : (
                   <Send className="h-4 w-4" />
                 )}
@@ -108,7 +105,7 @@ export const AIAssistantFloating = () => {
           </div>
 
           {/* Ejemplos de consultas */}
-          {!response && (
+          {!response && !isStreaming && (
             <div className="space-y-2">
               <p className="text-sm text-muted-foreground">Prueba con alguna de estas:</p>
               <div className="grid gap-2">
@@ -118,7 +115,7 @@ export const AIAssistantFloating = () => {
                     variant="outline"
                     onClick={() => handleQuery(example)}
                     className="justify-start text-left h-auto py-3 px-4 whitespace-normal"
-                    disabled={loading}
+                    disabled={isStreaming}
                   >
                     <Sparkles className="h-4 w-4 mr-2 shrink-0" />
                     <span className="text-sm">{example}</span>
@@ -128,25 +125,43 @@ export const AIAssistantFloating = () => {
             </div>
           )}
 
-          {/* Respuesta */}
-          {response && (
+          {/* Respuesta con streaming */}
+          {(response || isStreaming) && (
             <div className="space-y-2">
               <div className="flex items-center justify-between">
-                <label className="text-sm font-medium">Respuesta:</label>
-                <Button
-                  variant="ghost"
-                  size="sm"
-                  onClick={() => {
-                    setResponse("");
-                    setQuery("");
-                  }}
-                >
-                  Nueva consulta
-                </Button>
+                <label className="text-sm font-medium">
+                  {isStreaming ? (
+                    <span className="flex items-center gap-2">
+                      <Loader2 className="h-3 w-3 animate-spin" />
+                      Generando respuesta...
+                    </span>
+                  ) : (
+                    "Respuesta:"
+                  )}
+                </label>
+                {!isStreaming && response && (
+                  <Button
+                    variant="ghost"
+                    size="sm"
+                    onClick={() => {
+                      setQuery("");
+                    }}
+                  >
+                    Nueva consulta
+                  </Button>
+                )}
               </div>
-              <div className="bg-muted p-4 rounded-lg min-h-[200px] whitespace-pre-wrap text-sm">
-                {response}
+              <div className="bg-muted p-4 rounded-lg min-h-[200px] whitespace-pre-wrap text-sm relative">
+                {response || ""}
+                {isStreaming && (
+                  <span className="inline-block w-2 h-4 bg-primary animate-pulse ml-1" />
+                )}
               </div>
+              {streamError && (
+                <div className="text-sm text-destructive bg-destructive/10 p-3 rounded-lg">
+                  ⚠️ {streamError}
+                </div>
+              )}
             </div>
           )}
         </div>

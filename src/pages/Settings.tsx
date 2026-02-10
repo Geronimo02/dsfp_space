@@ -1082,11 +1082,12 @@ export default function Settings() {
                   </div>
                 </div>
 
-                <div className="flex justify-end gap-2">
+                <div className="flex flex-col sm:flex-row justify-end gap-2">
                   <Button 
                     variant="outline"
                     onClick={handleResetTicketConfig}
                     type="button"
+                    className="w-full sm:w-auto"
                   >
                     Restablecer por Defecto
                   </Button>
@@ -1094,6 +1095,7 @@ export default function Settings() {
                     onClick={handleSaveTicketConfig}
                     disabled={saveTicketConfigMutation.isPending}
                     type="button"
+                    className="w-full sm:w-auto"
                   >
                     {saveTicketConfigMutation.isPending ? "Guardando..." : "Guardar Configuración"}
                   </Button>

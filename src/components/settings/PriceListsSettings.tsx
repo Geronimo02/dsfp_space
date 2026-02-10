@@ -219,7 +219,7 @@ export function PriceListsSettings() {
 
   return (
     <div className="space-y-4">
-      <div className="flex items-center justify-between">
+      <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3">
         <div>
           <h3 className="text-lg font-semibold">Listas de Precios</h3>
           <p className="text-sm text-muted-foreground">
@@ -231,7 +231,7 @@ export function PriceListsSettings() {
           if (!open) resetForm();
         }}>
           <DialogTrigger asChild>
-            <Button>
+            <Button className="w-full sm:w-auto">
               <Plus className="w-4 h-4 mr-2" />
               Nueva Lista
             </Button>

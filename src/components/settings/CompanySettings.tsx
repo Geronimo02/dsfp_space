@@ -732,7 +732,7 @@ export function CompanySettings() {
 
           {/* Actualización Automática de Tipos de Cambio */}
           <div className="space-y-4 pt-4 border-t">
-            <div className="flex items-center justify-between">
+            <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3">
               <div>
                 <h3 className="font-semibold text-lg">Actualización Automática de Tipos de Cambio</h3>
                 <p className="text-sm text-muted-foreground">
@@ -743,6 +743,7 @@ export function CompanySettings() {
                 type="button"
                 variant="outline"
                 size="sm"
+                className="w-full sm:w-auto"
                 onClick={() => updateExchangeRatesNowMutation.mutate()}
                 disabled={updateExchangeRatesNowMutation.isPending}
               >

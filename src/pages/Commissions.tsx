@@ -337,14 +337,14 @@ export default function Commissions() {
   return (
     <Layout>
       <div className="space-y-6">
-        <div className="flex items-center justify-between">
+        <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4">
           <div>
-            <h1 className="text-3xl font-bold">Comisiones</h1>
-            <p className="text-muted-foreground">Gestiona comisiones de vendedores y clientes</p>
+            <h1 className="text-2xl sm:text-3xl font-bold">Comisiones</h1>
+            <p className="text-muted-foreground text-sm sm:text-base">Gestiona comisiones de vendedores y clientes</p>
           </div>
           <Dialog open={isDialogOpen} onOpenChange={setIsDialogOpen}>
             <DialogTrigger asChild>
-              <Button onClick={resetForm}>
+              <Button onClick={resetForm} className="w-full sm:w-auto">
                 <Plus className="h-4 w-4 mr-2" />
                 Nueva Comisión
               </Button>
@@ -626,14 +626,14 @@ export default function Commissions() {
           <TabsContent value="transactions" className="space-y-4">
             <Card>
               <CardHeader>
-                <div className="flex items-center justify-between">
+                <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3">
                   <div>
                     <CardTitle>Transacciones de Comisiones</CardTitle>
                     <CardDescription>Historial detallado de comisiones</CardDescription>
                   </div>
-                  <div className="flex gap-2">
+                  <div className="flex gap-2 w-full sm:w-auto">
                     <Select value={selectedSeller} onValueChange={setSelectedSeller}>
-                      <SelectTrigger className="w-[180px]">
+                      <SelectTrigger className="w-full sm:w-[180px]">
                         <SelectValue placeholder="Vendedor" />
                       </SelectTrigger>
                       <SelectContent>
@@ -646,7 +646,7 @@ export default function Commissions() {
                       </SelectContent>
                     </Select>
                     <Select value={statusFilter} onValueChange={setStatusFilter}>
-                      <SelectTrigger className="w-[150px]">
+                      <SelectTrigger className="w-full sm:w-[150px]">
                         <SelectValue placeholder="Estado" />
                       </SelectTrigger>
                       <SelectContent>

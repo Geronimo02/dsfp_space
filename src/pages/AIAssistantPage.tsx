@@ -165,19 +165,19 @@ const AIAssistantPage = () => {
 
   return (
     <Layout>
-      <div className="container mx-auto p-6 max-w-6xl">
-        <div className="flex items-center justify-between mb-6">
+      <div className="w-full p-6 max-w-none min-h-screen">
+        <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4 mb-6">
           <div>
-            <h1 className="text-3xl font-bold flex items-center gap-2">
-              <Sparkles className="h-8 w-8 text-primary" />
+            <h1 className="text-2xl sm:text-3xl font-bold flex items-center gap-2">
+              <Sparkles className="h-7 w-7 sm:h-8 sm:w-8 text-primary shrink-0" />
               Asistente IA
             </h1>
-            <p className="text-muted-foreground">
+            <p className="text-muted-foreground text-sm sm:text-base">
               Análisis inteligente y recomendaciones para tu negocio
             </p>
           </div>
           {messages.length > 0 && (
-            <Button variant="outline" onClick={clearChat}>
+            <Button variant="outline" onClick={clearChat} className="w-full sm:w-auto">
               <RefreshCw className="h-4 w-4 mr-2" />
               Nueva conversación
             </Button>

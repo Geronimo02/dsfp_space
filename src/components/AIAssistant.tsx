@@ -1,6 +1,6 @@
 import { useState } from "react";
 import { useCompany } from "@/contexts/CompanyContext";
-import { supabase } from "@/integrations/supabase/client";
+import { useSSEStream } from "@/hooks/useSSEStream";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -18,7 +18,8 @@ import {
   Users, 
   DollarSign,
   AlertTriangle,
-  Target
+  Target,
+  StopCircle
 } from "lucide-react";
 import { toast } from "sonner";
 
@@ -27,9 +28,16 @@ type AnalysisType = "search" | "suggestion" | "report" | "stock-analysis" | "sal
 export const AIAssistant = () => {
   const { currentCompany } = useCompany();
   const [query, setQuery] = useState("");
-  const [response, setResponse] = useState("");
-  const [loading, setLoading] = useState(false);
   const [activeTab, setActiveTab] = useState<AnalysisType>("search");
+
+  const { text: response, isStreaming, error: streamError, startStream, stopStream } = useSSEStream({
+    onComplete: (fullText) => {
+      console.log("Streaming completado:", fullText.length, "caracteres");
+    },
+    onError: (error) => {
+      toast.error(error || "Error al procesar tu consulta");
+    },
+  });
 
   const handleQuery = async (customQuery?: string, customType?: AnalysisType) => {
     const finalQuery = customQuery || query;
@@ -40,28 +48,17 @@ export const AIAssistant = () => {
       return;
     }
 
-    setLoading(true);
-    setResponse("");
-
-    try {
-      const { data, error } = await supabase.functions.invoke("ai-assistant", {
-        body: {
-          query: finalQuery,
-          type: finalType,
-          companyId: currentCompany?.id,
-          context: finalType === "report" ? finalQuery : undefined,
-        },
-      });
-
-      if (error) throw error;
-
-      setResponse(data.response);
-    } catch (error) {
-      console.error("Error al consultar IA:", error);
-      toast.error("Error al procesar tu consulta");
-    } finally {
-      setLoading(false);
+    if (isStreaming) {
+      stopStream();
+      return;
     }
+
+    await startStream("ai-assistant-stream", {
+      query: finalQuery,
+      type: finalType,
+      companyId: currentCompany?.id,
+      context: finalType === "report" ? finalQuery : undefined,
+    });
   };
 
   const quickActions = [
@@ -189,7 +186,7 @@ export const AIAssistant = () => {
                   setActiveTab(action.type);
                   handleQuery(action.query, action.type);
                 }}
-                disabled={loading}
+                disabled={isStreaming}
               >
                 <action.icon className={`h-5 w-5 ${action.color}`} />
                 <span className="text-xs font-medium">{action.label}</span>
@@ -223,9 +220,12 @@ export const AIAssistant = () => {
                   onKeyDown={(e) => e.key === "Enter" && handleQuery()}
                   className="flex-1"
                 />
-                <Button onClick={() => handleQuery()} disabled={loading}>
-                  {loading ? (
-                    <Loader2 className="h-4 w-4 animate-spin" />
+                <Button onClick={() => handleQuery()} disabled={isStreaming}>
+                  {isStreaming ? (
+                    <>
+                      <StopCircle className="h-4 w-4 mr-2" />
+                      Detener
+                    </>
                   ) : (
                     <Sparkles className="h-4 w-4" />
                   )}
@@ -249,20 +249,36 @@ export const AIAssistant = () => {
               </div>
             </div>
 
-            {response && (
+            {(response || isStreaming) && (
               <div className="space-y-2">
                 <div className="flex items-center justify-between">
                   <label className="text-sm font-medium">Respuesta:</label>
-                  <Badge variant="outline" className="text-xs">
-                    <Sparkles className="h-3 w-3 mr-1" />
-                    IA
-                  </Badge>
+                  <div className="flex items-center gap-2">
+                    {isStreaming && (
+                      <Badge variant="outline" className="text-xs animate-pulse">
+                        <Loader2 className="h-3 w-3 mr-1 animate-spin" />
+                        Generando...
+                      </Badge>
+                    )}
+                    {!isStreaming && response && (
+                      <Badge variant="outline" className="text-xs">
+                        <Sparkles className="h-3 w-3 mr-1" />
+                        IA
+                      </Badge>
+                    )}
+                  </div>
                 </div>
-                <div className="bg-muted rounded-lg p-4 prose prose-sm max-w-none dark:prose-invert">
-                  <pre className="whitespace-pre-wrap font-sans text-sm leading-relaxed">
-                    {response}
-                  </pre>
+                <div className="bg-muted rounded-lg p-4 prose prose-sm max-w-none dark:prose-invert min-h-[100px]">
+                  <div className="whitespace-pre-wrap font-sans text-sm leading-relaxed">
+                    {response || ""}
+                    {isStreaming && <span className="inline-block w-2 h-4 bg-primary animate-pulse ml-1" />}
+                  </div>
                 </div>
+                {streamError && (
+                  <div className="text-sm text-destructive bg-destructive/10 p-3 rounded-lg">
+                    ⚠️ {streamError}
+                  </div>
+                )}
               </div>
             )}
           </TabsContent>
