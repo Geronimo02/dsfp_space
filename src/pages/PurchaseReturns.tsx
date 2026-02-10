@@ -267,14 +267,14 @@ const PurchaseReturns = () => {
   return (
     <Layout>
       <div className="space-y-6">
-        <div className="flex items-center justify-between">
+        <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4">
           <div>
-            <h1 className="text-3xl font-bold">Devoluciones a Proveedores</h1>
-            <p className="text-muted-foreground">Gestiona las devoluciones de productos a proveedores</p>
+            <h1 className="text-2xl sm:text-3xl font-bold">Devoluciones a Proveedores</h1>
+            <p className="text-muted-foreground text-sm sm:text-base">Gestiona las devoluciones de productos a proveedores</p>
           </div>
           <Dialog open={isDialogOpen} onOpenChange={setIsDialogOpen}>
             <DialogTrigger asChild>
-              <Button>
+              <Button className="w-full sm:w-auto">
                 <Plus className="mr-2 h-4 w-4" />
                 Nueva Devolución
               </Button>
@@ -429,16 +429,16 @@ const PurchaseReturns = () => {
 
         <Card>
           <CardHeader>
-            <div className="flex items-center justify-between">
+            <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3">
               <CardTitle>Listado de Devoluciones</CardTitle>
-              <div className="flex items-center gap-2">
-                <div className="relative">
+              <div className="flex items-center gap-2 w-full sm:w-auto">
+                <div className="relative w-full sm:w-auto">
                   <Search className="absolute left-2 top-2.5 h-4 w-4 text-muted-foreground" />
                   <Input
                     placeholder="Buscar por número..."
                     value={searchQuery}
                     onChange={(e) => setSearchQuery(e.target.value)}
-                    className="pl-8 w-[300px]"
+                    className="pl-8 w-full sm:w-[300px]"
                   />
                 </div>
               </div>

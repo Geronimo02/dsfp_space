@@ -1668,8 +1668,8 @@ export default function Products() {
         {selectedProducts.size > 0 && (
           <Card className="shadow-soft bg-muted/50">
             <CardContent className="pt-4">
-              <div className="flex items-center justify-between">
-                <div className="flex items-center gap-4">
+              <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3">
+                <div className="flex flex-wrap items-center gap-3">
                   <span className="text-sm font-medium">
                     {selectedProducts.size} producto{selectedProducts.size > 1 ? 's' : ''} seleccionado{selectedProducts.size > 1 ? 's' : ''}
                   </span>

@@ -243,14 +243,14 @@ export default function CustomerSupport() {
     <Layout>
       <div className="space-y-6">
         {/* Header */}
-        <div className="flex justify-between items-center">
+        <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4">
           <div>
-            <h1 className="text-3xl font-bold">Atención al Cliente</h1>
-            <p className="text-muted-foreground">
+            <h1 className="text-2xl sm:text-3xl font-bold">Atención al Cliente</h1>
+            <p className="text-muted-foreground text-sm sm:text-base">
               Gestiona tickets de soporte. Las respuestas se envían automáticamente por email/SMS al cliente
             </p>
           </div>
-          <div className="flex gap-2">
+          <div className="flex flex-wrap gap-2 w-full sm:w-auto">
             <Button variant="outline" onClick={() => navigate("/customer-support/knowledge-base")}>
               <BookOpen className="h-4 w-4 mr-2" />
               Base de Conocimiento

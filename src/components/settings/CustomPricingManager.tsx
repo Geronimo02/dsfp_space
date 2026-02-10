@@ -220,7 +220,7 @@ export function CustomPricingManager({ companyId, companyName }: CustomPricingMa
     <div className="space-y-6">
       <Card>
         <CardHeader>
-          <div className="flex items-center justify-between">
+          <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3">
             <div>
               <CardTitle className="flex items-center gap-2">
                 <DollarSign className="h-5 w-5" />
@@ -230,7 +230,7 @@ export function CustomPricingManager({ companyId, companyName }: CustomPricingMa
                 Configura precios especiales para módulos específicos de esta empresa
               </CardDescription>
             </div>
-            <Button onClick={() => handleOpenDialog()}>
+            <Button onClick={() => handleOpenDialog()} className="w-full sm:w-auto">
               <Plus className="h-4 w-4 mr-2" />
               Nuevo Precio
             </Button>

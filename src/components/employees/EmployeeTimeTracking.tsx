@@ -161,23 +161,24 @@ export function EmployeeTimeTracking() {
   return (
     <Card>
       <CardHeader>
-        <div className="flex items-center justify-between">
+        <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3">
           <div className="flex items-center gap-2">
-            <Clock className="h-5 w-5 text-primary" />
+            <Clock className="h-5 w-5 text-primary shrink-0" />
             <CardTitle>Control de Horarios</CardTitle>
           </div>
-          <div className="flex items-center gap-2">
+          <div className="flex items-center gap-2 w-full sm:w-auto">
             <Input
               type="month"
               value={filterMonth}
               onChange={(e) => setFilterMonth(e.target.value)}
-              className="w-40"
+              className="w-full sm:w-40"
             />
             <Dialog open={dialogOpen} onOpenChange={setDialogOpen}>
               <DialogTrigger asChild>
-                <Button>
+                <Button className="shrink-0">
                   <Plus className="mr-2 h-4 w-4" />
-                  Registrar Horario
+                  <span className="hidden sm:inline">Registrar Horario</span>
+                  <span className="sm:hidden">Registrar</span>
                 </Button>
               </DialogTrigger>
               <DialogContent>

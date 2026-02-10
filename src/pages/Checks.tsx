@@ -170,16 +170,16 @@ export default function Checks() {
   return (
     <Layout>
       <div className="container mx-auto p-6 space-y-6">
-        <div className="flex justify-between items-center">
+        <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4">
           <div>
-            <h1 className="text-3xl font-bold">Gestión de Cheques</h1>
-            <p className="text-muted-foreground">
+            <h1 className="text-2xl sm:text-3xl font-bold">Gestión de Cheques</h1>
+            <p className="text-muted-foreground text-sm sm:text-base">
               Administra los cheques recibidos y emitidos
             </p>
           </div>
         <Dialog open={isDialogOpen} onOpenChange={setIsDialogOpen}>
           <DialogTrigger asChild>
-            <Button>
+            <Button className="w-full sm:w-auto">
               <Plus className="h-4 w-4 mr-2" />
               Registrar Cheque
             </Button>
