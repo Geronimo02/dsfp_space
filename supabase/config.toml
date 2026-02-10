@@ -25,6 +25,10 @@ jwt_expiry = 3600
 enable_signup = true
 enable_anonymous_sign_ins = false
 
+# Password Security Settings
+password_min_length = 8
+enable_password_breach_check = true  # Check passwords against HaveIBeenPwned database
+
 [auth.email]
 enable_signup = true
 double_confirm_changes = true

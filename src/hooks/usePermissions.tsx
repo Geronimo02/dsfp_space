@@ -282,9 +282,8 @@ export const DEFAULT_ROLE_PERMISSIONS: Record<AppRole, Partial<RolePermissionDef
     ...allowAll(["dashboard", "reports", "sales", "products", "customers"], DEFAULT_VIEW_ONLY),
   },
   employee: {
-
-    ...allowAll(["employees"], DEFAULT_VIEW_ONLY),
-
+    // Agregar dashboard para evitar redirect loop al iniciar sesión
+    ...allowAll(["dashboard", "employees"], DEFAULT_VIEW_ONLY),
   },
 };
 

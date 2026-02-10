@@ -1,4 +1,4 @@
-import { useState, useRef, useEffect } from "react";
+import { useRef, useEffect } from "react";
 import { useRateLimit } from "@/hooks/useRateLimit";
 import { getErrorMessage } from "@/lib/errorHandling";
 import { Layout } from "@/components/layout/Layout";
@@ -42,53 +42,70 @@ import { CustomerSelector } from "@/components/pos/CustomerSelector";
 import { PaymentSection } from "@/components/pos/PaymentSection";
 import { format } from "date-fns";
 import { useCompany } from "@/contexts/CompanyContext";
-
-interface CartItem {
-  product_id: string;
-  product_name: string;
-  quantity: number;
-  unit_price: number;
-  subtotal: number;
-}
-
-interface PaymentMethod {
-  id: string;
-  method: string;
-  baseAmount: number;    // Monto base (parte del total_base que cubre)
-  surcharge: number;     // Recargo aplicado (solo tarjeta con cuotas > 1)
-  amount: number;        // Total del tramo (baseAmount + surcharge)
-  installments?: number;
-  currency?: string;     // Moneda del pago
-}
+import { usePOSState, type CartItem, type PaymentMethod } from "@/hooks/usePOSState";
 
 export default function POS() {
   const { currentCompany } = useCompany();
-  const [searchQuery, setSearchQuery] = useState("");
-  const [cart, setCart] = useState<CartItem[]>([]);
-  const [paymentMethods, setPaymentMethods] = useState<PaymentMethod[]>([]);
-  const [currentPaymentMethod, setCurrentPaymentMethod] = useState("cash");
-  const [currentPaymentAmount, setCurrentPaymentAmount] = useState("");
-  const [currentInstallments, setCurrentInstallments] = useState(1);
-  const [currentPaymentCurrency, setCurrentPaymentCurrency] = useState("ARS");
-  const [discountRate, setDiscountRate] = useState(0);
-  const [loyaltyPointsToUse, setLoyaltyPointsToUse] = useState(0);
-  const [selectedCustomer, setSelectedCustomer] = useState<any>(null);
-  const [selectedWarehouse, setSelectedWarehouse] = useState<string>("");
-  const [selectedPOSAfipId, setSelectedPOSAfipId] = useState<string>("");
-  const [createCustomerDialog, setCreateCustomerDialog] = useState(false);
-  const [newCustomerName, setNewCustomerName] = useState("");
-  const [newCustomerPhone, setNewCustomerPhone] = useState("");
-  const [newCustomerEmail, setNewCustomerEmail] = useState("");
-  const [newCustomerDocument, setNewCustomerDocument] = useState("");
-  const [showReceiptOptions, setShowReceiptOptions] = useState(false);
-  const [lastSaleData, setLastSaleData] = useState<any>(null);
-  const [tempPhoneNumber, setTempPhoneNumber] = useState("");
-  const [tempEmail, setTempEmail] = useState("");
-  const [isProcessingSale, setIsProcessingSale] = useState(false);
-  const [walkInSale, setWalkInSale] = useState(false);
-  const [selectedPaymentMethod, setSelectedPaymentMethod] = useState('cash');
+  const [state, dispatch] = usePOSState();
   const queryClient = useQueryClient();
   const searchInputRef = useRef<HTMLInputElement>(null);
+  
+  // Destructure state for easier access
+  const {
+    searchQuery,
+    cart,
+    paymentMethods,
+    currentPaymentMethod,
+    currentPaymentAmount,
+    currentInstallments,
+    currentPaymentCurrency,
+    discountRate,
+    loyaltyPointsToUse,
+    selectedCustomer,
+    selectedWarehouse,
+    selectedPOSAfipId,
+    createCustomerDialog,
+    newCustomerName,
+    newCustomerPhone,
+    newCustomerEmail,
+    newCustomerDocument,
+    showReceiptOptions,
+    lastSaleData,
+    tempPhoneNumber,
+    tempEmail,
+    isProcessingSale,
+    walkInSale,
+    selectedPaymentMethod,
+  } = state;
+  
+  // Helper functions for state updates (maintain readability while using reducer)
+  const setSearchQuery = (value: string) => dispatch({ type: 'SET_SEARCH_QUERY', payload: value });
+  const setCart = (value: CartItem[] | ((prev: CartItem[]) => CartItem[])) => {
+    const newCart = typeof value === 'function' ? value(cart) : value;
+    dispatch({ type: 'SET_CART', payload: newCart });
+  };
+  const setPaymentMethods = (value: PaymentMethod[]) => dispatch({ type: 'SET_PAYMENT_METHODS', payload: value });
+  const setCurrentPaymentMethod = (value: string) => dispatch({ type: 'SET_CURRENT_PAYMENT_METHOD', payload: value });
+  const setCurrentPaymentAmount = (value: string) => dispatch({ type: 'SET_CURRENT_PAYMENT_AMOUNT', payload: value });
+  const setCurrentInstallments = (value: number) => dispatch({ type: 'SET_CURRENT_INSTALLMENTS', payload: value });
+  const setCurrentPaymentCurrency = (value: string) => dispatch({ type: 'SET_CURRENT_PAYMENT_CURRENCY', payload: value });
+  const setDiscountRate = (value: number) => dispatch({ type: 'SET_DISCOUNT_RATE', payload: value });
+  const setLoyaltyPointsToUse = (value: number) => dispatch({ type: 'SET_LOYALTY_POINTS_TO_USE', payload: value });
+  const setSelectedCustomer = (value: any | null) => dispatch({ type: 'SET_SELECTED_CUSTOMER', payload: value });
+  const setSelectedWarehouse = (value: string) => dispatch({ type: 'SET_SELECTED_WAREHOUSE', payload: value });
+  const setSelectedPOSAfipId = (value: string) => dispatch({ type: 'SET_SELECTED_POS_AFIP_ID', payload: value });
+  const setCreateCustomerDialog = (value: boolean) => dispatch({ type: 'SET_CREATE_CUSTOMER_DIALOG', payload: value });
+  const setNewCustomerName = (value: string) => dispatch({ type: 'SET_NEW_CUSTOMER_NAME', payload: value });
+  const setNewCustomerPhone = (value: string) => dispatch({ type: 'SET_NEW_CUSTOMER_PHONE', payload: value });
+  const setNewCustomerEmail = (value: string) => dispatch({ type: 'SET_NEW_CUSTOMER_EMAIL', payload: value });
+  const setNewCustomerDocument = (value: string) => dispatch({ type: 'SET_NEW_CUSTOMER_DOCUMENT', payload: value });
+  const setShowReceiptOptions = (value: boolean) => dispatch({ type: 'SET_SHOW_RECEIPT_OPTIONS', payload: value });
+  const setLastSaleData = (value: any | null) => dispatch({ type: 'SET_LAST_SALE_DATA', payload: value });
+  const setTempPhoneNumber = (value: string) => dispatch({ type: 'SET_TEMP_PHONE_NUMBER', payload: value });
+  const setTempEmail = (value: string) => dispatch({ type: 'SET_TEMP_EMAIL', payload: value });
+  const setIsProcessingSale = (value: boolean) => dispatch({ type: 'SET_IS_PROCESSING_SALE', payload: value });
+  const setWalkInSale = (value: boolean) => dispatch({ type: 'SET_WALK_IN_SALE', payload: value });
+  const setSelectedPaymentMethod = (value: string) => dispatch({ type: 'SET_SELECTED_PAYMENT_METHOD', payload: value });
 
   const { data: products, isLoading: isLoadingProducts } = useQuery({
     queryKey: ["products", searchQuery, selectedCustomer?.price_list_id, currentCompany?.id],
@@ -304,14 +321,7 @@ export default function POS() {
   };
 
   const clearCart = () => {
-    setCart([]);
-    setDiscountRate(0);
-    setCurrentInstallments(1);
-    setSelectedCustomer(null);
-    setPaymentMethods([]);
-    setCurrentPaymentMethod("cash");
-    setCurrentPaymentAmount("");
-    setLoyaltyPointsToUse(0);
+    dispatch({ type: 'CLEAR_CART' });
     toast.info("Carrito vaciado");
   };
 
@@ -1146,14 +1156,7 @@ Impuestos: $${saleData.tax.toFixed(2)}
                   onUpdateQuantity={updateQuantity}
                   onRemoveItem={removeFromCart}
                   onClearCart={clearCart}
-                  loyaltyDiscount={{
-                    customer: selectedCustomer,
-                    rate: loyaltyDiscountRate,
-                    pointsToUse: loyaltyPointsToUse,
-                    pointsValue: loyaltyPointsValue,
-                    onPointsChange: setLoyaltyPointsToUse,
-                    companySettings: companySettings
-                  }}
+                  loyaltyDiscount={loyaltyDiscountAmount + loyaltyPointsValue}
                 />
 
                 {cart.length > 0 && (

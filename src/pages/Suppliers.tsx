@@ -27,7 +27,7 @@ import { Badge } from "@/components/ui/badge";
 
 import { Plus, Search, Edit, TrendingUp, TrendingDown, AlertCircle, CheckCircle2, Info, Wallet, Building2, CreditCard as CreditCardIcon, History, DollarSign } from "lucide-react";
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip";
-
+import { sanitizeSearchQuery } from "@/lib/searchUtils";
 import { toast } from "sonner";
 import { usePermissions } from "@/hooks/usePermissions";
 import { useCompany } from "@/contexts/CompanyContext";
@@ -36,6 +36,25 @@ import { format } from "date-fns";
 import { useDebounce } from "@/hooks/useDebounce";
 import { useRateLimit } from "@/hooks/useRateLimit";
 import { getErrorMessage } from "@/lib/errorHandling";
+import { z } from "zod";
+
+const supplierSchema = z.object({
+  name: z.string().trim().min(1, "El nombre es requerido").max(200, "El nombre debe tener máximo 200 caracteres"),
+  contact_name: z.string().trim().max(200, "El nombre de contacto debe tener máximo 200 caracteres").optional(),
+  email: z.string().trim().toLowerCase().max(255, "El email debe tener máximo 255 caracteres")
+    .refine((val) => val === "" || z.string().email().safeParse(val).success, "Email inválido")
+    .optional(),
+  phone: z.string().max(20, "El teléfono debe tener máximo 20 caracteres").optional(),
+  address: z.string().max(500, "La dirección debe tener máximo 500 caracteres").optional(),
+  tax_id: z.string().max(50, "El Tax ID debe tener máximo 50 caracteres").optional(),
+  payment_terms: z.string().max(100, "Los términos de pago deben tener máximo 100 caracteres").optional(),
+  credit_limit: z.number({ invalid_type_error: "El límite de crédito debe ser un número" })
+    .nonnegative("El límite de crédito no puede ser negativo")
+    .max(9999999999.99, "El límite de crédito es demasiado alto")
+    .optional(),
+  notes: z.string().max(1000, "Las notas deben tener máximo 1000 caracteres").optional(),
+  active: z.boolean(),
+});
 
 interface Supplier {
   id: string;
@@ -66,6 +85,8 @@ export default function Suppliers() {
   const [paymentDialogOpen, setPaymentDialogOpen] = useState(false);
   const [historyDialogOpen, setHistoryDialogOpen] = useState(false);
   const [selectedSupplier, setSelectedSupplier] = useState<Supplier | null>(null);
+  const [currentPage, setCurrentPage] = useState(1);
+  const [pageSize] = useState(50);
   const [formData, setFormData] = useState({
     name: "",
     contact_name: "",
@@ -87,26 +108,34 @@ export default function Suppliers() {
   const queryClient = useQueryClient();
 
   const { data: suppliers = [] } = useQuery({
-    queryKey: ["suppliers", debouncedSearch, currentCompany?.id],
+    queryKey: ["suppliers", debouncedSearch, currentCompany?.id, currentPage, pageSize],
     queryFn: async () => {
+      const from = (currentPage - 1) * pageSize;
+      const to = from + pageSize - 1;
+      
       let query = supabase
         .from("suppliers")
-        .select("*")
+        .select("*", { count: "exact" })
         .eq("company_id", currentCompany?.id)
-        .limit(500)
-        .order("name");
+        .order("name")
+        .range(from, to);
 
       if (debouncedSearch) {
-        query = query.or(
-          `name.ilike.%${debouncedSearch}%,contact_name.ilike.%${debouncedSearch}%,email.ilike.%${debouncedSearch}%`
-        );
+        const sanitized = sanitizeSearchQuery(debouncedSearch);
+        if (sanitized) {
+          query = query.or(
+            `name.ilike.%${sanitized}%,contact_name.ilike.%${sanitized}%,email.ilike.%${sanitized}%`
+          );
+        }
       }
 
-      const { data, error } = await query;
+      const { data, error, count } = await query;
       if (error) throw error;
-      return data as Supplier[];
+      return { data: data as Supplier[], count: count || 0 };
     },
   });
+
+  const totalPages = suppliers ? Math.ceil(suppliers.count / pageSize) : 0;
 
   const { data: supplierPayments = [] } = useQuery({
     queryKey: ["supplier-payments", selectedSupplier?.id],
@@ -127,21 +156,43 @@ export default function Suppliers() {
 
   const createSupplierMutation = useMutation({
     mutationFn: async (data: typeof formData) => {
-      const { error } = await supabase.from("suppliers").insert({
-        name: data.name,
-        contact_name: data.contact_name || null,
-        email: data.email || null,
-        phone: data.phone || null,
-        address: data.address || null,
-        tax_id: data.tax_id || null,
-        payment_terms: data.payment_terms || null,
-        credit_limit: parseFloat(data.credit_limit),
-        active: data.active,
-        notes: data.notes || null,
-        company_id: currentCompany?.id,
-      });
+      try {
+        // Validate with Zod
+        const validatedData = supplierSchema.parse({
+          name: data.name,
+          contact_name: data.contact_name || undefined,
+          email: data.email || undefined,
+          phone: data.phone || undefined,
+          address: data.address || undefined,
+          tax_id: data.tax_id || undefined,
+          payment_terms: data.payment_terms || undefined,
+          credit_limit: parseFloat(data.credit_limit) || 0,
+          notes: data.notes || undefined,
+          active: data.active,
+        });
 
-      if (error) throw error;
+        const { error } = await supabase.from("suppliers").insert({
+          name: validatedData.name,
+          contact_name: validatedData.contact_name || null,
+          email: validatedData.email || null,
+          phone: validatedData.phone || null,
+          address: validatedData.address || null,
+          tax_id: validatedData.tax_id || null,
+          payment_terms: validatedData.payment_terms || null,
+          credit_limit: validatedData.credit_limit || 0,
+          active: validatedData.active,
+          notes: validatedData.notes || null,
+          company_id: currentCompany?.id,
+        });
+
+        if (error) throw error;
+      } catch (error) {
+        if (error instanceof z.ZodError) {
+          const firstError = error.errors[0];
+          throw new Error(firstError.message);
+        }
+        throw error;
+      }
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["suppliers"] });
@@ -205,23 +256,45 @@ export default function Suppliers() {
 
   const updateSupplierMutation = useMutation({
     mutationFn: async (data: typeof formData & { id: string }) => {
-      const { error } = await supabase
-        .from("suppliers")
-        .update({
+      try {
+        // Validate with Zod
+        const validatedData = supplierSchema.parse({
           name: data.name,
-          contact_name: data.contact_name || null,
-          email: data.email || null,
-          phone: data.phone || null,
-          address: data.address || null,
-          tax_id: data.tax_id || null,
-          payment_terms: data.payment_terms || null,
-          credit_limit: parseFloat(data.credit_limit),
+          contact_name: data.contact_name || undefined,
+          email: data.email || undefined,
+          phone: data.phone || undefined,
+          address: data.address || undefined,
+          tax_id: data.tax_id || undefined,
+          payment_terms: data.payment_terms || undefined,
+          credit_limit: parseFloat(data.credit_limit) || 0,
+          notes: data.notes || undefined,
           active: data.active,
-          notes: data.notes || null,
-        })
-        .eq("id", data.id);
+        });
 
-      if (error) throw error;
+        const { error } = await supabase
+          .from("suppliers")
+          .update({
+            name: validatedData.name,
+            contact_name: validatedData.contact_name || null,
+            email: validatedData.email || null,
+            phone: validatedData.phone || null,
+            address: validatedData.address || null,
+            tax_id: validatedData.tax_id || null,
+            payment_terms: validatedData.payment_terms || null,
+            credit_limit: validatedData.credit_limit || 0,
+            active: validatedData.active,
+            notes: validatedData.notes || null,
+          })
+          .eq("id", data.id);
+
+        if (error) throw error;
+      } catch (error) {
+        if (error instanceof z.ZodError) {
+          const firstError = error.errors[0];
+          throw new Error(firstError.message);
+        }
+        throw error;
+      }
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["suppliers"] });
@@ -593,7 +666,7 @@ export default function Suppliers() {
                   </TableRow>
                 </TableHeader>
                 <TableBody>
-                  {suppliers.map((supplier) => {
+                  {suppliers.data?.map((supplier) => {
                     const balanceStatus = getBalanceStatus(
                       supplier.current_balance,
                       supplier.credit_limit
@@ -841,6 +914,31 @@ export default function Suppliers() {
             </div>
           </DialogContent>
         </Dialog>
+
+        {/* Pagination */}
+        {suppliers && totalPages > 1 && (
+          <div className="flex justify-center items-center gap-2 mt-4">
+            <Button
+              variant="outline"
+              size="sm"
+              onClick={() => setCurrentPage(p => Math.max(1, p - 1))}
+              disabled={currentPage === 1}
+            >
+              Anterior
+            </Button>
+            <span className="text-sm text-muted-foreground">
+              Página {currentPage} de {totalPages}
+            </span>
+            <Button
+              variant="outline"
+              size="sm"
+              onClick={() => setCurrentPage(p => Math.min(totalPages, p + 1))}
+              disabled={currentPage === totalPages}
+            >
+              Siguiente
+            </Button>
+          </div>
+        )}
       </div>
     </Layout>
   );

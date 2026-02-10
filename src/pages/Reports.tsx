@@ -241,6 +241,7 @@ const Reports = () => {
       const { data: cashMovements } = await supabase
         .from("cash_movements")
         .select("amount, type")
+        .eq("company_id", currentCompany?.id)
         .gte("created_at", start.toISOString())
         .lte("created_at", end.toISOString());
 

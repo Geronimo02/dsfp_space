@@ -74,8 +74,8 @@ Deno.serve(async (req: Request) => {
         // If user already exists, proceed without failing
         const msg = String(userErr.message ?? userErr);
         if (msg.toLowerCase().includes("already") || msg.toLowerCase().includes("registrado")) {
-          // Try to find existing user via auth list (best-effort)
-          const { data: usersList } = await supabaseAdmin.auth.admin.listUsers();
+          // Try to find existing user via auth list with pagination (best-effort)
+          const { data: usersList } = await supabaseAdmin.auth.admin.listUsers({ page: 1, perPage: 1000 });
           const existing = usersList?.users?.find((u: any) => (u.email || "").toLowerCase() === String(intent.email).toLowerCase());
           userId = existing?.id ?? null;
         } else {

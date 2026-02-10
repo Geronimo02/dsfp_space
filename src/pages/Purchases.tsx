@@ -35,6 +35,8 @@ const Purchases = () => {
   const [searchQuery, setSearchQuery] = useState("");
   const [isDialogOpen, setIsDialogOpen] = useState(false);
   const [selectedPurchase, setSelectedPurchase] = useState<any>(null);
+  const [currentPage, setCurrentPage] = useState(1);
+  const [pageSize] = useState(50);
   
   // New purchase form state
   const [supplierId, setSupplierId] = useState("");
@@ -47,16 +49,20 @@ const Purchases = () => {
 
   // Fetch purchases
   const { data: purchases, isLoading } = useQuery({
-    queryKey: ["purchases", searchQuery, currentCompany?.id],
+    queryKey: ["purchases", searchQuery, currentCompany?.id, currentPage, pageSize],
     queryFn: async () => {
+      const from = (currentPage - 1) * pageSize;
+      const to = from + pageSize - 1;
+      
       let query = supabase
         .from("purchases")
         .select(`
           *,
           suppliers(name)
-        `)
+        `, { count: "exact" })
         .eq("company_id", currentCompany?.id)
-        .order("purchase_date", { ascending: false });
+        .order("purchase_date", { ascending: false })
+        .range(from, to);
 
       if (searchQuery) {
         const sanitized = sanitizeSearchQuery(searchQuery);
@@ -65,11 +71,13 @@ const Purchases = () => {
         }
       }
 
-      const { data, error } = await query.limit(200);
+      const { data, error, count } = await query;
       if (error) throw error;
-      return data;
+      return { data, count: count || 0 };
     },
   });
+
+  const totalPages = purchases ? Math.ceil(purchases.count / pageSize) : 0;
 
   // Fetch suppliers
   const { data: suppliers } = useQuery({
@@ -116,67 +124,38 @@ const Purchases = () => {
       // Generate purchase number
       const purchaseNumber = `PUR-${Date.now()}`;
 
-      // Insert purchase
-      const { data: purchase, error: purchaseError } = await supabase
-        .from("purchases")
-        .insert({
-          purchase_number: purchaseNumber,
-          supplier_id: supplierId,
-          user_id: user.id,
-          subtotal,
-          tax,
-          tax_rate: taxRate,
-          total,
-          notes,
-          payment_status: "pending",
-          company_id: currentCompany?.id,
-        })
-        .select()
-        .single();
+      // Prepare purchase data
+      const purchaseData = {
+        purchase_number: purchaseNumber,
+        supplier_id: supplierId,
+        user_id: user.id,
+        subtotal: subtotal,
+        tax: tax,
+        total: total,
+        status: "pending",
+        company_id: currentCompany?.id,
+      };
 
-      if (purchaseError) throw purchaseError;
-
-      // Insert purchase items
+      // Prepare items data
       const items = purchaseItems.map(item => ({
-        purchase_id: purchase.id,
         product_id: item.product_id,
-        product_name: item.product_name,
         quantity: item.quantity,
         unit_cost: item.unit_cost,
         subtotal: item.subtotal,
-        company_id: currentCompany?.id!
+        company_id: currentCompany?.id,
       }));
 
-      const { error: itemsError } = await supabase
-        .from("purchase_items")
-        .insert(items);
-
-      if (itemsError) throw itemsError;
-
-      // Update product stock
-      for (const item of purchaseItems) {
-        const product = products?.find(p => p.id === item.product_id);
-        if (product) {
-          const { error: stockError } = await supabase
-            .from("products")
-            .update({ stock: product.stock + item.quantity })
-            .eq("id", item.product_id);
-
-          if (stockError) throw stockError;
+      // Call atomic RPC function to process purchase
+      // This prevents race conditions by executing all updates in a single transaction
+      const { data: purchase, error } = await supabase.rpc(
+        'process_purchase_atomic',
+        {
+          p_purchase_data: purchaseData,
+          p_items: items,
         }
-      }
+      );
 
-      // Update supplier balance
-      const supplier = suppliers?.find(s => s.id === supplierId);
-      if (supplier) {
-        const { error: balanceError } = await supabase
-          .from("suppliers")
-          .update({ current_balance: (supplier.current_balance || 0) + total })
-          .eq("id", supplierId);
-
-        if (balanceError) throw balanceError;
-      }
-
+      if (error) throw error;
       return purchase;
     },
     onSuccess: () => {
@@ -538,7 +517,7 @@ const Purchases = () => {
                     </TableCell>
                   </TableRow>
                 ) : (
-                  purchases?.map((purchase) => (
+                  purchases?.data?.map((purchase) => (
                     <TableRow key={purchase.id}>
                       <TableCell className="font-medium">{purchase.purchase_number}</TableCell>
                       <TableCell>{format(new Date(purchase.purchase_date), "dd/MM/yyyy")}</TableCell>
@@ -574,6 +553,31 @@ const Purchases = () => {
             </Table>
           </CardContent>
         </Card>
+
+        {/* Pagination */}
+        {purchases && totalPages > 1 && (
+          <div className="flex justify-center items-center gap-2 mt-4">
+            <Button
+              variant="outline"
+              size="sm"
+              onClick={() => setCurrentPage(p => Math.max(1, p - 1))}
+              disabled={currentPage === 1}
+            >
+              Anterior
+            </Button>
+            <span className="text-sm text-muted-foreground">
+              Página {currentPage} de {totalPages}
+            </span>
+            <Button
+              variant="outline"
+              size="sm"
+              onClick={() => setCurrentPage(p => Math.min(totalPages, p + 1))}
+              disabled={currentPage === totalPages}
+            >
+              Siguiente
+            </Button>
+          </div>
+        )}
       </div>
     </Layout>
   );

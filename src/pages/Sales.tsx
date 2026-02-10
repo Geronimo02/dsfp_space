@@ -28,6 +28,8 @@ export default function Sales() {
   const [productFilter, setProductFilter] = useState("ALL");
   const [selectedSale, setSelectedSale] = useState<any>(null);
   const [isDetailOpen, setIsDetailOpen] = useState(false);
+  const [currentPage, setCurrentPage] = useState(1);
+  const [pageSize] = useState(50);
   const queryClient = useQueryClient();
 
   const createDeliveryNoteMutation = useMutation({
@@ -109,8 +111,13 @@ export default function Sales() {
   });
 
   const { data: sales } = useQuery({
-    queryKey: ["sales", searchQuery, productFilter, currentCompany?.id],
+    queryKey: ["sales", searchQuery, productFilter, currentCompany?.id, currentPage, pageSize],
     queryFn: async () => {
+      if (!currentCompany?.id) return { data: [], count: 0 };
+      
+      const from = (currentPage - 1) * pageSize;
+      const to = from + pageSize - 1;
+      
       let query = supabase
         .from("sales")
         .select(`
@@ -118,9 +125,10 @@ export default function Sales() {
           customer:customers(name, email, phone, document, address),
           sale_items(*, product:products(name)),
           returns(id, return_number, status, refund_method, total)
-        `)
-        .eq("company_id", currentCompany?.id)
-        .order("created_at", { ascending: false });
+        `, { count: "exact" })
+        .eq("company_id", currentCompany.id)
+        .order("created_at", { ascending: false })
+        .range(from, to);
       
       if (searchQuery) {
         const sanitized = sanitizeSearchQuery(searchQuery);
@@ -129,19 +137,23 @@ export default function Sales() {
         }
       }
       
-      const { data, error } = await query;
+      const { data, error, count } = await query;
       if (error) throw error;
 
-      // Filter by product on client side since we need to check sale_items
+      // Filter by product on client side for current page only
+      let filteredData = data;
       if (productFilter && productFilter !== "ALL") {
-        return data?.filter(sale => 
+        filteredData = data?.filter(sale => 
           sale.sale_items?.some((item: any) => item.product_id === productFilter)
-        );
+        ) || [];
       }
       
-      return data;
+      return { data: filteredData, count: count || 0 };
     },
+    enabled: !!currentCompany?.id,
   });
+
+  const totalPages = sales ? Math.ceil(sales.count / pageSize) : 0;
 
   const { data: saleDetails } = useQuery({
     queryKey: ["sale-details", selectedSale?.id],
@@ -301,7 +313,7 @@ export default function Sales() {
                 </TableRow>
               </TableHeader>
               <TableBody>
-                {sales?.map((sale) => (
+                {sales?.data?.map((sale) => (
                   <TableRow key={sale.id}>
                     <TableCell className="font-medium flex items-center gap-2">
                       <Receipt className="h-4 w-4 text-muted-foreground" />
@@ -433,6 +445,31 @@ export default function Sales() {
             </Table>
           </CardContent>
         </Card>
+
+        {/* Pagination */}
+        {sales && totalPages > 1 && (
+          <div className="flex justify-center items-center gap-2 mt-4">
+            <Button
+              variant="outline"
+              size="sm"
+              onClick={() => setCurrentPage(p => Math.max(1, p - 1))}
+              disabled={currentPage === 1}
+            >
+              Anterior
+            </Button>
+            <span className="text-sm text-muted-foreground">
+              Página {currentPage} de {totalPages}
+            </span>
+            <Button
+              variant="outline"
+              size="sm"
+              onClick={() => setCurrentPage(p => Math.min(totalPages, p + 1))}
+              disabled={currentPage === totalPages}
+            >
+              Siguiente
+            </Button>
+          </div>
+        )}
 
         <Dialog open={isDetailOpen} onOpenChange={setIsDetailOpen}>
           <DialogContent className="max-w-3xl max-h-[90vh] overflow-y-auto">

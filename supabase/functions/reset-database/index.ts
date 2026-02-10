@@ -1,9 +1,6 @@
 import { serve } from "https://deno.land/std@0.168.0/http/server.ts";
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
 
-interface UserRole {
-  role: string;
-}
 // Restrict CORS to specific domains for security
 const ALLOWED_ORIGINS = [
   "https://5670e5fc-c3f6-4b61-9f11-214ae88eb9ef.lovableproject.com",
@@ -52,15 +49,16 @@ serve(async (req) => {
       throw new Error("Unauthorized");
     }
 
-    // Check if user has admin role
-    const { data: roles } = await supabaseAdmin
-      .from("user_roles")
-      .select("role")
-      .eq("user_id", user.id);
+    // Check if user is a platform admin
+    const { data: platformAdmin } = await supabaseAdmin
+      .from("platform_admins")
+      .select("active")
+      .eq("user_id", user.id)
+      .eq("active", true)
+      .maybeSingle();
 
-    const isAdmin = (roles as UserRole[] | null)?.some((r: UserRole) => r.role === "admin");
-    if (!isAdmin) {
-      throw new Error("Only admins can reset the database");
+    if (!platformAdmin) {
+      throw new Error("Only platform admins can reset the database");
     }
 
     // Delete all data from tables (in correct order to respect foreign keys)

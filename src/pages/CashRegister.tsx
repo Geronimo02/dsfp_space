@@ -79,11 +79,14 @@ export default function CashRegister() {
 
   // Query for current register
   const { data: currentRegister, isLoading: loading } = useQuery({
-    queryKey: ["cash-register"],
+    queryKey: ["cash-register", currentCompany?.id],
     queryFn: async () => {
+      if (!currentCompany?.id) return null;
+      
       const { data: register, error: registerError } = await supabase
         .from("cash_registers")
         .select("*")
+        .eq("company_id", currentCompany.id)
         .eq("status", "open")
         .order("opening_date", { ascending: false })
         .limit(1)
@@ -92,7 +95,9 @@ export default function CashRegister() {
       if (registerError) throw registerError;
       return register;
     },
-    refetchInterval: 5000, // Refetch every 5 seconds
+    enabled: !!currentCompany?.id,
+    // Removed aggressive polling - using realtime subscriptions instead
+    staleTime: 30000, // Data is fresh for 30 seconds
   });
 
   // Query for movements
@@ -112,8 +117,43 @@ export default function CashRegister() {
       return movementsData || [];
     },
     enabled: !!currentRegister?.id,
-    refetchInterval: 5000, // Refetch every 5 seconds
+    // Removed aggressive polling - using realtime subscriptions instead
+    staleTime: 30000, // Data is fresh for 30 seconds
   });
+
+  // Subscribe to realtime changes for cash registers and movements
+  useEffect(() => {
+    if (!currentCompany?.id) return;
+
+    const registerChannel = supabase
+      .channel('cash-register-changes')
+      .on('postgres_changes', {
+        event: '*',
+        schema: 'public',
+        table: 'cash_registers',
+        filter: `company_id=eq.${currentCompany.id}`
+      }, () => {
+        queryClient.invalidateQueries({ queryKey: ["cash-register", currentCompany.id] });
+      })
+      .subscribe();
+
+    const movementsChannel = supabase
+      .channel('cash-movements-changes')
+      .on('postgres_changes', {
+        event: '*',
+        schema: 'public',
+        table: 'cash_movements',
+        filter: `company_id=eq.${currentCompany.id}`
+      }, () => {
+        queryClient.invalidateQueries({ queryKey: ["cash-movements"] });
+      })
+      .subscribe();
+
+    return () => {
+      registerChannel.unsubscribe();
+      movementsChannel.unsubscribe();
+    };
+  }, [currentCompany?.id, queryClient]);
 
   const handleOpenRegister = async () => {
     try {

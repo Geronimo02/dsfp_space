@@ -9,6 +9,7 @@ import { Card } from "@/components/ui/card";
 import { supabase } from "@/integrations/supabase/client";
 import { toast } from "sonner";
 import { Building2 } from "lucide-react";
+import { Link } from "react-router-dom";
 
 import { logger } from "@/lib/logger";
 
@@ -266,9 +267,9 @@ export default function SignupWizard() {
         {/* Footer */}
         <p className="text-center text-sm text-slate-200 mt-6">
           ¿Ya tienes una cuenta?{" "}
-          <a href="/auth" className="text-cyan-200 hover:text-cyan-100 underline-offset-4 hover:underline font-medium">
+          <Link to="/auth" className="text-cyan-200 hover:text-cyan-100 underline-offset-4 hover:underline font-medium">
             Inicia sesión
-          </a>
+          </Link>
         </p>
       </div>
     </div>

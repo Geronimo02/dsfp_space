@@ -320,6 +320,8 @@ const App = () => (
             <Route path="/reset-password" element={<ResetPassword />} />
             <Route path="/set-password/:token" element={<SetPasswordToken />} />
             <Route path="/module-not-available" element={<ProtectedRoute><ModuleNotAvailable /></ProtectedRoute>} />
+            {/* Redirect legacy /dashboard to /app */}
+            <Route path="/dashboard" element={<Navigate to="/app" replace />} />
             {/* Mostrar landing solo en la raíz */}
             <Route path="/" element={<Landing />} />
 
