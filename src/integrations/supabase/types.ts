@@ -7579,6 +7579,10 @@ export type Database = {
       is_company_admin_or_manager: { Args: never; Returns: boolean }
       is_platform_admin: { Args: { _user_id: string }; Returns: boolean }
       is_platform_admin_secure: { Args: never; Returns: boolean }
+      process_purchase_atomic: {
+        Args: { p_items: Json[]; p_purchase_data: Json }
+        Returns: Json
+      }
       save_company_oauth_app: {
         Args: {
           p_client_id: string
