@@ -19,6 +19,68 @@ export interface PaymentMethod {
   currency?: string;
 }
 
+export interface SelectedSale {
+  id: string;
+  sale_number: string;
+  total: number;
+}
+
+export interface SelectedCustomer {
+  id: string;
+  name: string;
+  phone?: string;
+  price_list_id?: string | null;
+  loyalty_tier?: 'gold' | 'silver' | 'bronze';
+  loyalty_points?: number;
+  current_balance?: number;
+  credit_limit?: number;
+  condicion_iva?: string;
+  selectedSale?: SelectedSale | null;
+}
+
+export interface LastSaleCustomer {
+  name: string;
+  email?: string;
+  phone?: string;
+  condicion_iva?: string;
+  tipo_documento?: string;
+  numero_documento?: string;
+  document?: string;
+}
+
+export interface LastSaleItem {
+  product_name: string;
+  product?: { name: string; code?: string };
+  quantity: number;
+  unit_price: number;
+  subtotal: number;
+  total?: number;
+}
+
+export interface LastSalePaymentMethod {
+  method: string;
+  amount: number;
+  installments?: number;
+  surcharge?: number;
+}
+
+export interface LastSaleData {
+  sale_number: string;
+  created_at: string;
+  total: number;
+  subtotal: number;
+  discount: number;
+  tax: number;
+  tax_rate?: number;
+  items: LastSaleItem[];
+  paymentMethods: LastSalePaymentMethod[];
+  customer: LastSaleCustomer | null;
+  numero_comprobante?: string | null;
+  cae?: string | null;
+  fecha_vencimiento_cae?: string | null;
+  pos_afip_id?: string | null;
+}
+
 export interface POSState {
   // Search & Cart
   searchQuery: string;
@@ -35,7 +97,7 @@ export interface POSState {
   selectedPaymentMethod: string;
   
   // Customer
-  selectedCustomer: any | null;
+  selectedCustomer: SelectedCustomer | null;
   newCustomerName: string;
   newCustomerPhone: string;
   newCustomerEmail: string;
@@ -54,7 +116,7 @@ export interface POSState {
   walkInSale: boolean;
   
   // Receipt
-  lastSaleData: any | null;
+  lastSaleData: LastSaleData | null;
 }
 
 // Action Types
@@ -74,7 +136,7 @@ export type POSAction =
   | { type: 'SET_CURRENT_PAYMENT_CURRENCY'; payload: string }
   | { type: 'SET_DISCOUNT_RATE'; payload: number }
   | { type: 'SET_LOYALTY_POINTS_TO_USE'; payload: number }
-  | { type: 'SET_SELECTED_CUSTOMER'; payload: any | null }
+  | { type: 'SET_SELECTED_CUSTOMER'; payload: SelectedCustomer | null }
   | { type: 'SET_NEW_CUSTOMER_NAME'; payload: string }
   | { type: 'SET_NEW_CUSTOMER_PHONE'; payload: string }
   | { type: 'SET_NEW_CUSTOMER_EMAIL'; payload: string }
@@ -88,7 +150,7 @@ export type POSAction =
   | { type: 'SET_SHOW_RECEIPT_OPTIONS'; payload: boolean }
   | { type: 'SET_IS_PROCESSING_SALE'; payload: boolean }
   | { type: 'SET_WALK_IN_SALE'; payload: boolean }
-  | { type: 'SET_LAST_SALE_DATA'; payload: any | null }
+  | { type: 'SET_LAST_SALE_DATA'; payload: LastSaleData | null }
   | { type: 'SET_SELECTED_PAYMENT_METHOD'; payload: string }
   | { type: 'RESET_POS' };
 

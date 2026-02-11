@@ -1,13 +1,35 @@
-import { useEffect } from "react";
+import { useEffect, useRef } from "react";
 import { useQueryClient } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
 import { toast } from "sonner";
+import { logger } from "@/lib/logger";
+
+interface RealtimeTicket {
+  id: string;
+  ticket_number: string;
+  company_id: string;
+  subject: string;
+  status: string;
+  priority: string;
+  updated_at: string;
+  [key: string]: unknown;
+}
+
+interface RealtimeMessage {
+  id: string;
+  ticket_id: string;
+  sender_type: string;
+  sender_id: string;
+  message: string;
+  created_at: string;
+  [key: string]: unknown;
+}
 
 interface RealtimeOptions {
   companyId?: string;
   ticketId?: string;
-  onNewMessage?: (message: any) => void;
-  onTicketUpdate?: (ticket: any) => void;
+  onNewMessage?: (message: RealtimeMessage) => void;
+  onTicketUpdate?: (ticket: RealtimeTicket) => void;
 }
 
 export function usePlatformSupportRealtime({
@@ -17,6 +39,12 @@ export function usePlatformSupportRealtime({
   onTicketUpdate,
 }: RealtimeOptions) {
   const queryClient = useQueryClient();
+
+  // Stabilize callbacks with refs to avoid re-subscribing on every render
+  const onNewMessageRef = useRef(onNewMessage);
+  onNewMessageRef.current = onNewMessage;
+  const onTicketUpdateRef = useRef(onTicketUpdate);
+  onTicketUpdateRef.current = onTicketUpdate;
 
   useEffect(() => {
     if (!companyId) return;
@@ -33,7 +61,7 @@ export function usePlatformSupportRealtime({
           filter: `company_id=eq.${companyId}`,
         },
         (payload) => {
-          console.log("Ticket change:", payload);
+          logger.debug("[Realtime] Ticket change:", payload.eventType);
           
           // Invalidate queries to refresh data
           queryClient.invalidateQueries({ 
@@ -52,7 +80,7 @@ export function usePlatformSupportRealtime({
               toast.info(`Ticket ${newData.ticket_number}: Estado cambiado a ${newData.status}`);
             }
 
-            onTicketUpdate?.(newData);
+            onTicketUpdateRef.current?.(newData);
           }
         }
       )
@@ -73,7 +101,7 @@ export function usePlatformSupportRealtime({
             filter: `ticket_id=eq.${ticketId}`,
           },
           async (payload) => {
-            console.log("New message:", payload);
+            logger.debug("[Realtime] New message received");
             
             // Invalidate messages query
             queryClient.invalidateQueries({ 
@@ -90,7 +118,7 @@ export function usePlatformSupportRealtime({
               });
             }
 
-            onNewMessage?.(newMessage);
+            onNewMessageRef.current?.(newMessage);
           }
         )
         .subscribe();
@@ -102,5 +130,5 @@ export function usePlatformSupportRealtime({
         supabase.removeChannel(messageChannel);
       }
     };
-  }, [companyId, ticketId, queryClient, onNewMessage, onTicketUpdate]);
+  }, [companyId, ticketId, queryClient]);
 }

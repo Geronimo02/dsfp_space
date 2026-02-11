@@ -85,29 +85,32 @@ export function CompanyProvider({ children }: { children: React.ReactNode }) {
       }
 
       logger.debug("Companies fetched:", data?.length || 0, "companies");
-      const companyUsers = data as CompanyUser[];
+      // Filter out entries where the company join returned null (e.g., deleted company)
+      const companyUsers = (data ?? []).filter(
+        (cu): cu is CompanyUser => cu.companies != null
+      );
       setUserCompanies(companyUsers);
 
       // Set current company from localStorage or first company
       const savedCompanyId = localStorage.getItem('currentCompanyId');
       if (savedCompanyId) {
-        const savedCompany = data?.find((cu) => cu.company_id === savedCompanyId);
+        const savedCompany = companyUsers.find((cu) => cu.company_id === savedCompanyId);
         if (savedCompany) {
           setCurrentCompany(savedCompany.companies);
           setCurrentCompanyRole(savedCompany.role);
         } else {
           // Empresa guardada no pertenece al usuario actual - limpiar y usar primera empresa
           localStorage.removeItem('currentCompanyId');
-          if (data && data.length > 0) {
-            setCurrentCompany(data[0].companies);
-            setCurrentCompanyRole((data[0] as CompanyUser).role);
-            localStorage.setItem('currentCompanyId', data[0].company_id);
+          if (companyUsers.length > 0) {
+            setCurrentCompany(companyUsers[0].companies);
+            setCurrentCompanyRole(companyUsers[0].role);
+            localStorage.setItem('currentCompanyId', companyUsers[0].company_id);
           }
         }
-      } else if (data && data.length > 0) {
-        setCurrentCompany(data[0].companies);
-        setCurrentCompanyRole((data[0] as CompanyUser).role);
-        localStorage.setItem('currentCompanyId', data[0].company_id);
+      } else if (companyUsers.length > 0) {
+        setCurrentCompany(companyUsers[0].companies);
+        setCurrentCompanyRole(companyUsers[0].role);
+        localStorage.setItem('currentCompanyId', companyUsers[0].company_id);
       }
     } catch (error) {
       if (import.meta.env.DEV) console.error('Error fetching companies:', error);

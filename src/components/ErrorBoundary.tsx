@@ -30,7 +30,26 @@ export class ErrorBoundary extends Component<Props, State> {
       console.error('ErrorBoundary caught an error:', error, errorInfo);
     }
 
-    // In production, you would send this to an error tracking service like Sentry
+    // Production error reporting
+    // Send to external service (Sentry, LogRocket, etc.) when configured
+    try {
+      const errorReport = {
+        message: error.message,
+        stack: error.stack,
+        componentStack: errorInfo.componentStack,
+        timestamp: new Date().toISOString(),
+        url: window.location.href,
+        userAgent: navigator.userAgent,
+      };
+      // TODO: Replace with actual error reporting service endpoint
+      // e.g., Sentry.captureException(error, { extra: errorReport });
+      if (!import.meta.env.DEV) {
+        console.error('[ErrorBoundary] Production error:', errorReport.message);
+      }
+    } catch {
+      // Silently fail if error reporting itself fails
+    }
+
     this.setState({ error, errorInfo });
   }
 

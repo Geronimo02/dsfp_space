@@ -4,6 +4,7 @@ import { ArrowRight, Loader2, AlertCircle } from "lucide-react";
 import { toast } from "sonner";
 import { Alert, AlertDescription } from "@/components/ui/alert";
 import { supabase } from "@/integrations/supabase/client";
+import { logger } from "@/lib/logger";
 
 interface MercadoPagoCardFieldsProps {
   onSuccess: (token: string, metadata: { brand: string; last4: string; exp_month: number; exp_year: number }) => void;
@@ -79,15 +80,15 @@ export function MercadoPagoCardFields({ onSuccess, isLoading }: MercadoPagoCardF
                     setMpLoaded(true);
                   },
                   onError: (error: any) => {
-                    console.error("[MP] Brick error:", error);
+                    logger.error("[MP] Brick error:", error?.message);
                     const friendlyMessage = translateMercadoPagoError(error?.message);
                     setCardError(friendlyMessage);
                   },
                   onSubmit: async (formData: any) => {
                     setSaving(true);
                     try {
-                      console.log("[MP] formData received:", formData);
-                      console.log("[MP] All form data keys:", Object.keys(formData));
+                      logger.debug("[MP] formData received");
+                      logger.debug("[MP] All form data keys:", Object.keys(formData));
                       
                       // Try to extract card data from formData
                       // MP Bricks may include: cardNumber, cardholderName, cardExpirationMonth, cardExpirationYear, securityCode
@@ -115,7 +116,7 @@ export function MercadoPagoCardFields({ onSuccess, isLoading }: MercadoPagoCardF
                         if (tokenResp.error) throw tokenResp.error;
                         
                         const token = tokenResp.data?.token_id || tokenResp.data?.id;
-                        console.log("[MP] Token created:", token);
+                        logger.debug("[MP] Token created successfully");
                         
                         // Extract metadata from card data
                         const last4 = cardData.cardNumber.replace(/\s/g, '').slice(-4);
@@ -124,20 +125,20 @@ export function MercadoPagoCardFields({ onSuccess, isLoading }: MercadoPagoCardF
                         const exp_year = parseInt(cardData.cardExpirationYear, 10);
                         
                         const metadata = { brand, last4, exp_month, exp_year };
-                        console.log("[MP] Card metadata:", metadata);
+                        logger.debug("[MP] Card metadata extracted");
                         
                         toast.success("Tarjeta procesada exitosamente");
                         onSuccess(token, metadata);
                       } else {
                         // Fallback: generate test token
-                        console.log("[MP] No card data in formData, using test token");
+                        logger.debug("[MP] No card data in formData, using test token");
                         const testToken = `mp_token_${Date.now()}`;
                         const testMetadata = { brand: "test", last4: "0000", exp_month: 12, exp_year: 2030 };
                         toast.success("Tarjeta guardada exitosamente");
                         onSuccess(testToken, testMetadata);
                       }
                     } catch (error: any) {
-                      console.error("[MP] Token error:", error);
+                      logger.error("[MP] Token error:", error?.message);
                       const friendlyMessage = translateMercadoPagoError(error?.message);
                       setCardError(friendlyMessage);
                       setSaving(false);
@@ -158,7 +159,7 @@ export function MercadoPagoCardFields({ onSuccess, isLoading }: MercadoPagoCardF
         };
         document.body.appendChild(script);
       } catch (error: any) {
-        console.error("[MP] Init error:", error);
+        logger.error("[MP] Init error:", error?.message);
         setMpError(error?.message || "Error inicializando Mercado Pago");
       }
     };
@@ -170,7 +171,7 @@ export function MercadoPagoCardFields({ onSuccess, isLoading }: MercadoPagoCardF
         try {
           cardPaymentRef.current.unmount();
         } catch (e) {
-          console.log("[MP] Unmount error (ok):", e);
+          // Cleanup unmount - safe to ignore
         }
       }
     };
@@ -185,7 +186,7 @@ export function MercadoPagoCardFields({ onSuccess, isLoading }: MercadoPagoCardF
       setSaving(true);
       await cardPaymentRef.current.submit();
     } catch (error: any) {
-      console.error("[MP] Submit error:", error);
+      logger.error("[MP] Submit error:", error?.message);
       const friendlyMessage = translateMercadoPagoError(error?.message);
       setCardError(friendlyMessage);
       setSaving(false);

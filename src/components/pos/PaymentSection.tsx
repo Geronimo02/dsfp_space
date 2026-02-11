@@ -148,6 +148,7 @@ export function PaymentSection({
                   <Button
                     size="icon"
                     variant="ghost"
+                    aria-label="Eliminar pago"
                     onClick={() => onRemovePayment(payment.id)}
                     disabled={isProcessing}
                   >

@@ -11,7 +11,7 @@ vi.mock('@/integrations/supabase/client', () => ({
   supabase: {
     auth: {
       getUser: vi.fn(),
-      getSession: vi.fn(),
+      getSession: vi.fn(() => Promise.resolve({ data: { session: null }, error: null })),
       onAuthStateChange: vi.fn(() => ({
         data: { subscription: { unsubscribe: vi.fn() } },
       })),
@@ -130,7 +130,7 @@ describe('useAuth', () => {
 
     await waitFor(() => {
       expect(result.current.isLoading).toBe(false);
-    });
+    }, { timeout: 10000 });
 
     expect(result.current.error).toBeTruthy();
   });

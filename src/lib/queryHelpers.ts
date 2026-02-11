@@ -82,10 +82,13 @@ export function withLimitAndOrder<T>(
 export function sanitizeSearchQuery(query: string | undefined | null): string | null {
   if (!query) return null;
   
-  // Remove special characters that could be used for SQL injection
+  // Remove special characters that could be problematic
+  // Note: Supabase uses parameterized queries (PostgREST), so SQL injection
+  // is mitigated at the driver level. This sanitization is defense-in-depth.
   const sanitized = query
     .trim()
-    .replace(/[;'"\\]/g, '') // Remove SQL special chars
+    .replace(/[;'"\\%_]/g, '') // Remove SQL special chars including wildcards
+    .replace(/[\x00-\x1F\x7F]/g, '') // Remove control characters
     .slice(0, 100); // Limit length
   
   return sanitized || null;

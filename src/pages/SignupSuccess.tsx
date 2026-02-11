@@ -33,11 +33,11 @@ export default function SignupSuccess() {
         setPassword(data.password);
         setPasswordLoaded(true);
       } catch (e) {
-        console.error("[SignupSuccess] Error loading password:", e);
+        logger.error("[SignupSuccess] Error loading password:", e);
         setPasswordLoaded(true); // Mark as loaded even if error
       }
     } else {
-      console.warn("[SignupSuccess] No saved wizard data found");
+      logger.warn("[SignupSuccess] No saved wizard data found");
       setPasswordLoaded(true);
     }
   }, []);
@@ -50,7 +50,7 @@ export default function SignupSuccess() {
 
     // Don't start checking until password is loaded
     if (!passwordLoaded) {
-      console.log("[SignupSuccess] Waiting for password to load...");
+      logger.debug("[SignupSuccess] Waiting for password to load...");
       return;
     }
 
@@ -78,12 +78,12 @@ export default function SignupSuccess() {
               body: { intent_id: intentId, stripe_session_id: stripeSessionId },
             });
             if (readyErr) throw readyErr;
-            console.log("[SignupSuccess] Marked intent ready:", readyData);
+            logger.debug("[SignupSuccess] Marked intent ready");
             // Re-check status to proceed to finalize
             setStatus("checking");
             setAttempts((prev) => prev + 1);
           } catch (e) {
-            console.error("[SignupSuccess] Error marking intent ready:", e);
+            logger.error("[SignupSuccess] Error marking intent ready:", e);
             setStatus("error");
           }
         } else if (attempts >= 30) {
@@ -91,7 +91,7 @@ export default function SignupSuccess() {
           setStatus("timeout");
         }
       } catch (error) {
-        console.error("[SignupSuccess] Error checking status:", error);
+        logger.error("[SignupSuccess] Error checking status:", error);
         setStatus("error");
       }
     };
@@ -111,14 +111,14 @@ export default function SignupSuccess() {
 
   const finalizeSignup = async () => {
     if (!intentId || !password) {
-      console.error("[SignupSuccess] Missing data:", { intentId, hasPassword: !!password });
+      logger.error("[SignupSuccess] Missing data for finalization");
       toast.error("Faltan datos para finalizar el registro");
       setStatus("error");
       return;
     }
 
     try {
-      console.log("[SignupSuccess] Finalizing signup with intent_id:", intentId);
+      logger.debug("[SignupSuccess] Finalizing signup");
 
       const { data, error } = await supabase.functions.invoke("finalize-signup", {
         body: {
@@ -129,7 +129,7 @@ export default function SignupSuccess() {
 
       if (error) throw error;
 
-      console.log("[SignupSuccess] Signup finalized:", data);
+      logger.debug("[SignupSuccess] Signup finalized successfully");
 
       // Clear localStorage
       localStorage.removeItem("signup_wizard_data");
@@ -152,18 +152,18 @@ export default function SignupSuccess() {
             .limit(1);
           
           if (companies && companies.length > 0) {
-            console.log("[SignupSuccess] Company verified, reloading...");
+            logger.debug("[SignupSuccess] Company verified, reloading...");
           } else {
-            console.warn("[SignupSuccess] Company not found yet, but reloading anyway...");
+            logger.warn("[SignupSuccess] Company not found yet, reloading anyway...");
           }
         }
       } catch (e) {
-        console.warn("[SignupSuccess] Could not verify company:", e);
+        logger.warn("[SignupSuccess] Could not verify company:", e);
       }
 
       window.location.href = "/";
     } catch (error) {
-      console.error("[SignupSuccess] Error finalizing:", error);
+      logger.error("[SignupSuccess] Error finalizing:", error);
       toast.error(`Error al finalizar registro: ${error}`);
       setStatus("error");
     }

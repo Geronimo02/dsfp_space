@@ -2,12 +2,11 @@ import { Toaster } from "@/components/ui/toaster";
 import { Toaster as Sonner } from "@/components/ui/sonner";
 import { TooltipProvider } from "@/components/ui/tooltip";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
-import { BrowserRouter, Routes, Route, Navigate, useLocation } from "react-router-dom";
-import { useEffect, useState, lazy, Suspense } from "react";
-import { supabase } from "@/integrations/supabase/client";
+import { BrowserRouter, Routes, Route, Navigate } from "react-router-dom";
+import { useEffect, useState, useRef, lazy, Suspense } from "react";
 import { CompanyProvider, useCompany } from "@/contexts/CompanyContext";
-import { User, Session } from "@supabase/supabase-js";
 import { usePlatformAdmin } from "@/hooks/usePlatformAdmin";
+import { useAuth } from "@/hooks/useAuth";
 import { ModuleProtectedRoute } from "./components/ModuleProtectedRoute";
 import { usePermissions } from "@/hooks/usePermissions";
 import { LoadingState } from "./components/LoadingState";
@@ -101,6 +100,12 @@ function CompanyCheck({ children }: { children: React.ReactNode }) {
   const { isPlatformAdmin, isLoading: isLoadingAdmin } = usePlatformAdmin();
   const [shouldRedirect, setShouldRedirect] = useState(false);
   const [pendingCheck, setPendingCheck] = useState(true); // NEW: block UI/redirect until timeout
+  const userCompaniesRef = useRef(userCompanies);
+
+  // Keep ref in sync with state to avoid stale closures in setInterval
+  useEffect(() => {
+    userCompaniesRef.current = userCompanies;
+  }, [userCompanies]);
 
   // LOGS para depuración
   // useEffect(() => {
@@ -121,13 +126,13 @@ function CompanyCheck({ children }: { children: React.ReactNode }) {
       let signedTsStr: string | null = null;
       try { signedTsStr = localStorage.getItem("just_signed_in_at"); } catch {}
       const recentLogin = signedTsStr ? (Date.now() - Number(signedTsStr)) < 15000 : false;
-      const maxWait = recentLogin ? 15000 : 8000;
+      const maxWait = recentLogin ? 10000 : 6000;
       const start = Date.now();
       const interval = setInterval(async () => {
         try { await refreshCompanies(); } catch {}
 
-        // If companies appear, stop waiting and do NOT redirect
-        if (userCompanies.length > 0) {
+        // Use ref to read latest state (avoids stale closure)
+        if (userCompaniesRef.current.length > 0) {
           setShouldRedirect(false);
           setPendingCheck(false);
           clearInterval(interval);
@@ -142,11 +147,11 @@ function CompanyCheck({ children }: { children: React.ReactNode }) {
           setPendingCheck(false);
           clearInterval(interval);
         }
-      }, 1000);
+      }, 2000);
 
       return () => clearInterval(interval);
     }
-  }, [loading, isLoadingAdmin, isPlatformAdmin, userCompanies, refreshCompanies, currentCompany]);
+  }, [loading, isLoadingAdmin, isPlatformAdmin, refreshCompanies, currentCompany]);
 
   // During the wait, keep showing loader unless we already have a current company
   if (loading || isLoadingAdmin || (pendingCheck && !currentCompany)) {
@@ -173,42 +178,15 @@ function CompanyCheck({ children }: { children: React.ReactNode }) {
 
 // Protected route that only checks authentication (no company check)
 function AuthOnlyRoute({ children }: { children: React.ReactNode }) {
-  const [user, setUser] = useState<User | null>(null);
-  const [session, setSession] = useState<Session | null>(null);
-  const [loading, setLoading] = useState(true);
+  const { user, isLoading } = useAuth();
   const { isPlatformAdmin, isLoading: isLoadingAdmin } = usePlatformAdmin();
 
-  useEffect(() => {
-    const { data: { subscription } } = supabase.auth.onAuthStateChange(
-      (event, session) => {
-        setSession(session);
-        setUser(session?.user ?? null);
-        setLoading(false);
-      }
-    );
-
-    supabase.auth.getSession().then(({ data: { session } }) => {
-      setSession(session);
-      setUser(session?.user ?? null);
-      setLoading(false);
-    });
-
-    return () => subscription.unsubscribe();
-  }, []);
-
-
-  if (loading || isLoadingAdmin) {
+  if (isLoading || isLoadingAdmin) {
     return <LoadingState fullScreen />;
   }
 
   if (!user) {
-    if (import.meta.env.DEV) console.warn("No hay usuario autenticado. Redirigiendo a login.");
-    return (
-      <div className="flex flex-col items-center justify-center min-h-screen">
-        <p className="text-lg text-destructive font-bold mb-4">No hay sesión activa. Por favor inicia sesión.</p>
-        <Navigate to="/auth" />
-      </div>
-    );
+    return <Navigate to="/auth" replace />;
   }
 
   // Platform admins bypass company setup and go to platform admin
@@ -221,38 +199,14 @@ function AuthOnlyRoute({ children }: { children: React.ReactNode }) {
 
 // Route specifically for platform admins - only checks auth and admin status
 function PlatformAdminRoute({ children }: { children: React.ReactNode }) {
-  const [user, setUser] = useState<User | null>(null);
-  const [loading, setLoading] = useState(true);
+  const { user, isLoading } = useAuth();
 
-  useEffect(() => {
-    const { data: { subscription } } = supabase.auth.onAuthStateChange(
-      (event, session) => {
-        setUser(session?.user ?? null);
-        setLoading(false);
-      }
-    );
-
-    supabase.auth.getSession().then(({ data: { session } }) => {
-      setUser(session?.user ?? null);
-      setLoading(false);
-    });
-
-    return () => subscription.unsubscribe();
-  }, []);
-
-
-  if (loading) {
+  if (isLoading) {
     return <LoadingState fullScreen />;
   }
 
   if (!user) {
-    if (import.meta.env.DEV) console.warn("No hay usuario autenticado (admin route). Redirigiendo a login.");
-    return (
-      <div className="flex flex-col items-center justify-center min-h-screen">
-        <p className="text-lg text-destructive font-bold mb-4">No hay sesión activa. Por favor inicia sesión.</p>
-        <Navigate to="/auth" />
-      </div>
-    );
+    return <Navigate to="/auth" replace />;
   }
 
   // No redirect here - just render the children (PlatformAdmin will handle admin check)
@@ -261,41 +215,20 @@ function PlatformAdminRoute({ children }: { children: React.ReactNode }) {
 
 // Protected route with both authentication and company checks
 function ProtectedRoute({ children }: { children: React.ReactNode }) {
-  const [user, setUser] = useState<User | null>(null);
-  const [session, setSession] = useState<Session | null>(null);
-  const [loading, setLoading] = useState(true);
+  const { user, isLoading } = useAuth();
   const { isPlatformAdmin } = usePlatformAdmin();
   const { isAdmin } = usePermissions();
 
-  useEffect(() => {
-    const { data: { subscription } } = supabase.auth.onAuthStateChange(
-      (event, session) => {
-        setSession(session);
-        setUser(session?.user ?? null);
-        setLoading(false);
-      }
-    );
-
-    supabase.auth.getSession().then(({ data: { session } }) => {
-      setSession(session);
-      setUser(session?.user ?? null);
-      setLoading(false);
-    });
-
-    return () => subscription.unsubscribe();
-  }, []);
-
-  if (loading) {
+  if (isLoading) {
     return <LoadingState fullScreen />;
   }
 
   if (!user) {
-    return <Navigate to="/auth" />;
+    return <Navigate to="/auth" replace />;
   }
 
   // Si es platform_admin y NO es admin de empresa, redirige a /admin/platform
   if (isPlatformAdmin && !isAdmin) {
-    // console.log("[ProtectedRoute] Redirigiendo a /admin/platform por isPlatformAdmin");
     return <Navigate to="/admin/platform" replace />;
   }
 

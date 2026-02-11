@@ -85,8 +85,13 @@ export function useServerPagination({
 
   const canGoPrevious = currentPage > 1;
 
-  const goToNextPage = () => {
-    setCurrentPage((prev) => prev + 1);
+  const goToNextPage = (totalCount?: number) => {
+    setCurrentPage((prev) => {
+      if (totalCount !== undefined) {
+        return Math.min(prev + 1, getTotalPages(totalCount));
+      }
+      return prev + 1;
+    });
   };
 
   const goToPreviousPage = () => {

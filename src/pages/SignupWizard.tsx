@@ -56,7 +56,7 @@ export default function SignupWizard() {
       });
 
       if (error) {
-        console.error("[SignupWizard] Intent error:", error);
+        logger.error("[SignupWizard] Intent error:", error);
         throw error;
       }
 
@@ -94,7 +94,7 @@ export default function SignupWizard() {
       );
 
       if (checkoutError) {
-        console.error("[SignupWizard] Checkout error:", checkoutError);
+        logger.error("[SignupWizard] Checkout error:", checkoutError);
         throw checkoutError;
       }
 
@@ -107,16 +107,16 @@ export default function SignupWizard() {
         return;
       }
 
-      console.log("[SignupWizard] is_free_trial:", checkoutData?.is_free_trial);
-      console.log("[SignupWizard] checkout_url:", checkoutData?.checkout_url);
-      console.log("[SignupWizard] intent_id:", checkoutData?.intent_id);
+      logger.debug("[SignupWizard] is_free_trial:", checkoutData?.is_free_trial);
+      logger.debug("[SignupWizard] has checkout_url:", !!checkoutData?.checkout_url);
+      logger.debug("[SignupWizard] has intent_id:", !!checkoutData?.intent_id);
 
       // Handle free trial (no external checkout needed)
       if (checkoutData?.is_free_trial || !checkoutData?.checkout_url) {
         // Save intent_id to localStorage if provided
         if (checkoutData?.intent_id) {
           localStorage.setItem("signup_intent_id", checkoutData.intent_id);
-          console.log("[SignupWizard] Saved intent_id to localStorage:", checkoutData.intent_id);
+          logger.debug("[SignupWizard] Saved intent_id to localStorage");
         }
         toast.success("¡Prueba gratuita activada!");
         setTimeout(() => {
@@ -130,7 +130,7 @@ export default function SignupWizard() {
         throw new Error("No checkout_url o is_free_trial en response");
       }
     } catch (error) {
-      console.error("[SignupWizard] Error:", error);
+      logger.error("[SignupWizard] Error:", error);
       toast.error("Error al procesar la solicitud. Por favor intenta de nuevo.");
       throw error;
     }

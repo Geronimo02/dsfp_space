@@ -1302,7 +1302,7 @@ Impuestos: $${saleData.tax.toFixed(2)}
                               onChange={(e) => setCurrentPaymentAmount(e.target.value)}
                               className="flex-1"
                             />
-                            <Button type="button" size="icon" onClick={() => addPaymentMethod()}>
+                            <Button type="button" size="icon" aria-label="Agregar método de pago" onClick={() => addPaymentMethod()}>
                               <Plus className="h-4 w-4" />
                             </Button>
                           </div>
@@ -1338,7 +1338,7 @@ Impuestos: $${saleData.tax.toFixed(2)}
                                 </div>
                                 <div className="flex items-center gap-2">
                                   <span className="text-sm font-semibold">${pm.amount.toFixed(2)} ARS</span>
-                                  <Button size="icon" variant="ghost" className="h-6 w-6 hover:scale-110 transition-transform" onClick={() => removePaymentMethod(pm.id)}>
+                                  <Button size="icon" variant="ghost" className="h-6 w-6 hover:scale-110 transition-transform" aria-label="Eliminar tramo de pago" onClick={() => removePaymentMethod(pm.id)}>
                                     <Trash2 className="h-3 w-3" />
                                   </Button>
                                 </div>

@@ -320,9 +320,10 @@ export function usePermissions() {
   });
 
   const roleNames = userRoles?.map(r => r.role) || [];
+  const roleNamesKey = roleNames.join(',');
 
   const { data: permissions, isLoading: permissionsLoading } = useQuery({
-    queryKey: ["role-permissions", roleNames, currentCompany?.id],
+    queryKey: ["role-permissions", roleNamesKey, currentCompany?.id],
     queryFn: async () => {
       if (roleNames.length === 0 || !currentCompany?.id) return [];
       
@@ -382,7 +383,7 @@ export function usePermissions() {
     });
   };
 
-  const hasRole = (role: string): boolean => {
+  const hasRole = (role: AppRole): boolean => {
     return userRoles?.some(r => r.role === role) || false;
   };
 

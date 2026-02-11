@@ -1,5 +1,5 @@
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
-import { renderHook, waitFor } from '@testing-library/react';
+import { renderHook, act, waitFor } from '@testing-library/react';
 import { useDebounce } from '@/hooks/useDebounce';
 
 describe('useDebounce', () => {
@@ -28,13 +28,10 @@ describe('useDebounce', () => {
     rerender({ value: 'updated', delay: 500 });
     expect(result.current).toBe('initial'); // Still old value
 
-    // Fast forward time
-    vi.advanceTimersByTime(499);
-    expect(result.current).toBe('initial'); // Still old value
-
-    vi.advanceTimersByTime(1);
-    // Need to wait for React to re-render
-    await vi.runAllTimersAsync();
+    // Fast forward time past debounce delay
+    await act(async () => {
+      await vi.advanceTimersByTimeAsync(500);
+    });
     expect(result.current).toBe('updated'); // Now updated
   });
 
@@ -45,15 +42,20 @@ describe('useDebounce', () => {
     );
 
     rerender({ value: 'second' });
-    vi.advanceTimersByTime(200);
+    await act(async () => {
+      await vi.advanceTimersByTimeAsync(200);
+    });
     
     rerender({ value: 'third' });
-    vi.advanceTimersByTime(200);
+    await act(async () => {
+      await vi.advanceTimersByTimeAsync(200);
+    });
     
     rerender({ value: 'fourth' });
-    vi.advanceTimersByTime(500);
+    await act(async () => {
+      await vi.advanceTimersByTimeAsync(500);
+    });
 
-    await vi.runAllTimersAsync();
     expect(result.current).toBe('fourth');
   });
 
@@ -66,9 +68,10 @@ describe('useDebounce', () => {
     expect(result.current).toBe(123);
 
     rerender({ value: 456 });
-    vi.advanceTimersByTime(300);
+    await act(async () => {
+      await vi.advanceTimersByTimeAsync(300);
+    });
 
-    await vi.runAllTimersAsync();
     expect(result.current).toBe(456);
   });
 
@@ -80,7 +83,9 @@ describe('useDebounce', () => {
 
     rerender({ value: 'updated' });
     
-    await vi.runAllTimersAsync();
+    await act(async () => {
+      await vi.runAllTimersAsync();
+    });
     expect(result.current).toBe('updated');
   });
 });

@@ -65,11 +65,11 @@ export default function Auth() {
       toast.success("Sesión iniciada correctamente");
       try { localStorage.setItem("just_signed_in_at", String(Date.now())); } catch {}
       navigate("/app");
-    } catch (error: any) {
+    } catch (error: unknown) {
       if (error instanceof z.ZodError) {
         toast.error(error.errors[0].message);
       } else {
-        toast.error(error.message || "Error al iniciar sesión");
+        toast.error(error instanceof Error ? error.message : "Error al iniciar sesión");
       }
     } finally {
       setIsLoading(false);
@@ -97,8 +97,8 @@ export default function Auth() {
       toast.success("¡Correo enviado! Revisa tu email para restablecer tu contraseña.");
       setShowForgotPassword(false);
       setResetEmail("");
-    } catch (error: any) {
-      toast.error(error.message || "Error al enviar correo de recuperación");
+    } catch (error: unknown) {
+      toast.error(error instanceof Error ? error.message : "Error al enviar correo de recuperación");
     } finally {
       setIsLoading(false);
     }

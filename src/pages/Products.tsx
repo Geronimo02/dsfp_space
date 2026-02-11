@@ -1371,6 +1371,7 @@ export default function Products() {
                             variant="destructive"
                             size="icon"
                             className="absolute top-1 right-1 h-6 w-6"
+                            aria-label="Eliminar imagen"
                             onClick={removeImage}
                           >
                             <X className="h-4 w-4" />
@@ -2008,7 +2009,7 @@ export default function Products() {
                               <TooltipProvider>
                                 <Tooltip>
                                   <TooltipTrigger asChild>
-                                    <Button size="sm" variant="ghost" onClick={(e) => { e.stopPropagation(); handleEdit(product); }}>
+                                    <Button size="sm" variant="ghost" aria-label="Editar producto" onClick={(e) => { e.stopPropagation(); handleEdit(product); }}>
                                       <Edit className="h-4 w-4" />
                                     </Button>
                                   </TooltipTrigger>
@@ -2021,7 +2022,7 @@ export default function Products() {
                             <TooltipProvider>
                               <Tooltip>
                                 <TooltipTrigger asChild>
-                                  <Button size="sm" variant="ghost" className="text-destructive hover:text-destructive hover:bg-destructive/10" onClick={(e) => { e.stopPropagation(); deleteProductMutation.mutate(product.id); }}>
+                                  <Button size="sm" variant="ghost" className="text-destructive hover:text-destructive hover:bg-destructive/10" aria-label="Eliminar producto" onClick={(e) => { e.stopPropagation(); deleteProductMutation.mutate(product.id); }}>
                                     <Trash2 className="h-4 w-4" />
                                   </Button>
                                 </TooltipTrigger>

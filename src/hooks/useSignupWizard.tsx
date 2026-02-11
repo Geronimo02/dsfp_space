@@ -54,9 +54,10 @@ export function useSignupWizard() {
     }
   }, []);
 
-  // Save to localStorage on change
+  // Save to localStorage on change (exclude password for security)
   useEffect(() => {
-    localStorage.setItem(STORAGE_KEY, JSON.stringify(formData));
+    const { password, ...safeData } = formData;
+    localStorage.setItem(STORAGE_KEY, JSON.stringify(safeData));
   }, [formData]);
 
   useEffect(() => {
