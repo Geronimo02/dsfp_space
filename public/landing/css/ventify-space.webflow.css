@@ -2181,12 +2181,15 @@ figure {
   padding-top: .5rem;
   padding-bottom: .5rem;
   display: flex;
+  text-align: center;
 }
 
 .pricing-feature {
   grid-column-gap: var(--_spacing---space--spacing-md);
   grid-row-gap: var(--_spacing---space--spacing-md);
   display: flex;
+  justify-content: center;
+  align-items: center;
 }
 
 .pricing-plans {
