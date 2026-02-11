@@ -71,6 +71,14 @@ const TAG_COLOR_PALETTE = [
 
 const normalizeColor = (color: string) => color.replace(/\s+/g, "").toLowerCase();
 
+const normalizeColorForCompare = (color: string) => {
+  const trimmed = color.trim();
+  if (trimmed.startsWith("#")) {
+    return normalizeColor(hexToRgb(trimmed));
+  }
+  return normalizeColor(trimmed);
+};
+
 const hexToRgb = (hex: string) => {
   const normalized = hex.replace("#", "");
   const bigint = parseInt(normalized, 16);
@@ -245,8 +253,10 @@ export function OpportunityDrawer({ open, onClose, companyId, opportunity }: Opp
   }, [tags, tagSearch]);
 
   const suggestedColor = useMemo(() => {
-    const existing = new Set(tags.map((t) => normalizeColor(t.color)));
-    const next = TAG_COLOR_PALETTE.find((color) => !existing.has(normalizeColor(color)));
+    const existing = new Set(tags.map((t) => normalizeColorForCompare(t.color)));
+    const next = TAG_COLOR_PALETTE.find(
+      (color) => !existing.has(normalizeColorForCompare(color))
+    );
     return next || TAG_COLOR_PALETTE[0];
   }, [tags]);
 
