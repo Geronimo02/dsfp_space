@@ -37,6 +37,8 @@ export interface OpportunityListParams {
     pipelineId?: string;
     stageId?: string;
     ownerId?: string;
+    status?: string;
+    dateRange?: { from: string; to: string };
     value?: { min: number; max: number };
   };
   sort?: { field: keyof OpportunityRow; direction: "asc" | "desc" };

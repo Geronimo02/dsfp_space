@@ -1,0 +1,9 @@
+-- Add indexes for crm_opportunities to improve filtering/sorting performance
+CREATE INDEX IF NOT EXISTS crm_opportunities_company_id_idx ON crm_opportunities (company_id);
+CREATE INDEX IF NOT EXISTS crm_opportunities_pipeline_id_idx ON crm_opportunities (pipeline_id);
+CREATE INDEX IF NOT EXISTS crm_opportunities_stage_idx ON crm_opportunities (stage);
+CREATE INDEX IF NOT EXISTS crm_opportunities_owner_id_idx ON crm_opportunities (owner_id);
+CREATE INDEX IF NOT EXISTS crm_opportunities_status_idx ON crm_opportunities (status);
+CREATE INDEX IF NOT EXISTS crm_opportunities_estimated_close_date_idx ON crm_opportunities (estimated_close_date);
+CREATE INDEX IF NOT EXISTS crm_opportunities_value_idx ON crm_opportunities (value);
+CREATE INDEX IF NOT EXISTS crm_opportunities_updated_at_idx ON crm_opportunities (updated_at);

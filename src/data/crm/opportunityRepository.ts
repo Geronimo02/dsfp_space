@@ -11,13 +11,22 @@ export const opportunityRepository = {
   async list(params: OpportunityListParams): Promise<OpportunityListResult> {
     let q = supabase
       .from("crm_opportunities")
-      .select("*")
+      .select(
+        "id, company_id, name, customer_id, pipeline_id, stage, value, estimated_close_date, probability, next_step, last_activity_at, created_at, updated_at, owner_id, status",
+        { count: "estimated" }
+      )
       .eq("company_id", params.companyId);
 
     if (params.search) q = q.ilike("name", `%${params.search}%`);
     if (params.filters?.pipelineId) q = q.eq("pipeline_id", params.filters.pipelineId);
     if (params.filters?.stageId) q = q.eq("stage", params.filters.stageId);
     if (params.filters?.ownerId) q = q.eq("owner_id", params.filters.ownerId);
+    if (params.filters?.status) q = q.eq("status", params.filters.status);
+    if (params.filters?.dateRange) {
+      q = q
+        .gte("estimated_close_date", params.filters.dateRange.from)
+        .lte("estimated_close_date", params.filters.dateRange.to);
+    }
     if (params.filters?.value) {
       q = q.gte("value", params.filters.value.min).lte("value", params.filters.value.max);
     }
@@ -29,11 +38,11 @@ export const opportunityRepository = {
     const pageSize = params.pageSize ?? 10;
     q = q.range((page - 1) * pageSize, page * pageSize - 1);
 
-    const { data, error } = await q;
+    const { data, error, count } = await q;
     if (error) throw error;
 
     const rows = data ?? [];
-    return { data: rows.map(toOpportunityDTO), total: rows.length };
+    return { data: rows.map(toOpportunityDTO), total: count ?? rows.length };
   },
 
   async getById(id: string) {

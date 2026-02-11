@@ -1,0 +1,131 @@
+# CRM — SOT (Single Source of Truth)
+
+Documento vivo para ingeniería y producto. Resume arquitectura, cambios por fases y funcionalidades visibles para usuarios.
+
+---
+
+## Alcance
+Este documento cubre el módulo CRM: oportunidades, pipelines, etiquetas, actividades, vistas guardadas, filtros, acciones masivas, exportaciones y performance.
+
+---
+
+## Arquitectura (resumen técnico)
+
+### Capas
+- **UI**: componentes y páginas React.
+- **Domain**: DTOs, mappers, services, validaciones (Zod).
+- **Data**: repositorios Supabase (queries y mapping).
+- **DB**: migraciones SQL con tablas, índices y RLS.
+
+### Rutas principales
+- CRM > Oportunidades
+- CRM > Pipelines (kanban)
+
+---
+
+## Fase 0 — Base arquitectónica
+
+### Objetivo
+Unificar modelo y validaciones, separar dominio/datos/UI y resolver inconsistencias históricas.
+
+### Entregado (Dev)
+- DTOs + mappers + repos + services en dominio CRM.
+- Schemas Zod para validación de oportunidades, pipelines, tags, actividades.
+- Refactor de `OpportunityDrawer` y `OpportunitiesList` para usar services y DTOs.
+
+### Archivos clave
+- Dominio: `src/domain/crm/dtos/*`, `src/domain/crm/mappers/*`, `src/domain/crm/services/*`, `src/domain/crm/validation/*`
+- Datos: `src/data/crm/*`
+
+### Funcionalidad para usuario
+- Edición/creación de oportunidades más estable.
+- Datos consistentes en formularios y listados.
+
+---
+
+## Fase 1 — Actividades e historial
+
+### Objetivo
+Agregar seguimiento operativo dentro de oportunidades.
+
+### Entregado (Dev)
+- Tablas `crm_activities` y `crm_activity_log` con RLS e índices.
+- CRUD de actividades (crear/editar/eliminar) y log de acciones.
+- Tabs en `OpportunityDrawer`: Detalles / Actividad / Historial.
+
+### Archivos clave
+- DB: `supabase/migrations/20260211_create_crm_activities.sql`
+- UI: `src/components/crm/OpportunityDrawer.tsx`
+- Dominio: `src/domain/crm/dtos/activity*`, `mappers`, `services`, `validation`
+
+### Funcionalidad para usuario
+- Registrar llamadas, emails, tareas, reuniones y notas.
+- Ver historial de acciones en la oportunidad.
+
+---
+
+## Fase 2 — Funcionalidades avanzadas
+
+### Objetivo
+Mejorar productividad con vistas guardadas, filtros persistentes, acciones masivas y exportación.
+
+### Entregado (Dev)
+- Vistas guardadas por usuario/empresa (`crm_saved_views`).
+- Barra de filtros con persistencia en URL.
+- Selección masiva + modal de edición masiva.
+- Exportación CSV/XLS con filtros activos.
+
+### Archivos clave
+- DB: `supabase/migrations/20260211_create_crm_saved_views.sql`
+- UI: `src/pages/Opportunities.tsx`, `src/components/crm/OpportunitiesList.tsx`
+
+### Funcionalidad para usuario
+- Guardar vistas con filtros y recuperarlas luego.
+- Filtrar por pipeline, etapa, responsable, status, fechas y monto.
+- Editar o eliminar oportunidades en bloque.
+- Exportar resultados filtrados a Excel/CSV.
+
+---
+
+## Fase 3 — Performance y escalabilidad
+
+### Objetivo
+Reducir latencia y carga en listados y kanban.
+
+### Entregado (Dev)
+- Índices en `crm_opportunities`.
+- Conteo estimado en listados.
+- Select de columnas específicas (sin `select(*)`).
+- Prefetch pipelines/owners/tags y menos refetch.
+- Virtualización en `OpportunitiesList`.
+- Memoización y normalización de filtros.
+
+### Archivos clave
+- DB: `supabase/migrations/20260211_add_crm_opportunities_indexes.sql`
+- Repos: `src/data/crm/opportunityRepository.ts`, `src/data/crm/pipelineRepository.ts`
+- UI: `src/components/crm/OpportunitiesList.tsx`, `src/components/crm/OpportunityDrawer.tsx`, `src/pages/Opportunities.tsx`
+
+### Funcionalidad para usuario
+- Listados más rápidos, menor latencia y scroll fluido.
+- Menos recargas al cambiar pestañas/ventanas.
+
+---
+
+## Notas operativas
+- Las selecciones masivas se persisten en `localStorage` por empresa.
+- Exportaciones respetan filtros activos.
+- Las actividades registran log de acciones para auditoría interna.
+
+---
+
+## Pendiente opcional (próximos pasos sugeridos)
+- Prefetch de páginas siguientes en listados.
+- Ajustes finos de virtualización por altura dinámica de filas.
+
+---
+
+## Mantenimiento del documento
+Actualizar este archivo ante cambios en:
+- esquema de DB CRM,
+- contratos de DTOs y services,
+- experiencia de usuario (filtros, vistas, acciones masivas, exportaciones).

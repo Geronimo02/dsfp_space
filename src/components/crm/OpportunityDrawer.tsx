@@ -160,6 +160,8 @@ export function OpportunityDrawer({ open, onClose, companyId, opportunity }: Opp
       return data || [];
     },
     enabled: !!companyId && open,
+    staleTime: 5 * 60 * 1000,
+    refetchOnWindowFocus: false,
   });
 
   const { data: customers = [], isLoading: customersLoading } = useQuery({
@@ -188,6 +190,8 @@ export function OpportunityDrawer({ open, onClose, companyId, opportunity }: Opp
       return data || [];
     },
     enabled: !!companyId && open,
+    staleTime: 5 * 60 * 1000,
+    refetchOnWindowFocus: false,
   });
 
   const { data: tags = [] } = useQuery<TagRow[]>({
@@ -196,6 +200,8 @@ export function OpportunityDrawer({ open, onClose, companyId, opportunity }: Opp
       return (await tagService.list(companyId)) as TagRow[];
     },
     enabled: !!companyId && open,
+    staleTime: 5 * 60 * 1000,
+    refetchOnWindowFocus: false,
   });
 
   const [tagSearch, setTagSearch] = useState("");

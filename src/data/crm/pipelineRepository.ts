@@ -6,7 +6,7 @@ export const pipelineRepository = {
   async list(companyId: string) {
     const { data, error } = await supabase
       .from("crm_pipelines")
-      .select("*")
+      .select("id, company_id, name, stages, created_at, updated_at")
       .eq("company_id", companyId)
       .order("created_at", { ascending: false });
     if (error) throw error;

@@ -10,6 +10,12 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuTrigger,
+} from "@/components/ui/dropdown-menu";
 import { useCompany } from "@/contexts/CompanyContext";
 import { OpportunitiesList } from "@/components/crm/OpportunitiesList";
 import { OpportunityDrawer } from "@/components/crm/OpportunityDrawer";
@@ -21,6 +27,9 @@ import { toast } from "sonner";
 import type { Database } from "@/integrations/supabase/types";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
+import { opportunityService } from "@/domain/crm/services/opportunityService";
+import type { OpportunityDTO } from "@/domain/crm/dtos/opportunity";
+import * as XLSX from "xlsx";
 
 // --- Data hooks reutilizables ---
 type OpportunityRow = Database["public"]["Tables"]["crm_opportunities"]["Row"];
@@ -129,6 +138,7 @@ function useCustomersAutocomplete(companyId: string, query: string) {
 
 export default function OpportunitiesPage() {
   const { currentCompany } = useCompany();
+  const queryClient = useQueryClient();
   const [search, setSearch] = useState("");
   const [showDrawer, setShowDrawer] = useState(false);
   const [filters, setFilters] = useState({
@@ -137,13 +147,239 @@ export default function OpportunitiesPage() {
     ownerId: undefined as string | undefined,
     status: undefined as string | undefined,
     dateRange: undefined as { from: string; to: string } | undefined,
-    amountRange: undefined as { min: number; max: number } | undefined,
+    value: undefined as { min: number; max: number } | undefined,
   })
 
-  // Saved views (basic: default + last used in localStorage)
-  const [savedView, setSavedView] = useState<string>("default");
+  const [savedViewId, setSavedViewId] = useState<string>("default");
+  const [newViewName, setNewViewName] = useState("");
+
+  const { data: savedViews = [] } = useQuery({
+    queryKey: ["crm-saved-views", currentCompany?.id],
+    queryFn: async () => {
+      const { data, error } = await supabase
+        .from("crm_saved_views")
+        .select("id, name, filters")
+        .eq("company_id", currentCompany?.id)
+        .order("created_at", { ascending: false });
+      if (error) throw error;
+      return data || [];
+    },
+    enabled: !!currentCompany?.id,
+  });
+
+  const { data: pipelines = [] } = useQuery({
+    queryKey: ["crm-pipelines", currentCompany?.id],
+    queryFn: async () => {
+      const { data, error } = await supabase
+        .from("crm_pipelines")
+        .select("id, name, stages")
+        .eq("company_id", currentCompany?.id)
+        .order("created_at", { ascending: false });
+      if (error) throw error;
+      return data || [];
+    },
+    enabled: !!currentCompany?.id,
+    staleTime: 5 * 60 * 1000,
+    refetchOnWindowFocus: false,
+  });
+
+  const { data: owners = [] } = useQuery({
+    queryKey: ["crm-owners", currentCompany?.id],
+    queryFn: async () => {
+      const { data, error } = await supabase
+        .from("employees")
+        .select("id, first_name, last_name")
+        .eq("company_id", currentCompany?.id)
+        .order("first_name", { ascending: true });
+      if (error) throw error;
+      return data || [];
+    },
+    enabled: !!currentCompany?.id,
+    staleTime: 5 * 60 * 1000,
+    refetchOnWindowFocus: false,
+  });
+
+  const stageOptions = useMemo(() => {
+    if (filters.pipelineId) {
+      const pipeline = pipelines.find((p: any) => p.id === filters.pipelineId);
+      return pipeline?.stages ?? [];
+    }
+    const allStages = pipelines.flatMap((p: any) => p.stages || []);
+    return Array.from(new Set(allStages));
+  }, [filters.pipelineId, pipelines]);
+
+  const createSavedViewMutation = useMutation({
+    mutationFn: async () => {
+      if (!newViewName.trim() || !currentCompany?.id) {
+        throw new Error("Nombre de vista requerido");
+      }
+      const { data: authData } = await supabase.auth.getUser();
+      const userId = authData?.user?.id;
+      if (!userId) {
+        throw new Error("Usuario no autenticado");
+      }
+      const { error } = await supabase.from("crm_saved_views").insert([
+        {
+          company_id: currentCompany.id,
+          user_id: userId,
+          name: newViewName.trim(),
+          filters: { ...filters, search },
+        },
+      ]);
+      if (error) throw error;
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["crm-saved-views", currentCompany?.id] });
+      setNewViewName("");
+    },
+  });
+
+  useEffect(() => {
+    const params = new URLSearchParams(window.location.search);
+    const nextFilters: any = {
+      pipelineId: params.get("pipelineId") || undefined,
+      stageId: params.get("stageId") || undefined,
+      ownerId: params.get("ownerId") || undefined,
+      status: params.get("status") || undefined,
+    };
+    const dateFrom = params.get("dateFrom");
+    const dateTo = params.get("dateTo");
+    if (dateFrom && dateTo) {
+      nextFilters.dateRange = { from: dateFrom, to: dateTo };
+    }
+    const valueMin = params.get("valueMin");
+    const valueMax = params.get("valueMax");
+    if (valueMin && valueMax) {
+      nextFilters.value = { min: Number(valueMin), max: Number(valueMax) };
+    }
+    setFilters((prev) => ({ ...prev, ...nextFilters }));
+    const searchParam = params.get("search");
+    if (searchParam !== null) setSearch(searchParam);
+  }, []);
+
+  useEffect(() => {
+    const params = new URLSearchParams();
+    if (search) params.set("search", search);
+    if (filters.pipelineId) params.set("pipelineId", filters.pipelineId);
+    if (filters.stageId) params.set("stageId", filters.stageId);
+    if (filters.ownerId) params.set("ownerId", filters.ownerId);
+    if (filters.status) params.set("status", filters.status);
+    if (filters.dateRange?.from) params.set("dateFrom", filters.dateRange.from);
+    if (filters.dateRange?.to) params.set("dateTo", filters.dateRange.to);
+    if (filters.value?.min !== undefined) params.set("valueMin", String(filters.value.min));
+    if (filters.value?.max !== undefined) params.set("valueMax", String(filters.value.max));
+
+    const queryString = params.toString();
+    const nextUrl = queryString ? `${window.location.pathname}?${queryString}` : window.location.pathname;
+    window.history.replaceState(null, "", nextUrl);
+  }, [search, filters]);
+
+  useEffect(() => {
+    if (!currentCompany?.id) return;
+    queryClient.prefetchQuery({
+      queryKey: ["crm-pipelines", currentCompany.id],
+      queryFn: async () => {
+        const { data, error } = await supabase
+          .from("crm_pipelines")
+          .select("id, name, stages")
+          .eq("company_id", currentCompany.id)
+          .order("created_at", { ascending: false });
+        if (error) throw error;
+        return data || [];
+      },
+    });
+    queryClient.prefetchQuery({
+      queryKey: ["crm-owners", currentCompany.id],
+      queryFn: async () => {
+        const { data, error } = await supabase
+          .from("employees")
+          .select("id, first_name, last_name")
+          .eq("company_id", currentCompany.id)
+          .order("first_name", { ascending: true });
+        if (error) throw error;
+        return data || [];
+      },
+    });
+    queryClient.prefetchQuery({
+      queryKey: ["crm-tags", currentCompany.id],
+      queryFn: async () => {
+        const { data, error } = await supabase
+          .from("crm_tags")
+          .select("id, name, color")
+          .eq("company_id", currentCompany.id)
+          .order("name", { ascending: true });
+        if (error) throw error;
+        return data || [];
+      },
+    });
+  }, [currentCompany?.id, queryClient]);
 
   if (!currentCompany) return null;
+
+  const formatDate = (value?: string | null) => {
+    if (!value) return "";
+    const date = new Date(value);
+    if (Number.isNaN(date.getTime())) return value;
+    return date.toISOString().slice(0, 10);
+  };
+
+  const buildExportRows = (rows: OpportunityDTO[]) =>
+    rows.map((row) => ({
+      Oportunidad: row.name,
+      Etapa: row.stage,
+      Monto: row.value ?? "",
+      Cierre: formatDate(row.estimatedCloseDate),
+      Probabilidad: row.probability ?? "",
+      "Próximo paso": row.nextStep ?? "",
+      "Última actividad": formatDate(row.lastActivityAt),
+    }));
+
+  const downloadBlob = (blob: Blob, filename: string) => {
+    const url = window.URL.createObjectURL(blob);
+    const link = document.createElement("a");
+    link.href = url;
+    link.download = filename;
+    link.click();
+    window.URL.revokeObjectURL(url);
+  };
+
+  const handleExport = async (format: "csv" | "xlsx") => {
+    try {
+      const result = await opportunityService.list({
+        companyId: currentCompany.id,
+        search,
+        filters,
+        page: 1,
+        pageSize: 10000,
+      });
+
+      const rows = buildExportRows(result.data);
+      if (rows.length === 0) {
+        toast.error("No hay oportunidades para exportar");
+        return;
+      }
+
+      if (format === "csv") {
+        const worksheet = XLSX.utils.json_to_sheet(rows);
+        const csv = XLSX.utils.sheet_to_csv(worksheet);
+        downloadBlob(new Blob([csv], { type: "text/csv;charset=utf-8;" }), "oportunidades.csv");
+        return;
+      }
+
+      const worksheet = XLSX.utils.json_to_sheet(rows);
+      const workbook = XLSX.utils.book_new();
+      XLSX.utils.book_append_sheet(workbook, worksheet, "Oportunidades");
+      const arrayBuffer = XLSX.write(workbook, { bookType: "xlsx", type: "array" });
+      downloadBlob(
+        new Blob([arrayBuffer], {
+          type: "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+        }),
+        "oportunidades.xlsx"
+      );
+    } catch (error: any) {
+      toast.error(error.message || "Error al exportar oportunidades");
+    }
+  };
 
   return (
     <Layout>
@@ -151,15 +387,38 @@ export default function OpportunitiesPage() {
         <div className="flex flex-col md:flex-row md:items-center md:justify-between gap-2 mb-2">
           <div className="flex items-center gap-2">
             <h1 className="text-2xl font-bold">Oportunidades</h1>
-            {/* Saved Views Dropdown (basic) */}
             <select
               className="ml-2 border rounded px-2 py-1 text-sm"
-              value={savedView}
-              onChange={e => setSavedView(e.target.value)}
+              value={savedViewId}
+              onChange={(e) => {
+                const nextId = e.target.value;
+                setSavedViewId(nextId);
+                if (nextId === "default") return;
+                const view = savedViews.find((v) => v.id === nextId);
+                if (view?.filters) {
+                  const nextFilters = view.filters as any;
+                  const nextValue = nextFilters.value ?? nextFilters.amountRange;
+                  setFilters({
+                    pipelineId: nextFilters.pipelineId,
+                    stageId: nextFilters.stageId,
+                    ownerId: nextFilters.ownerId,
+                    status: nextFilters.status,
+                    dateRange: nextFilters.dateRange,
+                    value: nextValue,
+                  });
+                  if (typeof nextFilters.search === "string") {
+                    setSearch(nextFilters.search);
+                  }
+                }
+              }}
               aria-label="Vista guardada"
             >
               <option value="default">Vista por defecto</option>
-              <option value="last">Última vista</option>
+              {savedViews.map((view) => (
+                <option key={view.id} value={view.id}>
+                  {view.name}
+                </option>
+              ))}
             </select>
           </div>
           <div className="flex gap-2 items-center">
@@ -173,16 +432,204 @@ export default function OpportunitiesPage() {
             <Button variant="outline" size="icon" aria-label="Filtros avanzados">
               <LucideFilter className="w-5 h-5" />
             </Button>
-            <Button variant="outline" size="icon" aria-label="Exportar oportunidades">
-              <LucideDownload className="w-5 h-5" />
-            </Button>
+            <DropdownMenu>
+              <DropdownMenuTrigger asChild>
+                <Button variant="outline" size="icon" aria-label="Exportar oportunidades">
+                  <LucideDownload className="w-5 h-5" />
+                </Button>
+              </DropdownMenuTrigger>
+              <DropdownMenuContent align="end">
+                <DropdownMenuItem onClick={() => handleExport("csv")}>
+                  Exportar CSV
+                </DropdownMenuItem>
+                <DropdownMenuItem onClick={() => handleExport("xlsx")}>
+                  Exportar XLSX
+                </DropdownMenuItem>
+              </DropdownMenuContent>
+            </DropdownMenu>
             <Button onClick={() => setShowDrawer(true)} variant="default" className="ml-2">
               <LucidePlus className="w-4 h-4 mr-1" /> Nueva oportunidad
             </Button>
           </div>
         </div>
-        {/* TODO: FiltersBar component (pipeline, stage, owner, date/amount range, status) */}
-        {/* <FiltersBar filters={filters} onChange={setFilters} /> */}
+        <div className="flex items-center gap-2">
+          <Input
+            value={newViewName}
+            onChange={(e) => setNewViewName(e.target.value)}
+            placeholder="Nombre de vista"
+            className="w-56"
+          />
+          <Button
+            variant="outline"
+            onClick={() => createSavedViewMutation.mutate()}
+            disabled={!newViewName.trim() || createSavedViewMutation.isPending}
+          >
+            Guardar vista
+          </Button>
+        </div>
+        <div className="grid grid-cols-1 md:grid-cols-6 gap-2">
+          <Select
+            value={filters.pipelineId || "all"}
+            onValueChange={(value) =>
+              setFilters((prev) => ({
+                ...prev,
+                pipelineId: value === "all" ? undefined : value,
+                stageId: undefined,
+              }))
+            }
+          >
+            <SelectTrigger>
+              <SelectValue placeholder="Pipeline" />
+            </SelectTrigger>
+            <SelectContent>
+              <SelectItem value="all">Todos los pipelines</SelectItem>
+              {pipelines.map((p: any) => (
+                <SelectItem key={p.id} value={p.id}>
+                  {p.name}
+                </SelectItem>
+              ))}
+            </SelectContent>
+          </Select>
+
+          <Select
+            value={filters.stageId || "all"}
+            onValueChange={(value) =>
+              setFilters((prev) => ({
+                ...prev,
+                stageId: value === "all" ? undefined : value,
+              }))
+            }
+          >
+            <SelectTrigger>
+              <SelectValue placeholder="Etapa" />
+            </SelectTrigger>
+            <SelectContent>
+              <SelectItem value="all">Todas las etapas</SelectItem>
+              {stageOptions.map((stage) => (
+                <SelectItem key={stage} value={stage}>
+                  {stage}
+                </SelectItem>
+              ))}
+            </SelectContent>
+          </Select>
+
+          <Select
+            value={filters.ownerId || "all"}
+            onValueChange={(value) =>
+              setFilters((prev) => ({
+                ...prev,
+                ownerId: value === "all" ? undefined : value,
+              }))
+            }
+          >
+            <SelectTrigger>
+              <SelectValue placeholder="Responsable" />
+            </SelectTrigger>
+            <SelectContent>
+              <SelectItem value="all">Todos</SelectItem>
+              {owners.map((o: any) => (
+                <SelectItem key={o.id} value={o.id}>
+                  {`${o.first_name} ${o.last_name}`.trim()}
+                </SelectItem>
+              ))}
+            </SelectContent>
+          </Select>
+
+          <Select
+            value={filters.status || "all"}
+            onValueChange={(value) =>
+              setFilters((prev) => ({
+                ...prev,
+                status: value === "all" ? undefined : value,
+              }))
+            }
+          >
+            <SelectTrigger>
+              <SelectValue placeholder="Estado" />
+            </SelectTrigger>
+            <SelectContent>
+              <SelectItem value="all">Todos</SelectItem>
+              <SelectItem value="abierta">Abierta</SelectItem>
+              <SelectItem value="ganado">Ganado</SelectItem>
+              <SelectItem value="perdido">Perdido</SelectItem>
+            </SelectContent>
+          </Select>
+
+          <Input
+            type="date"
+            value={filters.dateRange?.from || ""}
+            onChange={(e) =>
+              setFilters((prev) => ({
+                ...prev,
+                dateRange: {
+                  from: e.target.value,
+                  to: prev.dateRange?.to || e.target.value,
+                },
+              }))
+            }
+            placeholder="Desde"
+          />
+          <Input
+            type="date"
+            value={filters.dateRange?.to || ""}
+            onChange={(e) =>
+              setFilters((prev) => ({
+                ...prev,
+                dateRange: {
+                  from: prev.dateRange?.from || e.target.value,
+                  to: e.target.value,
+                },
+              }))
+            }
+            placeholder="Hasta"
+          />
+        </div>
+
+        <div className="grid grid-cols-1 md:grid-cols-4 gap-2">
+          <Input
+            type="number"
+            value={filters.value?.min ?? ""}
+            onChange={(e) =>
+              setFilters((prev) => ({
+                ...prev,
+                value: {
+                  min: e.target.value ? Number(e.target.value) : 0,
+                  max: prev.value?.max ?? 0,
+                },
+              }))
+            }
+            placeholder="Monto mínimo"
+          />
+          <Input
+            type="number"
+            value={filters.value?.max ?? ""}
+            onChange={(e) =>
+              setFilters((prev) => ({
+                ...prev,
+                value: {
+                  min: prev.value?.min ?? 0,
+                  max: e.target.value ? Number(e.target.value) : 0,
+                },
+              }))
+            }
+            placeholder="Monto máximo"
+          />
+          <Button
+            variant="outline"
+            onClick={() =>
+              setFilters({
+                pipelineId: undefined,
+                stageId: undefined,
+                ownerId: undefined,
+                status: undefined,
+                dateRange: undefined,
+                value: undefined,
+              })
+            }
+          >
+            Limpiar filtros
+          </Button>
+        </div>
         <OpportunitiesList
           companyId={currentCompany.id}
           search={search}
@@ -258,6 +705,8 @@ function CreateOpportunityDrawer({ open, onClose, companyId }: { open: boolean; 
       return data || [];
     },
     enabled: !!companyId,
+    staleTime: 5 * 60 * 1000,
+    refetchOnWindowFocus: false,
   });
 
   const { data: owners = [] } = useQuery({
@@ -265,13 +714,15 @@ function CreateOpportunityDrawer({ open, onClose, companyId }: { open: boolean; 
     queryFn: async () => {
       const { data, error } = await supabase
         .from("employees")
-        .select("id, name")
+        .select("id, first_name, last_name")
         .eq("company_id", companyId)
-        .order("name", { ascending: true });
+        .order("first_name", { ascending: true });
       if (error) throw error;
       return data || [];
     },
     enabled: !!companyId,
+    staleTime: 5 * 60 * 1000,
+    refetchOnWindowFocus: false,
   });
 
   const selectedPipelineId = form.watch("pipeline_id");
@@ -452,7 +903,7 @@ function CreateOpportunityDrawer({ open, onClose, companyId }: { open: boolean; 
                   <SelectItem value="__none__">Sin responsable</SelectItem>
                   {owners.map((o: any) => (
                     <SelectItem key={o.id} value={o.id}>
-                      {o.name}
+                      {[o.first_name, o.last_name].filter(Boolean).join(" ") || "Sin nombre"}
                     </SelectItem>
                   ))}
                 </SelectContent>
