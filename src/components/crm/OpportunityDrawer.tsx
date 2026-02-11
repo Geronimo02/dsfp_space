@@ -8,6 +8,7 @@ import { supabase } from "@/integrations/supabase/client";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
+import { Badge } from "@/components/ui/badge";
 import {
   Select,
   SelectContent,
@@ -15,6 +16,12 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
+import {
+  Popover,
+  PopoverContent,
+  PopoverTrigger,
+} from "@/components/ui/popover";
+import { Check, Plus, X } from "lucide-react";
 import type { Database } from "@/integrations/supabase/types";
 
 type OpportunityRow = Database["public"]["Tables"]["crm_opportunities"]["Row"];
@@ -38,10 +45,51 @@ const opportunitySchema = z.object({
   currency: z.string().optional(),
   expected_revenue: z.number().optional(),
   next_step: z.string().optional(),
-  tags: z.string().optional(),
+  tags: z.array(z.string()).optional(),
 });
 
 type OpportunityForm = z.infer<typeof opportunitySchema>;
+
+interface TagRow {
+  id: string;
+  name: string;
+  color: string;
+}
+
+const TAG_COLOR_PALETTE = [
+  "rgb(59, 130, 246)",
+  "rgb(16, 185, 129)",
+  "rgb(239, 68, 68)",
+  "rgb(234, 179, 8)",
+  "rgb(168, 85, 247)",
+  "rgb(14, 165, 233)",
+  "rgb(244, 63, 94)",
+  "rgb(34, 197, 94)",
+  "rgb(249, 115, 22)",
+  "rgb(99, 102, 241)",
+];
+
+const normalizeColor = (color: string) => color.replace(/\s+/g, "").toLowerCase();
+
+const hexToRgb = (hex: string) => {
+  const normalized = hex.replace("#", "");
+  const bigint = parseInt(normalized, 16);
+  if (Number.isNaN(bigint)) return "rgb(59, 130, 246)";
+  const r = (bigint >> 16) & 255;
+  const g = (bigint >> 8) & 255;
+  const b = bigint & 255;
+  return `rgb(${r}, ${g}, ${b})`;
+};
+
+const rgbToHex = (rgb: string) => {
+  if (rgb.startsWith("#")) return rgb;
+  const match = rgb.match(/\d+/g);
+  if (!match || match.length < 3) return "#3b82f6";
+  const [r, g, b] = match.map((v) => Number(v));
+  return `#${[r, g, b]
+    .map((x) => x.toString(16).padStart(2, "0"))
+    .join("")}`;
+};
 
 interface OpportunityDrawerProps {
   open: boolean;
@@ -60,6 +108,7 @@ export function OpportunityDrawer({ open, onClose, companyId, opportunity }: Opp
       probability: 50,
       status: "abierta",
       currency: "ARS",
+      tags: [],
     },
     mode: "onChange",
   });
@@ -88,7 +137,7 @@ export function OpportunityDrawer({ open, onClose, companyId, opportunity }: Opp
         currency: normalizeText(values.currency),
         expected_revenue: normalizeNumber(values.expected_revenue),
         next_step: normalizeText(values.next_step),
-        tags: values.tags ? values.tags.split(",").map(t => t.trim()).filter(Boolean) : null,
+        tags: values.tags && values.tags.length ? values.tags : null,
       };
 
       if (isEditing) {
@@ -168,6 +217,118 @@ export function OpportunityDrawer({ open, onClose, companyId, opportunity }: Opp
     enabled: !!companyId && open,
   });
 
+  const { data: tags = [] } = useQuery<TagRow[]>({
+    queryKey: ["crm-tags", companyId],
+    queryFn: async () => {
+      const { data, error } = await supabase
+        .from("crm_tags")
+        .select("id, name, color")
+        .eq("company_id", companyId)
+        .order("name", { ascending: true });
+      if (error) throw error;
+      return (data || []) as TagRow[];
+    },
+    enabled: !!companyId && open,
+  });
+
+  const [tagSearch, setTagSearch] = useState("");
+  const [newTagName, setNewTagName] = useState("");
+  const [newTagColorHex, setNewTagColorHex] = useState("");
+
+  const selectedTags = form.watch("tags") || [];
+  const selectedTagSet = useMemo(() => new Set(selectedTags), [selectedTags]);
+
+  const filteredTags = useMemo(() => {
+    if (!tagSearch.trim()) return tags;
+    const needle = tagSearch.trim().toLowerCase();
+    return tags.filter((tag) => tag.name.toLowerCase().includes(needle));
+  }, [tags, tagSearch]);
+
+  const suggestedColor = useMemo(() => {
+    const existing = new Set(tags.map((t) => normalizeColor(t.color)));
+    const next = TAG_COLOR_PALETTE.find((color) => !existing.has(normalizeColor(color)));
+    return next || TAG_COLOR_PALETTE[0];
+  }, [tags]);
+
+  useEffect(() => {
+    if (!newTagColorHex) {
+      setNewTagColorHex(rgbToHex(suggestedColor));
+    }
+  }, [suggestedColor, newTagColorHex]);
+
+  const setSelectedTags = (next: string[]) => {
+    form.setValue("tags", next, { shouldValidate: true });
+  };
+
+  const addTag = (name: string) => {
+    if (selectedTagSet.has(name)) return;
+    setSelectedTags([...selectedTags, name]);
+  };
+
+  const removeTag = (name: string) => {
+    setSelectedTags(selectedTags.filter((tag) => tag !== name));
+  };
+
+  const toggleTag = (name: string) => {
+    if (selectedTagSet.has(name)) {
+      removeTag(name);
+    } else {
+      addTag(name);
+    }
+  };
+
+  const handleCreateTag = () => {
+    const name = newTagName.trim();
+    if (!name) {
+      toast.error("El nombre del tag es requerido");
+      return;
+    }
+    const existing = tags.find((t) => t.name.toLowerCase() === name.toLowerCase());
+    if (existing) {
+      addTag(existing.name);
+      setNewTagName("");
+      setTagSearch("");
+      return;
+    }
+    const colorRgb = hexToRgb(newTagColorHex || rgbToHex(suggestedColor));
+    createTagMutation.mutate({ name, color: colorRgb });
+  };
+
+  const createTagMutation = useMutation({
+    mutationFn: async ({ name, color }: { name: string; color: string }) => {
+      const { data, error } = await supabase
+        .from("crm_tags")
+        .insert([{ company_id: companyId, name, color }])
+        .select("id, name, color")
+        .single();
+      if (error) throw error;
+      return data as TagRow;
+    },
+    onSuccess: (newTag) => {
+      queryClient.invalidateQueries({ queryKey: ["crm-tags", companyId] });
+      addTag(newTag.name);
+      setNewTagName("");
+      setTagSearch("");
+      setNewTagColorHex("");
+    },
+    onError: (error: any) => {
+      toast.error(error.message || "Error al crear tag");
+    },
+  });
+
+  const updateTagColorMutation = useMutation({
+    mutationFn: async ({ tagId, color }: { tagId: string; color: string }) => {
+      const { error } = await supabase
+        .from("crm_tags")
+        .update({ color })
+        .eq("id", tagId);
+      if (error) throw error;
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["crm-tags", companyId] });
+    },
+  });
+
   const selectedPipelineId = form.watch("pipeline_id");
   const selectedPipeline = useMemo(
     () => pipelines.find((p: any) => p.id === selectedPipelineId),
@@ -205,7 +366,7 @@ export function OpportunityDrawer({ open, onClose, companyId, opportunity }: Opp
         currency: opportunity.currency || "ARS",
         expected_revenue: opportunity.expected_revenue ?? undefined,
         next_step: opportunity.next_step || "",
-        tags: opportunity.tags?.join(", ") || "",
+        tags: opportunity.tags || [],
       };
       console.log("Form values to reset:", formValues);
       form.reset(formValues);
@@ -218,7 +379,7 @@ export function OpportunityDrawer({ open, onClose, companyId, opportunity }: Opp
         description: "",
         next_step: "",
         source: "",
-        tags: "",
+        tags: [],
         lost_reason: "",
         won_reason: "",
       });
@@ -449,8 +610,119 @@ export function OpportunityDrawer({ open, onClose, companyId, opportunity }: Opp
           </div>
 
           <div className="grid gap-2">
-            <label className="font-medium">Tags (separados por coma)</label>
-            <Input {...form.register("tags")} placeholder="Ej: urgente, cliente nuevo" />
+            <label className="font-medium">Tags</label>
+            <div className="flex flex-wrap gap-2">
+              {selectedTags.length === 0 ? (
+                <span className="text-xs text-muted-foreground">Sin tags asignados.</span>
+              ) : (
+                selectedTags.map((tagName) => {
+                  const tag = tags.find((t) => t.name === tagName);
+                  const tagColor = tag?.color || "rgb(148, 163, 184)";
+                  return (
+                    <Badge
+                      key={tagName}
+                      className="gap-1 text-white"
+                      style={{ backgroundColor: tagColor }}
+                    >
+                      {tagName}
+                      <button
+                        type="button"
+                        className="ml-1 rounded-full hover:bg-black/20"
+                        onClick={() => removeTag(tagName)}
+                        aria-label={`Quitar ${tagName}`}
+                      >
+                        <X className="h-3 w-3" />
+                      </button>
+                    </Badge>
+                  );
+                })
+              )}
+            </div>
+            <Popover>
+              <PopoverTrigger asChild>
+                <Button type="button" variant="outline" size="sm" className="w-fit">
+                  Gestionar tags
+                </Button>
+              </PopoverTrigger>
+              <PopoverContent className="w-80">
+                <div className="space-y-3">
+                  <div className="space-y-2">
+                    <label className="text-xs font-medium text-muted-foreground">Buscar tags</label>
+                    <Input
+                      value={tagSearch}
+                      onChange={(e) => setTagSearch(e.target.value)}
+                      placeholder="Buscar tag..."
+                    />
+                  </div>
+                  <div className="max-h-48 overflow-y-auto rounded-md border">
+                    {filteredTags.length === 0 ? (
+                      <div className="px-3 py-2 text-xs text-muted-foreground">
+                        No hay tags.
+                      </div>
+                    ) : (
+                      filteredTags.map((tag) => (
+                        <button
+                          key={tag.id}
+                          type="button"
+                          onClick={() => toggleTag(tag.name)}
+                          className="flex w-full items-center justify-between px-3 py-2 text-sm hover:bg-muted"
+                        >
+                          <div className="flex items-center gap-2">
+                            <span
+                              className="h-2.5 w-2.5 rounded-full"
+                              style={{ backgroundColor: tag.color }}
+                            />
+                            <span>{tag.name}</span>
+                          </div>
+                          <div className="flex items-center gap-2">
+                            <Input
+                              type="color"
+                              value={rgbToHex(tag.color)}
+                              onClick={(e) => e.stopPropagation()}
+                              onChange={(e) => {
+                                const nextColor = hexToRgb(e.target.value);
+                                updateTagColorMutation.mutate({ tagId: tag.id, color: nextColor });
+                              }}
+                              className="h-6 w-8 p-0"
+                            />
+                            {selectedTagSet.has(tag.name) && (
+                              <Check className="h-4 w-4 text-primary" />
+                            )}
+                          </div>
+                        </button>
+                      ))
+                    )}
+                  </div>
+                  <div className="space-y-2 border-t pt-3">
+                    <label className="text-xs font-medium text-muted-foreground">Crear tag</label>
+                    <Input
+                      value={newTagName}
+                      onChange={(e) => setNewTagName(e.target.value)}
+                      placeholder="Ej: urgente"
+                    />
+                    <div className="flex items-center gap-2">
+                      <Input
+                        type="color"
+                        value={newTagColorHex || rgbToHex(suggestedColor)}
+                        onChange={(e) => setNewTagColorHex(e.target.value)}
+                        className="h-9 w-12 p-1"
+                      />
+                      <span className="text-xs text-muted-foreground">Color sugerido</span>
+                      <Button
+                        type="button"
+                        size="sm"
+                        className="ml-auto"
+                        onClick={handleCreateTag}
+                        disabled={createTagMutation.isPending}
+                      >
+                        <Plus className="h-4 w-4 mr-1" />
+                        Crear
+                      </Button>
+                    </div>
+                  </div>
+                </div>
+              </PopoverContent>
+            </Popover>
           </div>
 
           <div className="sticky bottom-0 bg-white border-t pt-4 flex gap-2">
