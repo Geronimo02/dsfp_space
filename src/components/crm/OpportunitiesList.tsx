@@ -613,7 +613,15 @@ export function OpportunitiesList({
                         aria-label={`Seleccionar ${opp.name}`}
                       />
                     </td>
-                    <td className="px-4 py-2 font-semibold max-w-xs truncate">{opp.name}</td>
+                    <td className="px-4 py-2 font-semibold max-w-xs truncate">
+                      <button
+                        type="button"
+                        className="text-left hover:underline"
+                        onClick={() => setEditingOpportunity(toOpportunityRow(opp))}
+                      >
+                        {opp.name}
+                      </button>
+                    </td>
 
                     <td className="px-4 py-2">
                       {opp.stage ? <Badge variant="secondary">{opp.stage}</Badge> : <Badge variant="secondary">-</Badge>}

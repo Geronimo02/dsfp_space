@@ -153,6 +153,7 @@ Integrar envío y tracking de mensajes con plantillas y logs centralizados.
 - Logs visibles en la oportunidad con estado (queued/sent/failed).
 - Calendario: pendiente de integración.
 - Credenciales WhatsApp (Twilio) por empresa con UI.
+- Tab dedicado de Mensajes en la oportunidad.
 
 ### Archivos clave
 - DB: `supabase/migrations/20260211_create_crm_message_templates_logs.sql`

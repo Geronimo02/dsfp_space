@@ -480,6 +480,22 @@ export function OpportunityDrawer({ open, onClose, companyId, opportunity }: Opp
     refetchOnWindowFocus: false,
   });
 
+  const { data: whatsappCreds } = useQuery({
+    queryKey: ["crm-whatsapp-credentials", companyId],
+    queryFn: async () => {
+      const { data, error } = await supabase
+        .from("crm_whatsapp_credentials")
+        .select("account_sid, auth_token, phone_number")
+        .eq("company_id", companyId)
+        .maybeSingle();
+      if (error) throw error;
+      return data;
+    },
+    enabled: !!companyId && open,
+    staleTime: 5 * 60 * 1000,
+    refetchOnWindowFocus: false,
+  });
+
   const { data: messageLogs = [] } = useQuery({
     queryKey: ["crm-message-logs", companyId, opportunity?.id],
     queryFn: () =>
@@ -495,6 +511,10 @@ export function OpportunityDrawer({ open, onClose, companyId, opportunity }: Opp
     [messageTemplates, messageChannel]
   );
 
+  const hasWhatsappCreds = Boolean(
+    whatsappCreds?.account_sid && whatsappCreds?.auth_token && whatsappCreds?.phone_number
+  );
+
   useEffect(() => {
     if (!messageTemplateId) return;
     const template = messageTemplates.find((tpl: any) => tpl.id === messageTemplateId);
@@ -508,6 +528,12 @@ export function OpportunityDrawer({ open, onClose, companyId, opportunity }: Opp
     const exists = filteredTemplates.some((tpl: any) => tpl.id === messageTemplateId);
     if (!exists) setMessageTemplateId("");
   }, [filteredTemplates, messageTemplateId]);
+
+  useEffect(() => {
+    if (messageChannel === "whatsapp" && !hasWhatsappCreds) {
+      setMessageChannel("email");
+    }
+  }, [hasWhatsappCreds, messageChannel]);
 
   useEffect(() => {
     if (!selectedCustomer) return;
@@ -684,6 +710,7 @@ export function OpportunityDrawer({ open, onClose, companyId, opportunity }: Opp
             <TabsList className="w-full">
               <TabsTrigger value="details" className="flex-1">Detalles</TabsTrigger>
               <TabsTrigger value="activity" className="flex-1">Actividad</TabsTrigger>
+              <TabsTrigger value="messages" className="flex-1">Mensajes</TabsTrigger>
               <TabsTrigger value="history" className="flex-1">Historial</TabsTrigger>
             </TabsList>
 
@@ -1061,122 +1088,6 @@ export function OpportunityDrawer({ open, onClose, companyId, opportunity }: Opp
                 </div>
               ) : (
                 <>
-                  <div className="space-y-3 rounded-lg border p-3">
-                    <div className="text-sm font-semibold text-muted-foreground">Mensajes</div>
-                    <div className="grid grid-cols-2 gap-2">
-                      <div>
-                        <label className="text-xs font-medium">Canal</label>
-                        <Select
-                          value={messageChannel}
-                          onValueChange={(value) => setMessageChannel(value as "email" | "whatsapp")}
-                        >
-                          <SelectTrigger>
-                            <SelectValue />
-                          </SelectTrigger>
-                          <SelectContent>
-                            <SelectItem value="email">Email</SelectItem>
-                            <SelectItem value="whatsapp">WhatsApp</SelectItem>
-                          </SelectContent>
-                        </Select>
-                      </div>
-                      <div>
-                        <label className="text-xs font-medium">Plantilla</label>
-                        <Select
-                          value={messageTemplateId || "__none__"}
-                          onValueChange={(value) =>
-                            setMessageTemplateId(value === "__none__" ? "" : value)
-                          }
-                        >
-                          <SelectTrigger>
-                            <SelectValue placeholder="Sin plantilla" />
-                          </SelectTrigger>
-                          <SelectContent>
-                            <SelectItem value="__none__">Sin plantilla</SelectItem>
-                            {filteredTemplates.map((tpl: any) => (
-                              <SelectItem key={tpl.id} value={tpl.id}>
-                                {tpl.name}
-                              </SelectItem>
-                            ))}
-                          </SelectContent>
-                        </Select>
-                      </div>
-                    </div>
-                    <div>
-                      <label className="text-xs font-medium">Destinatario</label>
-                      <Input
-                        value={messageRecipient}
-                        onChange={(e) => setMessageRecipient(e.target.value)}
-                        placeholder={messageChannel === "email" ? "email@cliente.com" : "+54 9 11 1234-5678"}
-                      />
-                    </div>
-                    {messageChannel === "email" && (
-                      <div>
-                        <label className="text-xs font-medium">Asunto</label>
-                        <Input
-                          value={messageSubject}
-                          onChange={(e) => setMessageSubject(e.target.value)}
-                          placeholder="Asunto del email"
-                        />
-                      </div>
-                    )}
-                    <div>
-                      <label className="text-xs font-medium">Mensaje</label>
-                      <Textarea
-                        value={messageBody}
-                        onChange={(e) => setMessageBody(e.target.value)}
-                        rows={3}
-                        placeholder="Escribí el mensaje..."
-                      />
-                    </div>
-                    <div className="flex gap-2">
-                      <Button
-                        type="button"
-                        size="sm"
-                        onClick={() => sendMessageMutation.mutate()}
-                        disabled={sendMessageMutation.isPending}
-                      >
-                        Enviar
-                      </Button>
-                      <Button
-                        type="button"
-                        size="sm"
-                        variant="outline"
-                        onClick={() => createTemplateMutation.mutate()}
-                        disabled={createTemplateMutation.isPending || !messageBody.trim()}
-                      >
-                        Guardar plantilla
-                      </Button>
-                    </div>
-                  </div>
-
-                  <div className="space-y-2">
-                    <div className="text-sm font-semibold text-muted-foreground">Logs de mensajes</div>
-                    {messageLogs.length === 0 ? (
-                      <div className="text-sm text-muted-foreground">Sin mensajes enviados.</div>
-                    ) : (
-                      <div className="space-y-2">
-                        {messageLogs.map((log: MessageLogDTO) => (
-                          <div key={log.id} className="rounded border p-2 text-xs">
-                            <div className="flex items-center justify-between">
-                              <span className="font-medium">
-                                {log.channel.toUpperCase()} • {log.recipient}
-                              </span>
-                              <Badge variant={log.status === "failed" ? "destructive" : "secondary"}>
-                                {log.status}
-                              </Badge>
-                            </div>
-                            {log.subject && <div className="text-muted-foreground">{log.subject}</div>}
-                            <div className="text-muted-foreground line-clamp-2">{log.body}</div>
-                            {log.error && <div className="text-destructive">{log.error}</div>}
-                            <div className="text-muted-foreground">
-                              {new Date(log.createdAt).toLocaleString()}
-                            </div>
-                          </div>
-                        ))}
-                      </div>
-                    )}
-                  </div>
-
                   <div className="flex items-center gap-2">
                     <Select value={activityTypeFilter} onValueChange={setActivityTypeFilter}>
                       <SelectTrigger className="w-48">
@@ -1338,6 +1249,139 @@ export function OpportunityDrawer({ open, onClose, companyId, opportunity }: Opp
                           </div>
                         </div>
                       ))
+                    )}
+                  </div>
+                </>
+              )}
+            </TabsContent>
+
+            <TabsContent value="messages" className="space-y-4">
+              {!opportunity?.id ? (
+                <div className="text-sm text-muted-foreground">
+                  Guardá la oportunidad para enviar mensajes.
+                </div>
+              ) : (
+                <>
+                  <div className="space-y-3 rounded-lg border p-3">
+                    <div className="text-sm font-semibold text-muted-foreground">Mensajes</div>
+                    <div className="grid grid-cols-2 gap-2">
+                      <div>
+                        <label className="text-xs font-medium">Canal</label>
+                        <Select
+                          value={messageChannel}
+                          onValueChange={(value) => setMessageChannel(value as "email" | "whatsapp")}
+                        >
+                          <SelectTrigger>
+                            <SelectValue />
+                          </SelectTrigger>
+                          <SelectContent>
+                            <SelectItem value="email">Email</SelectItem>
+                            {hasWhatsappCreds && (
+                              <SelectItem value="whatsapp">WhatsApp</SelectItem>
+                            )}
+                          </SelectContent>
+                        </Select>
+                        {!hasWhatsappCreds && (
+                          <p className="text-xs text-muted-foreground mt-1">
+                            Configurá Twilio en Notificaciones para habilitar WhatsApp.
+                          </p>
+                        )}
+                      </div>
+                      <div>
+                        <label className="text-xs font-medium">Plantilla</label>
+                        <Select
+                          value={messageTemplateId || "__none__"}
+                          onValueChange={(value) =>
+                            setMessageTemplateId(value === "__none__" ? "" : value)
+                          }
+                        >
+                          <SelectTrigger>
+                            <SelectValue placeholder="Sin plantilla" />
+                          </SelectTrigger>
+                          <SelectContent>
+                            <SelectItem value="__none__">Sin plantilla</SelectItem>
+                            {filteredTemplates.map((tpl: any) => (
+                              <SelectItem key={tpl.id} value={tpl.id}>
+                                {tpl.name}
+                              </SelectItem>
+                            ))}
+                          </SelectContent>
+                        </Select>
+                      </div>
+                    </div>
+                    <div>
+                      <label className="text-xs font-medium">Destinatario</label>
+                      <Input
+                        value={messageRecipient}
+                        onChange={(e) => setMessageRecipient(e.target.value)}
+                        placeholder={messageChannel === "email" ? "email@cliente.com" : "+54 9 11 1234-5678"}
+                      />
+                    </div>
+                    {messageChannel === "email" && (
+                      <div>
+                        <label className="text-xs font-medium">Asunto</label>
+                        <Input
+                          value={messageSubject}
+                          onChange={(e) => setMessageSubject(e.target.value)}
+                          placeholder="Asunto del email"
+                        />
+                      </div>
+                    )}
+                    <div>
+                      <label className="text-xs font-medium">Mensaje</label>
+                      <Textarea
+                        value={messageBody}
+                        onChange={(e) => setMessageBody(e.target.value)}
+                        rows={3}
+                        placeholder="Escribí el mensaje..."
+                      />
+                    </div>
+                    <div className="flex gap-2">
+                      <Button
+                        type="button"
+                        size="sm"
+                        onClick={() => sendMessageMutation.mutate()}
+                        disabled={sendMessageMutation.isPending || (messageChannel === "whatsapp" && !hasWhatsappCreds)}
+                      >
+                        Enviar
+                      </Button>
+                      <Button
+                        type="button"
+                        size="sm"
+                        variant="outline"
+                        onClick={() => createTemplateMutation.mutate()}
+                        disabled={createTemplateMutation.isPending || !messageBody.trim()}
+                      >
+                        Guardar plantilla
+                      </Button>
+                    </div>
+                  </div>
+
+                  <div className="space-y-2">
+                    <div className="text-sm font-semibold text-muted-foreground">Logs de mensajes</div>
+                    {messageLogs.length === 0 ? (
+                      <div className="text-sm text-muted-foreground">Sin mensajes enviados.</div>
+                    ) : (
+                      <div className="space-y-2">
+                        {messageLogs.map((log: MessageLogDTO) => (
+                          <div key={log.id} className="rounded border p-2 text-xs">
+                            <div className="flex items-center justify-between">
+                              <span className="font-medium">
+                                {log.channel.toUpperCase()} • {log.recipient}
+                              </span>
+                              <Badge variant={log.status === "failed" ? "destructive" : "secondary"}>
+                                {log.status}
+                              </Badge>
+                            </div>
+                            {log.subject && <div className="text-muted-foreground">{log.subject}</div>}
+                            <div className="text-muted-foreground line-clamp-2">{log.body}</div>
+                            {log.error && <div className="text-destructive">{log.error}</div>}
+                            <div className="text-muted-foreground">
+                              {new Date(log.createdAt).toLocaleString()}
+                            </div>
+                          </div>
+                        ))}
+                      </div>
                     )}
                   </div>
                 </>
