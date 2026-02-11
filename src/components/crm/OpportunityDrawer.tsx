@@ -1,4 +1,4 @@
-import { useState, useMemo, useEffect } from "react";
+import { useState, useMemo, useEffect, useRef } from "react";
 import { useForm } from "react-hook-form";
 import { z } from "zod";
 import { zodResolver } from "@hookform/resolvers/zod";
@@ -260,11 +260,22 @@ export function OpportunityDrawer({ open, onClose, companyId, opportunity }: Opp
     return next || TAG_COLOR_PALETTE[0];
   }, [tags]);
 
+  const suggestedColorHex = useMemo(() => rgbToHex(suggestedColor), [suggestedColor]);
+  const lastSuggestedRef = useRef(suggestedColorHex);
+
   useEffect(() => {
-    if (!newTagColorHex) {
-      setNewTagColorHex(rgbToHex(suggestedColor));
+    const lastSuggested = lastSuggestedRef.current;
+    const isAutoSelection =
+      !newTagColorHex ||
+      normalizeColorForCompare(hexToRgb(newTagColorHex)) ===
+        normalizeColorForCompare(hexToRgb(lastSuggested));
+
+    if (isAutoSelection) {
+      setNewTagColorHex(suggestedColorHex);
     }
-  }, [suggestedColor, newTagColorHex]);
+
+    lastSuggestedRef.current = suggestedColorHex;
+  }, [suggestedColorHex, newTagColorHex]);
 
   const setSelectedTags = (next: string[]) => {
     form.setValue("tags", next, { shouldValidate: true });
