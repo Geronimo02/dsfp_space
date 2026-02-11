@@ -10,6 +10,7 @@ import { usePermissions } from "@/hooks/usePermissions";
 import { useCompany } from "@/contexts/CompanyContext";
 import { Badge } from "@/components/ui/badge";
 import { BusinessHealthPanel } from "@/components/dashboard/BusinessHealthPanel";
+import { OnboardingChecklist } from "@/components/onboarding/OnboardingChecklist";
 
 export default function Dashboard() {
   const { currentCompany } = useCompany();
@@ -447,6 +448,9 @@ export default function Dashboard() {
           <h1 className="text-xl md:text-3xl font-bold text-foreground">Dashboard</h1>
           <p className="text-xs md:text-base text-muted-foreground">Panel de control y salud del negocio</p>
         </div>
+
+        {/* Onboarding Checklist */}
+        <OnboardingChecklist />
 
         {/* Business Health Panel */}
         {currentCompany?.id && (

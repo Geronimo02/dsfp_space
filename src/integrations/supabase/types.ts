@@ -687,6 +687,7 @@ export type Database = {
           autoprint_receipt: boolean | null
           backup_enabled: boolean | null
           base_price: number | null
+          business_niche: string | null
           calculated_price: number | null
           card_surcharge_rate: number | null
           certificado_afip_url: string | null
@@ -743,6 +744,7 @@ export type Database = {
           autoprint_receipt?: boolean | null
           backup_enabled?: boolean | null
           base_price?: number | null
+          business_niche?: string | null
           calculated_price?: number | null
           card_surcharge_rate?: number | null
           certificado_afip_url?: string | null
@@ -799,6 +801,7 @@ export type Database = {
           autoprint_receipt?: boolean | null
           backup_enabled?: boolean | null
           base_price?: number | null
+          business_niche?: string | null
           calculated_price?: number | null
           card_surcharge_rate?: number | null
           certificado_afip_url?: string | null
@@ -1020,6 +1023,7 @@ export type Database = {
           is_active: boolean | null
           last_activity_at: string | null
           notes: string | null
+          onboarding_dismissed: boolean | null
           payment_method_configured: boolean | null
           started_at: string | null
           team_members_invited: boolean | null
@@ -1039,6 +1043,7 @@ export type Database = {
           is_active?: boolean | null
           last_activity_at?: string | null
           notes?: string | null
+          onboarding_dismissed?: boolean | null
           payment_method_configured?: boolean | null
           started_at?: string | null
           team_members_invited?: boolean | null
@@ -1058,6 +1063,7 @@ export type Database = {
           is_active?: boolean | null
           last_activity_at?: string | null
           notes?: string | null
+          onboarding_dismissed?: boolean | null
           payment_method_configured?: boolean | null
           started_at?: string | null
           team_members_invited?: boolean | null
@@ -3735,6 +3741,41 @@ export type Database = {
         Relationships: [
           {
             foreignKeyName: "notifications_company_id_fkey"
+            columns: ["company_id"]
+            isOneToOne: false
+            referencedRelation: "companies"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      onboarding_checklist_items: {
+        Row: {
+          company_id: string
+          completed: boolean
+          completed_at: string | null
+          created_at: string
+          id: string
+          item_key: string
+        }
+        Insert: {
+          company_id: string
+          completed?: boolean
+          completed_at?: string | null
+          created_at?: string
+          id?: string
+          item_key: string
+        }
+        Update: {
+          company_id?: string
+          completed?: boolean
+          completed_at?: string | null
+          created_at?: string
+          id?: string
+          item_key?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "onboarding_checklist_items_company_id_fkey"
             columns: ["company_id"]
             isOneToOne: false
             referencedRelation: "companies"

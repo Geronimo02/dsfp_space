@@ -4,10 +4,12 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/com
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Button } from "@/components/ui/button";
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { supabase } from "@/integrations/supabase/client";
 import { useCompany } from "@/contexts/CompanyContext";
 import { toast } from "sonner";
 import { Building2, Loader2 } from "lucide-react";
+import { NICHE_OPTIONS, type BusinessNiche } from "@/lib/onboardingChecklists";
 
 export default function CompanySetup() {
   const [loading, setLoading] = useState(false);
@@ -15,6 +17,7 @@ export default function CompanySetup() {
   const [taxId, setTaxId] = useState("");
   const [phone, setPhone] = useState("");
   const [address, setAddress] = useState("");
+  const [businessNiche, setBusinessNiche] = useState<BusinessNiche | "">("");
   const navigate = useNavigate();
   const { userCompanies, loading: companyLoading } = useCompany();
 
@@ -62,6 +65,15 @@ export default function CompanySetup() {
       }
 
       console.log("Company created successfully with ID:", companyId);
+
+      // Save business niche
+      if (businessNiche) {
+        await supabase
+          .from("companies")
+          .update({ business_niche: businessNiche } as any)
+          .eq("id", companyId);
+      }
+
       toast.success("Empresa creada exitosamente");
       
       // Esperar un momento para que se actualice la BD
@@ -148,6 +160,28 @@ export default function CompanySetup() {
                 value={address}
                 onChange={(e) => setAddress(e.target.value)}
               />
+            </div>
+
+            <div className="space-y-2">
+              <Label htmlFor="niche">Rubro / Tipo de negocio</Label>
+              <Select value={businessNiche} onValueChange={(v) => setBusinessNiche(v as BusinessNiche)}>
+                <SelectTrigger id="niche" className="w-full">
+                  <SelectValue placeholder="Seleccioná tu rubro" />
+                </SelectTrigger>
+                <SelectContent>
+                  {NICHE_OPTIONS.map((opt) => (
+                    <SelectItem key={opt.value} value={opt.value}>
+                      <div className="flex flex-col">
+                        <span>{opt.label}</span>
+                        <span className="text-xs text-muted-foreground">{opt.description}</span>
+                      </div>
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+              <p className="text-xs text-muted-foreground">
+                Esto personaliza tu tutorial de bienvenida.
+              </p>
             </div>
 
             <Button type="submit" className="w-full" disabled={loading}>
