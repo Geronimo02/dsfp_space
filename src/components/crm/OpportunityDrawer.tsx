@@ -1,6 +1,5 @@
 import { useState, useMemo, useEffect, useRef } from "react";
 import { useForm } from "react-hook-form";
-import { z } from "zod";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { toast } from "sonner";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
@@ -21,35 +20,18 @@ import {
   PopoverContent,
   PopoverTrigger,
 } from "@/components/ui/popover";
-import { Check, Plus, X } from "lucide-react";
+import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
+import { Check, Plus, X, Pencil, Trash2 } from "lucide-react";
 import type { Database } from "@/integrations/supabase/types";
+import { opportunitySchema, type OpportunityForm } from "@/domain/crm/validation/opportunitySchema";
+import { opportunityService } from "@/domain/crm/services/opportunityService";
+import { tagService } from "@/domain/crm/services/tagService";
+import { activityService } from "@/domain/crm/services/activityService";
+import { activityLogService } from "@/domain/crm/services/activityLogService";
+import type { ActivityDTO, ActivityListResult } from "@/domain/crm/dtos/activity";
+import type { ActivityLogListResult } from "@/domain/crm/dtos/activityLog";
 
 type OpportunityRow = Database["public"]["Tables"]["crm_opportunities"]["Row"];
-type OpportunityInsert = Database["public"]["Tables"]["crm_opportunities"]["Insert"];
-
-const opportunitySchema = z.object({
-  name: z.string().min(1, "El nombre es requerido"),
-  customer_id: z.string().optional(),
-  pipeline_id: z.string().min(1, "Pipeline es requerido"),
-  stage: z.string().min(1, "Etapa es requerida"),
-  value: z.number().optional(),
-  estimated_close_date: z.string().optional(),
-  probability: z.number().min(0).max(100).optional(),
-  description: z.string().optional(),
-  owner_id: z.string().optional(),
-  status: z.string().optional(),
-  close_date: z.string().optional(),
-  lost_reason: z.string().optional(),
-  won_reason: z.string().optional(),
-  source: z.string().optional(),
-  currency: z.string().optional(),
-  expected_revenue: z.number().optional(),
-  next_step: z.string().optional(),
-  tags: z.array(z.string()).optional(),
-});
-
-type OpportunityForm = z.infer<typeof opportunitySchema>;
-
 interface TagRow {
   id: string;
   name: string;
@@ -149,26 +131,9 @@ export function OpportunityDrawer({ open, onClose, companyId, opportunity }: Opp
       };
 
       if (isEditing) {
-        const { data, error } = await supabase
-          .from("crm_opportunities")
-          .update(payload)
-          .eq("id", opportunity!.id)
-          .select();
-        if (error) {
-          console.error("Error updating opportunity:", error);
-          throw error;
-        }
-        console.log("Updated opportunity:", data);
+        await opportunityService.update(opportunity!.id, payload);
       } else {
-        const { data, error } = await supabase
-          .from("crm_opportunities")
-          .insert([{ ...payload, company_id: companyId }])
-          .select();
-        if (error) {
-          console.error("Error creating opportunity:", error);
-          throw error;
-        }
-        console.log("Created opportunity:", data);
+        await opportunityService.create({ ...payload, company_id: companyId });
       }
     },
     onSuccess: () => {
@@ -228,13 +193,7 @@ export function OpportunityDrawer({ open, onClose, companyId, opportunity }: Opp
   const { data: tags = [] } = useQuery<TagRow[]>({
     queryKey: ["crm-tags", companyId],
     queryFn: async () => {
-      const { data, error } = await supabase
-        .from("crm_tags")
-        .select("id, name, color")
-        .eq("company_id", companyId)
-        .order("name", { ascending: true });
-      if (error) throw error;
-      return (data || []) as TagRow[];
+      return (await tagService.list(companyId)) as TagRow[];
     },
     enabled: !!companyId && open,
   });
@@ -242,6 +201,16 @@ export function OpportunityDrawer({ open, onClose, companyId, opportunity }: Opp
   const [tagSearch, setTagSearch] = useState("");
   const [newTagName, setNewTagName] = useState("");
   const [newTagColorHex, setNewTagColorHex] = useState("");
+  const [editingTagId, setEditingTagId] = useState<string | null>(null);
+  const [editingTagName, setEditingTagName] = useState("");
+  const [activityTypeFilter, setActivityTypeFilter] = useState<string>("all");
+  const [activityForm, setActivityForm] = useState({
+    type: "call",
+    subject: "",
+    notes: "",
+    due_at: "",
+  });
+  const [editingActivityId, setEditingActivityId] = useState<string | null>(null);
 
   const selectedTags = form.watch("tags") || [];
   const selectedTagSet = useMemo(() => new Set(selectedTags), [selectedTags]);
@@ -315,15 +284,37 @@ export function OpportunityDrawer({ open, onClose, companyId, opportunity }: Opp
     createTagMutation.mutate({ name, color: colorRgb });
   };
 
+  const startEditTag = (tag: TagRow) => {
+    setEditingTagId(tag.id);
+    setEditingTagName(tag.name);
+  };
+
+  const cancelEditTag = () => {
+    setEditingTagId(null);
+    setEditingTagName("");
+  };
+
+  const saveEditTag = (tag: TagRow) => {
+    const name = editingTagName.trim();
+    if (!name) {
+      toast.error("El nombre del tag es requerido");
+      return;
+    }
+    if (name.toLowerCase() === tag.name.toLowerCase()) {
+      cancelEditTag();
+      return;
+    }
+    updateTagNameMutation.mutate({ tagId: tag.id, name, previousName: tag.name });
+  };
+
+  const handleDeleteTag = (tag: TagRow) => {
+    if (!confirm(`¿Eliminar el tag "${tag.name}"?`)) return;
+    deleteTagMutation.mutate({ tagId: tag.id, name: tag.name });
+  };
+
   const createTagMutation = useMutation({
     mutationFn: async ({ name, color }: { name: string; color: string }) => {
-      const { data, error } = await supabase
-        .from("crm_tags")
-        .insert([{ company_id: companyId, name, color }])
-        .select("id, name, color")
-        .single();
-      if (error) throw error;
-      return data as TagRow;
+      return (await tagService.create({ company_id: companyId, name, color })) as TagRow;
     },
     onSuccess: (newTag) => {
       queryClient.invalidateQueries({ queryKey: ["crm-tags", companyId] });
@@ -339,14 +330,44 @@ export function OpportunityDrawer({ open, onClose, companyId, opportunity }: Opp
 
   const updateTagColorMutation = useMutation({
     mutationFn: async ({ tagId, color }: { tagId: string; color: string }) => {
-      const { error } = await supabase
-        .from("crm_tags")
-        .update({ color })
-        .eq("id", tagId);
-      if (error) throw error;
+      await tagService.update(tagId, { color });
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["crm-tags", companyId] });
+    },
+  });
+
+  const updateTagNameMutation = useMutation({
+    mutationFn: async ({ tagId, name }: { tagId: string; name: string; previousName?: string }) => {
+      await tagService.update(tagId, { name });
+    },
+    onSuccess: (_data, variables) => {
+      queryClient.invalidateQueries({ queryKey: ["crm-tags", companyId] });
+      if (variables.previousName && variables.previousName !== variables.name) {
+        setSelectedTags(
+          selectedTags.map((tag) => (tag === variables.previousName ? variables.name : tag))
+        );
+      }
+      setEditingTagId(null);
+      setEditingTagName("");
+    },
+    onError: (error: any) => {
+      toast.error(error.message || "Error al editar tag");
+    },
+  });
+
+  const deleteTagMutation = useMutation({
+    mutationFn: async ({ tagId }: { tagId: string; name?: string }) => {
+      await tagService.remove(tagId);
+    },
+    onSuccess: (_data, variables) => {
+      queryClient.invalidateQueries({ queryKey: ["crm-tags", companyId] });
+      if (variables.name) {
+        removeTag(variables.name);
+      }
+    },
+    onError: (error: any) => {
+      toast.error(error.message || "Error al eliminar tag");
     },
   });
 
@@ -407,6 +428,91 @@ export function OpportunityDrawer({ open, onClose, companyId, opportunity }: Opp
     }
   }, [opportunity, open, isEditing, pipelinesLoading, customersLoading, ownersLoading, form]);
 
+  const { data: activityList } = useQuery<ActivityListResult>({
+    queryKey: ["crm-activities", companyId, opportunity?.id, activityTypeFilter],
+    queryFn: () =>
+      activityService.listByOpportunity({
+        companyId,
+        opportunityId: opportunity?.id,
+        type: activityTypeFilter === "all" ? undefined : activityTypeFilter,
+        page: 1,
+        pageSize: 50,
+      }),
+    enabled: !!companyId && !!opportunity?.id && open,
+  });
+
+  const { data: activityLogList } = useQuery<ActivityLogListResult>({
+    queryKey: ["crm-activity-log", companyId, opportunity?.id],
+    queryFn: () =>
+      activityLogService.listByOpportunity({
+        companyId,
+        opportunityId: opportunity?.id,
+        page: 1,
+        pageSize: 50,
+      }),
+    enabled: !!companyId && !!opportunity?.id && open,
+  });
+
+  const createActivityMutation = useMutation({
+    mutationFn: async () => {
+      if (!opportunity?.id) throw new Error("Oportunidad no seleccionada");
+      return activityService.create({
+        company_id: companyId,
+        opportunity_id: opportunity.id,
+        type: activityForm.type,
+        subject: activityForm.subject || null,
+        notes: activityForm.notes || null,
+        due_at: activityForm.due_at || null,
+      });
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({
+        queryKey: ["crm-activities", companyId, opportunity?.id],
+      });
+      setActivityForm({ type: "call", subject: "", notes: "", due_at: "" });
+      setEditingActivityId(null);
+    },
+    onError: (error: any) => {
+      toast.error(error.message || "Error al crear actividad");
+    },
+  });
+
+  const updateActivityMutation = useMutation({
+    mutationFn: async () => {
+      if (!editingActivityId) throw new Error("Actividad no seleccionada");
+      return activityService.update(editingActivityId, {
+        type: activityForm.type,
+        subject: activityForm.subject || null,
+        notes: activityForm.notes || null,
+        due_at: activityForm.due_at || null,
+      });
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({
+        queryKey: ["crm-activities", companyId, opportunity?.id],
+      });
+      setActivityForm({ type: "call", subject: "", notes: "", due_at: "" });
+      setEditingActivityId(null);
+    },
+    onError: (error: any) => {
+      toast.error(error.message || "Error al actualizar actividad");
+    },
+  });
+
+  const deleteActivityMutation = useMutation({
+    mutationFn: async (activityId: string) => {
+      await activityService.remove(activityId);
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({
+        queryKey: ["crm-activities", companyId, opportunity?.id],
+      });
+    },
+    onError: (error: any) => {
+      toast.error(error.message || "Error al eliminar actividad");
+    },
+  });
+
   if (!open) return null;
 
   return (
@@ -435,316 +541,577 @@ export function OpportunityDrawer({ open, onClose, companyId, opportunity }: Opp
             Los campos con * son obligatorios.
           </div>
 
-          <div className="text-sm font-semibold text-muted-foreground">Datos básicos</div>
-          <div className="grid gap-2">
-            <label className="font-medium">Nombre *</label>
-            <Input
-              {...form.register("name")}
-              placeholder="Ej: Renovación contrato ACME"
-              aria-invalid={!!form.formState.errors.name}
-            />
-            {form.formState.errors.name && (
-              <span className="text-xs text-red-500">{form.formState.errors.name.message}</span>
-            )}
-          </div>
+          <Tabs defaultValue="details" className="w-full">
+            <TabsList className="w-full">
+              <TabsTrigger value="details" className="flex-1">Detalles</TabsTrigger>
+              <TabsTrigger value="activity" className="flex-1">Actividad</TabsTrigger>
+              <TabsTrigger value="history" className="flex-1">Historial</TabsTrigger>
+            </TabsList>
 
-          <div className="grid grid-cols-2 gap-2">
-            <div>
-              <label className="font-medium">Pipeline *</label>
-              <Select
-                value={form.watch("pipeline_id") || ""}
-                onValueChange={(value) => {
-                  form.setValue("pipeline_id", value, { shouldValidate: true });
-                  const pipeline = pipelines.find((p: any) => p.id === value);
-                  const nextStage = pipeline?.stages?.[0];
-                  if (nextStage && !isEditing) {
-                    form.setValue("stage", nextStage, { shouldValidate: true });
-                  }
-                }}
-              >
-                <SelectTrigger>
-                  <SelectValue placeholder="Elegí un pipeline" />
-                </SelectTrigger>
-                <SelectContent>
-                  {pipelines.map((p: any) => (
-                    <SelectItem key={p.id} value={p.id}>
-                      {p.name}
-                    </SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
-            </div>
-            <div>
-              <label className="font-medium">Etapa *</label>
-              <Select
-                value={form.watch("stage") || ""}
-                onValueChange={(value) => form.setValue("stage", value, { shouldValidate: true })}
-                disabled={!pipelineStages.length}
-              >
-                <SelectTrigger>
-                  <SelectValue placeholder={pipelineStages.length ? "Seleccionar" : "Elegí pipeline"} />
-                </SelectTrigger>
-                <SelectContent>
-                  {pipelineStages.map((stage: string) => (
-                    <SelectItem key={stage} value={stage}>
-                      {stage}
-                    </SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
-            </div>
-          </div>
+            <TabsContent value="details" className="space-y-4">
+              <div className="text-sm font-semibold text-muted-foreground">Datos básicos</div>
+              <div className="grid gap-2">
+                <label className="font-medium">Nombre *</label>
+                <Input
+                  {...form.register("name")}
+                  placeholder="Ej: Renovación contrato ACME"
+                  aria-invalid={!!form.formState.errors.name}
+                />
+                {form.formState.errors.name && (
+                  <span className="text-xs text-red-500">{form.formState.errors.name.message}</span>
+                )}
+              </div>
 
-          <div className="grid grid-cols-2 gap-2">
-            <div>
-              <label className="font-medium">Cliente</label>
-              <Select
-                value={form.watch("customer_id") || "__none__"}
-                onValueChange={(value) =>
-                  form.setValue("customer_id", value === "__none__" ? undefined : value)
-                }
-              >
-                <SelectTrigger>
-                  <SelectValue placeholder="Sin cliente" />
-                </SelectTrigger>
-                <SelectContent>
-                  <SelectItem value="__none__">Sin cliente</SelectItem>
-                  {customers.map((c: any) => (
-                    <SelectItem key={c.id} value={c.id}>
-                      {c.name}
-                    </SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
-            </div>
-            <div>
-              <label className="font-medium">Responsable (empleado)</label>
-              <Select
-                value={form.watch("owner_id") || "__none__"}
-                onValueChange={(value) =>
-                  form.setValue("owner_id", value === "__none__" ? undefined : value)
-                }
-              >
-                <SelectTrigger>
-                  <SelectValue placeholder="Seleccionar empleado (opcional)" />
-                </SelectTrigger>
-                <SelectContent>
-                  <SelectItem value="__none__">Sin asignar</SelectItem>
-                  {owners.map((o: any) => (
-                    <SelectItem key={o.id} value={o.id}>
-                      {`${o.first_name} ${o.last_name}`.trim()}
-                    </SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
-              <p className="text-xs text-muted-foreground">Puede quedar vacío.</p>
-            </div>
-          </div>
+              <div className="grid grid-cols-2 gap-2">
+                <div>
+                  <label className="font-medium">Pipeline *</label>
+                  <Select
+                    value={form.watch("pipeline_id") || ""}
+                    onValueChange={(value) => {
+                      form.setValue("pipeline_id", value, { shouldValidate: true });
+                      const pipeline = pipelines.find((p: any) => p.id === value);
+                      const nextStage = pipeline?.stages?.[0];
+                      if (nextStage && !isEditing) {
+                        form.setValue("stage", nextStage, { shouldValidate: true });
+                      }
+                    }}
+                  >
+                    <SelectTrigger>
+                      <SelectValue placeholder="Elegí un pipeline" />
+                    </SelectTrigger>
+                    <SelectContent>
+                      {pipelines.map((p: any) => (
+                        <SelectItem key={p.id} value={p.id}>
+                          {p.name}
+                        </SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                </div>
+                <div>
+                  <label className="font-medium">Etapa *</label>
+                  <Select
+                    value={form.watch("stage") || ""}
+                    onValueChange={(value) => form.setValue("stage", value, { shouldValidate: true })}
+                    disabled={!pipelineStages.length}
+                  >
+                    <SelectTrigger>
+                      <SelectValue placeholder={pipelineStages.length ? "Seleccionar" : "Elegí pipeline"} />
+                    </SelectTrigger>
+                    <SelectContent>
+                      {pipelineStages.map((stage: string) => (
+                        <SelectItem key={stage} value={stage}>
+                          {stage}
+                        </SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                </div>
+              </div>
 
-          <div className="text-sm font-semibold text-muted-foreground">Monto y fechas</div>
-          <div className="grid grid-cols-2 gap-2">
-            <div>
-              <label className="font-medium">Monto</label>
-              <Input
-                type="number"
-                {...form.register("value", { valueAsNumber: true })}
-                placeholder="0"
-              />
-            </div>
-            <div>
-              <label className="font-medium">Moneda</label>
-              <Select
-                value={form.watch("currency") || "ARS"}
-                onValueChange={(value) => form.setValue("currency", value)}
-              >
-                <SelectTrigger>
-                  <SelectValue />
-                </SelectTrigger>
-                <SelectContent>
-                  <SelectItem value="ARS">ARS</SelectItem>
-                  <SelectItem value="USD">USD</SelectItem>
-                  <SelectItem value="EUR">EUR</SelectItem>
-                  <SelectItem value="BRL">BRL</SelectItem>
-                  <SelectItem value="MXN">MXN</SelectItem>
-                  <SelectItem value="CLP">CLP</SelectItem>
-                  <SelectItem value="COP">COP</SelectItem>
-                  <SelectItem value="PEN">PEN</SelectItem>
-                  <SelectItem value="UYU">UYU</SelectItem>
-                </SelectContent>
-              </Select>
-            </div>
-          </div>
+              <div className="grid grid-cols-2 gap-2">
+                <div>
+                  <label className="font-medium">Cliente</label>
+                  <Select
+                    value={form.watch("customer_id") || "__none__"}
+                    onValueChange={(value) =>
+                      form.setValue("customer_id", value === "__none__" ? undefined : value)
+                    }
+                  >
+                    <SelectTrigger>
+                      <SelectValue placeholder="Sin cliente" />
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="__none__">Sin cliente</SelectItem>
+                      {customers.map((c: any) => (
+                        <SelectItem key={c.id} value={c.id}>
+                          {c.name}
+                        </SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                </div>
+                <div>
+                  <label className="font-medium">Responsable (empleado)</label>
+                  <Select
+                    value={form.watch("owner_id") || "__none__"}
+                    onValueChange={(value) =>
+                      form.setValue("owner_id", value === "__none__" ? undefined : value)
+                    }
+                  >
+                    <SelectTrigger>
+                      <SelectValue placeholder="Seleccionar empleado (opcional)" />
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="__none__">Sin asignar</SelectItem>
+                      {owners.map((o: any) => (
+                        <SelectItem key={o.id} value={o.id}>
+                          {`${o.first_name} ${o.last_name}`.trim()}
+                        </SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                  <p className="text-xs text-muted-foreground">Puede quedar vacío.</p>
+                </div>
+              </div>
 
-          <div className="grid grid-cols-2 gap-2">
-            <div>
-              <label className="font-medium">Cierre estimado</label>
-              <Input type="date" {...form.register("estimated_close_date")} />
-            </div>
-            <div>
-              <label className="font-medium">Probabilidad (%)</label>
-              <Input
-                type="number"
-                {...form.register("probability", { valueAsNumber: true })}
-                placeholder="50"
-                min="0"
-                max="100"
-              />
-            </div>
-          </div>
+              <div className="text-sm font-semibold text-muted-foreground">Monto y fechas</div>
+              <div className="grid grid-cols-2 gap-2">
+                <div>
+                  <label className="font-medium">Monto</label>
+                  <Input
+                    type="number"
+                    {...form.register("value", { valueAsNumber: true })}
+                    placeholder="0"
+                  />
+                </div>
+                <div>
+                  <label className="font-medium">Moneda</label>
+                  <Select
+                    value={form.watch("currency") || "ARS"}
+                    onValueChange={(value) => form.setValue("currency", value)}
+                  >
+                    <SelectTrigger>
+                      <SelectValue />
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="ARS">ARS</SelectItem>
+                      <SelectItem value="USD">USD</SelectItem>
+                      <SelectItem value="EUR">EUR</SelectItem>
+                      <SelectItem value="BRL">BRL</SelectItem>
+                      <SelectItem value="MXN">MXN</SelectItem>
+                      <SelectItem value="CLP">CLP</SelectItem>
+                      <SelectItem value="COP">COP</SelectItem>
+                      <SelectItem value="PEN">PEN</SelectItem>
+                      <SelectItem value="UYU">UYU</SelectItem>
+                    </SelectContent>
+                  </Select>
+                </div>
+              </div>
 
-          <div className="text-sm font-semibold text-muted-foreground">Estado y seguimiento</div>
-          <div className="grid gap-2">
-            <label className="font-medium">Estado</label>
-            <Select
-              value={form.watch("status") || "abierta"}
-              onValueChange={(value) => form.setValue("status", value)}
-            >
-              <SelectTrigger>
-                <SelectValue />
-              </SelectTrigger>
-              <SelectContent>
-                <SelectItem value="abierta">Abierta</SelectItem>
-                <SelectItem value="ganado">Ganado</SelectItem>
-                <SelectItem value="perdido">Perdido</SelectItem>
-              </SelectContent>
-            </Select>
-          </div>
+              <div className="grid grid-cols-2 gap-2">
+                <div>
+                  <label className="font-medium">Cierre estimado</label>
+                  <Input type="date" {...form.register("estimated_close_date")} />
+                </div>
+                <div>
+                  <label className="font-medium">Probabilidad (%)</label>
+                  <Input
+                    type="number"
+                    {...form.register("probability", { valueAsNumber: true })}
+                    placeholder="50"
+                    min="0"
+                    max="100"
+                  />
+                </div>
+              </div>
 
-          <div className="grid gap-2">
-            <label className="font-medium">Próximo paso</label>
-            <Input {...form.register("next_step")} placeholder="Agendar reunión..." />
-          </div>
+              <div className="text-sm font-semibold text-muted-foreground">Estado y seguimiento</div>
+              <div className="grid gap-2">
+                <label className="font-medium">Estado</label>
+                <Select
+                  value={form.watch("status") || "abierta"}
+                  onValueChange={(value) => form.setValue("status", value)}
+                >
+                  <SelectTrigger>
+                    <SelectValue />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="abierta">Abierta</SelectItem>
+                    <SelectItem value="ganado">Ganado</SelectItem>
+                    <SelectItem value="perdido">Perdido</SelectItem>
+                  </SelectContent>
+                </Select>
+              </div>
 
-          <div className="text-sm font-semibold text-muted-foreground">Notas</div>
-          <div className="grid gap-2">
-            <label className="font-medium">Descripción</label>
-            <Textarea
-              {...form.register("description")}
-              placeholder="Detalles de la oportunidad..."
-              rows={3}
-            />
-          </div>
+              <div className="grid gap-2">
+                <label className="font-medium">Próximo paso</label>
+                <Input {...form.register("next_step")} placeholder="Agendar reunión..." />
+              </div>
 
-          <div className="grid gap-2">
-            <label className="font-medium">Fuente</label>
-            <Input {...form.register("source")} placeholder="Ej: Web, Referido, Email..." />
-          </div>
+              <div className="text-sm font-semibold text-muted-foreground">Notas</div>
+              <div className="grid gap-2">
+                <label className="font-medium">Descripción</label>
+                <Textarea
+                  {...form.register("description")}
+                  placeholder="Detalles de la oportunidad..."
+                  rows={3}
+                />
+              </div>
 
-          <div className="grid gap-2">
-            <label className="font-medium">Tags</label>
-            <div className="flex flex-wrap gap-2">
-              {selectedTags.length === 0 ? (
-                <span className="text-xs text-muted-foreground">Sin tags asignados.</span>
-              ) : (
-                selectedTags.map((tagName) => {
-                  const tag = tags.find((t) => t.name === tagName);
-                  const tagColor = tag?.color || "rgb(148, 163, 184)";
-                  return (
-                    <Badge
-                      key={tagName}
-                      className="gap-1 text-white"
-                      style={{ backgroundColor: tagColor }}
-                    >
-                      {tagName}
-                      <button
-                        type="button"
-                        className="ml-1 rounded-full hover:bg-black/20"
-                        onClick={() => removeTag(tagName)}
-                        aria-label={`Quitar ${tagName}`}
-                      >
-                        <X className="h-3 w-3" />
-                      </button>
-                    </Badge>
-                  );
-                })
-              )}
-            </div>
-            <Popover>
-              <PopoverTrigger asChild>
-                <Button type="button" variant="outline" size="sm" className="w-fit">
-                  Gestionar tags
-                </Button>
-              </PopoverTrigger>
-              <PopoverContent className="w-80">
-                <div className="space-y-3">
-                  <div className="space-y-2">
-                    <label className="text-xs font-medium text-muted-foreground">Buscar tags</label>
-                    <Input
-                      value={tagSearch}
-                      onChange={(e) => setTagSearch(e.target.value)}
-                      placeholder="Buscar tag..."
-                    />
-                  </div>
-                  <div className="max-h-48 overflow-y-auto rounded-md border">
-                    {filteredTags.length === 0 ? (
-                      <div className="px-3 py-2 text-xs text-muted-foreground">
-                        No hay tags.
-                      </div>
-                    ) : (
-                      filteredTags.map((tag) => (
-                        <button
-                          key={tag.id}
-                          type="button"
-                          onClick={() => toggleTag(tag.name)}
-                          className="flex w-full items-center justify-between px-3 py-2 text-sm hover:bg-muted"
+              <div className="grid gap-2">
+                <label className="font-medium">Fuente</label>
+                <Input {...form.register("source")} placeholder="Ej: Web, Referido, Email..." />
+              </div>
+
+              <div className="grid gap-2">
+                <label className="font-medium">Tags</label>
+                <div className="flex flex-wrap gap-2">
+                  {selectedTags.length === 0 ? (
+                    <span className="text-xs text-muted-foreground">Sin tags asignados.</span>
+                  ) : (
+                    selectedTags.map((tagName) => {
+                      const tag = tags.find((t) => t.name === tagName);
+                      const tagColor = tag?.color || "rgb(148, 163, 184)";
+                      return (
+                        <Badge
+                          key={tagName}
+                          className="gap-1 text-white"
+                          style={{ backgroundColor: tagColor }}
                         >
-                          <div className="flex items-center gap-2">
-                            <span
-                              className="h-2.5 w-2.5 rounded-full"
-                              style={{ backgroundColor: tag.color }}
-                            />
-                            <span>{tag.name}</span>
+                          {tagName}
+                          <button
+                            type="button"
+                            className="ml-1 rounded-full hover:bg-black/20"
+                            onClick={() => removeTag(tagName)}
+                            aria-label={`Quitar ${tagName}`}
+                          >
+                            <X className="h-3 w-3" />
+                          </button>
+                        </Badge>
+                      );
+                    })
+                  )}
+                </div>
+                <Popover>
+                  <PopoverTrigger asChild>
+                    <Button type="button" variant="outline" size="sm" className="w-fit">
+                      Gestionar tags
+                    </Button>
+                  </PopoverTrigger>
+                  <PopoverContent className="w-80">
+                    <div className="space-y-3">
+                      <div className="space-y-2">
+                        <label className="text-xs font-medium text-muted-foreground">Buscar tags</label>
+                        <Input
+                          value={tagSearch}
+                          onChange={(e) => setTagSearch(e.target.value)}
+                          placeholder="Buscar tag..."
+                        />
+                      </div>
+                      <div className="max-h-48 overflow-y-auto rounded-md border">
+                        {filteredTags.length === 0 ? (
+                          <div className="px-3 py-2 text-xs text-muted-foreground">
+                            No hay tags.
                           </div>
-                          <div className="flex items-center gap-2">
-                            <Input
-                              type="color"
-                              value={rgbToHex(tag.color)}
-                              onClick={(e) => e.stopPropagation()}
-                              onChange={(e) => {
-                                const nextColor = hexToRgb(e.target.value);
-                                updateTagColorMutation.mutate({ tagId: tag.id, color: nextColor });
-                              }}
-                              className="h-6 w-8 p-0"
-                            />
-                            {selectedTagSet.has(tag.name) && (
-                              <Check className="h-4 w-4 text-primary" />
-                            )}
-                          </div>
-                        </button>
-                      ))
-                    )}
+                        ) : (
+                          filteredTags.map((tag) => {
+                            const isEditingTag = editingTagId === tag.id;
+                            return (
+                              <div
+                                key={tag.id}
+                                className="flex w-full items-center justify-between gap-2 px-3 py-2 text-sm hover:bg-muted"
+                              >
+                                {isEditingTag ? (
+                                  <div className="flex flex-1 items-center gap-2">
+                                    <span
+                                      className="h-2.5 w-2.5 rounded-full"
+                                      style={{ backgroundColor: tag.color }}
+                                    />
+                                    <Input
+                                      value={editingTagName}
+                                      onChange={(e) => setEditingTagName(e.target.value)}
+                                      className="h-7"
+                                    />
+                                  </div>
+                                ) : (
+                                  <button
+                                    type="button"
+                                    onClick={() => toggleTag(tag.name)}
+                                    className="flex flex-1 items-center gap-2 text-left"
+                                  >
+                                    <span
+                                      className="h-2.5 w-2.5 rounded-full"
+                                      style={{ backgroundColor: tag.color }}
+                                    />
+                                    <span>{tag.name}</span>
+                                  </button>
+                                )}
+                                <div className="flex items-center gap-2">
+                                  <Input
+                                    type="color"
+                                    value={rgbToHex(tag.color)}
+                                    onClick={(e) => e.stopPropagation()}
+                                    onChange={(e) => {
+                                      const nextColor = hexToRgb(e.target.value);
+                                      updateTagColorMutation.mutate({ tagId: tag.id, color: nextColor });
+                                    }}
+                                    className="h-6 w-8 p-0"
+                                  />
+                                  {selectedTagSet.has(tag.name) && (
+                                    <Check className="h-4 w-4 text-primary" />
+                                  )}
+                                  {isEditingTag ? (
+                                    <>
+                                      <button
+                                        type="button"
+                                        className="rounded p-1 hover:bg-muted"
+                                        onClick={() => saveEditTag(tag)}
+                                      >
+                                        <Check className="h-4 w-4" />
+                                      </button>
+                                      <button
+                                        type="button"
+                                        className="rounded p-1 hover:bg-muted"
+                                        onClick={cancelEditTag}
+                                      >
+                                        <X className="h-4 w-4" />
+                                      </button>
+                                    </>
+                                  ) : (
+                                    <>
+                                      <button
+                                        type="button"
+                                        className="rounded p-1 hover:bg-muted"
+                                        onClick={() => startEditTag(tag)}
+                                      >
+                                        <Pencil className="h-4 w-4" />
+                                      </button>
+                                      <button
+                                        type="button"
+                                        className="rounded p-1 hover:bg-muted text-destructive"
+                                        onClick={() => handleDeleteTag(tag)}
+                                      >
+                                        <Trash2 className="h-4 w-4" />
+                                      </button>
+                                    </>
+                                  )}
+                                </div>
+                              </div>
+                            );
+                          })
+                        )}
+                      </div>
+                      <div className="space-y-2 border-t pt-3">
+                        <label className="text-xs font-medium text-muted-foreground">Crear tag</label>
+                        <Input
+                          value={newTagName}
+                          onChange={(e) => setNewTagName(e.target.value)}
+                          placeholder="Ej: urgente"
+                        />
+                        <div className="flex items-center gap-2">
+                          <Input
+                            type="color"
+                            value={newTagColorHex || rgbToHex(suggestedColor)}
+                            onChange={(e) => setNewTagColorHex(e.target.value)}
+                            className="h-9 w-12 p-1"
+                          />
+                          <span className="text-xs text-muted-foreground">Color sugerido</span>
+                          <Button
+                            type="button"
+                            size="sm"
+                            className="ml-auto"
+                            onClick={handleCreateTag}
+                            disabled={createTagMutation.isPending}
+                          >
+                            <Plus className="h-4 w-4 mr-1" />
+                            Crear
+                          </Button>
+                        </div>
+                      </div>
+                    </div>
+                  </PopoverContent>
+                </Popover>
+              </div>
+            </TabsContent>
+
+            <TabsContent value="activity" className="space-y-4">
+              {!opportunity?.id ? (
+                <div className="text-sm text-muted-foreground">
+                  Guardá la oportunidad para comenzar a gestionar actividades.
+                </div>
+              ) : (
+                <>
+                  <div className="flex items-center gap-2">
+                    <Select value={activityTypeFilter} onValueChange={setActivityTypeFilter}>
+                      <SelectTrigger className="w-48">
+                        <SelectValue placeholder="Filtrar por tipo" />
+                      </SelectTrigger>
+                      <SelectContent>
+                        <SelectItem value="all">Todos</SelectItem>
+                        <SelectItem value="call">Llamada</SelectItem>
+                        <SelectItem value="email">Email</SelectItem>
+                        <SelectItem value="task">Tarea</SelectItem>
+                        <SelectItem value="meeting">Reunión</SelectItem>
+                        <SelectItem value="note">Nota</SelectItem>
+                      </SelectContent>
+                    </Select>
                   </div>
-                  <div className="space-y-2 border-t pt-3">
-                    <label className="text-xs font-medium text-muted-foreground">Crear tag</label>
-                    <Input
-                      value={newTagName}
-                      onChange={(e) => setNewTagName(e.target.value)}
-                      placeholder="Ej: urgente"
-                    />
-                    <div className="flex items-center gap-2">
+
+                  <div className="space-y-2">
+                    <div className="grid grid-cols-2 gap-2">
+                      <div>
+                        <label className="text-xs font-medium">Tipo</label>
+                        <Select
+                          value={activityForm.type}
+                          onValueChange={(value) =>
+                            setActivityForm((prev) => ({ ...prev, type: value }))
+                          }
+                        >
+                          <SelectTrigger>
+                            <SelectValue />
+                          </SelectTrigger>
+                          <SelectContent>
+                            <SelectItem value="call">Llamada</SelectItem>
+                            <SelectItem value="email">Email</SelectItem>
+                            <SelectItem value="task">Tarea</SelectItem>
+                            <SelectItem value="meeting">Reunión</SelectItem>
+                            <SelectItem value="note">Nota</SelectItem>
+                          </SelectContent>
+                        </Select>
+                      </div>
+                      <div>
+                        <label className="text-xs font-medium">Fecha</label>
+                        <Input
+                          type="date"
+                          value={activityForm.due_at}
+                          onChange={(e) =>
+                            setActivityForm((prev) => ({ ...prev, due_at: e.target.value }))
+                          }
+                        />
+                      </div>
+                    </div>
+                    <div>
+                      <label className="text-xs font-medium">Asunto</label>
                       <Input
-                        type="color"
-                        value={newTagColorHex || rgbToHex(suggestedColor)}
-                        onChange={(e) => setNewTagColorHex(e.target.value)}
-                        className="h-9 w-12 p-1"
+                        value={activityForm.subject}
+                        onChange={(e) =>
+                          setActivityForm((prev) => ({ ...prev, subject: e.target.value }))
+                        }
+                        placeholder="Ej: Llamar para demo"
                       />
-                      <span className="text-xs text-muted-foreground">Color sugerido</span>
+                    </div>
+                    <div>
+                      <label className="text-xs font-medium">Notas</label>
+                      <Textarea
+                        value={activityForm.notes}
+                        onChange={(e) =>
+                          setActivityForm((prev) => ({ ...prev, notes: e.target.value }))
+                        }
+                        rows={2}
+                        placeholder="Detalles de la actividad..."
+                      />
+                    </div>
+                    <div className="flex gap-2">
                       <Button
                         type="button"
                         size="sm"
-                        className="ml-auto"
-                        onClick={handleCreateTag}
-                        disabled={createTagMutation.isPending}
+                        onClick={() => {
+                          if (editingActivityId) {
+                            updateActivityMutation.mutate();
+                          } else {
+                            createActivityMutation.mutate();
+                          }
+                        }}
+                        disabled={
+                          createActivityMutation.isPending || updateActivityMutation.isPending
+                        }
                       >
-                        <Plus className="h-4 w-4 mr-1" />
-                        Crear
+                        {editingActivityId ? "Actualizar" : "Crear"}
                       </Button>
+                      {editingActivityId && (
+                        <Button
+                          type="button"
+                          size="sm"
+                          variant="outline"
+                          onClick={() => {
+                            setEditingActivityId(null);
+                            setActivityForm({ type: "call", subject: "", notes: "", due_at: "" });
+                          }}
+                        >
+                          Cancelar
+                        </Button>
+                      )}
                     </div>
                   </div>
+
+                  <div className="space-y-2">
+                    {(activityList?.data ?? []).length === 0 ? (
+                      <div className="text-sm text-muted-foreground">
+                        No hay actividades registradas.
+                      </div>
+                    ) : (
+                      (activityList?.data ?? []).map((activity: ActivityDTO) => (
+                        <div
+                          key={activity.id}
+                          className="border rounded-md p-3 flex items-start justify-between gap-2"
+                        >
+                          <div className="space-y-1">
+                            <div className="flex items-center gap-2">
+                              <Badge variant="secondary">{activity.type}</Badge>
+                              {activity.dueAt && (
+                                <span className="text-xs text-muted-foreground">
+                                  {activity.dueAt}
+                                </span>
+                              )}
+                            </div>
+                            <div className="text-sm font-medium">{activity.subject || "Sin asunto"}</div>
+                            {activity.notes && (
+                              <div className="text-xs text-muted-foreground">{activity.notes}</div>
+                            )}
+                          </div>
+                          <div className="flex items-center gap-1">
+                            <Button
+                              type="button"
+                              size="icon"
+                              variant="ghost"
+                              onClick={() => {
+                                setEditingActivityId(activity.id);
+                                setActivityForm({
+                                  type: activity.type,
+                                  subject: activity.subject || "",
+                                  notes: activity.notes || "",
+                                  due_at: activity.dueAt || "",
+                                });
+                              }}
+                            >
+                              <Pencil className="h-4 w-4" />
+                            </Button>
+                            <Button
+                              type="button"
+                              size="icon"
+                              variant="ghost"
+                              className="text-destructive"
+                              onClick={() => {
+                                if (confirm("¿Eliminar esta actividad?")) {
+                                  deleteActivityMutation.mutate(activity.id);
+                                }
+                              }}
+                            >
+                              <Trash2 className="h-4 w-4" />
+                            </Button>
+                          </div>
+                        </div>
+                      ))
+                    )}
+                  </div>
+                </>
+              )}
+            </TabsContent>
+
+            <TabsContent value="history" className="space-y-4">
+              {!opportunity?.id ? (
+                <div className="text-sm text-muted-foreground">
+                  Guardá la oportunidad para ver el historial.
                 </div>
-              </PopoverContent>
-            </Popover>
-          </div>
+              ) : (activityLogList?.data ?? []).length === 0 ? (
+                <div className="text-sm text-muted-foreground">
+                  No hay historial registrado.
+                </div>
+              ) : (
+                <div className="space-y-2">
+                  {(activityLogList?.data ?? []).map((log) => (
+                    <div key={log.id} className="border rounded-md p-3">
+                      <div className="text-sm font-medium">{log.action}</div>
+                      <div className="text-xs text-muted-foreground">
+                        {new Date(log.createdAt).toLocaleString()} · {log.createdBy || "Sistema"}
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              )}
+            </TabsContent>
+          </Tabs>
 
           <div className="sticky bottom-0 bg-white border-t pt-4 flex gap-2">
             <Button type="button" variant="outline" onClick={onClose} className="flex-1">

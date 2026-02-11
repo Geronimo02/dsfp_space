@@ -1,7 +1,6 @@
 import type { Database } from "@/integrations/supabase/types";
 import { useMemo, useState } from "react";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
-import { supabase } from "@/integrations/supabase/client";
 import { Button } from "@/components/ui/button";
 import { Skeleton } from "@/components/ui/skeleton";
 import { Badge } from "@/components/ui/badge";
@@ -15,6 +14,8 @@ import { LucideMoreVertical, Pencil, Trash2 } from "lucide-react";
 import { format } from "date-fns";
 import { toast } from "sonner";
 import { OpportunityDrawer } from "./OpportunityDrawer";
+import { opportunityService } from "@/domain/crm/services/opportunityService";
+import type { OpportunityDTO } from "@/domain/crm/dtos/opportunity";
 
 // --- Types ---
 type SortableField = keyof Omit<Database["public"]["Tables"]["crm_opportunities"]["Row"], "closed_at" | "close_date" | "currency" | "expected_revenue" | "last_activity_at" | "lost_reason" | "next_step" | "source" | "status" | "tags" | "won_reason">;
@@ -33,7 +34,7 @@ interface OpportunitiesListProps {
 }
 
 type OpportunitiesQueryResult = {
-  data: OpportunityRow[];
+  data: OpportunityDTO[];
   total: number;
 };
 
@@ -88,6 +89,33 @@ export function OpportunitiesList({
     ]
   );
 
+  const toOpportunityRow = (dto: OpportunityDTO): OpportunityRow => ({
+    id: dto.id,
+    company_id: dto.companyId,
+    name: dto.name,
+    customer_id: dto.customerId,
+    pipeline_id: dto.pipelineId,
+    stage: dto.stage,
+    value: dto.value,
+    estimated_close_date: dto.estimatedCloseDate,
+    probability: dto.probability,
+    description: dto.description,
+    owner_id: dto.ownerId,
+    status: dto.status ?? "abierta",
+    close_date: dto.closeDate,
+    lost_reason: dto.lostReason,
+    won_reason: dto.wonReason,
+    source: dto.source,
+    currency: dto.currency,
+    expected_revenue: dto.expectedRevenue,
+    next_step: dto.nextStep,
+    last_activity_at: dto.lastActivityAt,
+    tags: dto.tags,
+    created_at: dto.createdAt,
+    updated_at: dto.updatedAt,
+    closed_at: null,
+  });
+
   // --- Data fetching ---
   const { data, isLoading, isError, refetch, isFetching } = useQuery<
     OpportunitiesQueryResult,
@@ -95,34 +123,14 @@ export function OpportunitiesList({
   >({
     queryKey,
     queryFn: async (): Promise<OpportunitiesQueryResult> => {
-      let q = supabase
-        .from("crm_opportunities")
-        .select("*")
-        .eq("company_id", companyId);
-
-
-      if (search) q = q.ilike("name",`%${search}%`);
-      if (filters.pipelineId) q = q.eq("pipeline_id", filters.pipelineId);
-      if (filters.stageId) q = q.eq("stage", filters.stageId);
-      if (filters.ownerId) q = q.eq("owner_id", filters.ownerId);
-
-
-      if (filters.value) {
-        q = q.gte("value", filters.value.min).lte("value", filters.value.max);
-      }
-
-      // supabase expects a real column name
-      if (sort.field) {
-        q = q.order(sort.field as string, { ascending: sort.direction === "asc" });
-      }
-
-      q = q.range((page - 1) * pageSize, page * pageSize - 1);
-
-      const { data, error } = await q;
-      if (error) throw error;
-
-      const typedData = (data ?? []) as unknown as OpportunityRow[];
-      return { data: typedData, total: typedData.length };
+      return opportunityService.list({
+        companyId,
+        search,
+        filters,
+        sort,
+        page,
+        pageSize,
+      });
     },
 
     enabled: !!companyId,
@@ -134,11 +142,7 @@ export function OpportunitiesList({
   // Delete opportunity mutation
   const deleteOpportunityMutation = useMutation({
     mutationFn: async (opportunityId: string) => {
-      const { error } = await supabase
-        .from("crm_opportunities")
-        .delete()
-        .eq("id", opportunityId);
-      if (error) throw error;
+      await opportunityService.remove(opportunityId);
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["opportunities", companyId] });
@@ -255,17 +259,17 @@ export function OpportunitiesList({
                   <td className="px-4 py-2 font-mono">{opp.value ? `$${opp.value}` : "-"}</td>
 
                   <td className="px-4 py-2">
-                    {opp.estimated_close_date ? format(new Date(opp.estimated_close_date), "dd/MM/yyyy") : "-"}
+                    {opp.estimatedCloseDate ? format(new Date(opp.estimatedCloseDate), "dd/MM/yyyy") : "-"}
                   </td>
 
                   <td className="px-4 py-2">{opp.probability ?? "-"}%</td>
 
                   <td className="px-4 py-2 text-xs">
-                    {opp.next_step ?? <span className="text-muted-foreground">-</span>}
+                    {opp.nextStep ?? <span className="text-muted-foreground">-</span>}
                   </td>
 
                   <td className="px-4 py-2 text-xs">
-                    {opp.last_activity_at ? format(new Date(opp.last_activity_at), "dd/MM/yyyy") : "-"}
+                    {opp.lastActivityAt ? format(new Date(opp.lastActivityAt), "dd/MM/yyyy") : "-"}
                   </td>
 
                   <td className="px-2 py-2">
@@ -276,7 +280,7 @@ export function OpportunitiesList({
                         </Button>
                       </DropdownMenuTrigger>
                       <DropdownMenuContent align="end">
-                        <DropdownMenuItem onClick={() => setEditingOpportunity(opp)}>
+                        <DropdownMenuItem onClick={() => setEditingOpportunity(toOpportunityRow(opp))}>
                           <Pencil className="w-4 h-4 mr-2" />
                           Editar
                         </DropdownMenuItem>

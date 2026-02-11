@@ -1,0 +1,27 @@
+import type { OpportunityDTO, OpportunityRow } from "@/domain/crm/dtos/opportunity";
+
+export const toOpportunityDTO = (row: OpportunityRow): OpportunityDTO => ({
+  id: row.id,
+  companyId: row.company_id,
+  name: row.name,
+  customerId: row.customer_id,
+  pipelineId: row.pipeline_id,
+  stage: row.stage,
+  value: row.value,
+  estimatedCloseDate: row.estimated_close_date,
+  probability: row.probability,
+  description: row.description,
+  ownerId: row.owner_id,
+  status: row.status,
+  closeDate: row.close_date,
+  lostReason: row.lost_reason,
+  wonReason: row.won_reason,
+  source: row.source,
+  currency: row.currency,
+  expectedRevenue: row.expected_revenue,
+  nextStep: row.next_step,
+  lastActivityAt: row.last_activity_at,
+  tags: row.tags,
+  createdAt: row.created_at,
+  updatedAt: row.updated_at,
+});
