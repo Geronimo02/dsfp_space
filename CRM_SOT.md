@@ -111,6 +111,64 @@ Reducir latencia y carga en listados y kanban.
 
 ---
 
+## Fase 4 — Automatizaciones (SLA / auto-assign / reminders)
+
+### Objetivo
+Automatizar reglas por etapa para reducir trabajo manual y mejorar cumplimiento de SLA.
+
+### Entregado (Dev)
+- Tabla `crm_stage_rules` con RLS, índices y trigger `updated_at`.
+- Columna `sla_due_at` en `crm_opportunities`.
+- Servicio de reglas por etapa con upsert, listado y aplicación automática.
+- Aplicación automática de reglas en creación y cambio de etapa.
+- UI de reglas por etapa en Pipelines (SLA, auto-asignación, recordatorio).
+- Notificaciones in-app + email para eventos CRM.
+
+### Archivos clave
+- DB: `supabase/migrations/20260211_create_crm_stage_rules.sql`
+- DB: `supabase/migrations/20260211_add_crm_notification_preferences.sql`
+- Dominio: `src/domain/crm/dtos/stageRule.ts`, `mappers/stageRuleMapper.ts`, `services/stageRuleService.ts`, `validation/stageRuleSchema.ts`
+- Dominio: `src/domain/crm/services/crmNotificationService.ts`
+- Datos: `src/data/crm/stageRuleRepository.ts`
+- UI: `src/components/crm/Pipelines.tsx`
+- UI: `src/components/NotificationCenter.tsx`, `src/pages/NotificationSettings.tsx`
+
+### Funcionalidad para usuario
+- Definir SLA por etapa (días).
+- Auto-asignar responsable al ingresar a una etapa.
+- Crear recordatorios automáticos asociados al SLA.
+- Recibir notificaciones en la app y por email sobre eventos CRM.
+
+---
+
+## Fase 5 — Integraciones (Email / WhatsApp / Calendario)
+
+### Objetivo
+Integrar envío y tracking de mensajes con plantillas y logs centralizados.
+
+### Entregado (Dev)
+- Tablas de plantillas y logs de mensajes CRM.
+- Edge Function `send-crm-message` para envíos email/WhatsApp.
+- UI de envío desde oportunidad con selección de plantilla.
+- Logs visibles en la oportunidad con estado (queued/sent/failed).
+- Calendario: pendiente de integración.
+- Credenciales WhatsApp (Twilio) por empresa con UI.
+
+### Archivos clave
+- DB: `supabase/migrations/20260211_create_crm_message_templates_logs.sql`
+- DB: `supabase/migrations/20260211_create_crm_whatsapp_credentials.sql`
+- Función: `supabase/functions/send-crm-message/index.ts`
+- Dominio: `src/domain/crm/dtos/messageTemplate.ts`, `messageLog.ts`, `services/messageTemplateService.ts`, `services/messageLogService.ts`
+- UI: `src/components/crm/OpportunityDrawer.tsx`
+- UI: `src/pages/NotificationSettings.tsx`
+
+### Funcionalidad para usuario
+- Enviar emails o WhatsApp desde la oportunidad.
+- Guardar y reutilizar plantillas.
+- Ver historial de envíos y estados.
+
+---
+
 ## Notas operativas
 - Las selecciones masivas se persisten en `localStorage` por empresa.
 - Exportaciones respetan filtros activos.

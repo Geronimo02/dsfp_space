@@ -29,6 +29,8 @@ import { toast } from "sonner";
 import { Plus, X, GripVertical, Pencil, Trash2, MoreVertical } from "lucide-react";
 import { OpportunityDrawer } from "./OpportunityDrawer";
 import type { Database } from "@/integrations/supabase/types";
+import { opportunityService } from "@/domain/crm/services/opportunityService";
+import { stageRuleService } from "@/domain/crm/services/stageRuleService";
 
 type OpportunityRow = Database["public"]["Tables"]["crm_opportunities"]["Row"];
 
@@ -70,6 +72,10 @@ export function Pipelines({ companyId }: { companyId: string }) {
   const [addExistingOpen, setAddExistingOpen] = useState<string | null>(null);
   const [editingOpportunity, setEditingOpportunity] = useState<OpportunityRow | null>(null);
   const [visibleCounts, setVisibleCounts] = useState<Record<string, number>>({});
+  const [ruleDialogStage, setRuleDialogStage] = useState<string | null>(null);
+  const [ruleSlaDays, setRuleSlaDays] = useState<string>("");
+  const [ruleAutoAssignOwnerId, setRuleAutoAssignOwnerId] = useState<string>("");
+  const [ruleReminderDaysBefore, setRuleReminderDaysBefore] = useState<string>("");
   const VISIBLE_PER_STAGE = 10;
 
   // Fetch pipelines
@@ -113,6 +119,34 @@ export function Pipelines({ companyId }: { companyId: string }) {
     enabled: !!companyId && !!selectedPipeline,
   });
 
+  const { data: owners = [] } = useQuery({
+    queryKey: ["crm-owners", companyId],
+    queryFn: async () => {
+      const { data, error } = await supabase
+        .from("employees")
+        .select("id, first_name, last_name")
+        .eq("company_id", companyId)
+        .order("first_name", { ascending: true });
+      if (error) throw error;
+      return data || [];
+    },
+    enabled: !!companyId,
+    staleTime: 5 * 60 * 1000,
+    refetchOnWindowFocus: false,
+  });
+
+  const { data: stageRules = [] } = useQuery({
+    queryKey: ["crm-stage-rules", companyId, selectedPipeline?.id],
+    queryFn: () =>
+      stageRuleService.listByPipeline({
+        companyId,
+        pipelineId: selectedPipeline!.id,
+      }),
+    enabled: !!companyId && !!selectedPipeline?.id,
+    staleTime: 5 * 60 * 1000,
+    refetchOnWindowFocus: false,
+  });
+
   // Create pipeline mutation
   const createPipelineMutation = useMutation({
     mutationFn: async () => {
@@ -141,11 +175,10 @@ export function Pipelines({ companyId }: { companyId: string }) {
   // Update opportunity stage mutation
   const updateStageMutation = useMutation({
     mutationFn: async ({ opportunityId, newStage }: { opportunityId: string; newStage: string }) => {
-      const { error } = await supabase
-        .from("crm_opportunities")
-        .update({ stage: newStage, updated_at: new Date().toISOString() })
-        .eq("id", opportunityId);
-      if (error) throw error;
+      await opportunityService.update(opportunityId, {
+        stage: newStage,
+        updated_at: new Date().toISOString(),
+      });
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["crm-opportunities-pipeline"] });
@@ -176,17 +209,14 @@ export function Pipelines({ companyId }: { companyId: string }) {
   const quickCreateMutation = useMutation({
     mutationFn: async ({ name, stage }: { name: string; stage: string }) => {
       if (!selectedPipeline) throw new Error("Pipeline no seleccionado");
-      const { error } = await supabase.from("crm_opportunities").insert([
-        {
-          company_id: companyId,
-          name: name.trim(),
-          stage,
-          pipeline_id: selectedPipeline.id,
-          customer_id: null,
-          probability: 50,
-        },
-      ]);
-      if (error) throw error;
+      await opportunityService.create({
+        company_id: companyId,
+        name: name.trim(),
+        stage,
+        pipeline_id: selectedPipeline.id,
+        customer_id: null,
+        probability: 50,
+      });
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["crm-opportunities-pipeline"] });
@@ -203,11 +233,11 @@ export function Pipelines({ companyId }: { companyId: string }) {
   const assignOpportunityMutation = useMutation({
     mutationFn: async ({ opportunityId, stage }: { opportunityId: string; stage: string }) => {
       if (!selectedPipeline) throw new Error("Pipeline no seleccionado");
-      const { error } = await supabase
-        .from("crm_opportunities")
-        .update({ pipeline_id: selectedPipeline.id, stage, updated_at: new Date().toISOString() })
-        .eq("id", opportunityId);
-      if (error) throw error;
+      await opportunityService.update(opportunityId, {
+        pipeline_id: selectedPipeline.id,
+        stage,
+        updated_at: new Date().toISOString(),
+      });
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["crm-opportunities-pipeline"] });
@@ -297,6 +327,60 @@ export function Pipelines({ companyId }: { companyId: string }) {
     });
     setDraggedOpportunity(null);
   };
+
+  const rulesByStage = useMemo(() => {
+    const map = new Map<string, (typeof stageRules)[number]>();
+    stageRules.forEach((rule) => {
+      map.set(rule.stage, rule);
+    });
+    return map;
+  }, [stageRules]);
+
+  const upsertStageRuleMutation = useMutation({
+    mutationFn: async () => {
+      if (!selectedPipeline || !ruleDialogStage) {
+        throw new Error("Pipeline o etapa no definida");
+      }
+
+      const slaDays = ruleSlaDays.trim() ? Number(ruleSlaDays) : null;
+      const reminderDaysBefore = ruleReminderDaysBefore.trim()
+        ? Number(ruleReminderDaysBefore)
+        : null;
+
+      return stageRuleService.upsert({
+        company_id: companyId,
+        pipeline_id: selectedPipeline.id,
+        stage: ruleDialogStage,
+        sla_days: Number.isFinite(slaDays as number) ? slaDays : null,
+        reminder_days_before: Number.isFinite(reminderDaysBefore as number)
+          ? reminderDaysBefore
+          : null,
+        auto_assign_owner_id: ruleAutoAssignOwnerId || null,
+      });
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["crm-stage-rules", companyId] });
+      toast.success("Reglas guardadas");
+      setRuleDialogStage(null);
+    },
+    onError: (error: any) => {
+      toast.error(error.message || "Error al guardar reglas");
+    },
+  });
+
+  const deleteStageRuleMutation = useMutation({
+    mutationFn: async (ruleId: string) => {
+      await stageRuleService.remove(ruleId);
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["crm-stage-rules", companyId] });
+      toast.success("Regla eliminada");
+      setRuleDialogStage(null);
+    },
+    onError: () => {
+      toast.error("Error al eliminar regla");
+    },
+  });
 
   const addStage = () => {
     setNewStages([...newStages, ""]);
@@ -467,7 +551,98 @@ export function Pipelines({ companyId }: { companyId: string }) {
                   <CardHeader className="pb-3">
                     <CardTitle className="text-sm font-medium flex items-center justify-between">
                       <span>{stage}</span>
-                      <Badge variant="secondary">{opportunitiesByStage[stage]?.length || 0}</Badge>
+                      <div className="flex items-center gap-2">
+                        <Dialog
+                          open={ruleDialogStage === stage}
+                          onOpenChange={(open) => {
+                            if (!open) {
+                              setRuleDialogStage(null);
+                              return;
+                            }
+                            const rule = rulesByStage.get(stage);
+                            setRuleSlaDays(rule?.slaDays != null ? String(rule.slaDays) : "");
+                            setRuleAutoAssignOwnerId(rule?.autoAssignOwnerId || "");
+                            setRuleReminderDaysBefore(
+                              rule?.reminderDaysBefore != null ? String(rule.reminderDaysBefore) : ""
+                            );
+                            setRuleDialogStage(stage);
+                          }}
+                        >
+                          <DialogTrigger asChild>
+                            <Button variant="ghost" size="icon" className="h-7 w-7">
+                              <Pencil className="w-3 h-3" />
+                            </Button>
+                          </DialogTrigger>
+                          <DialogContent>
+                            <DialogHeader>
+                              <DialogTitle>Reglas de etapa — {stage}</DialogTitle>
+                            </DialogHeader>
+                            <div className="space-y-3">
+                              <div className="space-y-1">
+                                <label className="text-xs font-medium">SLA (días)</label>
+                                <Input
+                                  type="number"
+                                  min={1}
+                                  value={ruleSlaDays}
+                                  onChange={(e) => setRuleSlaDays(e.target.value)}
+                                  placeholder="Ej: 7"
+                                />
+                              </div>
+                              <div className="space-y-1">
+                                <label className="text-xs font-medium">Auto-asignar responsable</label>
+                                <Select
+                                  value={ruleAutoAssignOwnerId || "__none__"}
+                                  onValueChange={(value) =>
+                                    setRuleAutoAssignOwnerId(value === "__none__" ? "" : value)
+                                  }
+                                >
+                                  <SelectTrigger>
+                                    <SelectValue placeholder="Sin responsable" />
+                                  </SelectTrigger>
+                                  <SelectContent>
+                                    <SelectItem value="__none__">Sin responsable</SelectItem>
+                                    {owners.map((owner: any) => (
+                                      <SelectItem key={owner.id} value={owner.id}>
+                                        {[owner.first_name, owner.last_name].filter(Boolean).join(" ")}
+                                      </SelectItem>
+                                    ))}
+                                  </SelectContent>
+                                </Select>
+                              </div>
+                              <div className="space-y-1">
+                                <label className="text-xs font-medium">Recordatorio (días antes)</label>
+                                <Input
+                                  type="number"
+                                  min={0}
+                                  value={ruleReminderDaysBefore}
+                                  onChange={(e) => setRuleReminderDaysBefore(e.target.value)}
+                                  placeholder="Ej: 2"
+                                />
+                                <p className="text-xs text-muted-foreground">
+                                  Se crea una tarea automática según el SLA.
+                                </p>
+                              </div>
+                            </div>
+                            <div className="flex justify-between gap-2 pt-2">
+                              <Button
+                                variant="ghost"
+                                onClick={() => {
+                                  const rule = rulesByStage.get(stage);
+                                  if (rule) deleteStageRuleMutation.mutate(rule.id);
+                                  else setRuleDialogStage(null);
+                                }}
+                                disabled={!rulesByStage.get(stage)}
+                              >
+                                Eliminar regla
+                              </Button>
+                              <Button onClick={() => upsertStageRuleMutation.mutate()}>
+                                Guardar
+                              </Button>
+                            </div>
+                          </DialogContent>
+                        </Dialog>
+                        <Badge variant="secondary">{opportunitiesByStage[stage]?.length || 0}</Badge>
+                      </div>
                     </CardTitle>
                   </CardHeader>
                   <CardContent className="min-h-[200px] flex flex-col gap-2">

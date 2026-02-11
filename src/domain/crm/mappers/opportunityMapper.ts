@@ -21,6 +21,7 @@ export const toOpportunityDTO = (row: OpportunityRow): OpportunityDTO => ({
   expectedRevenue: row.expected_revenue,
   nextStep: row.next_step,
   lastActivityAt: row.last_activity_at,
+  slaDueAt: row.sla_due_at,
   tags: row.tags,
   createdAt: row.created_at,
   updatedAt: row.updated_at,

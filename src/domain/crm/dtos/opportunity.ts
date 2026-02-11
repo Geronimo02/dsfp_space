@@ -25,6 +25,7 @@ export interface OpportunityDTO {
   expectedRevenue: number | null;
   nextStep: string | null;
   lastActivityAt: string | null;
+  slaDueAt: string | null;
   tags: string[] | null;
   createdAt: string | null;
   updatedAt: string | null;

@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
 import { useCompany } from "@/contexts/CompanyContext";
@@ -35,6 +35,20 @@ export default function NotificationSettings() {
     enabled: !!currentCompany?.id,
   });
 
+  const { data: whatsappCreds } = useQuery({
+    queryKey: ["crm-whatsapp-credentials", currentCompany?.id],
+    queryFn: async () => {
+      const { data, error } = await supabase
+        .from("crm_whatsapp_credentials")
+        .select("id, account_sid, auth_token, phone_number")
+        .eq("company_id", currentCompany?.id)
+        .maybeSingle();
+      if (error) throw error;
+      return data;
+    },
+    enabled: !!currentCompany?.id,
+  });
+
   const [formData, setFormData] = useState({
     email_enabled: preferences?.email_enabled ?? true,
     whatsapp_enabled: preferences?.whatsapp_enabled ?? false,
@@ -44,9 +58,48 @@ export default function NotificationSettings() {
     inactive_customers: preferences?.inactive_customers ?? true,
     overdue_invoices: preferences?.overdue_invoices ?? true,
     expiring_checks: preferences?.expiring_checks ?? true,
+    crm_stage_changed: preferences?.crm_stage_changed ?? true,
+    crm_auto_assign: preferences?.crm_auto_assign ?? true,
+    crm_sla_assigned: preferences?.crm_sla_assigned ?? true,
+    crm_reminder_created: preferences?.crm_reminder_created ?? true,
     daily_summary: preferences?.daily_summary ?? false,
     weekly_summary: preferences?.weekly_summary ?? false,
   });
+
+  const [whatsappForm, setWhatsappForm] = useState({
+    account_sid: whatsappCreds?.account_sid ?? "",
+    auth_token: whatsappCreds?.auth_token ?? "",
+    phone_number: whatsappCreds?.phone_number ?? "",
+  });
+
+  useEffect(() => {
+    if (!preferences) return;
+    setFormData({
+      email_enabled: preferences?.email_enabled ?? true,
+      whatsapp_enabled: preferences?.whatsapp_enabled ?? false,
+      whatsapp_number: preferences?.whatsapp_number ?? "",
+      low_stock: preferences?.low_stock ?? true,
+      expiring_products: preferences?.expiring_products ?? true,
+      inactive_customers: preferences?.inactive_customers ?? true,
+      overdue_invoices: preferences?.overdue_invoices ?? true,
+      expiring_checks: preferences?.expiring_checks ?? true,
+      crm_stage_changed: preferences?.crm_stage_changed ?? true,
+      crm_auto_assign: preferences?.crm_auto_assign ?? true,
+      crm_sla_assigned: preferences?.crm_sla_assigned ?? true,
+      crm_reminder_created: preferences?.crm_reminder_created ?? true,
+      daily_summary: preferences?.daily_summary ?? false,
+      weekly_summary: preferences?.weekly_summary ?? false,
+    });
+  }, [preferences]);
+
+  useEffect(() => {
+    if (!whatsappCreds) return;
+    setWhatsappForm({
+      account_sid: whatsappCreds.account_sid ?? "",
+      auth_token: whatsappCreds.auth_token ?? "",
+      phone_number: whatsappCreds.phone_number ?? "",
+    });
+  }, [whatsappCreds]);
 
   const savePreferences = useMutation({
     mutationFn: async () => {
@@ -70,6 +123,25 @@ export default function NotificationSettings() {
     onError: (error) => {
       console.error("Error saving preferences:", error);
       toast.error("Error al guardar preferencias");
+    },
+  });
+
+  const saveWhatsappCreds = useMutation({
+    mutationFn: async () => {
+      const { error } = await supabase.from("crm_whatsapp_credentials").upsert({
+        company_id: currentCompany?.id,
+        account_sid: whatsappForm.account_sid,
+        auth_token: whatsappForm.auth_token,
+        phone_number: whatsappForm.phone_number,
+      });
+      if (error) throw error;
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["crm-whatsapp-credentials"] });
+      toast.success("Credenciales WhatsApp guardadas");
+    },
+    onError: () => {
+      toast.error("Error al guardar credenciales");
     },
   });
 
@@ -240,6 +312,129 @@ export default function NotificationSettings() {
                 }
               />
             </div>
+
+            <div className="pt-2">
+              <h3 className="text-sm font-semibold">CRM</h3>
+              <p className="text-xs text-muted-foreground">
+                Alertas del módulo de oportunidades y pipelines
+              </p>
+            </div>
+
+            <div className="flex items-center justify-between">
+              <div>
+                <Label>Cambios de etapa</Label>
+                <p className="text-sm text-muted-foreground">
+                  Notificar cuando una oportunidad cambia de etapa
+                </p>
+              </div>
+              <Switch
+                checked={formData.crm_stage_changed}
+                onCheckedChange={(checked) =>
+                  setFormData({ ...formData, crm_stage_changed: checked })
+                }
+              />
+            </div>
+
+            <div className="flex items-center justify-between">
+              <div>
+                <Label>Auto-asignación</Label>
+                <p className="text-sm text-muted-foreground">
+                  Notificar cuando una oportunidad se asigna automáticamente
+                </p>
+              </div>
+              <Switch
+                checked={formData.crm_auto_assign}
+                onCheckedChange={(checked) =>
+                  setFormData({ ...formData, crm_auto_assign: checked })
+                }
+              />
+            </div>
+
+            <div className="flex items-center justify-between">
+              <div>
+                <Label>SLA asignado</Label>
+                <p className="text-sm text-muted-foreground">
+                  Notificar cuando se asigna un SLA a una oportunidad
+                </p>
+              </div>
+              <Switch
+                checked={formData.crm_sla_assigned}
+                onCheckedChange={(checked) =>
+                  setFormData({ ...formData, crm_sla_assigned: checked })
+                }
+              />
+            </div>
+
+            <div className="flex items-center justify-between">
+              <div>
+                <Label>Recordatorios automáticos</Label>
+                <p className="text-sm text-muted-foreground">
+                  Notificar cuando se crea un recordatorio CRM
+                </p>
+              </div>
+              <Switch
+                checked={formData.crm_reminder_created}
+                onCheckedChange={(checked) =>
+                  setFormData({ ...formData, crm_reminder_created: checked })
+                }
+              />
+            </div>
+          </div>
+        </div>
+
+        <Separator />
+
+        <div className="space-y-4">
+          <h2 className="text-xl font-semibold">Credenciales Twilio (WhatsApp)</h2>
+          <p className="text-sm text-muted-foreground">
+            Usamos Twilio para enviar WhatsApp. Pegá tu Account SID, Auth Token y número de WhatsApp.
+          </p>
+          <div className="rounded-md border bg-muted/30 p-3 text-xs text-muted-foreground space-y-1">
+            <div className="font-medium text-foreground">Tutorial rápido</div>
+            <ol className="list-decimal pl-4 space-y-1">
+              <li>Creá una cuenta en Twilio y activá WhatsApp.</li>
+              <li>En Twilio Console → Account, copiá tu Account SID y Auth Token.</li>
+              <li>En Messaging → WhatsApp, copiá el número habilitado.</li>
+              <li>Pegá los datos acá y guardá.</li>
+            </ol>
+          </div>
+          <div className="grid gap-3">
+            <div className="space-y-1">
+              <Label>Account SID (Twilio)</Label>
+              <Input
+                value={whatsappForm.account_sid}
+                onChange={(e) =>
+                  setWhatsappForm({ ...whatsappForm, account_sid: e.target.value })
+                }
+                placeholder="ACxxxxxxxxxxxxxxxxxxxxxxxxxxxx"
+              />
+            </div>
+            <div className="space-y-1">
+              <Label>Auth Token (Twilio)</Label>
+              <Input
+                type="password"
+                value={whatsappForm.auth_token}
+                onChange={(e) =>
+                  setWhatsappForm({ ...whatsappForm, auth_token: e.target.value })
+                }
+                placeholder="Token de Twilio"
+              />
+            </div>
+            <div className="space-y-1">
+              <Label>Número WhatsApp (Twilio)</Label>
+              <Input
+                value={whatsappForm.phone_number}
+                onChange={(e) =>
+                  setWhatsappForm({ ...whatsappForm, phone_number: e.target.value })
+                }
+                placeholder="+1 555 123 4567"
+              />
+            </div>
+          </div>
+          <div className="flex justify-end">
+            <Button onClick={() => saveWhatsappCreds.mutate()}>
+              Guardar credenciales
+            </Button>
           </div>
         </div>
 

@@ -192,6 +192,7 @@ export function OpportunitiesList({
     expected_revenue: dto.expectedRevenue,
     next_step: dto.nextStep,
     last_activity_at: dto.lastActivityAt,
+    sla_due_at: dto.slaDueAt,
     tags: dto.tags,
     created_at: dto.createdAt,
     updated_at: dto.updatedAt,

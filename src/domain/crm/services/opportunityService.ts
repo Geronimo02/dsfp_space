@@ -6,6 +6,8 @@ import type {
 } from "@/domain/crm/dtos/opportunity";
 import { opportunityRepository } from "@/data/crm/opportunityRepository";
 import { opportunitySchema } from "@/domain/crm/validation/opportunitySchema";
+import { stageRuleService } from "@/domain/crm/services/stageRuleService";
+import { crmNotificationService } from "@/domain/crm/services/crmNotificationService";
 
 export const opportunityService = {
   async list(params: OpportunityListParams): Promise<OpportunityListResult> {
@@ -37,11 +39,37 @@ export const opportunityService = {
       next_step: values.next_step || undefined,
       tags: values.tags || undefined,
     });
-    return opportunityRepository.create(values);
+    const created = await opportunityRepository.create(values);
+    await stageRuleService.applyForOpportunity({
+      companyId: created.companyId,
+      pipelineId: created.pipelineId,
+      stage: created.stage,
+      opportunityId: created.id,
+    });
+    return created;
   },
 
   async update(id: string, values: OpportunityUpdate) {
-    return opportunityRepository.update(id, values);
+    const updated = await opportunityRepository.update(id, values);
+    if (values.stage) {
+      await crmNotificationService.notify({
+        companyId: updated.companyId,
+        type: "crm_stage_changed",
+        title: "Oportunidad cambió de etapa",
+        message: `La oportunidad "${updated.name}" ahora está en ${updated.stage}.`,
+        data: { opportunity_id: updated.id, stage: updated.stage },
+        userIds: updated.ownerId ? [updated.ownerId] : undefined,
+      });
+    }
+    if (values.stage || values.pipeline_id) {
+      await stageRuleService.applyForOpportunity({
+        companyId: updated.companyId,
+        pipelineId: updated.pipelineId,
+        stage: updated.stage,
+        opportunityId: updated.id,
+      });
+    }
+    return updated;
   },
 
   async remove(id: string) {

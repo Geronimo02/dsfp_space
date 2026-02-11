@@ -28,8 +28,11 @@ import { opportunityService } from "@/domain/crm/services/opportunityService";
 import { tagService } from "@/domain/crm/services/tagService";
 import { activityService } from "@/domain/crm/services/activityService";
 import { activityLogService } from "@/domain/crm/services/activityLogService";
+import { messageTemplateService } from "@/domain/crm/services/messageTemplateService";
+import { messageLogService } from "@/domain/crm/services/messageLogService";
 import type { ActivityDTO, ActivityListResult } from "@/domain/crm/dtos/activity";
 import type { ActivityLogListResult } from "@/domain/crm/dtos/activityLog";
+import type { MessageLogDTO } from "@/domain/crm/dtos/messageLog";
 
 type OpportunityRow = Database["public"]["Tables"]["crm_opportunities"]["Row"];
 interface TagRow {
@@ -169,7 +172,7 @@ export function OpportunityDrawer({ open, onClose, companyId, opportunity }: Opp
     queryFn: async () => {
       const { data, error } = await supabase
         .from("customers")
-        .select("id, name")
+        .select("id, name, email, phone")
         .eq("company_id", companyId)
         .order("name", { ascending: true });
       if (error) throw error;
@@ -217,9 +220,19 @@ export function OpportunityDrawer({ open, onClose, companyId, opportunity }: Opp
     due_at: "",
   });
   const [editingActivityId, setEditingActivityId] = useState<string | null>(null);
+  const [messageChannel, setMessageChannel] = useState<"email" | "whatsapp">("email");
+  const [messageTemplateId, setMessageTemplateId] = useState<string>("");
+  const [messageSubject, setMessageSubject] = useState("");
+  const [messageBody, setMessageBody] = useState("");
+  const [messageRecipient, setMessageRecipient] = useState("");
 
   const selectedTags = form.watch("tags") || [];
   const selectedTagSet = useMemo(() => new Set(selectedTags), [selectedTags]);
+  const selectedCustomerId = form.watch("customer_id");
+  const selectedCustomer = useMemo(
+    () => customers.find((customer: any) => customer.id === selectedCustomerId),
+    [customers, selectedCustomerId]
+  );
 
   const filteredTags = useMemo(() => {
     if (!tagSearch.trim()) return tags;
@@ -459,6 +472,53 @@ export function OpportunityDrawer({ open, onClose, companyId, opportunity }: Opp
     enabled: !!companyId && !!opportunity?.id && open,
   });
 
+  const { data: messageTemplates = [] } = useQuery({
+    queryKey: ["crm-message-templates", companyId],
+    queryFn: () => messageTemplateService.list(companyId),
+    enabled: !!companyId && open,
+    staleTime: 5 * 60 * 1000,
+    refetchOnWindowFocus: false,
+  });
+
+  const { data: messageLogs = [] } = useQuery({
+    queryKey: ["crm-message-logs", companyId, opportunity?.id],
+    queryFn: () =>
+      messageLogService.listByOpportunity({
+        companyId,
+        opportunityId: opportunity!.id,
+      }),
+    enabled: !!companyId && !!opportunity?.id && open,
+  });
+
+  const filteredTemplates = useMemo(
+    () => messageTemplates.filter((tpl: any) => tpl.channel === messageChannel),
+    [messageTemplates, messageChannel]
+  );
+
+  useEffect(() => {
+    if (!messageTemplateId) return;
+    const template = messageTemplates.find((tpl: any) => tpl.id === messageTemplateId);
+    if (!template) return;
+    setMessageSubject(template.subject ?? "");
+    setMessageBody(template.body ?? "");
+  }, [messageTemplateId, messageTemplates]);
+
+  useEffect(() => {
+    if (!messageTemplateId) return;
+    const exists = filteredTemplates.some((tpl: any) => tpl.id === messageTemplateId);
+    if (!exists) setMessageTemplateId("");
+  }, [filteredTemplates, messageTemplateId]);
+
+  useEffect(() => {
+    if (!selectedCustomer) return;
+    const nextRecipient =
+      messageChannel === "email" ? selectedCustomer.email : selectedCustomer.phone;
+    if (!nextRecipient) return;
+    if (!messageRecipient) {
+      setMessageRecipient(nextRecipient);
+    }
+  }, [selectedCustomer, messageChannel, messageRecipient]);
+
   const createActivityMutation = useMutation({
     mutationFn: async () => {
       if (!opportunity?.id) throw new Error("Oportunidad no seleccionada");
@@ -516,6 +576,79 @@ export function OpportunityDrawer({ open, onClose, companyId, opportunity }: Opp
     },
     onError: (error: any) => {
       toast.error(error.message || "Error al eliminar actividad");
+    },
+  });
+
+  const createTemplateMutation = useMutation({
+    mutationFn: async () => {
+      const name = window.prompt("Nombre de la plantilla");
+      if (!name) throw new Error("Nombre requerido");
+      return messageTemplateService.create({
+        company_id: companyId,
+        name: name.trim(),
+        channel: messageChannel,
+        subject: messageChannel === "email" ? messageSubject : null,
+        body: messageBody,
+      });
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["crm-message-templates", companyId] });
+      toast.success("Plantilla guardada");
+    },
+    onError: (error: any) => {
+      toast.error(error.message || "Error al guardar plantilla");
+    },
+  });
+
+  const sendMessageMutation = useMutation({
+    mutationFn: async () => {
+      if (!opportunity?.id) throw new Error("Oportunidad no seleccionada");
+      if (!messageRecipient.trim()) throw new Error("Destinatario requerido");
+      if (!messageBody.trim()) throw new Error("Contenido requerido");
+
+      const { data: authData } = await supabase.auth.getUser();
+      const createdBy = authData?.user?.id ?? null;
+
+      const log = await messageLogService.create({
+        company_id: companyId,
+        opportunity_id: opportunity.id,
+        customer_id: selectedCustomer?.id ?? null,
+        channel: messageChannel,
+        template_id: messageTemplateId || null,
+        subject: messageChannel === "email" ? messageSubject || null : null,
+        body: messageBody,
+        recipient: messageRecipient,
+        status: "queued",
+        created_by: createdBy,
+      });
+
+      try {
+        await messageLogService.sendMessage({
+          logId: log.id,
+          channel: messageChannel,
+          recipient: messageRecipient,
+          subject: messageChannel === "email" ? messageSubject : null,
+          body: messageBody,
+        });
+      } catch (error: any) {
+        await messageLogService.update(log.id, {
+          status: "failed",
+          error: error?.message || "Error al enviar",
+        });
+        throw error;
+      }
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({
+        queryKey: ["crm-message-logs", companyId, opportunity?.id],
+      });
+      toast.success("Mensaje enviado");
+    },
+    onError: (error: any) => {
+      toast.error(error.message || "Error al enviar mensaje");
+      queryClient.invalidateQueries({
+        queryKey: ["crm-message-logs", companyId, opportunity?.id],
+      });
     },
   });
 
@@ -928,6 +1061,122 @@ export function OpportunityDrawer({ open, onClose, companyId, opportunity }: Opp
                 </div>
               ) : (
                 <>
+                  <div className="space-y-3 rounded-lg border p-3">
+                    <div className="text-sm font-semibold text-muted-foreground">Mensajes</div>
+                    <div className="grid grid-cols-2 gap-2">
+                      <div>
+                        <label className="text-xs font-medium">Canal</label>
+                        <Select
+                          value={messageChannel}
+                          onValueChange={(value) => setMessageChannel(value as "email" | "whatsapp")}
+                        >
+                          <SelectTrigger>
+                            <SelectValue />
+                          </SelectTrigger>
+                          <SelectContent>
+                            <SelectItem value="email">Email</SelectItem>
+                            <SelectItem value="whatsapp">WhatsApp</SelectItem>
+                          </SelectContent>
+                        </Select>
+                      </div>
+                      <div>
+                        <label className="text-xs font-medium">Plantilla</label>
+                        <Select
+                          value={messageTemplateId || "__none__"}
+                          onValueChange={(value) =>
+                            setMessageTemplateId(value === "__none__" ? "" : value)
+                          }
+                        >
+                          <SelectTrigger>
+                            <SelectValue placeholder="Sin plantilla" />
+                          </SelectTrigger>
+                          <SelectContent>
+                            <SelectItem value="__none__">Sin plantilla</SelectItem>
+                            {filteredTemplates.map((tpl: any) => (
+                              <SelectItem key={tpl.id} value={tpl.id}>
+                                {tpl.name}
+                              </SelectItem>
+                            ))}
+                          </SelectContent>
+                        </Select>
+                      </div>
+                    </div>
+                    <div>
+                      <label className="text-xs font-medium">Destinatario</label>
+                      <Input
+                        value={messageRecipient}
+                        onChange={(e) => setMessageRecipient(e.target.value)}
+                        placeholder={messageChannel === "email" ? "email@cliente.com" : "+54 9 11 1234-5678"}
+                      />
+                    </div>
+                    {messageChannel === "email" && (
+                      <div>
+                        <label className="text-xs font-medium">Asunto</label>
+                        <Input
+                          value={messageSubject}
+                          onChange={(e) => setMessageSubject(e.target.value)}
+                          placeholder="Asunto del email"
+                        />
+                      </div>
+                    )}
+                    <div>
+                      <label className="text-xs font-medium">Mensaje</label>
+                      <Textarea
+                        value={messageBody}
+                        onChange={(e) => setMessageBody(e.target.value)}
+                        rows={3}
+                        placeholder="Escribí el mensaje..."
+                      />
+                    </div>
+                    <div className="flex gap-2">
+                      <Button
+                        type="button"
+                        size="sm"
+                        onClick={() => sendMessageMutation.mutate()}
+                        disabled={sendMessageMutation.isPending}
+                      >
+                        Enviar
+                      </Button>
+                      <Button
+                        type="button"
+                        size="sm"
+                        variant="outline"
+                        onClick={() => createTemplateMutation.mutate()}
+                        disabled={createTemplateMutation.isPending || !messageBody.trim()}
+                      >
+                        Guardar plantilla
+                      </Button>
+                    </div>
+                  </div>
+
+                  <div className="space-y-2">
+                    <div className="text-sm font-semibold text-muted-foreground">Logs de mensajes</div>
+                    {messageLogs.length === 0 ? (
+                      <div className="text-sm text-muted-foreground">Sin mensajes enviados.</div>
+                    ) : (
+                      <div className="space-y-2">
+                        {messageLogs.map((log: MessageLogDTO) => (
+                          <div key={log.id} className="rounded border p-2 text-xs">
+                            <div className="flex items-center justify-between">
+                              <span className="font-medium">
+                                {log.channel.toUpperCase()} • {log.recipient}
+                              </span>
+                              <Badge variant={log.status === "failed" ? "destructive" : "secondary"}>
+                                {log.status}
+                              </Badge>
+                            </div>
+                            {log.subject && <div className="text-muted-foreground">{log.subject}</div>}
+                            <div className="text-muted-foreground line-clamp-2">{log.body}</div>
+                            {log.error && <div className="text-destructive">{log.error}</div>}
+                            <div className="text-muted-foreground">
+                              {new Date(log.createdAt).toLocaleString()}
+                            </div>
+                          </div>
+                        ))}
+                      </div>
+                    )}
+                  </div>
+
                   <div className="flex items-center gap-2">
                     <Select value={activityTypeFilter} onValueChange={setActivityTypeFilter}>
                       <SelectTrigger className="w-48">

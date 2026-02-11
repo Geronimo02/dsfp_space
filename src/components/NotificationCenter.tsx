@@ -92,6 +92,8 @@ export function NotificationCenter() {
                   navigate("/accounts-receivable");
                 } else if (notification.type === "expiring_check") {
                   navigate("/checks");
+                } else if (notification.type?.startsWith("crm_")) {
+                  navigate("/opportunities");
                 }
               }}
             >
