@@ -1,5 +1,5 @@
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
-import { useState, useMemo } from "react";
+import { useState, useMemo, useEffect } from "react";
 import { supabase } from "@/integrations/supabase/client";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -47,6 +47,7 @@ interface Opportunity {
   stage: string;
   customer_id: string | null;
   probability: number | null;
+  updated_at: string;
   customers?: { name: string } | null;
 }
 
@@ -68,6 +69,8 @@ export function Pipelines({ companyId }: { companyId: string }) {
   const [quickCreateOpen, setQuickCreateOpen] = useState(false);
   const [addExistingOpen, setAddExistingOpen] = useState<string | null>(null);
   const [editingOpportunity, setEditingOpportunity] = useState<OpportunityRow | null>(null);
+  const [visibleCounts, setVisibleCounts] = useState<Record<string, number>>({});
+  const VISIBLE_PER_STAGE = 10;
 
   // Fetch pipelines
   const { data: pipelines, isLoading: pipelinesLoading } = useQuery<Pipeline[]>({
@@ -100,10 +103,10 @@ export function Pipelines({ companyId }: { companyId: string }) {
       if (!selectedPipeline) return [];
       const { data, error } = await supabase
         .from("crm_opportunities")
-        .select("id, name, value, stage, customer_id, probability, customers(name)")
+        .select("id, name, value, stage, customer_id, probability, updated_at, customers(name)")
         .eq("company_id", companyId)
         .eq("pipeline_id", selectedPipeline.id)
-        .order("created_at", { ascending: false });
+        .order("updated_at", { ascending: false });
       if (error) throw error;
       return data as Opportunity[];
     },
@@ -140,7 +143,7 @@ export function Pipelines({ companyId }: { companyId: string }) {
     mutationFn: async ({ opportunityId, newStage }: { opportunityId: string; newStage: string }) => {
       const { error } = await supabase
         .from("crm_opportunities")
-        .update({ stage: newStage })
+        .update({ stage: newStage, updated_at: new Date().toISOString() })
         .eq("id", opportunityId);
       if (error) throw error;
     },
@@ -202,7 +205,7 @@ export function Pipelines({ companyId }: { companyId: string }) {
       if (!selectedPipeline) throw new Error("Pipeline no seleccionado");
       const { error } = await supabase
         .from("crm_opportunities")
-        .update({ pipeline_id: selectedPipeline.id, stage })
+        .update({ pipeline_id: selectedPipeline.id, stage, updated_at: new Date().toISOString() })
         .eq("id", opportunityId);
       if (error) throw error;
     },
@@ -223,10 +226,10 @@ export function Pipelines({ companyId }: { companyId: string }) {
       if (!selectedPipeline) return [];
       const { data, error } = await supabase
         .from("crm_opportunities")
-        .select("id, name, value, stage, customer_id, probability, customers(name)")
+        .select("id, name, value, stage, customer_id, probability, updated_at, customers(name)")
         .eq("company_id", companyId)
         .neq("pipeline_id", selectedPipeline.id)
-        .order("created_at", { ascending: false });
+        .order("updated_at", { ascending: false });
       if (error) throw error;
       return data as Opportunity[];
     },
@@ -319,8 +322,33 @@ export function Pipelines({ companyId }: { companyId: string }) {
         grouped[opp.stage].push(opp);
       }
     });
+    selectedPipeline?.stages.forEach((stage) => {
+      grouped[stage]?.sort(
+        (a, b) => new Date(b.updated_at).getTime() - new Date(a.updated_at).getTime()
+      );
+    });
     return grouped;
   }, [opportunities, selectedPipeline]);
+
+  useEffect(() => {
+    if (!selectedPipeline?.stages?.length) return;
+    const initialCounts: Record<string, number> = {};
+    selectedPipeline.stages.forEach((stage) => {
+      initialCounts[stage] = VISIBLE_PER_STAGE;
+    });
+    setVisibleCounts(initialCounts);
+  }, [selectedPipeline?.id, selectedPipeline?.stages]);
+
+  const handleColumnScroll = (stage: string, e: React.UIEvent<HTMLDivElement>) => {
+    const target = e.currentTarget;
+    const nearBottom = target.scrollTop + target.clientHeight >= target.scrollHeight - 40;
+    if (!nearBottom) return;
+
+    setVisibleCounts((prev) => ({
+      ...prev,
+      [stage]: (prev[stage] ?? VISIBLE_PER_STAGE) + VISIBLE_PER_STAGE,
+    }));
+  };
 
   if (pipelinesLoading) {
     return <div className="p-6">Cargando pipelines...</div>;
@@ -442,64 +470,71 @@ export function Pipelines({ companyId }: { companyId: string }) {
                       <Badge variant="secondary">{opportunitiesByStage[stage]?.length || 0}</Badge>
                     </CardTitle>
                   </CardHeader>
-                  <CardContent className="space-y-2 min-h-[200px]">
-                    {opportunitiesByStage[stage]?.map((opp) => (
-                      <div
-                        key={opp.id}
-                        draggable
-                        onDragStart={() => handleDragStart(opp)}
-                        onClick={() => handleEditOpportunity(opp.id)}
-                        className="p-3 bg-white border rounded-lg cursor-pointer hover:shadow-md transition-shadow"
-                      >
-                        <div className="flex items-start justify-between mb-2">
-                          <div className="flex items-start gap-2 flex-1">
-                            <GripVertical className="w-4 h-4 text-muted-foreground mt-0.5" />
-                            <div className="flex-1">
-                              <p className="font-medium text-sm">{opp.name}</p>
-                              {opp.customers?.name && (
-                                <p className="text-xs text-muted-foreground">{opp.customers.name}</p>
+                  <CardContent className="min-h-[200px] flex flex-col gap-2">
+                    <div
+                      className="space-y-2 max-h-[520px] overflow-y-auto pr-1"
+                      onScroll={(e) => handleColumnScroll(stage, e)}
+                    >
+                      {opportunitiesByStage[stage]
+                        ?.slice(0, visibleCounts[stage] ?? VISIBLE_PER_STAGE)
+                        .map((opp) => (
+                          <div
+                            key={opp.id}
+                            draggable
+                            onDragStart={() => handleDragStart(opp)}
+                            onClick={() => handleEditOpportunity(opp.id)}
+                            className="p-3 bg-white border rounded-lg cursor-pointer hover:shadow-md transition-shadow"
+                          >
+                            <div className="flex items-start justify-between mb-2">
+                              <div className="flex items-start gap-2 flex-1">
+                                <GripVertical className="w-4 h-4 text-muted-foreground mt-0.5" />
+                                <div className="flex-1">
+                                  <p className="font-medium text-sm">{opp.name}</p>
+                                  {opp.customers?.name && (
+                                    <p className="text-xs text-muted-foreground">{opp.customers.name}</p>
+                                  )}
+                                </div>
+                              </div>
+                              <DropdownMenu>
+                                <DropdownMenuTrigger asChild onClick={(e) => e.stopPropagation()}>
+                                  <Button variant="ghost" size="icon" className="h-6 w-6">
+                                    <MoreVertical className="w-3 h-3" />
+                                  </Button>
+                                </DropdownMenuTrigger>
+                                <DropdownMenuContent align="end">
+                                  <DropdownMenuItem
+                                    onClick={(e) => {
+                                      e.stopPropagation();
+                                      handleEditOpportunity(opp.id);
+                                    }}
+                                  >
+                                    <Pencil className="w-4 h-4 mr-2" />
+                                    Editar
+                                  </DropdownMenuItem>
+                                  <DropdownMenuItem
+                                    onClick={(e) => {
+                                      e.stopPropagation();
+                                      handleDeleteOpportunity(opp.id, opp.name);
+                                    }}
+                                    className="text-destructive focus:text-destructive"
+                                  >
+                                    <Trash2 className="w-4 h-4 mr-2" />
+                                    Eliminar
+                                  </DropdownMenuItem>
+                                </DropdownMenuContent>
+                              </DropdownMenu>
+                            </div>
+                            <div className="flex items-center justify-between text-xs">
+                              {opp.value && <span className="font-mono">${opp.value}</span>}
+                              {opp.probability !== null && (
+                                <Badge variant="outline" className="text-xs">
+                                  {opp.probability}%
+                                </Badge>
                               )}
                             </div>
                           </div>
-                          <DropdownMenu>
-                            <DropdownMenuTrigger asChild onClick={(e) => e.stopPropagation()}>
-                              <Button variant="ghost" size="icon" className="h-6 w-6">
-                                <MoreVertical className="w-3 h-3" />
-                              </Button>
-                            </DropdownMenuTrigger>
-                            <DropdownMenuContent align="end">
-                              <DropdownMenuItem
-                                onClick={(e) => {
-                                  e.stopPropagation();
-                                  handleEditOpportunity(opp.id);
-                                }}
-                              >
-                                <Pencil className="w-4 h-4 mr-2" />
-                                Editar
-                              </DropdownMenuItem>
-                              <DropdownMenuItem
-                                onClick={(e) => {
-                                  e.stopPropagation();
-                                  handleDeleteOpportunity(opp.id, opp.name);
-                                }}
-                                className="text-destructive focus:text-destructive"
-                              >
-                                <Trash2 className="w-4 h-4 mr-2" />
-                                Eliminar
-                              </DropdownMenuItem>
-                            </DropdownMenuContent>
-                          </DropdownMenu>
-                        </div>
-                        <div className="flex items-center justify-between text-xs">
-                          {opp.value && <span className="font-mono">${opp.value}</span>}
-                          {opp.probability !== null && (
-                            <Badge variant="outline" className="text-xs">
-                              {opp.probability}%
-                            </Badge>
-                          )}
-                        </div>
-                      </div>
-                    ))}
+                        ))}
+                    </div>
                     <div className="flex gap-2 pt-2">
                       <Dialog open={quickCreateStage === stage && quickCreateOpen} onOpenChange={(open) => {
                         if (!open) {
