@@ -153,9 +153,13 @@ En **CRM > Reporting**:
 - **Team**: ve oportunidades de su empresa.
 - **Manager/Admin**: acceso completo.
 
-Roles disponibles en el sistema: **owner**, **team**, **manager**, **admin**.
+Roles CRM disponibles: **owner**, **team**, **manager**.
 
-> La asignación de roles se realiza a nivel empresa desde **Ajustes > Roles CRM**.
+**Roles personalizados**:
+- Podés crear roles CRM con permisos granulares (ver/crear/editar/eliminar).
+- Usalos con precaución para evitar bloqueos de acceso o exposición de datos.
+
+> La asignación de roles CRM se realiza a nivel empresa desde **Ajustes > Roles CRM** (solo admin).
 
 ---
 
