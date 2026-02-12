@@ -170,6 +170,32 @@ Integrar envío y tracking de mensajes con plantillas y logs centralizados.
 
 ---
 
+## Fase 6 — Scoring de oportunidades
+
+### Objetivo
+Asignar puntajes automáticos según reglas configurables para priorizar oportunidades.
+
+### Entregado (Dev)
+- Tabla `crm_scoring_rules` con RLS e índices.
+- Columnas `score_total` y `score_updated_at` en `crm_opportunities`.
+- Servicio de reglas de scoring con cálculo y recálculo masivo.
+- Cálculo automático en creación/edición de oportunidades.
+- UI para crear/editar/eliminar reglas y forzar recálculo.
+- Columna de score en la lista de oportunidades.
+
+### Archivos clave
+- DB: `supabase/migrations/20260211_create_crm_scoring_rules.sql`
+- Dominio: `src/domain/crm/dtos/scoringRule.ts`, `mappers/scoringRuleMapper.ts`, `services/scoringRuleService.ts`, `validation/scoringRuleSchema.ts`
+- Datos: `src/data/crm/scoringRuleRepository.ts`
+- UI: `src/components/crm/ScoringRules.tsx`, `src/components/crm/Pipelines.tsx`, `src/components/crm/OpportunitiesList.tsx`
+
+### Funcionalidad para usuario
+- Definir reglas por campo (monto, probabilidad, etapa, estado, fuente, tags).
+- Ver score en listado de oportunidades.
+- Recalcular scores en un click.
+
+---
+
 ## Notas operativas
 - Las selecciones masivas se persisten en `localStorage` por empresa.
 - Exportaciones respetan filtros activos.

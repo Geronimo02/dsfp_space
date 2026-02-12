@@ -3,11 +3,37 @@ import type {
   OpportunityUpdate,
   OpportunityListParams,
   OpportunityListResult,
+  OpportunityDTO,
 } from "@/domain/crm/dtos/opportunity";
 import { opportunityRepository } from "@/data/crm/opportunityRepository";
 import { opportunitySchema } from "@/domain/crm/validation/opportunitySchema";
 import { stageRuleService } from "@/domain/crm/services/stageRuleService";
 import { crmNotificationService } from "@/domain/crm/services/crmNotificationService";
+import { scoringRuleService } from "@/domain/crm/services/scoringRuleService";
+
+const applyScoringForOpportunity = async (opportunity: OpportunityDTO) => {
+  const rules = await scoringRuleService.listActive(opportunity.companyId);
+  const total = rules.length
+    ? scoringRuleService.computeScore(
+        opportunity,
+        rules.map((rule) => ({
+          field: rule.field,
+          operator: rule.operator,
+          value: rule.value,
+          points: rule.points,
+        }))
+      )
+    : 0;
+
+  if (opportunity.scoreTotal === total && opportunity.scoreUpdatedAt) {
+    return opportunity;
+  }
+
+  return opportunityRepository.update(opportunity.id, {
+    score_total: total,
+    score_updated_at: new Date().toISOString(),
+  });
+};
 
 export const opportunityService = {
   async list(params: OpportunityListParams): Promise<OpportunityListResult> {
@@ -46,7 +72,7 @@ export const opportunityService = {
       stage: created.stage,
       opportunityId: created.id,
     });
-    return created;
+    return applyScoringForOpportunity(created);
   },
 
   async update(id: string, values: OpportunityUpdate) {
@@ -69,7 +95,7 @@ export const opportunityService = {
         opportunityId: updated.id,
       });
     }
-    return updated;
+    return applyScoringForOpportunity(updated);
   },
 
   async remove(id: string) {

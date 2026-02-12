@@ -12,7 +12,7 @@ export const opportunityRepository = {
     let q = supabase
       .from("crm_opportunities")
       .select(
-        "id, company_id, name, customer_id, pipeline_id, stage, value, estimated_close_date, probability, next_step, last_activity_at, sla_due_at, created_at, updated_at, owner_id, status",
+        "id, company_id, name, customer_id, pipeline_id, stage, value, estimated_close_date, probability, next_step, last_activity_at, sla_due_at, score_total, score_updated_at, created_at, updated_at, owner_id, status",
         { count: "estimated" }
       )
       .eq("company_id", params.companyId);
@@ -79,5 +79,14 @@ export const opportunityRepository = {
   async remove(id: string) {
     const { error } = await supabase.from("crm_opportunities").delete().eq("id", id);
     if (error) throw error;
+  },
+
+  async listForScoring(companyId: string) {
+    const { data, error } = await supabase
+      .from("crm_opportunities")
+      .select("*")
+      .eq("company_id", companyId);
+    if (error) throw error;
+    return (data ?? []).map(toOpportunityDTO);
   },
 };

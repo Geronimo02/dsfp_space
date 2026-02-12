@@ -193,6 +193,8 @@ export function OpportunitiesList({
     next_step: dto.nextStep,
     last_activity_at: dto.lastActivityAt,
     sla_due_at: dto.slaDueAt,
+    score_total: dto.scoreTotal ?? 0,
+    score_updated_at: dto.scoreUpdatedAt,
     tags: dto.tags,
     created_at: dto.createdAt,
     updated_at: dto.updatedAt,
@@ -342,6 +344,7 @@ export function OpportunitiesList({
   // --- Table columns ---
   const columns: { key: keyof OpportunityRow | "actions"; label: string }[] = [
     { key: "name", label: "Oportunidad" },
+    { key: "score_total", label: "Score" },
     { key: "stage", label: "Etapa" },
     { key: "value", label: "Monto" },
     { key: "estimated_close_date", label: "Cierre" },
@@ -358,7 +361,7 @@ export function OpportunitiesList({
     const sortableFields: (keyof OpportunityRow)[] = [
       "id", "company_id", "customer_id", "name", "value", "stage", 
       "probability", "estimated_close_date", "owner_id", "created_at", 
-      "updated_at", "pipeline_id", "description"
+      "updated_at", "pipeline_id", "description", "score_total"
     ];
     if (!sortableFields.includes(key as keyof OpportunityRow)) {
       return;
@@ -621,6 +624,10 @@ export function OpportunitiesList({
                       >
                         {opp.name}
                       </button>
+                    </td>
+
+                    <td className="px-4 py-2 font-mono">
+                      {opp.scoreTotal ?? 0}
                     </td>
 
                     <td className="px-4 py-2">

@@ -26,6 +26,8 @@ export interface OpportunityDTO {
   nextStep: string | null;
   lastActivityAt: string | null;
   slaDueAt: string | null;
+  scoreTotal: number | null;
+  scoreUpdatedAt: string | null;
   tags: string[] | null;
   createdAt: string | null;
   updatedAt: string | null;

@@ -28,6 +28,7 @@ import { Badge } from "@/components/ui/badge";
 import { toast } from "sonner";
 import { Plus, X, GripVertical, Pencil, Trash2, MoreVertical } from "lucide-react";
 import { OpportunityDrawer } from "./OpportunityDrawer";
+import { ScoringRules } from "./ScoringRules";
 import type { Database } from "@/integrations/supabase/types";
 import { opportunityService } from "@/domain/crm/services/opportunityService";
 import { stageRuleService } from "@/domain/crm/services/stageRuleService";
@@ -787,6 +788,8 @@ export function Pipelines({ companyId }: { companyId: string }) {
           </div>
         </div>
       )}
+
+      <ScoringRules companyId={companyId} />
 
       <OpportunityDrawer
         open={!!editingOpportunity}
