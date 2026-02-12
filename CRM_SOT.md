@@ -232,6 +232,7 @@ Restringir acceso a datos CRM según roles owner/team/manager, reforzar RLS y ag
 - Extensión de `app_role` con roles `owner` y `team`.
 - Separación de roles CRM en `company_users.crm_role` (sin afectar roles de plataforma).
 - Roles CRM personalizados con permisos granulares (ver/crear/editar/eliminar).
+- Consolidación de RLS CRM con policy final + optimizaciones de performance.
 - Restricción de escritura para reglas y credenciales sensibles.
 - Logging estructurado y tracking de errores con Sentry.
 - UI de administración de roles CRM.
@@ -241,6 +242,7 @@ Restringir acceso a datos CRM según roles owner/team/manager, reforzar RLS y ag
 - DB: `supabase/migrations/20260211_add_crm_app_roles.sql`
 - DB: `supabase/migrations/20260211_fix_crm_roles_isolation.sql`
 - DB: `supabase/migrations/20260211_add_crm_custom_roles.sql`
+- DB: `supabase/migrations/20260212_consolidate_crm_rls_performance.sql`
 - UI: `src/main.tsx`
 - Lib: `src/lib/logger.ts`
 - Config: `.env`
