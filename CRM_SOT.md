@@ -178,6 +178,7 @@ Asignar puntajes automáticos según reglas configurables para priorizar oportun
 ### Entregado (Dev)
 - Tabla `crm_scoring_rules` con RLS e índices.
 - Columnas `score_total` y `score_updated_at` en `crm_opportunities`.
+- Migración defensiva para columnas de score.
 - Servicio de reglas de scoring con cálculo y recálculo masivo.
 - Cálculo automático en creación/edición de oportunidades.
 - UI para crear/editar/eliminar reglas y forzar recálculo.
@@ -185,6 +186,7 @@ Asignar puntajes automáticos según reglas configurables para priorizar oportun
 
 ### Archivos clave
 - DB: `supabase/migrations/20260211_create_crm_scoring_rules.sql`
+- DB: `supabase/migrations/20260211_add_crm_score_columns.sql`
 - Dominio: `src/domain/crm/dtos/scoringRule.ts`, `mappers/scoringRuleMapper.ts`, `services/scoringRuleService.ts`, `validation/scoringRuleSchema.ts`
 - Datos: `src/data/crm/scoringRuleRepository.ts`
 - UI: `src/components/crm/ScoringRules.tsx`, `src/components/crm/Pipelines.tsx`, `src/components/crm/OpportunitiesList.tsx`
@@ -219,23 +221,29 @@ Visualizar KPIs y embudos por pipeline para monitorear desempeño comercial.
 
 ---
 
-## Fase 8 — Seguridad y observabilidad (Roles CRM)
+## Fase 8 — Seguridad y observabilidad (Roles CRM + Sentry)
 
 ### Objetivo
-Restringir acceso a datos CRM según roles owner/team/manager y reforzar RLS.
+Restringir acceso a datos CRM según roles owner/team/manager, reforzar RLS y agregar observabilidad.
 
 ### Entregado (Dev)
 - Funciones SQL de ayuda para rol y acceso a oportunidades.
 - RLS extendido por rol en oportunidades y entidades relacionadas.
 - Restricción de escritura para reglas y credenciales sensibles.
+- Logging estructurado y tracking de errores con Sentry.
 
 ### Archivos clave
 - DB: `supabase/migrations/20260211_add_crm_security_rls_roles.sql`
+- UI: `src/main.tsx`
+- Lib: `src/lib/logger.ts`
+- Config: `.env`
+- Config: `package.json`
 
 ### Funcionalidad para usuario
 - Owner solo ve y edita oportunidades asignadas.
 - Team ve oportunidades de su compañía.
 - Manager/admin con acceso completo.
+- Captura de errores y logs estructurados para diagnóstico.
 
 ---
 
