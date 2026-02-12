@@ -288,6 +288,26 @@ export const DEFAULT_ROLE_PERMISSIONS: Record<AppRole, Partial<RolePermissionDef
   },
 };
 
+const PLATFORM_ROLES: AppRole[] = [
+  "admin",
+  "manager",
+  "cashier",
+  "accountant",
+  "viewer",
+  "warehouse",
+  "technician",
+  "auditor",
+  "employee",
+];
+
+const normalizePlatformRole = (role?: string | null): AppRole | null => {
+  if (!role) return null;
+  const normalized = role.trim();
+  if (PLATFORM_ROLES.includes(normalized as AppRole)) return normalized as AppRole;
+  if (normalized === "owner" || normalized === "team") return "employee";
+  return "employee";
+};
+
 export function usePermissions() {
   const { currentCompany } = useCompany();
   
@@ -312,10 +332,12 @@ export function usePermissions() {
         .or("active.eq.true,active.is.null");
       
       if (error) throw error;
-      return data.map(r => ({
-        role: r.role,
-        platform_admin: r.platform_admin || false,
-      }));
+      return data
+        .map(r => ({
+          role: normalizePlatformRole(r.role),
+          platform_admin: r.platform_admin || false,
+        }))
+        .filter((r): r is { role: AppRole; platform_admin: boolean } => !!r.role);
     },
     enabled: !!user?.id && !!currentCompany?.id,
   });

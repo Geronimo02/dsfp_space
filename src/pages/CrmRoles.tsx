@@ -36,6 +36,7 @@ interface CompanyUserRow {
   id: string;
   user_id: string;
   role: string;
+  crm_role?: string | null;
   active: boolean | null;
   platform_admin: boolean | null;
   profile?: { full_name: string | null } | null;
@@ -43,9 +44,9 @@ interface CompanyUserRow {
 
 export default function CrmRoles() {
   const { currentCompany } = useCompany();
-  const { isAdmin, isManager } = usePermissions();
+  const { isAdmin } = usePermissions();
   const queryClient = useQueryClient();
-  const canManage = isAdmin || isManager;
+  const canManage = isAdmin;
 
   const { data: members = [], isLoading } = useQuery({
     queryKey: ["crm-role-members", currentCompany?.id],
@@ -54,7 +55,7 @@ export default function CrmRoles() {
 
       const { data: companyUsers, error } = await supabase
         .from("company_users")
-        .select("id, user_id, role, active, platform_admin")
+        .select("id, user_id, role, crm_role, active, platform_admin")
         .eq("company_id", currentCompany.id)
         .order("created_at", { ascending: true });
 
@@ -84,7 +85,7 @@ export default function CrmRoles() {
       }
       const { error } = await supabase
         .from("company_users")
-        .update({ role: role as any })
+        .update({ crm_role: role as any })
         .eq("id", id);
       if (error) throw error;
     },
@@ -132,7 +133,7 @@ export default function CrmRoles() {
           <CardHeader>
             <CardTitle>Usuarios de la empresa</CardTitle>
             <CardDescription>
-              Actualizá el rol CRM de cada usuario. Solo admin/manager puede editar.
+              Actualizá el rol CRM de cada usuario. Solo admin puede editar.
             </CardDescription>
           </CardHeader>
           <CardContent>
@@ -163,7 +164,14 @@ export default function CrmRoles() {
                     </TableCell>
                     <TableCell>
                       <Select
-                        value={(member.role || "team") as string}
+                        value={
+                          (member.crm_role ||
+                            (member.role === "manager" || member.role === "admin"
+                              ? "manager"
+                              : member.role === "owner" || member.role === "team"
+                                ? member.role
+                                : "team")) as string
+                        }
                         onValueChange={(value) =>
                           updateRoleMutation.mutate({
                             id: member.id,
