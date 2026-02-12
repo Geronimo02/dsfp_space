@@ -78,6 +78,7 @@ const SignupCancel = lazy(() => import("./pages/SignupCancel"));
 const Opportunities = lazy(() => import("./pages/Opportunities"));
 const Pipelines = lazy(() => import("./pages/Pipelines"));
 const CrmReports = lazy(() => import("./pages/CrmReports"));
+const CrmRoles = lazy(() => import("./pages/CrmRoles"));
 
 const queryClient = new QueryClient();
 
@@ -340,6 +341,7 @@ const App = () => (
             <Route path="/opportunities" element={<ProtectedRoute><ModuleProtectedRoute moduleCode="opportunities"><Opportunities /></ModuleProtectedRoute></ProtectedRoute>} />
             <Route path="/pipelines" element={<ProtectedRoute><ModuleProtectedRoute moduleCode="pipelines"><Pipelines /></ModuleProtectedRoute></ProtectedRoute>} />
             <Route path="/crm-reports" element={<ProtectedRoute><ModuleProtectedRoute moduleCode="opportunities"><CrmReports /></ModuleProtectedRoute></ProtectedRoute>} />
+            <Route path="/settings/crm-roles" element={<ProtectedRoute><ModuleProtectedRoute moduleCode="opportunities"><CrmRoles /></ModuleProtectedRoute></ProtectedRoute>} />
             
 
             {/* Inventario & Compras */}

@@ -652,12 +652,14 @@ export default function OpportunitiesPage() {
 // --- CreateOpportunityDrawer ---
 const opportunitySchema = z.object({
   name: z.string().min(2, "Requerido"),
-  pipeline_id: z.string().min(1, "Requerido"),
-  stage: z.string().min(1, "Requerido"),
+  email: z.string().min(1, "Requerido").email("Email inválido"),
+  phone: z.string().min(1, "Requerido"),
+  pipeline_id: z.string().optional(),
+  stage: z.string().optional(),
   customer_id: z.string().optional(),
   value: z.number().min(0.01, "Monto requerido").optional(),
   currency: z.string().default("ARS"),
-  estimated_close_date: z.string().min(1, "Requerido"),
+  estimated_close_date: z.string().optional(),
   probability: z.number().min(0).max(100).optional(),
   description: z.string().optional(),
   owner_id: z.string().optional(),
@@ -677,6 +679,8 @@ function CreateOpportunityDrawer({ open, onClose, companyId }: { open: boolean; 
   const form = useForm<OpportunityForm>({
     resolver: zodResolver(opportunitySchema),
     defaultValues: {
+      email: "",
+      phone: "",
       probability: 50,
       status: "abierta",
       currency: "ARS",
@@ -756,6 +760,8 @@ function CreateOpportunityDrawer({ open, onClose, companyId }: { open: boolean; 
             // Forzar que los campos requeridos estén presentes y no opcionales
             const {
               name,
+              email,
+              phone,
               pipeline_id,
               stage,
               customer_id,
@@ -777,10 +783,12 @@ function CreateOpportunityDrawer({ open, onClose, companyId }: { open: boolean; 
             const payload: OpportunityInsertExtended = {
               company_id: companyId,
               name: name!,
+              email: email!,
+              phone: phone!,
               customer_id: customer_id ?? null,
               // pipeline_id y stage pueden ser opcionales según el tipo, pero si son requeridos, forzar
               pipeline_id: pipeline_id ?? null,
-              stage: stage!,
+              stage: stage || null,
               value: value ?? null,
               estimated_close_date: estimated_close_date ?? null,
               probability: probability ?? null,
@@ -814,12 +822,41 @@ function CreateOpportunityDrawer({ open, onClose, companyId }: { open: boolean; 
             />
             {form.formState.errors.name && <span className="text-xs text-red-500">{form.formState.errors.name.message}</span>}
           </div>
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-2">
+            <div>
+              <label className="font-medium">Email *</label>
+              <Input
+                {...form.register("email")}
+                placeholder="cliente@email.com"
+                aria-invalid={!!form.formState.errors.email}
+              />
+              {form.formState.errors.email && (
+                <span className="text-xs text-red-500">{form.formState.errors.email.message}</span>
+              )}
+            </div>
+            <div>
+              <label className="font-medium">Teléfono *</label>
+              <Input
+                {...form.register("phone")}
+                placeholder="Ej: +54 9 11 1234-5678"
+                aria-invalid={!!form.formState.errors.phone}
+              />
+              {form.formState.errors.phone && (
+                <span className="text-xs text-red-500">{form.formState.errors.phone.message}</span>
+              )}
+            </div>
+          </div>
           <div className="grid grid-cols-2 gap-2">
             <div>
-              <label className="font-medium">Pipeline *</label>
+              <label className="font-medium">Pipeline</label>
               <Select
-                value={form.watch("pipeline_id") || ""}
+                value={form.watch("pipeline_id") || "__none__"}
                 onValueChange={(value) => {
+                  if (value === "__none__") {
+                    form.setValue("pipeline_id", undefined, { shouldValidate: true });
+                    form.setValue("stage", "", { shouldValidate: true });
+                    return;
+                  }
                   form.setValue("pipeline_id", value, { shouldValidate: true });
                   const pipeline = pipelines.find((p: any) => p.id === value);
                   const nextStage = pipeline?.stages?.[0];
@@ -832,6 +869,7 @@ function CreateOpportunityDrawer({ open, onClose, companyId }: { open: boolean; 
                   <SelectValue placeholder="Elegí un pipeline" />
                 </SelectTrigger>
                 <SelectContent>
+                  <SelectItem value="__none__">Sin pipeline</SelectItem>
                   {pipelines.map((p: any) => (
                     <SelectItem key={p.id} value={p.id}>
                       {p.name}
@@ -839,11 +877,10 @@ function CreateOpportunityDrawer({ open, onClose, companyId }: { open: boolean; 
                   ))}
                 </SelectContent>
               </Select>
-              {form.formState.errors.pipeline_id && <span className="text-xs text-red-500">{form.formState.errors.pipeline_id.message}</span>}
               <p className="text-xs text-muted-foreground">Define las etapas disponibles.</p>
             </div>
             <div>
-              <label className="font-medium">Etapa *</label>
+              <label className="font-medium">Etapa</label>
               <Select
                 value={form.watch("stage") || ""}
                 onValueChange={(value) => form.setValue("stage", value, { shouldValidate: true })}

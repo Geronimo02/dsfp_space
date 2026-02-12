@@ -229,21 +229,47 @@ Restringir acceso a datos CRM según roles owner/team/manager, reforzar RLS y ag
 ### Entregado (Dev)
 - Funciones SQL de ayuda para rol y acceso a oportunidades.
 - RLS extendido por rol en oportunidades y entidades relacionadas.
+- Extensión de `app_role` con roles `owner` y `team`.
 - Restricción de escritura para reglas y credenciales sensibles.
 - Logging estructurado y tracking de errores con Sentry.
+- UI de administración de roles CRM.
 
 ### Archivos clave
 - DB: `supabase/migrations/20260211_add_crm_security_rls_roles.sql`
+- DB: `supabase/migrations/20260211_add_crm_app_roles.sql`
 - UI: `src/main.tsx`
 - Lib: `src/lib/logger.ts`
 - Config: `.env`
 - Config: `package.json`
+- UI: `src/pages/CrmRoles.tsx`
+- UI: `src/components/layout/Sidebar.tsx`
+- Router: `src/App.tsx`
 
 ### Funcionalidad para usuario
 - Owner solo ve y edita oportunidades asignadas.
 - Team ve oportunidades de su compañía.
 - Manager/admin con acceso completo.
 - Captura de errores y logs estructurados para diagnóstico.
+- Administración de roles CRM desde Ajustes.
+
+---
+
+## Cambio 2026-02-11 — Campos de contacto en oportunidades
+
+### Objetivo
+Hacer obligatorios los datos de contacto (email y teléfono) y permitir oportunidades sin pipeline.
+
+### Entregado (Dev)
+- Nuevas columnas obligatorias `email` y `phone` en `crm_opportunities`.
+- Backfill desde clientes cuando existe relación.
+- `pipeline_id`/`stage` pasan a ser opcionales.
+
+### Archivo clave
+- DB: `supabase/migrations/20260211_add_crm_opportunity_contact_fields.sql`
+
+### Funcionalidad para usuario
+- Al crear/editar una oportunidad, **email** y **teléfono** son obligatorios.
+- Se puede guardar una oportunidad **sin pipeline** ni etapa.
 
 ---
 

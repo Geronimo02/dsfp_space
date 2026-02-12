@@ -261,6 +261,12 @@ export function Sidebar() {
               icon: BarChart3,
               module: "opportunities",
             },
+            {
+              title: "Roles CRM",
+              href: "/settings/crm-roles",
+              icon: Shield,
+              module: "opportunities",
+            },
           ],
         },
       ],

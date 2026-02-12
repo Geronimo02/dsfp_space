@@ -175,6 +175,8 @@ export function OpportunitiesList({
     id: dto.id,
     company_id: dto.companyId,
     name: dto.name,
+    email: dto.email,
+    phone: dto.phone,
     customer_id: dto.customerId,
     pipeline_id: dto.pipelineId,
     stage: dto.stage,

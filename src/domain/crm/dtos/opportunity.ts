@@ -8,6 +8,8 @@ export interface OpportunityDTO {
   id: string;
   companyId: string;
   name: string;
+  email: string;
+  phone: string;
   customerId: string | null;
   pipelineId: string | null;
   stage: string;

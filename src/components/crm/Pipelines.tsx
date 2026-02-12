@@ -208,11 +208,13 @@ export function Pipelines({ companyId }: { companyId: string }) {
 
   // Quick create opportunity mutation
   const quickCreateMutation = useMutation({
-    mutationFn: async ({ name, stage }: { name: string; stage: string }) => {
+    mutationFn: async ({ name, stage, email, phone }: { name: string; stage: string; email: string; phone: string }) => {
       if (!selectedPipeline) throw new Error("Pipeline no seleccionado");
       await opportunityService.create({
         company_id: companyId,
         name: name.trim(),
+        email: email.trim(),
+        phone: phone.trim(),
         stage,
         pipeline_id: selectedPipeline.id,
         customer_id: null,
@@ -739,8 +741,8 @@ export function Pipelines({ companyId }: { companyId: string }) {
                             </DialogHeader>
                             <QuickCreateOpportunityForm
                               stage={stage}
-                              onSubmit={(name) => {
-                                quickCreateMutation.mutate({ name, stage });
+                              onSubmit={(name, email, phone) => {
+                                quickCreateMutation.mutate({ name, stage, email, phone });
                               }}
                               isPending={quickCreateMutation.isPending}
                             />
@@ -883,19 +885,23 @@ function QuickCreateOpportunityForm({
   isPending,
 }: {
   stage: string;
-  onSubmit: (name: string) => void;
+  onSubmit: (name: string, email: string, phone: string) => void;
   isPending: boolean;
 }) {
   const [name, setName] = useState("");
+  const [email, setEmail] = useState("");
+  const [phone, setPhone] = useState("");
 
   return (
     <form
       className="space-y-4"
       onSubmit={(e) => {
         e.preventDefault();
-        if (name.trim()) {
-          onSubmit(name);
+        if (name.trim() && email.trim() && phone.trim()) {
+          onSubmit(name, email, phone);
           setName("");
+          setEmail("");
+          setPhone("");
         }
       }}
     >
@@ -909,8 +915,26 @@ function QuickCreateOpportunityForm({
           autoFocus
         />
       </div>
+      <div className="space-y-2">
+        <label className="text-sm font-medium">Email *</label>
+        <Input
+          value={email}
+          onChange={(e) => setEmail(e.target.value)}
+          placeholder="cliente@email.com"
+          required
+        />
+      </div>
+      <div className="space-y-2">
+        <label className="text-sm font-medium">Teléfono *</label>
+        <Input
+          value={phone}
+          onChange={(e) => setPhone(e.target.value)}
+          placeholder="Ej: +54 9 11 1234-5678"
+          required
+        />
+      </div>
       <div className="flex justify-end gap-2">
-        <Button type="submit" disabled={isPending || !name.trim()}>
+        <Button type="submit" disabled={isPending || !name.trim() || !email.trim() || !phone.trim()}>
           Crear Oportunidad
         </Button>
       </div>

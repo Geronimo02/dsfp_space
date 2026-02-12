@@ -98,6 +98,8 @@ export function OpportunityDrawer({ open, onClose, companyId, opportunity }: Opp
   const form = useForm<OpportunityForm>({
     resolver: zodResolver(opportunitySchema),
     defaultValues: {
+      email: "",
+      phone: "",
       probability: 50,
       status: "abierta",
       currency: "ARS",
@@ -114,9 +116,11 @@ export function OpportunityDrawer({ open, onClose, companyId, opportunity }: Opp
 
       const payload: any = {
         name: values.name,
+        email: normalizeText(values.email),
+        phone: normalizeText(values.phone),
         customer_id: values.customer_id || null,
         pipeline_id: values.pipeline_id || null,
-        stage: values.stage,
+        stage: values.stage || null,
         value: normalizeNumber(values.value),
         estimated_close_date: normalizeText(values.estimated_close_date),
         probability: normalizeNumber(values.probability),
@@ -233,6 +237,19 @@ export function OpportunityDrawer({ open, onClose, companyId, opportunity }: Opp
     () => customers.find((customer: any) => customer.id === selectedCustomerId),
     [customers, selectedCustomerId]
   );
+
+  useEffect(() => {
+    if (!selectedCustomer) return;
+    const currentEmail = form.getValues("email");
+    const currentPhone = form.getValues("phone");
+
+    if (!currentEmail && selectedCustomer.email) {
+      form.setValue("email", selectedCustomer.email, { shouldValidate: true });
+    }
+    if (!currentPhone && selectedCustomer.phone) {
+      form.setValue("phone", selectedCustomer.phone, { shouldValidate: true });
+    }
+  }, [selectedCustomer, form]);
 
   const filteredTags = useMemo(() => {
     if (!tagSearch.trim()) return tags;
@@ -411,6 +428,8 @@ export function OpportunityDrawer({ open, onClose, companyId, opportunity }: Opp
       console.log("Loading opportunity for edit:", opportunity);
       const formValues = {
         name: opportunity.name || "",
+        email: opportunity.email || "",
+        phone: opportunity.phone || "",
         customer_id: opportunity.customer_id || undefined,
         pipeline_id: opportunity.pipeline_id || undefined,
         stage: opportunity.stage || "",
@@ -434,6 +453,8 @@ export function OpportunityDrawer({ open, onClose, companyId, opportunity }: Opp
     } else if (!opportunity && !isEditing) {
       form.reset({
         name: "",
+        email: "",
+        phone: "",
         probability: 50,
         status: "abierta",
         currency: "ARS",
@@ -728,12 +749,42 @@ export function OpportunityDrawer({ open, onClose, companyId, opportunity }: Opp
                 )}
               </div>
 
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-2">
+                <div>
+                  <label className="font-medium">Email *</label>
+                  <Input
+                    {...form.register("email")}
+                    placeholder="cliente@email.com"
+                    aria-invalid={!!form.formState.errors.email}
+                  />
+                  {form.formState.errors.email && (
+                    <span className="text-xs text-red-500">{form.formState.errors.email.message}</span>
+                  )}
+                </div>
+                <div>
+                  <label className="font-medium">Teléfono *</label>
+                  <Input
+                    {...form.register("phone")}
+                    placeholder="Ej: +54 9 11 1234-5678"
+                    aria-invalid={!!form.formState.errors.phone}
+                  />
+                  {form.formState.errors.phone && (
+                    <span className="text-xs text-red-500">{form.formState.errors.phone.message}</span>
+                  )}
+                </div>
+              </div>
+
               <div className="grid grid-cols-2 gap-2">
                 <div>
-                  <label className="font-medium">Pipeline *</label>
+                  <label className="font-medium">Pipeline</label>
                   <Select
-                    value={form.watch("pipeline_id") || ""}
+                    value={form.watch("pipeline_id") || "__none__"}
                     onValueChange={(value) => {
+                      if (value === "__none__") {
+                        form.setValue("pipeline_id", undefined, { shouldValidate: true });
+                        form.setValue("stage", "", { shouldValidate: true });
+                        return;
+                      }
                       form.setValue("pipeline_id", value, { shouldValidate: true });
                       const pipeline = pipelines.find((p: any) => p.id === value);
                       const nextStage = pipeline?.stages?.[0];
@@ -746,6 +797,7 @@ export function OpportunityDrawer({ open, onClose, companyId, opportunity }: Opp
                       <SelectValue placeholder="Elegí un pipeline" />
                     </SelectTrigger>
                     <SelectContent>
+                      <SelectItem value="__none__">Sin pipeline</SelectItem>
                       {pipelines.map((p: any) => (
                         <SelectItem key={p.id} value={p.id}>
                           {p.name}
@@ -755,7 +807,7 @@ export function OpportunityDrawer({ open, onClose, companyId, opportunity }: Opp
                   </Select>
                 </div>
                 <div>
-                  <label className="font-medium">Etapa *</label>
+                  <label className="font-medium">Etapa</label>
                   <Select
                     value={form.watch("stage") || ""}
                     onValueChange={(value) => form.setValue("stage", value, { shouldValidate: true })}
@@ -897,7 +949,7 @@ export function OpportunityDrawer({ open, onClose, companyId, opportunity }: Opp
 
               <div className="text-sm font-semibold text-muted-foreground">Notas</div>
               <div className="grid gap-2">
-                <label className="font-medium">Descripción</label>
+                <label className="font-medium">Notas</label>
                 <Textarea
                   {...form.register("description")}
                   placeholder="Detalles de la oportunidad..."
@@ -914,16 +966,15 @@ export function OpportunityDrawer({ open, onClose, companyId, opportunity }: Opp
                 <label className="font-medium">Tags</label>
                 <div className="flex flex-wrap gap-2">
                   {selectedTags.length === 0 ? (
-                    <span className="text-xs text-muted-foreground">Sin tags asignados.</span>
+                    <span className="text-xs text-muted-foreground">Sin tags</span>
                   ) : (
                     selectedTags.map((tagName) => {
-                      const tag = tags.find((t) => t.name === tagName);
-                      const tagColor = tag?.color || "rgb(148, 163, 184)";
+                      const tagColor = tags.find((tag) => tag.name === tagName)?.color ?? "rgb(59, 130, 246)";
                       return (
                         <Badge
                           key={tagName}
-                          className="gap-1 text-white"
                           style={{ backgroundColor: tagColor }}
+                          className="text-white"
                         >
                           {tagName}
                           <button
@@ -945,7 +996,7 @@ export function OpportunityDrawer({ open, onClose, companyId, opportunity }: Opp
                       Gestionar tags
                     </Button>
                   </PopoverTrigger>
-                  <PopoverContent className="w-80">
+                  <PopoverContent className="w-96">
                     <div className="space-y-3">
                       <div className="space-y-2">
                         <label className="text-xs font-medium text-muted-foreground">Buscar tags</label>

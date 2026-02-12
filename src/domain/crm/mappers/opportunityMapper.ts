@@ -4,6 +4,8 @@ export const toOpportunityDTO = (row: OpportunityRow): OpportunityDTO => ({
   id: row.id,
   companyId: row.company_id,
   name: row.name,
+  email: row.email,
+  phone: row.phone,
   customerId: row.customer_id,
   pipelineId: row.pipeline_id,
   stage: row.stage,

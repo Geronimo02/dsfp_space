@@ -47,9 +47,11 @@ export const opportunityService = {
   async create(values: OpportunityInsert) {
     opportunitySchema.parse({
       name: values.name,
+      email: (values as any).email,
+      phone: (values as any).phone,
       customer_id: values.customer_id || undefined,
-      pipeline_id: values.pipeline_id || "",
-      stage: values.stage || "",
+      pipeline_id: values.pipeline_id || undefined,
+      stage: values.stage || undefined,
       value: values.value ?? undefined,
       estimated_close_date: values.estimated_close_date || undefined,
       probability: values.probability ?? undefined,
