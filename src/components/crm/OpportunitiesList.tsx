@@ -79,7 +79,7 @@ export function OpportunitiesList({
   const [pageSize] = useState(10);
 
   const [sort, setSort] = useState<{ field: SortableField; direction: "asc" | "desc" }>(
-    { field: "close_date", direction: "desc" } as any
+    { field: "created_at", direction: "desc" } as any
   );
 
   useEffect(() => {
