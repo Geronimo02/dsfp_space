@@ -255,6 +255,12 @@ export function Sidebar() {
               icon: TrendingUp,
               module: "pipelines",
             },
+            {
+              title: "Reporting",
+              href: "/crm-reports",
+              icon: BarChart3,
+              module: "opportunities",
+            },
           ],
         },
       ],

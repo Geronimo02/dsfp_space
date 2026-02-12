@@ -196,6 +196,29 @@ Asignar puntajes automáticos según reglas configurables para priorizar oportun
 
 ---
 
+## Fase 7 — Reporting (Dashboards y embudos)
+
+### Objetivo
+Visualizar KPIs y embudos por pipeline para monitorear desempeño comercial.
+
+### Entregado (Dev)
+- Dashboard de KPIs CRM (totales, valor, tasa de cierre, ciclo promedio).
+- Gráfico de valor por pipeline.
+- Embudos por pipeline con conteo por etapa.
+- Filtro por rango de fechas (rápido y personalizado).
+
+### Archivos clave
+- UI: `src/pages/CrmReports.tsx`
+- UI: `src/components/layout/Sidebar.tsx`
+- Router: `src/App.tsx`
+
+### Funcionalidad para usuario
+- Consultar KPIs de oportunidades filtrados por fecha.
+- Comparar valor total por pipeline.
+- Ver el embudo por etapa dentro de cada pipeline.
+
+---
+
 ## Notas operativas
 - Las selecciones masivas se persisten en `localStorage` por empresa.
 - Exportaciones respetan filtros activos.
