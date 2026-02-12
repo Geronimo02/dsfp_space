@@ -219,6 +219,26 @@ Visualizar KPIs y embudos por pipeline para monitorear desempeño comercial.
 
 ---
 
+## Fase 8 — Seguridad y observabilidad (Roles CRM)
+
+### Objetivo
+Restringir acceso a datos CRM según roles owner/team/manager y reforzar RLS.
+
+### Entregado (Dev)
+- Funciones SQL de ayuda para rol y acceso a oportunidades.
+- RLS extendido por rol en oportunidades y entidades relacionadas.
+- Restricción de escritura para reglas y credenciales sensibles.
+
+### Archivos clave
+- DB: `supabase/migrations/20260211_add_crm_security_rls_roles.sql`
+
+### Funcionalidad para usuario
+- Owner solo ve y edita oportunidades asignadas.
+- Team ve oportunidades de su compañía.
+- Manager/admin con acceso completo.
+
+---
+
 ## Notas operativas
 - Las selecciones masivas se persisten en `localStorage` por empresa.
 - Exportaciones respetan filtros activos.
