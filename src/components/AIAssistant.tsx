@@ -19,11 +19,16 @@ import {
   DollarSign,
   AlertTriangle,
   Target,
-  StopCircle
+  StopCircle,
+  Briefcase,
+  Landmark,
+  CreditCard,
+  ShoppingCart,
+  Headphones
 } from "lucide-react";
 import { toast } from "sonner";
 
-type AnalysisType = "search" | "suggestion" | "report" | "stock-analysis" | "sales-prediction" | "customer-insights" | "financial-summary";
+type AnalysisType = "search" | "suggestion" | "report" | "stock-analysis" | "sales-prediction" | "customer-insights" | "financial-summary" | "hr-analysis" | "treasury" | "crm-pipeline" | "accounts-analysis" | "procurement" | "support-analysis";
 
 export const AIAssistant = () => {
   const { currentCompany } = useCompany();
@@ -110,6 +115,54 @@ export const AIAssistant = () => {
       query: "Dame 5 oportunidades concretas para aumentar las ventas esta semana",
       color: "text-emerald-500",
     },
+    {
+      icon: Briefcase,
+      label: "RRHH",
+      description: "Empleados y comisiones",
+      type: "hr-analysis" as AnalysisType,
+      query: "Analiza mi equipo: dotación, comisiones, horas y costo laboral",
+      color: "text-indigo-500",
+    },
+    {
+      icon: Landmark,
+      label: "Tesorería",
+      description: "Bancos, cheques, tarjetas",
+      type: "treasury" as AnalysisType,
+      query: "Dame el estado de tesorería: saldos, cheques pendientes y tarjetas por acreditar",
+      color: "text-cyan-500",
+    },
+    {
+      icon: Target,
+      label: "CRM Pipeline",
+      description: "Oportunidades y conversión",
+      type: "crm-pipeline" as AnalysisType,
+      query: "Analiza mi pipeline comercial: oportunidades abiertas, valor ponderado y tasa de conversión",
+      color: "text-pink-500",
+    },
+    {
+      icon: CreditCard,
+      label: "Cuenta Cte",
+      description: "Cobros y vencimientos",
+      type: "accounts-analysis" as AnalysisType,
+      query: "Analiza mi cuenta corriente: cobros, vencimientos pendientes y notas de crédito",
+      color: "text-amber-500",
+    },
+    {
+      icon: ShoppingCart,
+      label: "Compras",
+      description: "Órdenes y costos detalle",
+      type: "procurement" as AnalysisType,
+      query: "Analiza mis compras: órdenes abiertas, productos más comprados y costos",
+      color: "text-teal-500",
+    },
+    {
+      icon: Headphones,
+      label: "Soporte",
+      description: "Tickets y SLA",
+      type: "support-analysis" as AnalysisType,
+      query: "Analiza mis tickets de soporte: abiertos, SLA y prioridades",
+      color: "text-rose-500",
+    },
   ];
 
   const exampleQueries: Record<AnalysisType, string[]> = {
@@ -148,6 +201,36 @@ export const AIAssistant = () => {
       "¿Cuál es mi margen de ganancia?",
       "Análisis de cuentas por cobrar",
     ],
+    "hr-analysis": [
+      "¿Cuántos empleados activos tengo?",
+      "¿Cuánto pagué en comisiones?",
+      "Resumen de horas trabajadas y productividad",
+    ],
+    "treasury": [
+      "¿Cuánto tengo en cuentas bancarias?",
+      "¿Qué cheques tengo pendientes?",
+      "¿Cuánto espero cobrar por tarjetas?",
+    ],
+    "crm-pipeline": [
+      "¿Cuántas oportunidades abiertas tengo?",
+      "¿Cuál es el valor ponderado del pipeline?",
+      "Tasa de conversión de oportunidades",
+    ],
+    "accounts-analysis": [
+      "¿Cuántos movimientos vencidos tengo?",
+      "Notas de crédito activas con saldo",
+      "Principales deudores de cuenta corriente",
+    ],
+    "procurement": [
+      "¿Cuántas órdenes de compra abiertas tengo?",
+      "Productos más comprados por costo",
+      "Costo total de compras del trimestre",
+    ],
+    "support-analysis": [
+      "¿Cuántos tickets abiertos tengo?",
+      "¿Se cumplen los SLA de respuesta?",
+      "Tickets de alta prioridad pendientes",
+    ],
   };
 
   const tabConfig = [
@@ -158,6 +241,12 @@ export const AIAssistant = () => {
     { value: "sales-prediction", icon: TrendingUp, label: "Predicción" },
     { value: "customer-insights", icon: Users, label: "Clientes" },
     { value: "financial-summary", icon: DollarSign, label: "Finanzas" },
+    { value: "hr-analysis", icon: Briefcase, label: "RRHH" },
+    { value: "treasury", icon: Landmark, label: "Tesorería" },
+    { value: "crm-pipeline", icon: Target, label: "CRM" },
+    { value: "accounts-analysis", icon: CreditCard, label: "Cta Cte" },
+    { value: "procurement", icon: ShoppingCart, label: "Compras" },
+    { value: "support-analysis", icon: Headphones, label: "Soporte" },
   ];
 
   return (
@@ -175,7 +264,7 @@ export const AIAssistant = () => {
         {/* Quick Actions Grid */}
         <div>
           <label className="text-sm font-medium mb-3 block">Análisis Rápidos</label>
-          <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-6 gap-2">
+          <div className="grid grid-cols-2 md:grid-cols-4 lg:grid-cols-6 gap-2">
             {quickActions.map((action) => (
               <Button
                 key={action.label}
@@ -200,11 +289,11 @@ export const AIAssistant = () => {
 
         {/* Tabs */}
         <Tabs value={activeTab} onValueChange={(v) => setActiveTab(v as AnalysisType)}>
-          <TabsList className="grid w-full grid-cols-7">
+          <TabsList className="grid w-full" style={{ gridTemplateColumns: 'repeat(13, 1fr)' }}>
             {tabConfig.map((tab) => (
-              <TabsTrigger key={tab.value} value={tab.value} className="gap-1 text-xs px-2">
+              <TabsTrigger key={tab.value} value={tab.value} className="gap-1 text-xs px-1">
                 <tab.icon className="h-3 w-3" />
-                <span className="hidden sm:inline">{tab.label}</span>
+                <span className="hidden lg:inline">{tab.label}</span>
               </TabsTrigger>
             ))}
           </TabsList>

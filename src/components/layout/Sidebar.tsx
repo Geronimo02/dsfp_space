@@ -897,6 +897,19 @@ export function Sidebar() {
               </Button>
             </Link>
 
+            <Link to="/bot-requests" className="flex-1">
+              <Button
+                variant="outline"
+                size="sm"
+                className="w-full h-9 flex items-center gap-2 px-2 text-xs rounded-lg border-purple-500/50 text-purple-600 hover:bg-purple-50 dark:hover:bg-purple-950 transition-all active:scale-[0.98]"
+              >
+                <MessageCircle className="w-3.5 h-3.5" />
+                <span>Contáctanos</span>
+              </Button>
+            </Link>
+          </div>
+
+          <div className="flex gap-2">
             <Button
               onClick={async () => {
                 const { error } = await supabase.auth.signOut();

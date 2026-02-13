@@ -37,9 +37,30 @@ export const AIAssistantFloating = () => {
     setQuery(finalQuery);
 
     // Auto-detectar el tipo de consulta
-    const type = finalQuery.toLowerCase().includes("suger") || finalQuery.toLowerCase().includes("recomend") 
+    const lq = finalQuery.toLowerCase();
+    const type = lq.includes("empleado") || lq.includes("comision") || lq.includes("nómina") || lq.includes("rrhh") || lq.includes("horas trabajadas")
+      ? "hr-analysis"
+      : lq.includes("banco") || lq.includes("cheque") || lq.includes("tarjeta") || lq.includes("tesorería") || lq.includes("saldo")
+      ? "treasury"
+      : lq.includes("oportunidad") || lq.includes("pipeline") || lq.includes("crm") || lq.includes("lead")
+      ? "crm-pipeline"
+      : lq.includes("cuenta corriente") || lq.includes("vencido") || lq.includes("nota de crédito") || lq.includes("deudor") || lq.includes("cobro")
+      ? "accounts-analysis"
+      : lq.includes("compra") || lq.includes("orden de compra") || lq.includes("proveedor") || lq.includes("abastecimiento")
+      ? "procurement"
+      : lq.includes("ticket") || lq.includes("soporte") || lq.includes("sla") || lq.includes("reclamo")
+      ? "support-analysis"
+      : lq.includes("stock") || lq.includes("inventario") || lq.includes("reponer") || lq.includes("reposición")
+      ? "stock-analysis"
+      : lq.includes("predicción") || lq.includes("proyección") || lq.includes("tendencia")
+      ? "sales-prediction"
+      : lq.includes("cliente") || lq.includes("vip") || lq.includes("abandono")
+      ? "customer-insights"
+      : lq.includes("financ") || lq.includes("margen") || lq.includes("ganancia") || lq.includes("gasto")
+      ? "financial-summary"
+      : lq.includes("suger") || lq.includes("recomend")
       ? "suggestion"
-      : finalQuery.toLowerCase().includes("por qué") || finalQuery.toLowerCase().includes("explica") || finalQuery.toLowerCase().includes("compar")
+      : lq.includes("por qué") || lq.includes("explica") || lq.includes("compar")
       ? "report"
       : "search";
 
@@ -52,12 +73,16 @@ export const AIAssistantFloating = () => {
   };
 
   const exampleQueries = [
-    "Mostrame las ventas del mes pasado de cemento",
     "¿Cuáles son los productos más vendidos?",
     "Dame sugerencias para mejorar las ventas",
-    "¿Qué productos debería comprar más?",
-    "Explica por qué bajaron las ventas este mes",
-    "Compara las ventas con el mes anterior",
+    "¿Qué productos necesito reponer?",
+    "¿Cuánto pagué en comisiones este mes?",
+    "¿Cuánto tengo en cuentas bancarias?",
+    "Resumen financiero del mes",
+    "¿Cuántas oportunidades abiertas tengo en el CRM?",
+    "¿Tengo movimientos vencidos en cuenta corriente?",
+    "¿Cuántos tickets de soporte están abiertos?",
+    "¿Cuáles son mis órdenes de compra pendientes?",
   ];
 
   return (

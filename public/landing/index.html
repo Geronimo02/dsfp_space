@@ -47,6 +47,9 @@
               <a href="https://www.gitbook.com/" target="_blank" class="nav-link w-inline-block">
                 <div class="nav-link-text">Docs</div><img loading="lazy" src="https://cdn.prod.website-files.com/680b488484a2d11f12212394/680b488484a2d11f12212503_Lumify-Placeholder-Icon-Arrow-Up-Right.svg" alt="" class="nav-link-icon icon-small">
               </a>
+              <a href="#" onclick="openContactModal(event)" class="nav-link w-inline-block">
+                <div class="nav-link-text">Contáctanos</div>
+              </a>
             </div>
           </nav>
           <div id="w-node-ed1a30f1-6737-bc57-209a-0418d51ae124-d51ae109" class="nav-right">
@@ -778,10 +781,10 @@
                       </div>
                     </div>
                     <div class="pricing-custom-right">
-                      <a data-wf--button-main--style="secondary" href="mailto:digitalsolutionsfp@gmail.com?subject=Custom%20Plan%20-%20Ventify" class="button-main w-variant-c4d0cfdf-8785-178b-e7e3-d574ada61b0a w-inline-block">
+                      <a data-wf--button-main--style="secondary" href="#" onclick="openContactModal(event)" class="button-main w-variant-c4d0cfdf-8785-178b-e7e3-d574ada61b0a w-inline-block">
                         <div class="button-text-wrap">
-                          <div class="button-text-initial">Contactar</div>
-                          <div class="button-text-reveal">Contactar</div>
+                          <div class="button-text-initial">Contáctanos</div>
+                          <div class="button-text-reveal">Contáctanos</div>
                         </div>
                       </a>
                     </div>
@@ -1070,10 +1073,10 @@
                       </div>
                     </div>
                     <div class="pricing-custom-right">
-                      <a data-wf--button-main--style="secondary" href="mailto:digitalsolutionsfp@gmail.com?subject=Custom%20Plan%20-%20Ventify" class="button-main w-variant-c4d0cfdf-8785-178b-e7e3-d574ada61b0a w-inline-block">
+                      <a data-wf--button-main--style="secondary" href="#" onclick="openContactModal(event)" class="button-main w-variant-c4d0cfdf-8785-178b-e7e3-d574ada61b0a w-inline-block">
                         <div class="button-text-wrap">
-                          <div class="button-text-initial">Contactar</div>
-                          <div class="button-text-reveal">Contactar</div>
+                          <div class="button-text-initial">Contáctanos</div>
+                          <div class="button-text-reveal">Contáctanos</div>
                         </div>
                       </a>
                     </div>
@@ -1178,6 +1181,181 @@
     });
   </script>
   -->
+<!-- Contact Us Modal -->
+<div id="contactModal" style="display:none;position:fixed;inset:0;z-index:9999;background:rgba(0,0,0,0.6);backdrop-filter:blur(4px);overflow-y:auto;padding:20px;">
+  <div style="max-width:640px;margin:40px auto;background:#fff;border-radius:16px;box-shadow:0 25px 50px rgba(0,0,0,0.25);overflow:hidden;animation:modalIn 0.3s ease-out;">
+    <!-- Header -->
+    <div style="background:linear-gradient(135deg,#8b5cf6,#ec4899);padding:24px 32px;color:#fff;">
+      <div style="display:flex;align-items:center;gap:12px;">
+        <div style="width:40px;height:40px;background:rgba(255,255,255,0.2);border-radius:10px;display:flex;align-items:center;justify-content:center;">
+          <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 8V4H8"/><rect width="16" height="12" x="4" y="8" rx="2"/><path d="m2 14 6-6 6 6"/><path d="m14 20 6-6"/></svg>
+        </div>
+        <div>
+          <h2 style="margin:0;font-size:20px;font-weight:700;">Solicitar Bot Personalizado</h2>
+          <p style="margin:4px 0 0;font-size:13px;opacity:0.9;">Completa el formulario y te contactaremos para crear tu bot a medida</p>
+        </div>
+      </div>
+      <button onclick="closeContactModal()" style="position:absolute;top:20px;right:20px;background:rgba(255,255,255,0.2);border:none;color:#fff;width:32px;height:32px;border-radius:8px;cursor:pointer;font-size:18px;display:flex;align-items:center;justify-content:center;">&times;</button>
+    </div>
+    <!-- Form -->
+    <form id="contactForm" onsubmit="submitContactForm(event)" style="padding:24px 32px 32px;">
+      <p style="font-size:12px;font-weight:600;text-transform:uppercase;letter-spacing:1px;color:#6b7280;margin:0 0 12px;">Información de contacto</p>
+      <div style="display:grid;grid-template-columns:1fr 1fr;gap:12px;">
+        <div>
+          <label style="display:block;font-size:13px;font-weight:500;margin-bottom:4px;color:#374151;">Nombre completo *</label>
+          <input type="text" name="contact_name" required placeholder="Tu nombre" style="width:100%;padding:10px 12px;border:1px solid #d1d5db;border-radius:8px;font-size:14px;outline:none;transition:border 0.2s;" onfocus="this.style.borderColor='#8b5cf6'" onblur="this.style.borderColor='#d1d5db'">
+        </div>
+        <div>
+          <label style="display:block;font-size:13px;font-weight:500;margin-bottom:4px;color:#374151;">Email *</label>
+          <input type="email" name="contact_email" required placeholder="tu@email.com" style="width:100%;padding:10px 12px;border:1px solid #d1d5db;border-radius:8px;font-size:14px;outline:none;transition:border 0.2s;" onfocus="this.style.borderColor='#8b5cf6'" onblur="this.style.borderColor='#d1d5db'">
+        </div>
+        <div>
+          <label style="display:block;font-size:13px;font-weight:500;margin-bottom:4px;color:#374151;">Teléfono</label>
+          <input type="text" name="contact_phone" placeholder="+54 11 1234-5678" style="width:100%;padding:10px 12px;border:1px solid #d1d5db;border-radius:8px;font-size:14px;outline:none;transition:border 0.2s;" onfocus="this.style.borderColor='#8b5cf6'" onblur="this.style.borderColor='#d1d5db'">
+        </div>
+        <div>
+          <label style="display:block;font-size:13px;font-weight:500;margin-bottom:4px;color:#374151;">Empresa</label>
+          <input type="text" name="company_name" placeholder="Nombre de tu empresa" style="width:100%;padding:10px 12px;border:1px solid #d1d5db;border-radius:8px;font-size:14px;outline:none;transition:border 0.2s;" onfocus="this.style.borderColor='#8b5cf6'" onblur="this.style.borderColor='#d1d5db'">
+        </div>
+      </div>
+      <p style="font-size:12px;font-weight:600;text-transform:uppercase;letter-spacing:1px;color:#6b7280;margin:20px 0 12px;">Detalles del bot</p>
+      <div style="display:flex;flex-direction:column;gap:12px;">
+        <div>
+          <label style="display:block;font-size:13px;font-weight:500;margin-bottom:4px;color:#374151;">Asunto / Tipo de bot *</label>
+          <input type="text" name="subject" required placeholder="Ej: Bot de atención al cliente, Bot de ventas..." style="width:100%;padding:10px 12px;border:1px solid #d1d5db;border-radius:8px;font-size:14px;outline:none;transition:border 0.2s;" onfocus="this.style.borderColor='#8b5cf6'" onblur="this.style.borderColor='#d1d5db'">
+        </div>
+        <div>
+          <label style="display:block;font-size:13px;font-weight:500;margin-bottom:4px;color:#374151;">Descripción del requerimiento *</label>
+          <textarea name="description" required placeholder="Describe qué necesitas que haga el bot..." rows="3" style="width:100%;padding:10px 12px;border:1px solid #d1d5db;border-radius:8px;font-size:14px;outline:none;resize:vertical;transition:border 0.2s;font-family:inherit;" onfocus="this.style.borderColor='#8b5cf6'" onblur="this.style.borderColor='#d1d5db'"></textarea>
+        </div>
+        <div>
+          <label style="display:block;font-size:13px;font-weight:500;margin-bottom:4px;color:#374151;">Objetivos del bot</label>
+          <textarea name="bot_objectives" placeholder="¿Qué resultados esperas lograr?" rows="2" style="width:100%;padding:10px 12px;border:1px solid #d1d5db;border-radius:8px;font-size:14px;outline:none;resize:vertical;transition:border 0.2s;font-family:inherit;" onfocus="this.style.borderColor='#8b5cf6'" onblur="this.style.borderColor='#d1d5db'"></textarea>
+        </div>
+        <div>
+          <label style="display:block;font-size:13px;font-weight:500;margin-bottom:4px;color:#374151;">Disponibilidad para llamada</label>
+          <select name="preferred_schedule" style="width:100%;padding:10px 12px;border:1px solid #d1d5db;border-radius:8px;font-size:14px;outline:none;background:#fff;transition:border 0.2s;" onfocus="this.style.borderColor='#8b5cf6'" onblur="this.style.borderColor='#d1d5db'">
+            <option value="">Selecciona tu disponibilidad</option>
+            <option value="manana">Mañanas (9:00 - 12:00)</option>
+            <option value="mediodia">Mediodía (12:00 - 14:00)</option>
+            <option value="tarde">Tardes (14:00 - 18:00)</option>
+            <option value="flexible">Horario flexible</option>
+          </select>
+        </div>
+      </div>
+      <!-- Info -->
+      <div style="background:#eff6ff;border:1px solid #bfdbfe;border-radius:10px;padding:12px 16px;margin:16px 0;font-size:13px;color:#1e40af;">
+        <strong>¿Cómo funciona?</strong> Tras enviar tu solicitud, nuestro equipo realizará una llamada de diagnóstico para entender tus necesidades. Luego recibirás un presupuesto formal con alcance, tiempo estimado y precio.
+      </div>
+      <!-- Buttons -->
+      <div style="display:flex;justify-content:flex-end;gap:12px;margin-top:8px;">
+        <button type="button" onclick="closeContactModal()" style="padding:10px 20px;border:1px solid #d1d5db;background:#fff;border-radius:8px;font-size:14px;cursor:pointer;color:#374151;">Cancelar</button>
+        <button type="submit" id="contactSubmitBtn" style="padding:10px 24px;background:linear-gradient(135deg,#8b5cf6,#ec4899);border:none;border-radius:8px;font-size:14px;color:#fff;font-weight:600;cursor:pointer;transition:opacity 0.2s;">Enviar Solicitud</button>
+      </div>
+    </form>
+    <!-- Success state (hidden initially) -->
+    <div id="contactSuccess" style="display:none;padding:48px 32px;text-align:center;">
+      <div style="width:64px;height:64px;border-radius:50%;background:#dcfce7;display:flex;align-items:center;justify-content:center;margin:0 auto 16px;">
+        <svg width="32" height="32" viewBox="0 0 24 24" fill="none" stroke="#16a34a" stroke-width="2.5"><polyline points="20 6 9 17 4 12"/></svg>
+      </div>
+      <h3 style="margin:0 0 8px;font-size:20px;font-weight:700;color:#111827;">¡Solicitud Recibida!</h3>
+      <p style="color:#6b7280;font-size:14px;max-width:360px;margin:0 auto 20px;">Hemos recibido tu solicitud. Nuestro equipo se pondrá en contacto contigo para agendar una llamada de diagnóstico.</p>
+      <div style="background:#f9fafb;border-radius:10px;padding:16px;max-width:320px;margin:0 auto 24px;text-align:left;font-size:13px;color:#374151;">
+        <p style="font-weight:600;margin:0 0 8px;">Próximos pasos:</p>
+        <p style="margin:4px 0;">📅 Te contactaremos en 24-48h hábiles</p>
+        <p style="margin:4px 0;">📞 Llamada de diagnóstico</p>
+        <p style="margin:4px 0;">📄 Presupuesto formal</p>
+      </div>
+      <button onclick="closeContactModal()" style="padding:10px 24px;background:linear-gradient(135deg,#8b5cf6,#ec4899);border:none;border-radius:8px;font-size:14px;color:#fff;font-weight:600;cursor:pointer;">Entendido</button>
+    </div>
+  </div>
+</div>
+<style>
+  @keyframes modalIn { from { opacity:0; transform:translateY(20px) scale(0.97); } to { opacity:1; transform:translateY(0) scale(1); } }
+  #contactModal input:focus, #contactModal textarea:focus, #contactModal select:focus { box-shadow: 0 0 0 3px rgba(139,92,246,0.1); }
+  @media (max-width: 640px) {
+    #contactModal > div { margin: 16px auto; }
+    #contactModal form div[style*="grid-template-columns"] { grid-template-columns: 1fr !important; }
+  }
+</style>
+<script>
+  // Supabase config for landing page
+  var SUPABASE_URL = 'https://pjcfncnydhxrlnaowbae.supabase.co';
+  var SUPABASE_ANON_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InBqY2ZuY255ZGh4cmxuYW93YmFlIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NjEwNDM5MjAsImV4cCI6MjA3NjYxOTkyMH0.TUK35RTVDRfu2kmV8V8rArWebgBA2IMe1-iYSfISLAI';
+
+  function openContactModal(e) {
+    if (e) e.preventDefault();
+    document.getElementById('contactModal').style.display = 'block';
+    document.body.style.overflow = 'hidden';
+  }
+
+  function closeContactModal() {
+    document.getElementById('contactModal').style.display = 'none';
+    document.body.style.overflow = '';
+    // Reset form after animation
+    setTimeout(function() {
+      document.getElementById('contactForm').style.display = 'block';
+      document.getElementById('contactSuccess').style.display = 'none';
+      document.getElementById('contactForm').reset();
+    }, 300);
+  }
+
+  // Close on backdrop click
+  document.getElementById('contactModal').addEventListener('click', function(e) {
+    if (e.target === this) closeContactModal();
+  });
+
+  // Close on Escape
+  document.addEventListener('keydown', function(e) {
+    if (e.key === 'Escape') closeContactModal();
+  });
+
+  async function submitContactForm(e) {
+    e.preventDefault();
+    var btn = document.getElementById('contactSubmitBtn');
+    btn.disabled = true;
+    btn.textContent = 'Enviando...';
+    btn.style.opacity = '0.7';
+
+    var form = document.getElementById('contactForm');
+    var fd = new FormData(form);
+
+    var payload = {
+      contact_name: fd.get('contact_name'),
+      contact_email: fd.get('contact_email'),
+      contact_phone: fd.get('contact_phone') || null,
+      company_name: fd.get('company_name') || null,
+      subject: fd.get('subject'),
+      description: fd.get('description'),
+      bot_objectives: fd.get('bot_objectives') || null,
+      preferred_schedule: fd.get('preferred_schedule') || null,
+      status: 'solicitud'
+    };
+
+    try {
+      var res = await fetch(SUPABASE_URL + '/rest/v1/bot_implementation_requests', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'apikey': SUPABASE_ANON_KEY,
+          'Authorization': 'Bearer ' + SUPABASE_ANON_KEY,
+          'Prefer': 'return=minimal'
+        },
+        body: JSON.stringify(payload)
+      });
+      if (!res.ok) throw new Error('Error ' + res.status);
+      form.style.display = 'none';
+      document.getElementById('contactSuccess').style.display = 'block';
+    } catch (err) {
+      alert('Error al enviar la solicitud. Por favor intenta nuevamente o escríbenos a digitalsolutionsfp@gmail.com');
+      console.error(err);
+    } finally {
+      btn.disabled = false;
+      btn.textContent = 'Enviar Solicitud';
+      btn.style.opacity = '1';
+    }
+  }
+</script>
 </body>
 </html>
 
