@@ -153,7 +153,7 @@
 
 ### Backend (Supabase) 📡
 - [ ] Deployar `ai-assistant-stream` Edge Function
-- [ ] Verificar LOVABLE_API_KEY en secrets
+
 - [ ] Test de health check con curl
 - [ ] Verificar logs sin errores
 

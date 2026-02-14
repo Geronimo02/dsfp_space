@@ -38,7 +38,7 @@ Sistema de respuestas progresivas para el Asistente IA utilizando **Server-Sent 
 
 ```typescript
 // Key points:
-1. Request con stream: true a Lovable AI Gateway
+
 2. ReadableStream que procesa chunks del servidor
 3. Parsing de eventos SSE (data: {...})
 4. Reenvío progresivo al cliente
@@ -213,7 +213,7 @@ done
 
 ### Pre-requisitos
 ```bash
-# 1. Verificar que LOVABLE_API_KEY está configurada
+
 supabase secrets list
 
 # 2. Deployar nueva función
@@ -262,7 +262,7 @@ Si se detectan problemas:
 
 ### OpenAI Streaming
 - [OpenAI Streaming Guide](https://platform.openai.com/docs/api-reference/streaming)
-- [Lovable AI Gateway Docs](https://docs.lovable.dev/ai-gateway)
+
 
 ---
 

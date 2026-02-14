@@ -5,7 +5,7 @@
 ### Backend (Supabase Edge Functions)
 - Supabase CLI instalado: `npm install -g supabase`
 - Proyecto Supabase configurado
-- LOVABLE_API_KEY configurada en secrets
+
 
 ### Frontend (React + Vite)
 - Node.js 18+
@@ -21,8 +21,8 @@
 # Verificar secrets actuales
 supabase secrets list
 
-# Configurar LOVABLE_API_KEY si no existe
-supabase secrets set LOVABLE_API_KEY=your_lovable_api_key_here
+
+
 
 # Verificar que existen (deben estar ya configuradas)
 # SUPABASE_URL
@@ -116,7 +116,7 @@ vercel --prod
 
 ### Backend ✓
 - [ ] Edge Function `ai-assistant-stream` deployada
-- [ ] LOVABLE_API_KEY configurada en secrets
+
 - [ ] CORS headers funcionando (OPTIONS request exitoso)
 - [ ] Test de streaming exitoso con curl
 - [ ] Logs de la función sin errores
